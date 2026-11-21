@@ -13,7 +13,7 @@ Updated: 2026-11-21 21:50, by Michał (via Claude, session "korpus").
 
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
-not → each checkable claim runs Fact Check and web search in parallel, then rerank and judge, verdict set in code (`prawdowid/pipeline.py`); non-checkable claims are
+not → each checkable claim runs Fact Check, EUvsDisinfo, the www.gov.pl site search and web search in parallel, then rerank and judge, verdict set in code (`prawdowid/pipeline.py`); non-checkable claims are
 `nie podlega weryfikacji`. Without keys and a corpus, every source fails and checkable claims come back `nie sprawdzono`. Links (#4, on `main` as #28): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls (incl. inline sign-in or subscribe walls), social media, URLs with a login or password, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Each check is kept as one masked record in the check log (#17); each link check logs URL (secret query values, userinfo and fragment redacted, also in the answer), content hash, claims and result to stdout.
 
 **Evidence corpus** (branch `claude/corpus-455bc1`, not merged, not wired into `verify()` yet): `make corpus`
@@ -104,6 +104,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Decisions
 
+- 2026-11-21: **User decision:** the www.gov.pl site search (`prawdowid/govpl.py`, the site's own undocumented `/api/data/search`, stability UNCONFIRMED) is a step 2 lookup next to Fact Check, EUvsDisinfo and web search, on by default (`PRAWDOWID_GOVPL=0` switches it off). Web search drops www.gov.pl hits in code while it is on; Tavily's `exclude_domains` is not used because it also drops sejm.gov.pl and every other *.gov.pl site.
 - 2026-11-21: Step 2c (own database, #19) is out of the pipeline for now (user decision): `verify()` runs only 2a and 2b before rerank and judge.
 - 2026-11-21: Time budget (#11). One deadline for the whole check, `PRAWDOWID_CHECK_BUDGET_S` (25 s, the API gives up at 60 s). A claim cut by it, or whose two sources (2a, 2b) both failed, gets the new `Verdict.NOT_CHECKED` (`nie sprawdzono`) with the reason in limitations: it is a marker, not a verdict. Retry query is the claim text (no HyDE-FC, which costs a model call). Defaults are UNCONFIRMED guesses, not tuned.
 - 2026-11-21: **User decision:** step 2c disabled until licensed sources are chosen. The #19 store, migration, compose service and seed script stay in the repo, but `verify()` does not call `search_documents`, checks never write to the database, and the backend runs without Postgres. (#19)
@@ -194,6 +195,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): gov.pl site search as an evidence source on `LukiLenkiewicz/govpl-search`: `prawdowid/govpl.py` (search per gov.pl query, top 5 pages through the safe fetch, publisher from the unit path, date from `publishDate`, limitation on failure), wired into the per-claim fan-out, extraction writes `govpl_queries`, web search leaves www.gov.pl to it; live smoke on 3 government claims (no eval, user decision).
 - 2026-11-21 Łukasz (Claude worker): CodeRabbit full review of main (PR #46) triaged on `fix/coderabbit-main`: 9 fixed with tests (deploy record, canary scan, self-contradiction context, dedupe signs and provenance, cache write, deletion race, session storage, deploy keys doc), 2 not bugs (EUvsDisinfo as one of two origins, http links with secret params), J01/J02 fault switch deferred (coordinator).
 - 2026-11-21 Michał: web UI polish: legend as tiles with the first words of each answer, test-version pill, input hint/counter and the footer's MSZ sentences removed (Michał's call).
 - 2026-11-21 Michał (session korpus): corpus search on `claude/corpus-455bc1`: `prawdowid/index.py` (incremental load into Postgres, model change rebuilds), `prawdowid/corpus_search.py` (pgvector + full-text, reciprocal rank fusion, two chunks per document, limitation on failure), `prawdowid/embeddings.py` (fastembed, e5-large, local); tests against a real Postgres with pgvector when `TEST_DATABASE_URL` is set; `make index`, image carries the corpus, `models` volume.

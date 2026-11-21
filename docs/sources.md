@@ -4,6 +4,29 @@ The committed evidence corpus (`corpus/evidence.jsonl`, built without any key fr
 catalogue of official sources and fact-checkers, searched by `prawdowid/corpus_search.py`) is
 described separately in [`docs/corpus.md`](corpus.md). This page covers web search and its cache.
 
+## www.gov.pl site search (`prawdowid/govpl.py`)
+
+Step 2 also searches www.gov.pl itself, next to Fact Check, EUvsDisinfo and web search, when
+`PRAWDOWID_GOVPL` is `1` (the default; `0` switches it off).
+
+| What | Detail |
+|---|---|
+| Endpoint | `GET https://www.gov.pl/api/data/search?query=<q>&page=1&size=5`: the search endpoint used by the www.gov.pl site itself (undocumented). No key. Not a published public API; its **stability is UNCONFIRMED** and it may change or go away without notice. |
+| Why it qualifies | Pages under `www.gov.pl/web/<unit>` are published by ministries and central offices (RCB, MSWiA, KG PSP, GIS, MON, MI, MSZ, KPRM and others): primary `official` sources. Publisher is the unit from the hit's `path` (or the name the page gives itself), publication date is the hit's `publishDate`. |
+| How we use it | One search per gov.pl query of a claim (the extraction model writes 1 or 2 keyword queries for claims about the Polish government, capped at 2 in code; otherwise the claim's first web query), at most 5 pages fetched per claim through the same safe fetch as web search (allowlist, public IPs only, robots.txt, 2 MB cap, trafilatura). Our usual User-Agent, an 8 s timeout and one retry on a network error or 5xx, at most 2 searches and 3 page fetches to gov.pl at a time, non-empty search answers cached in process for 10 minutes. A 403, 429 or login is never retried or worked around. |
+| On failure | A limitation on the claim ("Wyszukiwarka serwisu gov.pl nie odpowiedziała"), never a verdict. |
+| robots.txt | `User-Agent: * / Allow: /` (checked 2026-11-21). |
+| Licence | Public sector information; re-use under the Polish act on open data and re-use of public sector information (ustawa z 11.08.2021) and the gov.pl terms: **UNCONFIRMED**, nobody has checked the gov.pl terms yet. We quote short passages with a link, as for every other source. |
+
+Web search leaves `www.gov.pl` (and bare `gov.pl`) pages to this lookup while it is on, so the same
+page is not searched twice. The filter is on the host in our code, not Tavily's `exclude_domains`:
+Tavily drops a `www.` prefix, so excluding `www.gov.pl` there also dropped `sejm.gov.pl` and every
+other `*.gov.pl` site (tested 2026-11-21). While filtering, web search asks Tavily for twice the
+results (10) and keeps the first 5 left, since www.gov.pl pages can fill most of a result list. Other `*.gov.pl` sites (Sejm, GUS, PKW, NIK) are not
+covered by the gov.pl search and stay in web search.
+
+## Web search
+
 Web search (step 2b, `prawdowid/websearch.py`) only returns pages from the domains below. A host
 matches its own entry or the closest parent entry (`nik.gov.pl` falls under `gov.pl`). The list
 lives in `ALLOWLIST`; `tests/test_websearch.py` fails when a domain there is missing here.

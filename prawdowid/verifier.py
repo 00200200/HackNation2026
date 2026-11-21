@@ -202,8 +202,15 @@ Return in claims the {MAX_CHECKED_CLAIMS} highest-ranked claims, in rank order, 
   rhetorical question, or wish.
 - reason: one sentence in Polish saying only why the claim is or is not checkable. Never state or
   hint whether it is true.
-- queries: for a checkable claim, {QUERIES_PER_CLAIM} short search queries in Polish that would find
-  sources confirming or refuting it; vary the wording and the names used. Empty if not checkable.
+- queries: for a checkable claim, {QUERIES_PER_CLAIM} short web search queries in Polish that would
+  find sources confirming or refuting it; vary the wording and the names used. Empty if not
+  checkable. The web search already leaves out www.gov.pl, so never aim these at it: no "gov.pl",
+  "site:" or "portal gov.pl" in them.
+- govpl_queries: when the claim is about a fact of the Polish government or its offices (an official
+  statement, a regulation or law, an RCB alert, ministry data or decisions, a public service
+  announcement), 1 or 2 queries for the search box of the www.gov.pl portal: a few plain keywords,
+  such as the office and the subject ("RCB alert powódź", "MSWiA dowód osobisty"), no full
+  sentences, no operators. They do not repeat the web queries. Empty for any other claim.
 
 Return in other_claims every remaining claim, in rank order, as one short self-contained sentence
 each. Leave none out: they are shown to the user as not checked.
@@ -223,6 +230,9 @@ class ExtractedClaim(BaseModel):
     checkable: bool
     reason: str
     queries: list[str]
+    # Keyword queries for the www.gov.pl site search (`govpl`); empty when the claim is not about
+    # the Polish government.
+    govpl_queries: list[str] = []
 
 
 class Extraction(BaseModel):
@@ -401,7 +411,9 @@ async def verify_text(
     )
     checks = await asyncio.gather(
         *(
-            pipeline.check_claim(c.claim, c.queries, deadline, exclude_url)
+            pipeline.check_claim(
+                c.claim, c.queries, deadline, exclude_url, c.govpl_queries
+            )
             if c.checkable
             else asyncio.sleep(0)
             for c in checked_claims(result.output)

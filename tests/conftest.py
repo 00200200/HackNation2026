@@ -12,6 +12,10 @@ def offline_sources(monkeypatch):
     monkeypatch.delenv("GOOGLE_FACTCHECK_API_KEY", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("EUVSDISINFO_API_KEY", raising=False)
+    # gov.pl needs no key: off unless a test turns it on with a fake transport or search.
+    from prawdowid import govpl
+
+    monkeypatch.setattr(govpl, "ENABLED", False)
 
 
 @pytest.fixture(autouse=True)

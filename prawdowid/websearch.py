@@ -195,14 +195,32 @@ async def search_web(
     provider: SearchProvider = tavily_search,
     transport: httpx2.AsyncBaseTransport | None = None,  # tests only
     save: bool = True,
+    skip_hosts: frozenset[str] = frozenset(),
 ) -> WebSearch:
-    """Search allowlisted domains, fetch and extract every hit, cache what was read."""
-    hits = await _search(mask_personal_data(query), domains, limit, provider)
+    """Search allowlisted domains, fetch and extract every hit, cache what was read.
+
+    `skip_hosts`: hosts another lookup covers (www.gov.pl, by `govpl`). Filtered here, not with
+    Tavily's `exclude_domains`: Tavily drops the `www.` prefix, so excluding www.gov.pl there also
+    drops sejm.gov.pl, stat.gov.pl and every other *.gov.pl site (tested live 2026-11-21).
+    """
+    # Skipped hosts take result slots (www.gov.pl filled 14 of 15 for a GIS claim on 2026-11-21):
+    # ask for twice as many, keep `limit`. One Tavily basic search costs the same either way.
+    hits = await _search(
+        mask_personal_data(query), domains, limit * 2 if skip_hosts else limit, provider
+    )
     if hits is None:
         return WebSearch(limitation=SEARCH_UNAVAILABLE)
     by_url = {h.url: h for h in hits if allowed(h.url)}
     if not by_url:
         return WebSearch(limitation=SEARCH_UNAVAILABLE)
+    by_url = {
+        u: h
+        for u, h in by_url.items()
+        if (urlsplit(u).hostname or "").lower() not in skip_hosts
+    }
+    if not by_url:  # every hit is covered by another lookup: an answer, not a failure
+        return WebSearch()
+    by_url = dict(list(by_url.items())[:limit])
 
     async with safefetch.client(FETCH_TIMEOUT_S, transport) as http:
         docs = await asyncio.gather(
