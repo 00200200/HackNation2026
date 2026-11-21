@@ -9,7 +9,7 @@ Rules and jury criteria: `.claude/skills/hacknation-judging/SKILL.md`. Metrics: 
 
 ## Now (snapshot, edit in place)
 
-Updated: 2026-11-21 13:30, by Łukasz (via Claude).
+Updated: 2026-11-21 17:15, by Michał (via Claude).
 
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
@@ -20,8 +20,8 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 
 | Branch | State |
 |---|---|
-| `main` / `origin/main` | at `d5aa35b` (pre-push gate). Local `main` is behind: `git pull` before branching. |
-| `feat/llm-verifier` | PydanticAI verifier (`b52c248`), prompt tweaks (`c27b642`), worklog, eval results. Pushed to `origin/feat/llm-verifier`, not merged into `main`. |
+| `main` / `origin/main` | at `7ee1410`: skeleton (#1), PydanticAI verifier (#2), worklog and eval results (#3). |
+| `feat/ui-frontend` | ADR 0001, brand files, new web UI (`04d27db`), merged `feat/eval-cases` (`80a3ee0`). Pushed to `origin/feat/ui-frontend`, not merged into `main`. Backend unchanged. |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
 **Last eval** (`evals/results/latest.json`, quick, 4 example cases, commit `c27b642`, does not count for submission):
@@ -35,7 +35,7 @@ Every case returns `brak wystarczających dowodów`: expected while there are no
 
 Basic requirements first: the jury gives no points for extras if one of these is missing.
 
-- [ ] Merge `feat/llm-verifier` into `main` (pushed, needs a PR and a team OK). Owner: Łukasz
+- [x] Merge `feat/llm-verifier` into `main`: done as #2 (`390d483`). Owner: Łukasz
 - [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: ?
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
 - [ ] Second channel (Discord or other allowed one; not Telegram/WeChat) on the same `verify()`. Owner: ?
@@ -73,6 +73,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał: pushed `feat/ui-frontend` (UI, ADR, brand, eval set) after a judge check; no eval rerun, the API code is unchanged and this clone has no model key.
 - 2026-11-21 Michał: `feat/ui-frontend` merged `feat/eval-cases`; new web UI (`04d27db`): poster hero, detective logo, verdict card with sources before the model's assessment, honest "Wersja testowa" label until sources are connected.
 - 2026-11-21 Michał: `feat/ui-frontend` ADR 0001 (retrieval and verdict flow, mentor's answer format), brand files in `docs/brand/`.
 - 2026-11-21 Michał: `feat/eval-cases` real eval set, 41 cases A–J with sourced labels (Demagog ClaimReview, NATO, MON, europa.eu).
