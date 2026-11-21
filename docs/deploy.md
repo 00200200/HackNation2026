@@ -185,8 +185,24 @@ journalctl -u faktczyfejk-deploy -n 50 --no-pager
 `db` runs Postgres 18 with pgvector (`pgvector/pgvector:0.8.7-pg18`). Its data lives in the Docker
 volume `db_data`, its port is not published, and the backend gets
 `DATABASE_URL=postgresql://USER:PASSWORD@db:5432/DB` from `compose.prod.yaml`. On the first start
-with an empty volume Postgres creates the `vector` and `pg_trgm` extensions. The application does
-not use the database yet: tables and loading the corpus come with the search work.
+with an empty volume Postgres creates the `vector` and `pg_trgm` extensions.
+
+### Search index
+
+The corpus search (`prawdowid/corpus_search.py`) reads the tables `corpus_documents` and `corpus_chunks` (an
+embedding per chunk with an HNSW index, a full-text vector with a GIN index). They are built from
+`corpus/evidence.jsonl`, which is part of the backend image. After a deploy that changes the corpus,
+load it once:
+
+```bash
+docker compose exec backend python -m prawdowid.index corpus/evidence.jsonl
+```
+
+The first run downloads the embedding model (`intfloat/multilingual-e5-large`, about 2.2 GB) into
+the `models` volume and embeds every chunk; later runs embed only documents that changed and
+delete the ones that left the corpus. The model needs about 3 GB of memory while it runs, in the
+indexer, and in the backend once the first corpus search has loaded it (the backend loads it
+only when corpus search is first called, not at startup).
 
 On the server, in `/opt/faktczyfejk`. Backups go to `~/backups`, outside the checkout:
 
@@ -217,6 +233,7 @@ docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB
 ## Where data is processed
 
 - Web server, API, database and logs: OVHcloud VPS in Limburg, Germany.
+- Corpus search embeddings: computed on the same server with a local model; no external service.
 - The text of each check goes to the Anthropic API for claim extraction.
 
 ## Try the production setup locally

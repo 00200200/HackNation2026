@@ -39,6 +39,9 @@ services:
   backend:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      # Embedding model files (about 2.2 GB), kept between deploys. See "Search index" in docs/deploy.md.
+      - models:/models
     depends_on:
       db:
         condition: service_healthy
@@ -86,3 +89,4 @@ volumes:
   caddy_data:
   caddy_config:
   db_data:
+  models:

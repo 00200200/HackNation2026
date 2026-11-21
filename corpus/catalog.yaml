@@ -1,0 +1,516 @@
+# Source catalogue of faktczyfejk.pl: the auditable list behind corpus/evidence.jsonl.
+# Rebuild the corpus from it with `make corpus`. Description for the jury: docs/corpus.md.
+#
+# status: active    collected into the corpus
+#         live_only queried when a claim is checked, nothing stored
+#         candidate fits the rules, not collected yet (the note says what is missing)
+#         excluded  not used; stays here with the reason and the date
+# Licences, terms and robots.txt were read on the live sites on 2026-11-21.
+
+rules:
+  admit:
+    - Official Polish or EU bodies publishing under their own name (ministries, agencies, services, Sejm, EU institutions).
+    - Fact-checkers with a current IFCN or EFCSN status, read on the network's own member page; the entry records the date.
+    - The incident base named by the organiser (EUvsDisinfo).
+    - Every entry needs terms that allow at least a short fragment with a link, and a way to fetch it without going around robots.txt, a login, a paywall or bot protection.
+  storage:
+    - Full text only under a licence or terms that allow it (CC BY-SA 4.0, reuse with attribution, legal acts outside copyright). Each document carries its licence.
+    - Otherwise metadata, a fragment of at most 500 characters and the link.
+    - No images, audio or video. E-mail addresses are masked. Job adverts are skipped (they list contact persons and are not evidence).
+    - Who made a claim, and where, is stored only for public statements of public figures (Demagog's statements section), never for posts of private people.
+  update:
+    - Each entry has an update interval. `make corpus` fetches again every list, feed and API answer older than that interval; article pages stay cached until `make corpus ARGS=--refresh`. At most about one request per second per registered domain, with a generic User-Agent.
+    - A source that fails or is blocked keeps its records from the previous build, and the manifest says so. A build that misses a threshold writes nothing.
+    - Every document keeps its own publication date (null when the page states none) and retrieval time.
+    - Licence, terms and IFCN or EFCSN status are read again when an entry is added and before a release.
+  exclude:
+    - "robots.txt disallows the path, the site answers with a bot challenge or refuses automated clients, or the content exists only in a script-rendered app. Exception, recorded in the entry: an official portal whose own pages load the content from a public JSON endpoint without a login; then we read that JSON."
+    - The source is dead or blocked for longer than one update interval, loses its IFCN or EFCSN status, or changes its terms so that a fragment may no longer be stored.
+    - Excluded entries stay in this file with the reason and the date. A single document is removed by adding it to `removed_urls` and rebuilding.
+
+# Documents removed on request or after a correction: {url, reason, removed_on}.
+removed_urls: []
+
+x-shared:
+  govpl: &govpl
+    domain: www.gov.pl
+    source_type: official
+    licence: CC BY-SA 4.0 (treści tekstowe serwisu gov.pl, bez materiałów audiowizualnych)
+    licence_url: https://www.gov.pl/  # stated in the footer of every page
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: server-rendered news list (?page=N&size=10), article pages
+    update_interval: 24h
+    added: 2026-11-21
+    status: active
+    collector: news_list
+  govpl_pages: &govpl_pages
+    domain: www.gov.pl
+    source_type: official
+    licence: CC BY-SA 4.0 (treści tekstowe serwisu gov.pl, bez materiałów audiowizualnych)
+    licence_url: https://www.gov.pl/
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: single information pages
+    update_interval: 7d
+    added: 2026-11-21
+    status: active
+    collector: pages
+  policja: &policja
+    source_type: official
+    licence: "Zasady serwisu: wykorzystanie materiałów z podaniem źródła (policja.pl); utwory osób trzecich wyłączone"
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: server-rendered news list (?page=N, from 0), article pages
+    update_interval: 24h
+    added: 2026-11-21
+    status: active
+    collector: news_list
+  blocked: &blocked
+    licence: not checked (no access)
+    storage: none
+    access: none
+    update_interval: "-"
+    added: 2026-11-21
+    status: excluded
+    excluded_on: 2026-11-21
+
+sources:
+  # ---- Official and primary sources: www.gov.pl ------------------------------------------
+  - <<: *govpl
+    id: govpl-rcb
+    publisher: Rządowe Centrum Bezpieczeństwa
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/rcb/komunikaty?page={page}&size=10", pages: 6}
+  - <<: *govpl
+    id: govpl-msz
+    publisher: Ministerstwo Spraw Zagranicznych
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/dyplomacja/aktualnosci?page={page}&size=10", pages: 5}
+  - <<: *govpl
+    id: govpl-mswia
+    publisher: Ministerstwo Spraw Wewnętrznych i Administracji
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/mswia/aktualnosci?page={page}&size=10", pages: 3}
+  - <<: *govpl
+    id: govpl-kgpsp
+    publisher: Komenda Główna Państwowej Straży Pożarnej
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/kgpsp/aktualnosci?page={page}&size=10", pages: 3}
+  - <<: *govpl
+    id: govpl-mon
+    publisher: Ministerstwo Obrony Narodowej
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/obrona-narodowa/aktualnosci5?page={page}&size=10", pages: 2}
+  - <<: *govpl
+    id: govpl-gis
+    publisher: Główny Inspektorat Sanitarny
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/gis/ostrzezenia?page={page}&size=10", pages: 5}
+  - <<: *govpl
+    id: govpl-mi
+    publisher: Ministerstwo Infrastruktury
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/infrastruktura/aktualnosci?page={page}&size=10", pages: 2}
+  - <<: *govpl
+    id: govpl-kprm
+    publisher: Kancelaria Prezesa Rady Ministrów
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/premier/wydarzenia?page={page}&size=10", pages: 3}
+  - <<: *govpl
+    id: govpl-paa
+    publisher: Państwowa Agencja Atomistyki
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/paa/aktualnosci2?page={page}&size=10", pages: 2}
+  - <<: *govpl
+    id: govpl-mz
+    publisher: Ministerstwo Zdrowia
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/zdrowie/wiadomosci?page={page}&size=10", pages: 2}
+  - <<: *govpl
+    id: govpl-mc
+    publisher: Ministerstwo Cyfryzacji
+    params: {parser: govpl, list_url: "https://www.gov.pl/web/cyfryzacja/wiadomosci?page={page}&size=10", pages: 3}
+  - <<: *govpl_pages
+    id: govpl-rcb-pages
+    publisher: Rządowe Centrum Bezpieczeństwa
+    update_interval: 24h
+    params: {urls: ["https://www.gov.pl/web/rcb/raport-dobowy3"]}
+  - <<: *govpl_pages
+    id: govpl-mswia-pages
+    publisher: Ministerstwo Spraw Wewnętrznych i Administracji
+    params: {urls: ["https://www.gov.pl/web/mswia/regionalny-system-ostrzegania"]}
+  - <<: *govpl_pages
+    id: govpl-mi-pages
+    publisher: Ministerstwo Infrastruktury
+    params:
+      urls:
+        - https://www.gov.pl/web/infrastruktura/prawa-pasazerow
+        - https://www.gov.pl/web/infrastruktura/infolinia-dla-obywatela
+  - <<: *govpl_pages
+    id: govpl-gddkia-pages
+    publisher: Generalna Dyrekcja Dróg Krajowych i Autostrad
+    params: {urls: ["https://www.gov.pl/web/gddkia/informacja-drogowa---19-111"]}
+  - <<: *govpl_pages
+    id: govpl-wody-pages
+    publisher: Państwowe Gospodarstwo Wodne Wody Polskie
+    params: {urls: ["https://www.gov.pl/web/wody-polskie/komunikaty-nawigacyjne"]}
+
+  # ---- Official and primary sources: other domains ---------------------------------------
+  - id: cert-komunikaty
+    domain: moje.cert.pl
+    publisher: CERT Polska (NASK)
+    source_type: official
+    licence: CC BY-SA 4.0 (komunikaty bezpieczeństwa, o ile nie zaznaczono inaczej)
+    licence_url: https://moje.cert.pl/komunikaty/
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: server-rendered list /komunikaty/?page=N, advisory pages
+    update_interval: 24h
+    added: 2026-11-21
+    status: active
+    note: robots.txt allows only /, /komunikaty/ and /faq/. The RSS feed /advisories/feed/ is disallowed, so it is not used.
+    collector: news_list
+    params: {parser: cert, list_url: "https://moje.cert.pl/komunikaty/?page={page}", pages: 29}
+  - <<: *policja
+    id: policja-kgp
+    domain: policja.pl
+    publisher: Komenda Główna Policji
+    licence_url: https://policja.pl/pol/wolnytekst/46616,dok.html
+    params: {parser: policja, list_url: "https://policja.pl/pol/aktualnosci?page={page}", first_page: 0, pages: 4}
+  - <<: *policja
+    id: policja-mazowiecka
+    domain: mazowiecka.policja.gov.pl
+    publisher: Komenda Wojewódzka Policji z siedzibą w Radomiu
+    licence_url: https://mazowiecka.policja.gov.pl/ra/wolnytekst/10,Prawa-autorskie.html
+    params: {parser: policja, list_url: "https://mazowiecka.policja.gov.pl/ra/aktualnosci/aktualnosci?page={page}", first_page: 0, pages: 2}
+  - id: sejm-eli
+    domain: api.sejm.gov.pl
+    publisher: Kancelaria Sejmu, Internetowy System Aktów Prawnych (Dziennik Ustaw)
+    source_type: official
+    licence: Akty normatywne nie są przedmiotem prawa autorskiego (art. 4 pkt 1 ustawy o prawie autorskim i prawach pokrewnych)
+    licence_url: https://api.sejm.gov.pl/eli/openapi/
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: ELI API without a key (/acts/search, /acts/DU/{year}/{pos}/text.html)
+    update_interval: 7d
+    added: 2026-11-21
+    status: active
+    note: For each phrase below, the act in force whose title ends with it, preferably its newest consolidated text (obwieszczenie o jednolitym tekście); amendments and ratifications are skipped. Only versions with an HTML text (acts from 2025 on are PDF only), so a consolidated text can be older than the latest amendment; its date is kept. Texts are cut at max_chars; the record says so in `truncated`.
+    collector: sejm_eli
+    params:
+      max_chars: 30000
+      titles:
+        - ochronie ludności i obronie cywilnej
+        - zarządzaniu kryzysowym
+        - krajowym systemie cyberbezpieczeństwa
+        - zwalczaniu nadużyć w komunikacji elektronicznej
+        - stanie wyjątkowym
+        - stanie klęski żywiołowej
+        - obronie Ojczyzny
+        - ochronie granicy państwowej
+        - otwartych danych i ponownym wykorzystywaniu informacji sektora publicznego
+        - systemie powiadamiania ratunkowego
+        - Państwowej Straży Pożarnej
+        - bezpieczeństwie żywności i żywienia
+        - zapobieganiu oraz zwalczaniu zakażeń i chorób zakaźnych u ludzi
+        - transporcie kolejowym
+        - Prawo lotnicze
+        - Prawo atomowe
+        - ochronie danych osobowych
+        - świadczeniu usług drogą elektroniczną
+        - prawie autorskim i prawach pokrewnych
+        - dostępie do informacji publicznej
+  - id: imgw-warnings
+    domain: danepubliczne.imgw.pl
+    publisher: Instytut Meteorologii i Gospodarki Wodnej – Państwowy Instytut Badawczy
+    source_type: official
+    licence: "Regulamin udostępniania danych IMGW-PIB: nieodpłatnie, z podaniem źródła. „Źródłem pochodzenia danych jest Instytut Meteorologii i Gospodarki Wodnej – Państwowy Instytut Badawczy”. „Dane Instytutu Meteorologii i Gospodarki Wodnej – Państwowego Instytutu Badawczego zostały przetworzone”."
+    licence_url: https://danepubliczne.imgw.pl/
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: public JSON API without a key (/api/data/warningsmeteo, /api/data/warningshydro)
+    update_interval: 1h
+    added: 2026-11-21
+    status: active
+    note: A snapshot of the warnings valid at build time; it goes stale within hours. The answer must show both attribution sentences from the licence. The terms treat ad-funded publication as commercial use, which needs a contract; this service has no ads.
+    collector: imgw_warnings
+    params: {snapshot: true}  # a failed build drops old warnings instead of keeping them
+  - id: eurlex
+    domain: publications.europa.eu
+    publisher: Urząd Publikacji Unii Europejskiej (EUR-Lex)
+    source_type: official
+    licence: "© Unia Europejska. Dokumenty prawne z EUR-Lex można wykorzystywać do celów komercyjnych i niekomercyjnych z podaniem źródła (informacja prawna EUR-Lex, decyzja 2011/833/UE)"
+    licence_url: https://eur-lex.europa.eu/content/legal-notice/legal-notice.html
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: Cellar API of the Publications Office (/resource/celex/{number}, content negotiation); records link to the EUR-Lex page of the act
+    update_interval: 30d
+    added: 2026-11-21
+    status: active
+    note: "The text as first published in the Official Journal, without later amendments, cut at max_chars. The EUR-Lex website itself answers scripted clients with a bot challenge (HTTP 202), so it is not scraped. Acts: ban on RT and Sputnik broadcasts, Digital Services Act, European Media Freedom Act, passenger rights (air, rail, bus, sea)."
+    collector: eurlex
+    params:
+      max_chars: 40000
+      celex: ["32022R0350", "32022R2065", "32024R1083", "32004R0261", "32021R0782", "32011R0181", "32010R1177"]
+  - id: odyseusz
+    domain: odyseusz.gov.pl
+    publisher: Ministerstwo Spraw Zagranicznych (serwis Odyseusz)
+    source_type: official
+    licence: "Materiał urzędowy MSZ (art. 4 pkt 2 ustawy o prawie autorskim i prawach pokrewnych), informacja sektora publicznego. Serwis nie podaje licencji; organizator (MSZ) wskazał go jako źródło do pobierania (mentor, Discord, 21.11.2026)"
+    licence_url: https://odyseusz.gov.pl/o-serwisie/informacje-prawne
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: JSON endpoints called by the portal's own pages (/api/v1/informacje/...); public, not documented
+    update_interval: 6h
+    added: 2026-11-21
+    status: active
+    note: First on the organiser's list and used in the organiser's example answers. The portal is a single-page app; under the exception in rules.exclude the text is read from the public JSON its pages load (no login, no robots.txt rules). Country profiles carry the current MSZ notice and the travel warning level. Consular contact details and flag images are not stored. A country record links to the JSON endpoint, because the address of the rendered country page could not be confirmed without running the app.
+    collector: odyseusz
+    params: {max_chars: 8000}  # the notice and the warning come first
+  - id: gus
+    domain: new.stat.gov.pl
+    publisher: Główny Urząd Statystyczny
+    source_type: official
+    licence: CC BY 4.0 (stopka serwisu GUS)
+    licence_url: https://new.stat.gov.pl/
+    licence_checked: 2026-11-21
+    storage: full_text
+    access: server-rendered news list (?page=N, from 0), article pages
+    update_interval: 24h
+    added: 2026-11-21
+    status: active
+    note: Official statistics news, including GUS warnings about e-mails impersonating the office. The articles are short and mostly link to the statistical releases.
+    collector: news_list
+    params: {parser: gus, list_url: "https://new.stat.gov.pl/aktualnosci?page={page}", first_page: 0, pages: 4}
+  - id: kgsok
+    domain: kgsok.pl
+    publisher: Komenda Główna Straży Ochrony Kolei
+    source_type: official
+    licence: Brak licencji na stronie – metadane, fragment do 500 znaków i link (prawo cytatu, art. 29 pr. aut.)
+    licence_url: https://kgsok.pl/
+    licence_checked: 2026-11-21
+    storage: excerpt
+    access: RSS feed (/feed/, ?paged=N)
+    update_interval: 24h
+    added: 2026-11-21
+    status: active
+    collector: feed
+    params: {feeds: ["https://kgsok.pl/feed/", "https://kgsok.pl/feed/?paged=2", "https://kgsok.pl/feed/?paged=3"]}
+
+  # ---- Reliable secondary sources: fact-checkers -----------------------------------------
+  - &demagog
+    id: demagog-fake-news
+    domain: demagog.org.pl
+    publisher: Stowarzyszenie Demagog
+    source_type: fact_checker
+    licence: "Brak licencji; robots.txt: search=yes, use=reference. Metadane, ocena, fragment do 500 znaków, link"
+    licence_url: https://demagog.org.pl/robots.txt
+    licence_checked: 2026-11-21
+    storage: excerpt
+    access: RSS feed pages (?paged=N) for discovery, then the ClaimReview markup, the summary and the cited links of each page
+    update_interval: 24h
+    added: 2026-11-21
+    status: active
+    note: EFCSN verified member, valid until 2027-05-25 (members.efcsn.com/organization/demagog, read 2026-11-21). IFCN signatory according to Demagog; IFCN's own list could not be read automatically (UNCONFIRMED).
+    collector: claim_reviews
+    params:
+      feeds: ["https://demagog.org.pl/fake_news/feed/"]
+      pages: 15
+      summary_xpath: '//div[contains(@class, "summary-text")]'
+  - <<: *demagog
+    id: demagog-wypowiedzi
+    params:
+      feeds: ["https://demagog.org.pl/wypowiedzi/feed/"]
+      pages: 15
+      summary_xpath: '//div[contains(@class, "summary-text")]'
+      public_claimants: true
+  - <<: *demagog
+    id: demagog-analizy
+    access: RSS feed (title, date and summary)
+    collector: feed
+    params: {feeds: ["https://demagog.org.pl/feed/"], drop: "Artykuł .{0,300}? pochodzi z serwisu Demagog\\s*\\."}
+  - id: pravda
+    domain: pravda.org.pl
+    publisher: Stowarzyszenie Pravda
+    source_type: fact_checker
+    licence: Brak licencji na stronie – metadane, fragment do 500 znaków i link (prawo cytatu, art. 29 pr. aut.)
+    licence_url: https://pravda.org.pl/
+    licence_checked: 2026-11-21
+    storage: excerpt
+    access: RSS feed (/rss/); only the title, date and summary are kept
+    update_interval: 24h
+    added: 2026-11-21
+    status: active
+    note: EFCSN verified member, valid until 2028-02-23 (members.efcsn.com/organization/pravda, read 2026-11-21).
+    collector: feed
+    params: {feeds: ["https://pravda.org.pl/rss/"]}
+  - id: google-factcheck
+    domain: factchecktools.googleapis.com
+    publisher: Google Fact Check Tools (ClaimReview published by the fact-checkers)
+    source_type: fact_checker
+    licence: "Metadane ClaimReview publikowane przez weryfikatorów; Google APIs Terms of Service – przechowujemy twierdzenie, ocenę i link"
+    licence_url: https://developers.google.com/fact-check/tools/api
+    storage: excerpt
+    access: claims:search (languageCode=pl, reviewPublisherSiteFilter); the key goes in a header
+    update_interval: 24h
+    added: 2026-11-21
+    status: active
+    note: Named by the organiser. Needs a key from a Google Cloud project; not run yet, so the response shape is UNVERIFIED against the live API. Only publishers admitted above are queried.
+    collector: google_factcheck
+    requires_env: GOOGLE_FACTCHECK_API_KEY
+    params: {publisher_sites: [demagog.org.pl, pravda.org.pl], max_pages: 3}
+
+  # ---- Incident base -----------------------------------------------------------------------
+  - id: euvsdisinfo
+    domain: euvsdisinfo.eu
+    publisher: EUvsDisinfo (East StratCom Task Force, European External Action Service)
+    source_type: incident_base
+    licence: UNCONFIRMED – do potwierdzenia u organizatora razem z tokenem; do tego czasu tylko fragment do 500 znaków i link
+    licence_url: https://euvsdisinfo.eu/
+    storage: excerpt
+    language: en
+    access: MCP server named by the organiser (streamable HTTP, tool `cases`), token in a header
+    update_interval: 7d
+    added: 2026-11-21
+    status: active
+    note: Named by the organiser. Needs a token (form on euvsdisinfo.eu or a message to the mentor); not run yet, so UNVERIFIED against the live server. Also writes corpus/disinfo_domains.json, the domain list for the neutral warning of ADR 0001 section 5. The website itself answers HTTP 403 to automated clients and is not scraped.
+    collector: euvsdisinfo
+    requires_env: EUVSDISINFO_TOKEN
+    params: {scan_cases: 20000, max_docs: 300, domains_out: corpus/disinfo_domains.json}
+
+  # ---- Queried live, not stored --------------------------------------------------------------
+  - id: gios-air
+    domain: api.gios.gov.pl
+    publisher: Główny Inspektorat Ochrony Środowiska
+    source_type: official
+    licence: not checked (nothing is stored)
+    storage: none
+    access: public JSON API without a key (/pjp-api/v1/rest/...), replaces the API switched off on 2025-06-30
+    update_interval: 1h
+    added: 2026-11-21
+    status: live_only
+    note: Air quality changes hourly, so a stored copy would mislead. Planned as a live lookup (ADR 0001, step 4); not wired into the verifier yet.
+
+  # ---- Fit the rules, not collected yet --------------------------------------------------------
+  - id: nask
+    domain: www.nask.pl
+    publisher: NASK – Państwowy Instytut Badawczy
+    source_type: official
+    licence: "© NASK, wszelkie prawa zastrzeżone – tylko fragment i link"
+    storage: excerpt
+    access: news list rendered on the server, no feed or sitemap
+    update_interval: 24h
+    added: 2026-11-21
+    status: candidate
+    note: Needs its own list parser. The brief names NASK's materials on disinformation as a reference point.
+  - id: ums
+    domain: www.ums.gov.pl
+    publisher: Urząd Morski w Szczecinie
+    source_type: official
+    licence: "© UMS, wszelkie prawa zastrzeżone – tylko fragment i link"
+    storage: excerpt
+    access: single page /bezpieczenstwo-morskie/warunki-zeglugi, no feed or sitemap
+    update_interval: 24h
+    added: 2026-11-21
+    status: candidate
+    note: On the organiser's list. Reachable; needs its own parser.
+  - id: umgdy
+    domain: www.umgdy.gov.pl
+    publisher: Urząd Morski w Gdyni
+    source_type: official
+    licence: not checked
+    storage: excerpt
+    access: WordPress feed /feed/ (empty on 2026-11-21)
+    update_interval: 24h
+    added: 2026-11-21
+    status: candidate
+    note: On the organiser's list. The feed had no entries when checked.
+  - id: oko-press
+    domain: oko.press
+    publisher: Fundacja Ośrodek Kontroli Obywatelskiej OKO
+    source_type: fact_checker
+    licence: not checked
+    storage: excerpt
+    access: RSS feed /feed
+    update_interval: 24h
+    added: 2026-11-21
+    status: candidate
+    note: IFCN or EFCSN status not confirmed on 2026-11-21, so it is not admitted.
+
+  # ---- Excluded --------------------------------------------------------------------------------
+  - <<: *blocked
+    id: govpl-ostrzezenia
+    domain: www.gov.pl
+    publisher: Portal gov.pl (System ostrzeżeń)
+    source_type: official
+    excluded_reason: www.gov.pl/web/gov/ostrzezenia fills its list with a script; the HTML has no warnings and there is no documented API. On the organiser's list.
+  - <<: *blocked
+    id: utk
+    domain: utk.gov.pl
+    publisher: Urząd Transportu Kolejowego
+    source_type: official
+    excluded_reason: "robots.txt: Disallow: / for every client except Googlebot. On the organiser's list."
+  - <<: *blocked
+    id: ulc
+    domain: ulc.gov.pl
+    publisher: Urząd Lotnictwa Cywilnego
+    source_type: official
+    excluded_reason: Bot challenge (Imperva Incapsula) on every page; not bypassed. On the organiser's list.
+  - <<: *blocked
+    id: gddkia-drogi
+    domain: drogi.gddkia.gov.pl
+    publisher: Generalna Dyrekcja Dróg Krajowych i Autostrad
+    source_type: official
+    excluded_reason: Bot challenge (Imperva Incapsula) on every page; not bypassed. The 19 111 information page on www.gov.pl is collected instead. On the organiser's list.
+  - <<: *blocked
+    id: sar
+    domain: www.sar.gov.pl
+    publisher: Morska Służba Poszukiwania i Ratownictwa
+    source_type: official
+    excluded_reason: Bot challenge (Imperva Incapsula) on every page, robots.txt included; not bypassed. On the organiser's list.
+  - <<: *blocked
+    id: straz-graniczna
+    domain: www.strazgraniczna.pl
+    publisher: Komenda Główna Straży Granicznej
+    source_type: official
+    excluded_reason: Bot challenge on the news list; not bypassed.
+  - <<: *blocked
+    id: wojsko-polskie
+    domain: www.wojsko-polskie.pl
+    publisher: Wojsko Polskie
+    source_type: official
+    excluded_reason: The server closed the connection on robots.txt three times; without robots.txt we do not crawl (RFC 9309).
+  - <<: *blocked
+    id: paa-monitoring
+    domain: monitoring.paa.gov.pl
+    publisher: Państwowa Agencja Atomistyki
+    source_type: official
+    excluded_reason: Map application rendered by a script, no text. PAA news is collected from www.gov.pl/web/paa. On the organiser's list.
+  - <<: *blocked
+    id: imgw-apps
+    domain: meteo.imgw.pl
+    publisher: Instytut Meteorologii i Gospodarki Wodnej – Państwowy Instytut Badawczy
+    source_type: official
+    excluded_reason: meteo.imgw.pl, hydro.imgw.pl and baltyk.imgw.pl are script-rendered apps; the same warnings come from the documented API (imgw-warnings). On the organiser's list.
+  - <<: *blocked
+    id: portal-pasazera
+    domain: portalpasazera.pl
+    publisher: PKP Polskie Linie Kolejowe S.A.
+    source_type: official
+    excluded_reason: Timetable search application with all rights reserved; no document-like pages found on 2026-11-21. On the organiser's list.
+  - <<: *blocked
+    id: fakehunter-pap
+    domain: fakehunter.pap.pl
+    publisher: Polska Agencja Prasowa (FakeHunter)
+    source_type: fact_checker
+    excluded_reason: Bot challenge (Imperva Incapsula) on every page, robots.txt included; not bypassed.
+  - <<: *blocked
+    id: afp-sprawdzam
+    domain: factcheck.afp.com
+    publisher: Agence France-Presse (AFP Fact Check)
+    source_type: fact_checker
+    excluded_reason: HTTP 403 for automated clients, robots.txt included.
+  - <<: *blocked
+    id: edmo
+    domain: edmo.eu
+    publisher: European Digital Media Observatory
+    source_type: fact_checker
+    excluded_reason: HTTP 403 for automated clients, robots.txt included.
+  - <<: *blocked
+    id: konkret24
+    domain: konkret24.tvn24.pl
+    publisher: TVN S.A. (Konkret24)
+    source_type: fact_checker
+    licence: "© TVN S.A., zastrzeżenie z art. 25 ust. 1 pkt 1 lit. b ustawy o prawie autorskim"
+    excluded_reason: The page footer reserves further distribution and requires a licence agreement; IFCN or EFCSN status was not confirmed on 2026-11-21.

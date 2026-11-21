@@ -13,7 +13,7 @@ this so the numbers in the PDF and README come from a run anyone can repeat (`ev
 
 ```bash
 PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick          # one case per scenario, before a push
-PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --corpus corpus/docs.jsonl   # full set, before submitting
+PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --corpus corpus/evidence.jsonl   # full set, before submitting
 uv run pytest -q tests/test_eval_metrics.py                                      # metric code only
 ```
 

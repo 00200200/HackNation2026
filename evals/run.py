@@ -1,6 +1,6 @@
 """Runs the Prawdowid eval and writes results.
 
-Usage: uv run python -m evals.run [--quick] [--cases evals/cases.jsonl] [--corpus corpus/docs.jsonl]
+Usage: uv run python -m evals.run [--quick] [--cases evals/cases.jsonl] [--corpus corpus/evidence.jsonl]
 """
 
 from __future__ import annotations
