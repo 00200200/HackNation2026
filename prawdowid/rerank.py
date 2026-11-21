@@ -28,6 +28,7 @@ from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
 from prawdowid.contract import Source
+from prawdowid.factcheck import RATING_PREFIX
 
 log = logging.getLogger("prawdowid")
 
@@ -127,7 +128,8 @@ def split_all(candidates: list[Source], exclude_url: str | None) -> list[Fragmen
 
     The first candidate for a URL keeps its metadata; if it has no text (a fact-check hit is
     title only), it takes the text of a later candidate for the same URL, so the page text step
-    2b fetched is never hidden behind a bare title.
+    2b fetched is never hidden behind a bare title. A fact-check hit's rating fragment keeps the
+    fetched text after it.
     """
     excluded = canonical_url(exclude_url) if exclude_url else None
     docs: dict[str, Source] = {}
@@ -139,6 +141,15 @@ def split_all(candidates: list[Source], exclude_url: str | None) -> list[Fragmen
             docs[doc_id] = source
         elif _has_text(source) and not _has_text(docs[doc_id]):
             docs[doc_id] = docs[doc_id].model_copy(update={"fragment": source.fragment})
+        elif (
+            _has_text(source)
+            and _rating(docs[doc_id])
+            and not _rating(source)
+            and source.fragment not in docs[doc_id].fragment
+        ):
+            # The fact-checker's rating stays first, the fetched review page follows it.
+            text = f"{docs[doc_id].fragment}\n\n{source.fragment}"
+            docs[doc_id] = docs[doc_id].model_copy(update={"fragment": text})
     # ponytail: fixed budget of MAX_DOCUMENTS x MAX_DOC_CHARS (600k chars, ~750 fragments) keeps
     # this synchronous work in milliseconds; past that, raise the caps or move it off the loop.
     return [
@@ -241,6 +252,10 @@ def _recode(part: str) -> str:
     distinct."""
     text = unicodedata.normalize("NFC", unquote(part, errors="surrogateescape"))
     return quote(text, safe="", errors="surrogateescape")
+
+
+def _rating(source: Source) -> bool:
+    return (source.fragment or "").startswith(RATING_PREFIX)
 
 
 def _has_text(source: Source) -> bool:
