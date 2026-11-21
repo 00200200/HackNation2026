@@ -241,3 +241,6 @@ incidents/*
 
 # Corpus build: raw page cache (rebuilt by `make corpus`)
 corpus/.cache/
+
+# eval progress logs (python -m evals.run); latest.json stays committed
+evals/results/*.partial.jsonl
