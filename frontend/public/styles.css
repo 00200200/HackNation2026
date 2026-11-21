@@ -149,7 +149,6 @@ body.checked .ask textarea { min-height: 3.25rem; }
 body.checked .results { flex: 1 0 auto; }
 #result:empty { display: none; }
 #result { margin: 3rem 0; scroll-margin-top: 1rem; }
-.session { margin: 2rem auto 3rem; max-width: 60rem; font-size: .92rem; color: var(--muted); }
 .link-btn { padding: 0; font: inherit; font-weight: 700; color: var(--red-deep); background: none; border: 0;
             text-decoration: underline; cursor: pointer; }
 .link-btn[disabled] { cursor: progress; }

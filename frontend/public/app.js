@@ -374,7 +374,6 @@ input.addEventListener("keydown", (event) => {
 
 // Demo session: the API issues an id on the first check; this tab sends it back and can delete it.
 const SESSION_KEY = "prawdowid-session";
-const sessionNote = document.getElementById("session");
 const sessionStatus = document.getElementById("session-status");
 const deleteSession = document.getElementById("delete-session");
 
@@ -395,7 +394,6 @@ function storeSession(id) {
 function rememberSession(id) {
   if (!id) return;
   storeSession(id);
-  sessionNote.hidden = false;
   deleteSession.hidden = false;
   sessionStatus.textContent = "";
 }
@@ -420,7 +418,7 @@ deleteSession.addEventListener("click", async () => {
   }
 });
 
-if (storedSession()) sessionNote.hidden = false;
+if (storedSession()) deleteSession.hidden = false;
 
 chips.forEach((chip) => chip.addEventListener("click", () => {
   if (busy) return;
