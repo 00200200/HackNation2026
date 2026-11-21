@@ -5,7 +5,6 @@ const count = document.getElementById("count");
 const submit = document.getElementById("submit");
 const result = document.getElementById("result");
 
-const EXAMPLE = "Polska wstąpiła do NATO 12 marca 1999 roku.";
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 
 function el(tag, attrs = {}, ...children) {
@@ -36,11 +35,11 @@ function sourceItem(s) {
 
 function claimCard(c) {
   return el("article", { className: "claim" },
-    el("p", { className: "claim-text", textContent: c.claim }),
+    el("h2", { className: "claim-text", textContent: c.claim }),
     el("p", {}, "Ocena: ",
       el("span", { className: `verdict verdict-${c.verdict}`, textContent: c.verdict_label })),
     el("h3", { textContent: "Uzasadnienie" }), el("p", { textContent: c.reasoning }),
-    el("h3", { textContent: `Siła dowodów: ${c.strength}` }),
+    el("h3", { textContent: "Siła dowodów" }), el("p", { textContent: c.strength }),
     el("h3", { textContent: "Przesłanki" }), list(c.premises),
     el("h3", { textContent: "Źródła" }), el("ul", {}, ...c.sources.map(sourceItem)),
     c.limitations.length ? el("h3", { textContent: "Ograniczenia" }) : null,
@@ -90,9 +89,3 @@ form.addEventListener("submit", async (event) => {
 });
 
 input.addEventListener("input", () => { count.textContent = input.value.length; });
-
-document.getElementById("example").addEventListener("click", () => {
-  input.value = EXAMPLE;
-  count.textContent = EXAMPLE.length;
-  input.focus();
-});

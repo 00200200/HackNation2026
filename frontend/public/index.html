@@ -3,71 +3,77 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Prawdowid – sprawdź wiarygodność informacji</title>
+  <title>Prawdowid – czy to prawda?</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#tresc">Przejdź do treści</a>
 
-  <header class="top">
-    <div class="wrap top-inner">
-      <div class="brand">
-        <span class="flag" aria-hidden="true"></span>
-        <span>
-          <span class="brand-name">Prawdowid</span>
-          <span class="brand-tag">Sprawdź wiarygodność informacji</span>
-        </span>
-      </div>
-      <span class="top-meta">HackNation 2026</span>
+  <div class="servicebar">
+    <div class="wrap">Prototyp · HackNation 2026</div>
+  </div>
+
+  <header class="masthead">
+    <div class="wrap">
+      <a class="logo" href="/">
+        <svg class="logo-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="14" cy="14" r="10" fill="none" stroke="currentColor" stroke-width="3"/>
+          <path d="M9.5 14.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M21.5 21.5l7 7" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+        </svg>
+        Prawdowid
+      </a>
     </div>
   </header>
 
-  <div class="prototype">
-    <div class="wrap">
-      <strong>Wersja testowa.</strong> Weryfikacja nie jest jeszcze podłączona, więc na razie nie
-      dostaniesz oceny.
+  <section class="hero">
+    <div class="wrap narrow">
+      <h1>Sprawdź, zanim podasz dalej</h1>
+      <p>Wklej treść wiadomości, wpisu albo link do artykułu. Dla każdego twierdzenia pokażemy
+        ocenę, uzasadnienie i źródła. W tej wersji testowej weryfikacja nie jest jeszcze
+        podłączona.</p>
     </div>
-  </div>
+  </section>
 
-  <main id="tresc" class="wrap grid">
-    <section class="panel" aria-labelledby="material-title">
-      <div class="panel-head">
-        <h1 id="material-title">Materiał do sprawdzenia</h1>
-        <button type="button" class="btn-ghost" id="example">Pokaż przykład</button>
-      </div>
-
-      <form id="check-form" novalidate>
-        <label for="input">Tekst albo link</label>
-        <textarea id="input" name="input" maxlength="5000" required
-                  aria-describedby="input-hint input-count"
-                  placeholder="Wklej fragment artykułu, wpis albo link do strony…"></textarea>
-        <p class="count" id="input-count" aria-live="off"><span id="count">0</span> / 5000</p>
+  <main id="tresc" class="wrap narrow">
+    <form id="check-form" class="card" novalidate>
+      <label for="input">Co chcesz sprawdzić?</label>
+      <textarea id="input" name="input" maxlength="5000" required
+                aria-describedby="input-hint"></textarea>
+      <div class="form-row">
         <p class="hint" id="input-hint">
-          Linki muszą zaczynać się od http:// lub https://. Nie wpisuj danych osobowych.
+          Tekst albo link (http:// lub https://), do 5000 znaków.
+          Nie wpisuj danych osobowych. <span class="count"><span id="count">0</span>/5000</span>
         </p>
         <button type="submit" class="btn" id="submit">Sprawdź</button>
-        <noscript><p class="hint">Do działania strony potrzebny jest JavaScript.</p></noscript>
-      </form>
-    </section>
+      </div>
+      <noscript><p class="hint">Do działania strony potrzebny jest JavaScript.</p></noscript>
+    </form>
 
-    <section class="panel" aria-labelledby="result-title">
-      <div class="panel-head">
-        <h2 id="result-title">Wynik</h2>
-      </div>
-      <div id="result" aria-live="polite">
-        <div class="empty">
-          <p class="empty-title">Tu pojawi się wynik</p>
-          <p>Dla każdego twierdzenia zobaczysz ocenę, uzasadnienie i źródła.</p>
-        </div>
-      </div>
+    <section id="result" class="result" aria-live="polite" aria-label="Wynik sprawdzenia"></section>
+
+    <section class="legend" aria-labelledby="legend-title">
+      <h2 id="legend-title">Co oznaczają oceny</h2>
+      <dl>
+        <div><dt><span class="verdict verdict-confirmed">potwierdzone</span></dt>
+          <dd>Wiarygodne źródła potwierdzają to twierdzenie.</dd></div>
+        <div><dt><span class="verdict verdict-false">fałszywe</span></dt>
+          <dd>Wiarygodne źródła przeczą temu twierdzeniu.</dd></div>
+        <div><dt><span class="verdict verdict-misleading">wprowadzające w błąd</span></dt>
+          <dd>Część faktów się zgadza, ale całość daje mylny obraz.</dd></div>
+        <div><dt><span class="verdict verdict-insufficient_evidence">brak wystarczających dowodów</span></dt>
+          <dd>Nie ma dość źródeł, żeby to rozstrzygnąć.</dd></div>
+        <div><dt><span class="verdict verdict-not_verifiable">nie podlega weryfikacji</span></dt>
+          <dd>To opinia, prognoza albo coś, czego nie da się sprawdzić faktami.</dd></div>
+      </dl>
     </section>
   </main>
 
   <footer class="foot">
-    <div class="wrap">
-      Prototyp przygotowany na HackNation 2026. Nie jest to oficjalny serwis administracji
-      publicznej.
+    <div class="wrap narrow">
+      Prawdowid to prototyp zbudowany podczas HackNation 2026. Nie jest oficjalnym serwisem
+      administracji publicznej.
     </div>
   </footer>
 </body>
