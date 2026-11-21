@@ -53,8 +53,8 @@ def test_known_claim_returns_its_review_as_a_source():
 
     assert lookup.limitation is None
     [hit] = lookup.hits  # the review without a URL is dropped
-    assert hit.rating == "Fałsz"
-    assert hit.reviewed_claim == "Szczepionki zawierają mikroczipy."
+    assert hit.source.rating == "Fałsz"
+    assert hit.source.reviewed_claim == "Szczepionki zawierają mikroczipy."
     assert hit.source.title == "Mikroczipy w szczepionkach? To fake news"
     assert hit.source.publisher == "Demagog"
     assert hit.source.published_at == date(2021, 3, 4)
