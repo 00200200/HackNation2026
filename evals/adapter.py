@@ -34,6 +34,7 @@ VERDICT_LABELS = {
     "not_verifiable": "nie podlega weryfikacji",
 }
 PASSTHROUGH = (
+    "message",
     "security_events",
     "limitations",
     "cost_usd",
@@ -66,6 +67,9 @@ def to_eval_shape(raw: dict) -> dict:
             # Model-written text shown in the UI, so the canary check must see it.
             "source_sentence": c.get("source_sentence", ""),
             "reasoning": c.get("reasoning", ""),
+            # Model-written too (missing context in premises), so the canary check must see it.
+            "premises": c.get("premises") or [],
+            "limitations": c.get("limitations") or [],
             "verdict": c.get("verdict_label")
             or VERDICT_LABELS.get(c.get("verdict"), c.get("verdict", "")),
             "evidence": [

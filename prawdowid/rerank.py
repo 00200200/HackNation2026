@@ -32,6 +32,12 @@ from prawdowid.contract import Source
 log = logging.getLogger("prawdowid")
 
 # Hyperparameters. First guesses, not tuned.
+# Source types that count on their own in the verdict (`judge.decide`). Other types (web, article,
+# unknown) need a second, independent publisher. Type names follow step 2 (`factcheck.SOURCE_TYPE`)
+# and the tests; the demo corpus labels are UNCONFIRMED.
+RELIABLE_TYPES = {"official", "primary", "fact_check"}
+# A number with its sign and separators ("-10", "1,5", "1.500"), else a word.
+NUMBER_OR_WORD = re.compile(r"[-+\u2212]?\d+(?:[.,]\d+)*|\w+")
 TOP_K = int(os.getenv("PRAWDOWID_RERANK_TOP_K") or 12)
 FRAGMENT_CHARS = int(os.getenv("PRAWDOWID_FRAGMENT_CHARS") or 800)
 # Most fragments sent to the model, taken round-robin across documents: bounds prompt size.
@@ -175,16 +181,24 @@ def interleave(fragments: list[Fragment]) -> list[Fragment]:
 def dedupe(fragments: list[Fragment]) -> list[Fragment]:
     """Drop fragments with the same words as an earlier one (syndicated copies, mirrors).
 
-    Case, punctuation and spacing are ignored; any changed word, number or date keeps both.
+    Case, punctuation and spacing are ignored; any changed word, number, sign, decimal or thousands
+    separator, or date keeps both. Of two copies the one from a reliable source type stays, in the
+    place of the first, so a copy never hides an official source.
     """
-    seen: set[tuple[str, ...]] = set()
+    seen: dict[tuple[str, ...], int] = {}
     kept = []
     for fragment in fragments:
-        words = tuple(re.findall(r"\w+", _text(fragment).casefold()))
+        words = tuple(NUMBER_OR_WORD.findall(_text(fragment).casefold()))
         if words not in seen:
-            seen.add(words)
+            seen[words] = len(kept)
             kept.append(fragment)
+        elif _reliable(fragment) and not _reliable(kept[seen[words]]):
+            kept[seen[words]] = fragment
     return kept
+
+
+def _reliable(fragment: Fragment) -> bool:
+    return fragment.source.source_type in RELIABLE_TYPES
 
 
 TRACKING = re.compile(r"^(utm_|fbclid$|gclid$|mc_)")

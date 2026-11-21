@@ -152,6 +152,16 @@ def test_hits_are_fetched_extracted_and_cached(isolated):
     assert calls == ["sankcje"]
 
 
+def test_a_failed_cache_write_keeps_the_fetched_pages(monkeypatch):
+    def unwritable(doc):
+        raise PermissionError("read-only")
+
+    monkeypatch.setattr(websearch, "save_document", unwritable)
+    provider = provider_returning("https://www.gov.pl/web/kas/sankcje")
+    result = run(provider, {"www.gov.pl/web/kas/sankcje": html()})
+    assert result.limitation is None and len(result.documents) == 1
+
+
 def test_query_is_masked_before_it_leaves():
     calls = []
 

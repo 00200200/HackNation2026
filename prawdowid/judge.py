@@ -30,14 +30,11 @@ from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
 from prawdowid.contract import SecurityEvent, Source, Verdict
-from prawdowid.rerank import Fragment, Ranking
+from prawdowid.rerank import RELIABLE_TYPES, Fragment, Ranking
 
 log = logging.getLogger("prawdowid")
 
-# Source types that count on their own. Other types (web, article, unknown) need a second,
-# independent publisher. Type names follow step 2 (`factcheck.SOURCE_TYPE`) and the tests; the demo
-# corpus labels are UNCONFIRMED.
-RELIABLE_TYPES = {"official", "primary", "fact_check"}
+# Source types that count on their own: `rerank.RELIABLE_TYPES`.
 # Allowlisted reliable secondary reporting (`websearch.ALLOWLIST`, e.g. PAP). Its own finding does
 # not decide a verdict alone, but against a reliable source it shows a conflict (scenario C).
 NEWS = "news"
@@ -329,12 +326,20 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     decisive = [e for e in evidence if _publisher(e) not in undecided]
     supports = [e for e in decisive if e.label.stance is Stance.SUPPORTS]
     refutes = [e for e in decisive if e.label.stance is Stance.REFUTES]
+    both = _publishers(supports) & _publishers(refutes)
     supports, refutes, limitations = _one_side_per_publisher(
         supports, refutes, limitations
     )
     # Only labels still counted: a publisher dropped above cannot decide "misleading" either.
+    dropped = both - _publishers(supports + refutes)
     counted = (
-        supports + refutes + [e for e in decisive if e.label.stance is Stance.CONTEXT]
+        supports
+        + refutes
+        + [
+            e
+            for e in decisive
+            if e.label.stance is Stance.CONTEXT and _publisher(e) not in dropped
+        ]
     )
     context = [e for e in counted if _grounded(e)]
     limitations = limitations + _date_limits(evidence, today)
