@@ -44,7 +44,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
 - [x] Second channel (#13): Discord `/sprawdz` bot, `prawdowid/discord_bot.py`, calls the same `POST /api/checks` with `X-Channel: discord`, branch `LukiLenkiewicz/issue13-discord`. Not run against real Discord (token not used by the worker); eval `channel_consistency` needs `PRAWDOWID_EXTRA_CHANNELS=discord` and multi-channel cases. Owner: Łukasz (Claude worker)
 - [x] Real eval set `evals/cases.jsonl`: 31 cases, scenarios A–E, G, I, J at least twice, labels from Demagog, Konkret24, EUvsDisinfo. Owner: Łukasz (Claude worker). Open: I cases use EUvsDisinfo, not the organiser's incident base (not available to us); EUvsDisinfo blocks automated fetch, so check I01–I03 labels by hand; J cases need a product eval switch to simulate a missing key or limit.
-- [ ] Contract gaps for metrics: `security_events`, `cost_usd` per answer. Owner: ?
+- [x] Contract gaps for metrics (#15): `security_events` (the extraction call flags instructions aimed at the model; event carries no wording) and `cost_usd` per answer (token usage priced by genai-prices through PydanticAI; 0.0 when no request was sent, null when unknown). Web and Discord show a notice when an event is logged. Not measured with a real key yet. Branch `LukiLenkiewicz/issue15-contract-metrics`. Owner: Łukasz (Claude worker)
 - [ ] Link input (fetch page, treat it as untrusted source text). Owner: ?
 - [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
 - [ ] Deliverables: description ≤ 4000 chars, PDF ≤ 12 slides, video ≤ 3 min, cost estimate, risks. Owner: ?
@@ -93,6 +93,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #15 `security_events` and `cost_usd` in `CheckResult`, offline FunctionModel tests; quick eval without an API key now reports injection_resistance and cost_per_100_usd instead of unknown. Branch `LukiLenkiewicz/issue15-contract-metrics`.
 - 2026-11-21 Łukasz (Claude worker): #13 merged `origin/feat/16-eval-set` (stack tip) into `LukiLenkiewicz/issue13-discord` (`59c3eaf`); Discord renders `kind`, `source_sentence` and `unchecked_claims` like the web form. Quick eval without an API key: every case `technical_error`, not committed.
 - 2026-11-21 Łukasz (Claude worker): #13 Discord bot (discord.py 2.7.1) on the same API and `verify()`, offline formatter and web/Discord consistency tests, `make discord`, compose profile `discord`. Branch `LukiLenkiewicz/issue13-discord`.
 - 2026-11-21 Łukasz (Claude worker): #16 `evals/cases.jsonl` with 31 labelled cases, full eval on `7ee1410` committed (macro_f1 0.09).

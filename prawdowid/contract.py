@@ -2,6 +2,7 @@
 
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, HttpUrl, computed_field, model_validator
 
@@ -73,12 +74,23 @@ class ClaimResult(BaseModel):
         return self.verdict.label
 
 
+class SecurityEvent(BaseModel):
+    """Instructions aimed at the model were found and ignored. Never carries their wording."""
+
+    kind: Literal["prompt_injection"] = "prompt_injection"
+    # Where they were found: "input" (the user's text); "page" once links are fetched.
+    location: Literal["input", "page"]
+
+
 class CheckResult(BaseModel):
     status: Status
     message: str | None = None
     claims: list[ClaimResult] = []
     # Claims found but left out by the per-check cap. They have no verdict.
     unchecked_claims: list[str] = []
+    security_events: list[SecurityEvent] = []
+    # Model tokens plus paid API calls for this answer; None when it cannot be known.
+    cost_usd: float | None = None
 
     @model_validator(mode="after")
     def _non_ok_is_a_notice(self) -> "CheckResult":

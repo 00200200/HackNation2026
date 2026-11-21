@@ -14,6 +14,7 @@ from prawdowid.contract import (
     CheckResult,
     ClaimKind,
     ClaimResult,
+    SecurityEvent,
     Source,
     Status,
     Verdict,
@@ -114,6 +115,21 @@ def test_only_unchecked_claims_and_attribution_tag():
     claim = CHECK.claims[1].model_copy(update={"kind": ClaimKind.ATTRIBUTION})
     text = render(CheckResult(status=Status.OK, claims=[claim]))
     assert "-# [Kto co powiedział] W tekście:" in text
+
+
+def test_security_event_is_shown_first():
+    flagged = CHECK.model_copy(
+        update={"security_events": [SecurityEvent(location="input")]}
+    )
+    assert render(flagged).startswith("**Polecenia dla modelu.**")
+    assert "Polecenia dla modelu" not in render(CHECK)
+    only = CheckResult(
+        status=Status.NEEDS_CLARIFICATION,
+        message="Brak twierdzeń.",
+        security_events=[SecurityEvent(location="input")],
+    )
+    assert render(only).startswith("**Polecenia dla modelu.**")
+    assert "sprawdziliśmy resztę" not in render(only)
 
 
 def test_non_ok_status_is_a_notice_not_a_verdict():
