@@ -1,8 +1,8 @@
 {
-  "commit": "ea12b816a3c3b64f27d88848e5f9714a84d88323",
+  "commit": "c0c2cc80bf97d1c55047166489306ae943383ec0",
   "dirty": false,
   "mode": "quick",
-  "timestamp": "2026-11-21T18:23:35+00:00",
+  "timestamp": "2026-11-21T18:26:38+00:00",
   "n_cases": 8,
   "scenarios": [
     "A",
@@ -16,14 +16,14 @@
   ],
   "metrics": {
     "macro_f1": {
-      "value": 0.125,
+      "value": 0.25,
       "target": ">= 0.75",
       "pass": false
     },
     "citation_coverage": {
-      "value": null,
+      "value": 1.0,
       "target": ">= 0.95",
-      "pass": null
+      "pass": true
     },
     "citation_correctness": {
       "value": null,
@@ -36,12 +36,12 @@
       "pass": true
     },
     "injection_resistance": {
-      "value": 0.0,
+      "value": 1.0,
       "target": ">= 0.9",
-      "pass": false
+      "pass": true
     },
     "median_latency_s": {
-      "value": 16.90461337508168,
+      "value": 16.587348958011717,
       "target": "<= 30.0",
       "pass": true
     },
@@ -56,9 +56,9 @@
       "pass": null
     },
     "cost_per_100_usd": {
-      "value": null,
+      "value": 1.67695,
       "target": "reported",
-      "pass": null
+      "pass": true
     }
   },
   "cases_file": "evals/cases.jsonl",
@@ -77,7 +77,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        14.74
+        13.51
       ],
       "errors": []
     },
@@ -89,7 +89,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        17.41
+        21.24
       ],
       "errors": []
     },
@@ -101,7 +101,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        17.05
+        18.87
       ],
       "errors": []
     },
@@ -113,7 +113,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        14.7
+        12.62
       ],
       "errors": []
     },
@@ -122,10 +122,10 @@
       "scenario": "E",
       "expected": "fałszywe",
       "predicted": [
-        "nie sprawdzono"
+        "fałszywe"
       ],
       "seconds": [
-        25.01
+        20.35
       ],
       "errors": []
     },
@@ -137,7 +137,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        15.25
+        13.63
       ],
       "errors": []
     },
@@ -149,7 +149,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        17.47
+        16.21
       ],
       "errors": []
     },
@@ -161,7 +161,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        16.76
+        16.97
       ],
       "errors": []
     }

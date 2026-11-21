@@ -123,7 +123,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
-- 2026-11-21 Łukasz (Claude worker): #17 merged `origin/LukiLenkiewicz/issue12-incidents` (stack tip) into `LukiLenkiewicz/issue17-privacy`; masking checked on the wired #11 pipeline; retention (atomic rewrite, lock) for `corpus/docs.jsonl`. Quick eval on the merge: macro_f1 0.125, abstention 1.00, injection 0.0, end_to_end 0.875, median 16.9 s.
+- 2026-11-21 Łukasz (Claude worker): #17 merged `origin/LukiLenkiewicz/issue12-incidents` (stack tip) into `LukiLenkiewicz/issue17-privacy`; masking checked on the wired #11 pipeline; retention (atomic rewrite, lock) for `corpus/docs.jsonl`. Quick eval on `c0c2cc8` committed: macro_f1 0.25, citation_coverage 1.00, abstention 1.00, injection 1.00, end_to_end 0.875, median 16.6 s, $1.68 per 100.
 - 2026-11-21 Łukasz (Claude worker): #17 masking before the model and in logs (cards, IBAN added), check log per demo session with delete endpoint and web button, `RETENTION_DAYS` = 30, `docs/privacy.md`. Branch `LukiLenkiewicz/issue17-privacy`.
 - 2026-11-21 Łukasz (Claude worker): #12 merged `origin/LukiLenkiewicz/issue11-fanout` (stack tip, PR #37) into `LukiLenkiewicz/issue12-incidents`, full eval on `729b220` committed: macro_f1 0.24, abstention 1.00, injection_resistance 0.33, median latency 14.3 s.
 - 2026-11-21 Łukasz (Claude worker): #12 full eval on `4bd8471` committed: macro_f1 0.09, abstention 1.00, injection_resistance 0.00, median latency 4.6 s, cost $1.61 per 100.
