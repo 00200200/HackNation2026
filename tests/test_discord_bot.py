@@ -22,9 +22,9 @@ from prawdowid.discord_bot import (
     CONNECTION_ERROR,
     MAX_MESSAGES,
     MESSAGE_LIMIT,
-    TRUNCATED,
     ask_api,
     render,
+    reply,
     split,
 )
 from prawdowid.verifier import ExtractedClaim, Extraction, agent
@@ -124,10 +124,10 @@ def test_non_ok_status_is_a_notice_not_a_verdict():
 
 def test_split_respects_discord_limits():
     assert split("krótko") == ["krótko"]
-    parts = split("\n".join(["x" * 300] * 50))
-    assert len(parts) == MAX_MESSAGES
+    text = "\n".join(["x" * 300] * 50)
+    parts = split(text)
     assert all(0 < len(p) <= MESSAGE_LIMIT for p in parts)
-    assert parts[-1].endswith(TRUNCATED)
+    assert "\n".join(parts) == text  # a cut drops nothing
 
 
 def test_long_check_splits_into_messages_that_stand_alone():
@@ -144,8 +144,7 @@ def test_long_check_splits_into_messages_that_stand_alone():
         update={"sources": sources, "reasoning": "## Powód. " * 400}
     )
     parts = split(render(CheckResult(status=Status.OK, claims=[long_claim])))
-    assert len(parts) == MAX_MESSAGES
-    assert parts[-1].endswith(TRUNCATED)
+    assert len(parts) > MAX_MESSAGES
     for part in parts:
         assert 0 < len(part) <= MESSAGE_LIMIT
         for line in part.split("\n"):
@@ -282,3 +281,111 @@ def test_bot_refuses_to_start_without_token(monkeypatch):
     monkeypatch.delenv(discord_bot.TOKEN_ENV, raising=False)
     with pytest.raises(SystemExit, match="DISCORD_BOT_TOKEN is not set"):
         discord_bot.main()
+
+
+def five_claims(url="https://www.gov.pl/web/ue"):
+    claim = CHECK.claims[0]
+    return CheckResult(
+        status=Status.OK,
+        claims=[
+            claim.model_copy(
+                update={
+                    "claim": f"Twierdzenie {i}.",
+                    "reasoning": "Uzasadnienie. " * 120,
+                    "sources": [
+                        claim.sources[0].model_copy(update={"url": f"{url}{i}"})
+                    ],
+                }
+            )
+            for i in range(5)
+        ],
+    )
+
+
+def test_short_reply_has_no_attachment_and_keeps_a_long_url_inline():
+    """Codex review on #24: a 911-character URL fits one message and stays inline."""
+    url = "https://example.com/" + "a" * 891
+    check = CHECK.model_copy(
+        update={
+            "claims": [
+                CHECK.claims[0].model_copy(
+                    update={
+                        "sources": [
+                            CHECK.claims[0].sources[0].model_copy(update={"url": url})
+                        ]
+                    }
+                )
+            ]
+        }
+    )
+    parts, full = reply(check)
+    assert full is None
+    assert f"<{url}>" in "\n".join(parts)
+
+
+def test_overflow_goes_to_an_attachment_with_every_verdict_and_url():
+    check = five_claims()
+    parts, full = reply(check)
+    assert len(parts) <= MAX_MESSAGES
+    assert all(len(p) <= MESSAGE_LIMIT for p in parts)
+    assert parts[-1] == discord_bot.ATTACHED
+    for c in check.claims:
+        assert f"<{c.sources[0].url}>" in full
+        assert c.claim in full
+    assert full.count("Ocena: **") == 5
+
+
+def test_url_longer_than_a_message_is_whole_in_the_attachment():
+    url = "https://example.com/" + "a" * 1990
+    check = CHECK.model_copy(
+        update={
+            "claims": [
+                CHECK.claims[0].model_copy(
+                    update={
+                        "sources": [
+                            CHECK.claims[0].sources[0].model_copy(update={"url": url})
+                        ]
+                    }
+                )
+            ]
+        }
+    )
+    parts, full = reply(check)
+    assert discord_bot.URL_TOO_LONG in "\n".join(parts)
+    assert f"<{url}>" in full
+
+
+def test_slash_command_delivers_every_verdict_and_source(monkeypatch):
+    """The registered /sprawdz callback: messages plus attachment carry the whole answer."""
+    check = five_claims()
+
+    async def fake_api(text, client):
+        return check
+
+    monkeypatch.setattr(discord_bot, "ask_api", fake_api)
+    sent = []
+
+    class Response:
+        async def defer(self, thinking):
+            pass
+
+    class Followup:
+        async def send(self, content, **kwargs):
+            file = kwargs.get("file")
+            sent.append((content, file.fp.read().decode() if file else None))
+
+    class Interaction:
+        response = Response()
+        followup = Followup()
+
+    async def go():
+        bot = discord_bot.Bot("http://api")
+        await bot.tree.get_command("sprawdz").callback(Interaction(), "Tekst")
+
+    asyncio.run(go())
+    assert len(sent) <= MAX_MESSAGES
+    attachments = [f for _, f in sent if f]
+    assert len(attachments) == 1 and sent[-1][1] is not None
+    for c in check.claims:
+        assert c.verdict_label in attachments[0]
+        assert f"<{c.sources[0].url}>" in attachments[0]

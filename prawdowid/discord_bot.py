@@ -9,6 +9,7 @@ Run: `make discord` (reads DISCORD_BOT_TOKEN and PRAWDOWID_API_URL from the envi
 """
 
 import asyncio
+import io
 import logging
 import os
 import re
@@ -33,11 +34,17 @@ CHANNEL = "discord"
 API_TIMEOUT_S = 75
 MESSAGE_LIMIT = 2000  # Discord's limit for one message
 MAX_MESSAGES = 5
-TRUNCATED = "… Odpowiedź była za długa dla Discorda i została skrócona."
+ATTACHED = (
+    "Dalsza część odpowiedzi nie mieści się w wiadomościach Discorda. "
+    "Pełna odpowiedź, ze wszystkimi ocenami i linkami, jest w załączniku."
+)
+ATTACHMENT_NAME = "odpowiedz.md"
 # Raw characters per line before escaping; escaping at most doubles them, so a line stays
 # under MESSAGE_LIMIT with its prefix.
 WRAP_WIDTH = 900
-URL_TOO_LONG = "  (link za długi, by pokazać go na Discordzie; jest w formularzu WWW)"
+# "  <" + url + ">" must fit one message.
+URL_LIMIT = MESSAGE_LIMIT - 4
+URL_TOO_LONG = "  (link za długi na wiadomość Discorda; jest w załączniku)"
 CONNECTION_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę."
 
 
@@ -66,14 +73,15 @@ def _bullets(items: list[str]) -> list[str]:
     return [line for item in items for line in _field("- ", item, "  ")]
 
 
-def _source(s: Source) -> list[str]:
+def _source(s: Source, url_limit: int | None) -> list[str]:
     meta = ", ".join(
         part for part in (s.publisher, s.published_at and str(s.published_at)) if part
     )
     lines = _field("- ", f"{s.title}, {meta}" if meta else s.title, "  ")
     # Own line, <url> stops Discord from unfurling a preview of an untrusted page.
     url = str(s.url)
-    lines.append(f"  <{url}>" if len(url) <= WRAP_WIDTH else URL_TOO_LONG)
+    fits = url_limit is None or len(url) <= url_limit
+    lines.append(f"  <{url}>" if fits else URL_TOO_LONG)
     if s.fragment:
         lines += _field("> „", s.fragment, "> ", "”")
     return lines
@@ -90,7 +98,7 @@ UNCHECKED_NOTE = (
 )
 
 
-def _claim(n: int, c: ClaimResult) -> str:
+def _claim(n: int, c: ClaimResult, url_limit: int | None) -> str:
     kind = f"[{KIND_LABELS[c.kind]}] " if c.kind in KIND_LABELS else ""
     lines = [
         *_field(f"### {n}. ", c.claim, "### "),
@@ -101,21 +109,24 @@ def _claim(n: int, c: ClaimResult) -> str:
         "**Przesłanki:**",
         *_bullets(c.premises),
         "**Źródła:**",
-        *([line for s in c.sources for line in _source(s)] or ["- brak"]),
+        *([line for s in c.sources for line in _source(s, url_limit)] or ["- brak"]),
     ]
     if c.limitations:
         lines += ["**Ograniczenia:**", *_bullets(c.limitations)]
     return "\n".join(lines)
 
 
-def render(check: CheckResult) -> str:
-    """CheckResult as Discord Markdown, with the same sections as the web form."""
+def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
+    """CheckResult as Discord Markdown, with the same sections as the web form.
+
+    `url_limit=None` keeps every URL whole, for the attachment.
+    """
     # Statuses other than "ok" are notices, never verdicts.
     if check.status is not Status.OK:
         return "\n".join(_field("**Brak oceny.** ", check.message or ""))
     if not check.claims and not check.unchecked_claims:
         return "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
-    sections = [_claim(n, c) for n, c in enumerate(check.claims, 1)]
+    sections = [_claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)]
     if check.unchecked_claims:
         sections.append(
             "\n".join(
@@ -130,7 +141,7 @@ def render(check: CheckResult) -> str:
 
 
 def split(text: str) -> list[str]:
-    """Cut text into Discord messages between lines; at most MAX_MESSAGES, marked if cut.
+    """Cut text into Discord messages between lines.
 
     Every line is shorter than a message (`_field` wraps), so a cut never falls inside a line.
     """
@@ -143,12 +154,20 @@ def split(text: str) -> list[str]:
         else:
             current = candidate
     parts.append(current)
-    if len(parts) > MAX_MESSAGES:
-        lines = parts[MAX_MESSAGES - 1].split("\n")
-        while len("\n".join([*lines, TRUNCATED])) > MESSAGE_LIMIT:
-            lines.pop()
-        parts = [*parts[: MAX_MESSAGES - 1], "\n".join([*lines, TRUNCATED])]
     return parts
+
+
+def reply(check: CheckResult) -> tuple[list[str], str | None]:
+    """Messages for one check, plus the full text to attach when the messages would lose any.
+
+    At most MAX_MESSAGES messages. Nothing is dropped: whatever does not fit (more messages,
+    or a URL longer than a message) is in the attachment, which holds the whole answer.
+    """
+    text, full = render(check), render(check, url_limit=None)
+    parts = split(text)
+    if len(parts) <= MAX_MESSAGES and text == full:
+        return parts, None
+    return [*parts[: MAX_MESSAGES - 1], ATTACHED], full
 
 
 def _notice(message: str) -> CheckResult:
@@ -200,11 +219,17 @@ class Bot(discord.Client):
             await interaction.response.defer(thinking=True)
             check = await ask_api(tekst, self.api)
             log.info("check status=%s input_chars=%d", check.status, len(tekst))
-            for part in split(render(check)):
+            parts, full = reply(check)
+            for i, part in enumerate(parts, 1):
+                extra = {}
+                if full is not None and i == len(parts):
+                    data = io.BytesIO(full.encode())
+                    extra["file"] = discord.File(data, filename=ATTACHMENT_NAME)
                 await interaction.followup.send(
                     part,
                     allowed_mentions=discord.AllowedMentions.none(),
                     suppress_embeds=True,
+                    **extra,
                 )
 
     async def setup_hook(self) -> None:
