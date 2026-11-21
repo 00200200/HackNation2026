@@ -1,11 +1,12 @@
--- Step 2c (#19): our own source store. Pages fetched by web search (#8), split into chunks, with
--- Postgres full-text search. Apply in the Supabase SQL editor or with `supabase db push`.
+-- Step 2c (#19): our own source store, a local PostgreSQL. Pages fetched by web search (#8), split
+-- into chunks, with full-text search. `docker compose` applies this file when the database volume is
+-- created; `make db-migrate` applies it to an existing one (safe to rerun).
 --
 -- Full text only: pgvector and the embedding model are UNDECIDED (WORKLOG). Stock Postgres has no
 -- Polish text search configuration, so the index uses 'simple' (lower-case words, no stemming);
 -- the app widens recall with prefix terms (prawdowid/cache.py, build_tsquery).
 
-create table documents (
+create table if not exists documents (
     id bigint generated always as identity primary key,
     -- Canonical URL (prawdowid/rerank.py canonical_url): the doc id rerank (#9) keys on.
     doc_id text not null unique,
@@ -25,7 +26,7 @@ create table documents (
     delete_after timestamptz not null default now() + interval '90 days'
 );
 
-create table chunks (
+create table if not exists chunks (
     id bigint generated always as identity primary key,
     document_id bigint not null references documents (id) on delete cascade,
     position int not null,
@@ -34,20 +35,14 @@ create table chunks (
     unique (document_id, position)
 );
 
-create index chunks_tsv on chunks using gin (tsv);
-create index documents_delete_after on documents (delete_after);
+create index if not exists chunks_tsv on chunks using gin (tsv);
+create index if not exists documents_delete_after on documents (delete_after);
 
--- Access control: row level security on, and no policies, so the public anon and authenticated
--- keys (Supabase Data API) read and write nothing. Only the backend reaches the tables: it
--- connects as the table owner through DATABASE_URL, which lives in the backend .env only.
-alter table documents enable row level security;
-alter table chunks enable row level security;
+-- Access control: the database is reachable only on the compose network and on 127.0.0.1
+-- (compose.yaml); the backend is the only service given DATABASE_URL.
 
--- Deletion procedure: drops expired pages (chunks go with them). The seed script runs it; with
--- pg_cron enabled it can run daily:
---   select cron.schedule('delete-expired-documents', '0 3 * * *',
---                        'select delete_expired_documents()');
-create function delete_expired_documents()
+-- Deletion procedure: drops expired pages (chunks go with them). The seed script runs it first.
+create or replace function delete_expired_documents()
 returns int
 language sql
 set search_path = public
@@ -56,5 +51,5 @@ as $$
     select count(*)::int from gone
 $$;
 
--- Functions are callable by every role by default; keep this one to the backend.
-revoke execute on function delete_expired_documents() from public, anon, authenticated;
+-- Functions are callable by every role by default; keep this one to the owner (the backend).
+revoke execute on function delete_expired_documents() from public;

@@ -11,23 +11,24 @@ goes to `corpus/manifest.jsonl` when the corpus is built with `uv run python -m 
 **The corpus is not built yet:** DuckDuckGo returned no results from our machine on 2026-11-21, and
 the team will replace the provider (#7, #8).
 
-What we store: the extracted page text, split into chunks for full-text search, goes to our
-Supabase Postgres (`documents`, `chunks`; schema in `supabase/migrations/`) when `DATABASE_URL` is
-set, else to the local cache `corpus/docs.jsonl`. Neither is in the repo and we do not redistribute
-page content. Controls on the database:
+What we store: the extracted page text, split into chunks for full-text search, goes to our local
+PostgreSQL (`documents`, `chunks`; schema in `db/migrations/`, compose service `db`) when
+`DATABASE_URL` is set, else to the local cache `corpus/docs.jsonl`. Neither is in the repo and we
+do not redistribute page content. The database starts empty; the team seeds it with `make db-seed`
+(`python -m prawdowid.corpus` with `DATABASE_URL` set; queries in `corpus/queries.txt`). Controls:
 
 - Only pages found by web search are stored, never pages from links users submit.
 - Licence per document (`licence`, UNCONFIRMED until checked, see below).
 - Retention: `delete_after` defaults to 90 days after the page was stored (UNCONFIRMED: the team
   has not set the period; #17). `select delete_expired_documents()` deletes expired pages and their
-  chunks; the seed script runs it, and pg_cron can run it daily (command in the migration).
-- Access: row level security on with no policies, so Supabase's public keys see nothing; only the
-  backend connects, with `DATABASE_URL` from its `.env`.
-- Deletion: `delete from documents where doc_id = '<canonical url>'` removes one page and its chunks.
-  Delete `corpus/docs.jsonl` to clear the local cache.
+  chunks; the seed script runs it first.
+- Access: the database is reachable only on the compose network and on 127.0.0.1; the backend is the
+  only service given `DATABASE_URL`.
+- Deletion: `delete from documents where doc_id = '<canonical url>'` removes one page and its
+  chunks. `docker compose down -v` deletes the whole database volume. Delete `corpus/docs.jsonl` to
+  clear the local cache.
 
-Where the data is processed: the Supabase project region (an EEA region is planned; the project
-does not exist yet, UNCONFIRMED).
+Where the data is processed: on the machine that runs the compose stack.
 
 Licences: **UNCONFIRMED for every domain.** Nobody on the team has checked each site's terms yet.
 The column says where to check. Until it is checked we quote short passages with a link, and do not

@@ -5,7 +5,8 @@ services:
     # Compose reads these from the ignored .env at start-up; they are never part of the image.
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      DATABASE_URL: ${DATABASE_URL:-}
+      # Always the compose database; DATABASE_URL in .env is for `make dev` on the host.
+      DATABASE_URL: postgresql://prawdowid:${POSTGRES_PASSWORD:-prawdowid}@db:5432/prawdowid
       PRAWDOWID_MODEL: ${PRAWDOWID_MODEL:-}
       PYDANTIC_AI_NO_BANNER: "1"
     healthcheck:
@@ -14,6 +15,27 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    # Started, not healthy: without the database a check still runs and says so (scenario J).
+    depends_on:
+      db:
+        condition: service_started
+
+  # Step 2c source store. Starts empty: the team seeds it with `make db-seed`.
+  # Schema from db/migrations/ on first start of the volume. Port bound to 127.0.0.1 only, for
+  # `make dev`. The default password is for this local-only database; POSTGRES_PASSWORD applies
+  # only when the volume is created (`docker compose down -v` to recreate), URL-safe characters only.
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: prawdowid
+      POSTGRES_DB: prawdowid
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prawdowid}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
 
   # Second channel. Opt-in (make up DISCORD=1): it exits at once without DISCORD_BOT_TOKEN.
   discord:
@@ -38,3 +60,6 @@ services:
       backend:
         condition: service_healthy
         restart: true
+
+volumes:
+  pgdata:

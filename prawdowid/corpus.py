@@ -2,7 +2,7 @@
 
     uv run python -m prawdowid.corpus [--target 120]
 
-Pages go to the source cache (`prawdowid/cache.py`): the Supabase database when `DATABASE_URL` is
+Pages go to the source cache (`prawdowid/cache.py`): the Postgres database when `DATABASE_URL` is
 set, else the local JSONL file. With the database, expired pages are deleted first (retention).
 `corpus/manifest.jsonl` (committed) lists every stored document without its text (url, publisher,
 domain, type, licence, dates), so the source list stays auditable. With the database it also

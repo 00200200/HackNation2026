@@ -1,7 +1,7 @@
 PORT ?= 8080
 export PORT
 
-.PHONY: help install dev discord test lint format check up down logs
+.PHONY: help install dev discord test lint format check up down logs db db-migrate db-seed
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
@@ -34,6 +34,15 @@ up: ## Build and start frontend + backend in Docker (add DISCORD=1 for the Disco
 
 down: ## Stop the Docker stack
 	docker compose --profile discord down
+
+db: ## Start only the Postgres source store (for `make dev`: DATABASE_URL=postgresql://prawdowid:prawdowid@127.0.0.1:5433/prawdowid)
+	docker compose up -d db
+
+db-migrate: ## Apply db/migrations/ to the running database (safe to rerun)
+	cat db/migrations/*.sql | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U prawdowid -d prawdowid
+
+db-seed: ## Seed the running database from corpus/queries.txt through web search (not run by default)
+	DATABASE_URL=postgresql://prawdowid:$${POSTGRES_PASSWORD:-prawdowid}@127.0.0.1:$${DB_PORT:-5433}/prawdowid uv run python -m prawdowid.corpus
 
 logs: ## Follow Docker logs
 	docker compose --profile discord logs -f

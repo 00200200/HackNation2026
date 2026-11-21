@@ -1,17 +1,16 @@
 """Source cache and step 2c: every page fetched by web search, and full-text search over them.
 
-With `DATABASE_URL` set (Supabase Postgres, schema in `supabase/migrations/`) pages go to the
-`documents` and `chunks` tables and `search_documents` searches them per claim. Without it pages go
-to the local JSONL file `corpus/docs.jsonl` (ignored by git: full page text, not redistributed)
-and the database search reports itself unavailable, so the check goes on with steps 2a and 2b.
-The JSONL line format (`url`, `text`, ...) is what `evals.run --corpus` reads; `prawdowid.corpus`
-exports the database to it.
+With `DATABASE_URL` set (local PostgreSQL from compose.yaml, schema in `db/migrations/`) pages go
+to the `documents` and `chunks` tables and `search_documents` searches them per claim. Without it
+pages go to the local JSONL file `corpus/docs.jsonl` (ignored by git: full page text, not
+redistributed) and the database search reports itself unavailable, so the check goes on with
+steps 2a and 2b. The JSONL line format (`url`, `text`, ...) is what `evals.run --corpus` reads;
+`prawdowid.corpus` exports the database to it.
 
 Only web search (#8) calls `save_document`. Pages from links the user submits (#4) are never saved:
 they are fetched with `websearch.fetch_document`, which does not save.
 
-Plain psycopg, not the supabase client: a document and its chunks go in one transaction, and the
-ranked search is one SQL query.
+psycopg 3: a document and its chunks go in one transaction, and the ranked search is one SQL query.
 """
 
 import asyncio
@@ -240,8 +239,8 @@ SEARCH_SQL = """
 def _db() -> Iterator[psycopg.Connection]:
     """One connection per call, one transaction, every statement bounded.
 
-    prepare_threshold=None: works on the session pooler (README) and the transaction pooler,
-    which has no prepared statements.
+    prepare_threshold=None: no server-side prepared statements, so a pooler such as PgBouncer in
+    transaction mode works too.
     """
     with psycopg.connect(
         os.environ[DATABASE_ENV],
