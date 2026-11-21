@@ -29,11 +29,12 @@ not → on branch `LukiLenkiewicz/issue11-fanout` each checkable claim runs Fact
 | `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, stacked on `LukiLenkiewicz/issue4-link-input` (PR #28). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `d655078` (#5 merged into #16), no corpus):
-macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail: no `security_events`, verdicts
-wrong), median latency 5.0 s, end_to_end 0.94 (fail: both J cases, no eval switch to simulate a failure). Citation metrics,
-channel consistency and cost: not measured (no corpus, no second channel, no `cost_usd`). Every checkable case returns
-`brak wystarczających dowodów`: expected while there are no sources.
+**Last eval** (`evals/results/latest.json`, **full**, 31 cases, product at `0063c7d` (#11 fan-out), real Anthropic key, no Fact Check key, no corpus):
+every case `nie sprawdzono`: DuckDuckGo answered "No results found" to every query (about 20 s per search, two attempts), so
+2a and 2b both failed and no claim got a verdict. macro_f1 0.00, abstention 0.00, injection_resistance 0.00 (verdict part), end_to_end
+0.94 (both J cases, no eval switch), median latency 24.1 s (pass; the 25 s budget cuts the slow searches), cost per 100 checks
+$1.53 (extraction only; rerank and judge never ran). Citation metrics and channel consistency: not measured. Needs a search
+provider that returns results (#7) before verdict metrics mean anything.
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -111,7 +112,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
-- 2026-11-21 Łukasz (Claude worker): #11 per-claim fan-out, time budget, one retry, `Verdict.NOT_CHECKED`; offline tests `tests/test_pipeline.py` (5 fast claims under budget, slow search leaves the late claim not checked, retry only with time left). Branch `LukiLenkiewicz/issue11-fanout`.
+- 2026-11-21 Łukasz (Claude worker): #11 per-claim fan-out, time budget, one retry, `Verdict.NOT_CHECKED`; offline tests `tests/test_pipeline.py` (5 fast claims under budget, slow search leaves the late claim not checked, retry only with time left). Branch `LukiLenkiewicz/issue11-fanout`. Full eval on `0063c7d`: all 31 `nie sprawdzono` (DuckDuckGo no results), median 24.1 s, $1.53 per 100.
 - 2026-11-21 Łukasz (Claude worker): #10 PR #30 review fixes: fact-check debunk keeps its own conclusion, grounded missing context, syndicated copies one origin, exact numbers in quotes, `security_events` (location `source`) for injection in retrieved fragments.
 - 2026-11-21 Łukasz (Claude worker): #10 `prawdowid/judge.py` steps 4 and 5, model labels with quotes, verdict rules in code, offline FunctionModel tests per rule. Branch `LukiLenkiewicz/issue10-judge`.
 - 2026-11-21 Łukasz (Claude worker): #4 link input: `prawdowid/link.py`, `CheckResult.page`, offline tests `tests/test_link.py`.
