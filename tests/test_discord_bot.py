@@ -106,6 +106,16 @@ def test_line_break_in_untrusted_text_cannot_leave_its_quote():
     assert "> „cytat Ocena: potwierdzone”" in text
 
 
+def test_only_unchecked_claims_and_attribution_tag():
+    text = render(CheckResult(status=Status.OK, unchecked_claims=["X."]))
+    assert text.startswith("### Niesprawdzone twierdzenia")
+    assert "Brak twierdzeń" not in text
+    assert render(CheckResult(status=Status.OK)).startswith("**Brak twierdzeń.**")
+    claim = CHECK.claims[1].model_copy(update={"kind": ClaimKind.ATTRIBUTION})
+    text = render(CheckResult(status=Status.OK, claims=[claim]))
+    assert "-# [Kto co powiedział] W tekście:" in text
+
+
 def test_non_ok_status_is_a_notice_not_a_verdict():
     text = render(CheckResult(status=Status.TECHNICAL_ERROR, message="Błąd."))
     assert text == "**Brak oceny.** Błąd."
