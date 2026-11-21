@@ -129,6 +129,7 @@ a { color: var(--red-deep); }
 .bubble-label { font-size: .8rem; font-weight: 700; color: var(--muted); }
 .bubble-bot .bubble-label { color: #c9d1de; }
 .bubble-tag { margin-left: .35rem; padding: .1rem .5rem; border-radius: 999px; background: rgba(255, 255, 255, .14); color: #fff; }
+.bubble-link { color: #c9d1de; font-size: .9rem; text-decoration: underline; }
 .chat-caption { max-width: 26rem; font-size: .85rem; text-align: right; }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -204,6 +205,8 @@ body.checked .status-pill { margin-bottom: 1rem; }
         background: var(--soft); border: 1px solid var(--line); color: var(--navy); }
 .unchecked { padding-top: 1.6rem; border-top: 1px solid var(--line); }
 .unchecked h2 { font-size: 1.15rem; margin: 0 0 .5rem; }
+/* The plain-language answer, in the organiser's format; the details below back it up */
+.answer { margin: .9rem 0 0; font-size: 1.15rem; font-weight: 600; line-height: 1.4; }
 .part { margin: 1.5rem 0 .65rem; font-size: 1rem; font-weight: 800; }
 
 /* Sources as on the verdict slide: one per row, the quote marked with a red rule */

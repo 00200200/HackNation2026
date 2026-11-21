@@ -129,6 +129,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał: web answer in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić tej informacji." plus sources), the same text in copy-to-chat; example chips use the organiser's questions.
 - 2026-11-21 Michał: web UI matched to the pitch deck: Figtree, flat red hero with the outlined title echo, labelled chat preview, verdict card with sources one per row and quotes on a red rule.
 - 2026-11-21 Łukasz (Claude worker): merged `main` (#29 web UI) into `feat/5-self-contained-claims`; claim origin line and unchecked-claims list ported into the new UI. Quick eval on `6689ad6`: abstention 1.00, median 3.87 s, macro_f1 0.10, end_to_end 0.89 (no sources yet).
 - 2026-11-21 Łukasz (Claude worker): #5 review fixes on PR #22: reject hyperparameters below 1, latency numbers marked UNCONFIRMED, quote test fixture uses only names from its input.
