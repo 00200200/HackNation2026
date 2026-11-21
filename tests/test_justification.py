@@ -189,3 +189,11 @@ def test_self_contradicting_publisher_dropped_by_decide_is_not_cited():
     )
     assert verdict is Verdict.INSUFFICIENT_EVIDENCE
     assert "potwierdza Portal A, przeczy Portal A" not in text
+
+
+def test_evidence_that_no_side_counts_is_still_named_not_called_absent():
+    # Context label without a verified context quote: nothing counts, but the source exists.
+    ctx = source("Portal A", "Inne czasy.", source_type="article", slug="c")
+    verdict, text = decided(evidence(ctx, Stance.CONTEXT))
+    assert verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert text.startswith("Znaleźliśmy za mało") and "Portal A" in text

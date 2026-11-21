@@ -384,7 +384,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         premises,
         evidence,
         limitations + ([] if gaps else [NOT_ENOUGH]),
-        cited=_cited(gaps, "gap") + _cited(supports + refutes, "weak"),
+        cited=_cited(gaps, "gap") + _cited(supports + refutes or evidence, "weak"),
     )
 
 
