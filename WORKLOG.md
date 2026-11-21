@@ -9,12 +9,12 @@ Rules and jury criteria: `.claude/skills/hacknation-judging/SKILL.md`. Metrics: 
 
 ## Now (snapshot, edit in place)
 
-Updated: 2026-11-21, by Łukasz (Claude worker).
+Updated: 2026-11-21, by Łukasz (Codex worker).
 
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
 not → on branch `LukiLenkiewicz/issue11-fanout` each checkable claim runs Fact Check and web search in parallel, then rerank and judge, verdict set in code (`prawdowid/pipeline.py`); non-checkable claims are
-`nie podlega weryfikacji`. Without keys and a corpus, every source fails and checkable claims come back `nie sprawdzono`. Links (#4, branch `LukiLenkiewicz/issue4-link-input`): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls, social media, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Nothing is stored; each link check logs URL, content hash, claims and result to stdout.
+`nie podlega weryfikacji`. Without keys and a corpus, every source fails and checkable claims come back `nie sprawdzono`. Links (#4, branch `LukiLenkiewicz/issue4-link-input`): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls, social media, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Submitted page bodies are not stored; successful web evidence fetches use the local JSONL cache, and link checks log URL, content hash, claims and result to stdout.
 
 **Branches**
 
@@ -27,15 +27,12 @@ not → on branch `LukiLenkiewicz/issue11-fanout` each checkable claim runs Fact
 | `feat/16-eval-set` | #16 eval set (31 cases) and full eval, stacked on `feat/5-self-contained-claims`. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue9-rerank` | #9 step 3 rerank and dedupe, stacked on `LukiLenkiewicz/issue13-discord` (PR #24). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue11-fanout` | #11 orchestration: `verify()` runs steps 2 to 5 per claim (`prawdowid/pipeline.py`), stacked on `LukiLenkiewicz/issue19-supabase` (PR #34). PR open, not merged. Owner: Łukasz (Claude worker). |
+| `LukiLenkiewicz/issue18-deliverables` | #18 text drafts in `docs/submission/` and README run corrections, stacked on `LukiLenkiewicz/issue11-fanout`. PDF and video remain open human work. Owner: Łukasz (Codex worker). |
 | `LukiLenkiewicz/issue31-euvsdisinfo` | #31 EUvsDisinfo MCP lookup, stacked on the stack tip. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, stacked on `LukiLenkiewicz/issue4-link-input` (PR #28). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, **full**, 31 cases, product at `91d610c` (#11 fan-out on the #19 stack), real Anthropic
-and Google Fact Check keys, no EUvsDisinfo key, no corpus; DuckDuckGo still returns no results): macro_f1 0.32 (fail), citation_coverage 1.00,
-abstention 1.00, injection_resistance 0.67 (fail), median latency 15.8 s, end_to_end 0.94 (both J cases, no eval switch), cost per 100
-checks $1.75. Citation correctness and channel consistency: not measured. Verdicts come from Fact Check reviews only: 34 of 44
-checked claims had no source. Before the search cap (`f1e1684`) the judge step was cut on most cases (macro_f1 0.09, abstention 0.50).
+**Last eval** ([`evals/results/latest.json`](evals/results/latest.json), **quick**, 8 cases, product at `aa9fb7e`, timestamp `2026-11-21T18:19:08+00:00`, clean): macro_f1 `0.25` (fail), citation_coverage `1.0`, abstention `1.0`, injection_resistance `1.0`, median latency `17.00699254195206` s, end_to_end `0.875` (fail), cost per 100 checks `$1.7199700000000002`. Citation correctness and channel consistency are `null` (not measured); `overall_pass: false`. This quick run is not the full jury-sized evaluation. The prior full run on `91d610c` is described in Log.
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -60,7 +57,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [x] Contract gaps for metrics (#15): `security_events` (the extraction call flags instructions aimed at the model; event carries no wording) and `cost_usd` per answer (token usage priced by genai-prices through PydanticAI; 0.0 when no request was sent, null when unknown). Web and Discord show a notice when an event is logged. Not measured with a real key yet. Branch `LukiLenkiewicz/issue15-contract-metrics`. Owner: Łukasz (Claude worker)
 - [x] Link input (#4): safe fetch (http/https, SSRF guard on every connection incl. redirects and DNS, ≤ 3 redirects, 10 s, 2 MB, HTML via trafilatura, PDF via pypdf), page URL kept in `CheckResult.page` for later evidence exclusion. Branch `LukiLenkiewicz/issue4-link-input`, stacked on #15, in review. Prompt injection found in a page is logged with `location="page"`. Owner: Łukasz (Claude worker). Open: page text cut to 5000 chars (same as pasted text, UNCONFIRMED choice); no eval case uses a URL yet.
 - [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
-- [ ] Deliverables: description ≤ 4000 chars, PDF ≤ 12 slides, video ≤ 3 min, cost estimate, risks. Owner: ?
+- [ ] Deliverables (#18). Owner: Łukasz (Codex worker), branch `LukiLenkiewicz/issue18-deliverables`.
+  - [x] Text drafts: `docs/submission/description.md` (Polish, counted, TEAM_NAME placeholder), `architecture.md` (exact metrics from `evals/results/latest.json`), `sources.md` (provider/publisher terms and UNCONFIRMED rights), `risks.md` (existing controls with file:line), `cost.md` (measured-rate arithmetic), `slides-outline.md` (Polish). README documents Compose key forwarding and a writable temporary cache override. No product code changed; eval data not overwritten.
+  - [ ] Human work: confirm TEAM_NAME, prepare PDF ≤ 12 slides and video ≤ 3 min with reachable link; team approval before submission. Source permissions, full privacy controls, corpus, failing metrics and unmeasured channel/citation correctness remain open, not resolved by the drafts.
 - [ ] Optional after basics: moderator loop (scenario H), screenshots (F).
 - [ ] Team OK on the web search provider (PROPOSED below, #7); then run ~20 Polish test queries once a key exists. Owner: Łukasz (Claude worker)
 
@@ -118,6 +117,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 ## Log (newest first, append only)
 
 - 2026-11-21 Łukasz (Claude worker): #11 PR #37 Codex review fixes: judge outage is `nie sprawdzono`, any EUvsDisinfo source (Fact Check path too) is context only, extraction and link fetch bounded by the check budget, lookups in a TaskGroup (no search task outlives its claim; provider threads finish in the background; nothing started after the deadline), a retry judge failure keeps the first-pass verdict. Quick eval on `aa9fb7e` (8 cases, real Anthropic and Fact Check keys): macro_f1 0.25, abstention 1.00, injection 1.00, citation_coverage 1.00, median 17.0 s, end_to_end 0.88 (J case), $1.72 per 100, a failed web query and already-failed sources kept in the limitations, also on a time limit.
+- 2026-11-21 Łukasz (Codex worker): #18 six submission text drafts and README run corrections on `LukiLenkiewicz/issue18-deliverables`; exact saved eval metrics and measured cost extrapolation, code-cited risk register, source terms with unconfirmed permissions marked. PDF/video and TEAM_NAME remain open; no product or eval changes. Commit: this documentation commit.
 - 2026-11-21 Łukasz (Claude worker): #11 per-claim fan-out, time budget, one retry, `Verdict.NOT_CHECKED`; offline tests `tests/test_pipeline.py` (5 fast claims under budget, slow search leaves the late claim not checked, retry only with time left). Branch `LukiLenkiewicz/issue11-fanout`. Full eval on `0063c7d`: all 31 `nie sprawdzono` (DuckDuckGo no results), median 24.1 s, $1.53 per 100. With the Fact Check key, EUvsDisinfo wired and search capped, full eval on `91d610c`: macro_f1 0.32, abstention 1.00, citation_coverage 1.00, injection 0.67, median 15.8 s, $1.75 per 100.
 - 2026-11-21 Łukasz (Claude worker): #19 PR #34 Codex review fixes: per-document chunk cap before the document limit (regression test, passes on Postgres 17, old SQL returned only the long page), seed reads `.env` (`--local-db`), no full-text export of the database.
 - 2026-11-21 Łukasz (Claude worker): #19 merged `origin/LukiLenkiewicz/issue31-euvsdisinfo` (#33) to keep the stack linear; kept the newer quick eval (8 cases, 17:23 UTC) over the older full run from #31's base; quick eval rerun on the merge: macro_f1 0.111, injection 0.0, end_to_end 0.875, latency 3.4 s, $1.50 per 100.

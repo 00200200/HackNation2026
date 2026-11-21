@@ -15,13 +15,18 @@ web search, Fact Check and EUvsDisinfo all fail, comes back `not_checked` with t
 opinion, forecast or question is `not_verifiable`. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
-paste the text. Nothing is stored; each check is logged to stdout (status, latency, input length)
-with a second line for the model call (model, input and output tokens, latency).
+paste the text. Submitted page bodies are not saved, but successful web evidence fetches are
+cached in `corpus/docs.jsonl`. Stdout logs include claim text and results, link URLs/hashes,
+model usage, estimated cost and step timing. Cache and log retention remain open; see
+[submission risks](docs/submission/risks.md).
 
 ## Configuration
 
 Put these in `.env` in the repository root. The file is git-ignored and is not copied into the
-image; `docker compose` and `make dev` read it at start-up.
+image. `make dev` loads it into the API environment. Compose reads it for interpolation but only
+forwards variables declared in `compose.yaml`: the backend gets `ANTHROPIC_API_KEY` and
+`PRAWDOWID_MODEL`. The optional retrieval keys need the override shown under Run; other tuning
+variables need an explicit Compose environment override too.
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
@@ -38,13 +43,20 @@ image; `docker compose` and `make dev` read it at start-up.
 | `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `db` service (port bound to 127.0.0.1 only). Applies only when the volume is created (`docker compose --profile db down -v` to recreate). The database starts empty: seed it with `make db-seed`. |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 
-The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
-errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns
-`cannot_check`. Both carry a Polish message and no claims.
+The extraction call has a 45 s provider request timeout and at most one SDK retry, but shares
+the 25 s whole-check deadline with URL fetching and per-claim checks, inside the API's 60 s
+limit. Extraction errors and a missing model key return `technical_error`; a
+model refusal returns `cannot_check`. Both carry a Polish message and no claims. Retrieval
+failures are reported per claim. A judge-model outage becomes `not_checked` with a limitation;
+a failed retry judgement can retain the first-pass assessment with a warning when first-pass
+candidates existed.
 
 ## Run
 
-Needs Docker with Compose.
+Needs Docker with Compose and an Anthropic key in ignored `.env` for live model calls.
+The model IDs listed above and in [architecture](docs/submission/architecture.md) are literal code
+defaults; availability of those IDs on your account is UNCONFIRMED. Without working model
+credentials, the UI opens but verification returns a technical notice.
 
 ```bash
 make up
@@ -53,6 +65,33 @@ make up
 Open http://localhost:8080. Stop with `make down`. Use another port with `make up PORT=9000`.
 
 Without `make`: `docker compose up --build -d`.
+
+The base stack does not forward Google or EUvsDisinfo keys, and its non-root backend has no
+writable default cache directory. To enable optional retrieval keys from `.env` and use a writable
+temporary cache, run this instead of `make up` (the quoted heredoc contains variable names, not
+secret values):
+
+```bash
+docker compose -f compose.yaml -f - up --build -d <<'YAML'
+services:
+  backend:
+    environment:
+      GOOGLE_FACTCHECK_API_KEY: ${GOOGLE_FACTCHECK_API_KEY:-}
+      EUVSDISINFO_API_KEY: ${EUVSDISINFO_API_KEY:-}
+      PRAWDOWID_CACHE: /tmp/prawdowid/docs.jsonl
+YAML
+```
+
+This cache is lost when the backend container is replaced. Add `--profile discord` before `up`
+to start the bot too. Set `DISCORD_BOT_TOKEN` in `.env`, install the application in your Discord
+server with slash-command access, then use `/sprawdz tekst:`. Live Discord transport has not
+been verified in the saved eval; a token alone does not prove the bot is installed.
+
+For the local API, install [uv](https://docs.astral.sh/uv/getting-started/installation/), run
+`make install`, then `make dev`; `.env` is loaded by that target. Open the API docs at
+http://127.0.0.1:8000/docs. In another terminal, `make discord` loads the same `.env` and calls
+the local API. This path does not serve the web frontend. PostgreSQL is optional and disabled
+in checks; do not seed it until source permissions are confirmed.
 
 Run `make help` to list every target. The ones used most:
 
@@ -85,7 +124,7 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   Tools (`claims:search`). Each review becomes a `Source` (`source_type="fact_check"`) with the
   fact-checker's rating and the reviewed claim kept beside it, not in `fragment`: the rating is a
   signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
-  message and no hits. Not wired into `verify()` yet (issue #11).
+  message and no hits. Called by `pipeline._retrieve` for each checkable claim.
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
 - `prawdowid/discord_bot.py`: the second channel, a `/sprawdz tekst:` slash command (discord.py).
   It sends the same `POST /api/checks` as the web form, with `X-Channel: discord`, and renders the
@@ -111,6 +150,14 @@ back as 422 with a Polish message in `detail[0].msg`.
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
 their own copy of the labels.
+
+## Submission drafts
+
+Submission drafts: [description](docs/submission/description.md),
+[architecture and exact test results](docs/submission/architecture.md),
+[sources](docs/submission/sources.md), [risks](docs/submission/risks.md),
+[cost](docs/submission/cost.md), [Polish slide outline](docs/submission/slides-outline.md).
+The PDF and demo video remain open human work under [#18](https://github.com/00200200/HackNation2026/issues/18).
 
 ## Pre-push gate
 
