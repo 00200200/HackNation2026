@@ -86,6 +86,13 @@
     <div class="wrap narrow">
       <section id="result" aria-live="polite" aria-label="Wynik sprawdzenia"></section>
 
+      <p class="session" id="session" hidden>
+        Twoje sprawdzenia trzymamy do 30 dni. Przed zapisem ukrywamy numery PESEL, kont i kart,
+        adresy e-mail i telefony zapisane z +48 albo z myślnikami.
+        <button type="button" class="link-btn" id="delete-session">Usuń moje sprawdzenia</button>
+        <span id="session-status" role="status"></span>
+      </p>
+
       <section id="przyklad" class="example" aria-labelledby="przyklad-tytul">
         <div class="example-intro">
           <h2 id="przyklad-tytul">Werdykt, dowód i to, czego nie wiemy</h2>

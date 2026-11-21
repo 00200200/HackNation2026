@@ -25,6 +25,8 @@ import httpcore2
 import httpx2
 from pydantic import BaseModel
 
+from prawdowid.privacy import mask_personal_data
+
 log = logging.getLogger("prawdowid")
 # httpx2 logs every request URL at INFO, before redact() can run; fetch_page logs the redacted one.
 logging.getLogger("httpx2").setLevel(logging.WARNING)
@@ -250,11 +252,15 @@ async def fetch_page(
     except httpx2.UnsupportedProtocol:
         raise Refusal(BAD_URL) from None
     except (TimeoutError, httpx2.HTTPError) as exc:
-        log.warning("link fetch failed url=%s error=%r", redact(url), exc)
+        log.warning(
+            "link fetch failed url=%s error=%s",
+            mask_personal_data(redact(url)),
+            type(exc).__name__,
+        )
         raise Refusal(UNREACHABLE, technical=True) from None
     log.info(
         "link fetched url=%s sha256=%s bytes=%d chars=%d",
-        page.url,
+        mask_personal_data(page.url),
         page.sha256,
         len(body),
         len(page.text),

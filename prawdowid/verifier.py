@@ -30,6 +30,7 @@ from prawdowid.contract import (
 )
 from prawdowid.judge import Judgement
 from prawdowid.link import Page, Refusal, fetch_page
+from prawdowid.privacy import mask_personal_data
 
 log = logging.getLogger("prawdowid")
 
@@ -331,10 +332,10 @@ async def verify(text: str) -> CheckResult:
         for c in result.claims:
             c.limitations.append(PAGE_CUT)
     result.page = CheckedPage(**page.model_dump(exclude={"text"}))
-    # ponytail: the stdout log is the check store until storage is decided; the page text is not kept.
+    # The page text is not kept; the URL is masked (an e-mail in a query string).
     log.info(
         "link check url=%s sha256=%s status=%s claims=%s",
-        page.url,
+        mask_personal_data(page.url),
         page.sha256,
         result.status,
         json.dumps(
@@ -356,9 +357,10 @@ async def verify_text(
     """`deadline` is `loop.time()` when the whole check must end; `exclude_url` the linked page."""
     started = time.perf_counter()
     try:
+        # Masked before the model: placeholders keep the sentence, so claims still split (docs/privacy.md).
         # The extraction shares the check's budget: its own 45 s would overrun it.
         async with asyncio.timeout_at(deadline) as budget:
-            result = await agent.run(wrap(USER_TEXT, text))
+            result = await agent.run(wrap(USER_TEXT, mask_personal_data(text)))
     except TimeoutError:
         if not budget.expired():
             raise  # not our budget: the API answers with a technical error

@@ -175,6 +175,11 @@ body.checked .status-pill { margin-bottom: 1rem; }
 #result { margin-bottom: 3.5rem; scroll-margin-top: 1rem; }
 .example[hidden] { display: none; }
 .example-note { margin: 0 0 1rem; color: var(--muted); max-width: 44rem; }
+.session { margin: 0 auto 3.5rem; max-width: 60rem; font-size: .92rem; color: var(--muted); }
+.link-btn { padding: 0; font: inherit; font-weight: 700; color: var(--red-deep); background: none; border: 0;
+            text-decoration: underline; cursor: pointer; }
+.link-btn[disabled] { cursor: progress; }
+.link-btn[hidden] { display: none; }
 .example-intro { margin-bottom: 1.5rem; }
 /* Wide screens: the explanation beside the card, as on the verdict slide */
 @media (min-width: 1080px) {

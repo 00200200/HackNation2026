@@ -11,6 +11,9 @@ services:
       # same relative path resolves under /app in the container, where ./incidents is mounted.
       PRAWDOWID_INCIDENTS_PATH: ${PRAWDOWID_INCIDENTS_PATH:-}
       PYDANTIC_AI_NO_BANNER: "1"
+      # The image runs as nobody and /app is read-only to it; the check log and source cache live in /tmp.
+      PRAWDOWID_CHECK_LOG: /tmp/prawdowid/checks.jsonl
+      PRAWDOWID_CACHE: /tmp/prawdowid/docs.jsonl
     volumes:
       - ./incidents:/app/incidents:ro
     healthcheck:
