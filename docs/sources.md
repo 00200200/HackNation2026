@@ -27,8 +27,13 @@ do not redistribute page content. Controls on the database:
   given `DATABASE_URL`, only the seed script on the host.
 - Deletion: `delete from documents where doc_id = '<canonical url>'` removes one page and its
   chunks. `docker compose --profile db down -v` deletes the whole database volume. Delete
-  `corpus/docs.jsonl` to clear the local cache. After a seed, the database export for
-  `evals.run --corpus` is `corpus/db-export.jsonl`.
+  `corpus/docs.jsonl` to clear the local cache.
+- No copies: page text from the database is never exported. The seed writes only metadata to
+  `corpus/manifest.jsonl` (no text), so retention and deletion in the database cover every stored
+  copy. A citation eval against database content needs an export that follows the same retention;
+  it is left for when step 2c is enabled.
+- Seed settings: `make db-seed` reads `.env` like the app does and builds the URI from
+  `POSTGRES_PASSWORD` and `DB_PORT` (a `DATABASE_URL` you set wins).
 
 Where the data is processed: on the machine that runs the compose stack.
 

@@ -5,8 +5,8 @@ sources: checks never write to the database and nothing in `verify()` calls `sea
 
 - `save_document` / `load_documents`: the local JSONL cache `corpus/docs.jsonl` (ignored by git:
   full page text, not redistributed). Web search (#8) saves every fetched page here. Its line format
-  (`url`, `text`, ...) is what `evals.run --corpus` reads; the seed exports the database in the
-  same format to `corpus/db-export.jsonl`.
+  (`url`, `text`, ...) is what `evals.run --corpus` reads. Page text from the database is never
+  exported, so database retention and deletion cover every stored copy.
 - `store_document` / `stored_documents`: the PostgreSQL store (`DATABASE_URL`, schema in
   `db/migrations/`). Only the seed script `prawdowid.corpus` writes to it.
 - `search_documents(claim)`: per-claim search of the store for rerank (#9). Without `DATABASE_URL`,
@@ -52,7 +52,8 @@ TCP_SETTINGS = {
     "tcp_user_timeout": 10_000,  # ms; ignored where the OS has no TCP_USER_TIMEOUT
 }
 ATTEMPTS = 2  # first call plus one retry
-CHUNKS_PER_SEARCH = 20
+# Best chunks kept per document, so one long page cannot crowd out the others.
+CHUNKS_PER_DOCUMENT = 2
 DOCUMENTS_PER_CLAIM = 5
 MAX_TERMS = 12
 
@@ -182,7 +183,7 @@ async def search_documents(
         return DatabaseSearch()
     try:
         async with asyncio.timeout(SEARCH_DEADLINE_S):
-            rows = await _search_with_retry(query)
+            rows = await _search_with_retry(query, limit)
     except TimeoutError:
         log.warning("database search unavailable: over %d s", SEARCH_DEADLINE_S)
         return DatabaseSearch(limitation=DATABASE_UNAVAILABLE)
@@ -232,15 +233,28 @@ def group_by_document(rows: list[dict]) -> list[Fragment]:
 
 _COLUMNS = "url, title, publisher, published_at, fetched_at, source_type, domain, text, licence"
 
+# At most CHUNKS_PER_DOCUMENT chunks per document, then the best `limit` documents by their best
+# chunk. Chunks come back best document first, each document's chunks in rank order.
 SEARCH_SQL = """
+    with ranked as (
+        select c.document_id, c.text, ts_rank(c.tsv, q) as rank,
+               row_number() over (partition by c.document_id order by ts_rank(c.tsv, q) desc, c.position) as n
+        from chunks c, to_tsquery('simple', %(query)s) q
+        where c.tsv @@ q
+    ), best as (
+        select d.id, max(r.rank) as best_rank
+        from ranked r join documents d on d.id = r.document_id
+        where d.delete_after > now()
+        group by d.id
+        order by best_rank desc, d.id
+        limit %(documents)s
+    )
     select d.doc_id, d.url, d.title, d.publisher, d.source_type, d.published_at,
-           d.fetched_at, c.text as fragment
-    from chunks c
-    join documents d on d.id = c.document_id,
-         to_tsquery('simple', %(query)s) q
-    where c.tsv @@ q and d.delete_after > now()
-    order by ts_rank(c.tsv, q) desc
-    limit %(limit)s
+           d.fetched_at, r.text as fragment
+    from best b
+    join documents d on d.id = b.id
+    join ranked r on r.document_id = b.id and r.n <= %(per_document)s
+    order by b.best_rank desc, d.id, r.n
 """
 
 
@@ -293,18 +307,21 @@ def _insert(doc: Document) -> bool:
         return True
 
 
-def _search(query: str) -> list[dict]:
+def _search(query: str, documents: int) -> list[dict]:
+    params = {
+        "query": query,
+        "documents": documents,
+        "per_document": CHUNKS_PER_DOCUMENT,
+    }
     with _db() as conn:
-        return conn.execute(
-            SEARCH_SQL, {"query": query, "limit": CHUNKS_PER_SEARCH}
-        ).fetchall()
+        return conn.execute(SEARCH_SQL, params).fetchall()
 
 
-async def _search_with_retry(query: str) -> list[dict] | None:
+async def _search_with_retry(query: str, documents: int) -> list[dict] | None:
     """Blocking psycopg call in a thread, one retry. None when every attempt failed."""
     for attempt in range(1, ATTEMPTS + 1):
         try:
-            return await asyncio.to_thread(_search, query)
+            return await asyncio.to_thread(_search, query, documents)
         except psycopg.Error as exc:
             log.warning("database search attempt %d failed: %r", attempt, exc)
     return None

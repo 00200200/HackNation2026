@@ -19,7 +19,7 @@ services:
   # Starts empty: the team seeds it with `make db-seed`. Schema from db/migrations/ on first start
   # of the volume. Port bound to 127.0.0.1 only. The default password is for this local-only
   # database; POSTGRES_PASSWORD applies only when the volume is created (`docker compose
-  # --profile db down -v` to recreate), URL-safe characters only.
+  # --profile db down -v` to recreate).
   db:
     profiles: [db]
     image: postgres:17
