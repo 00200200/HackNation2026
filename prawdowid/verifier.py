@@ -25,6 +25,7 @@ from prawdowid.contract import (
     Verdict,
 )
 from prawdowid.link import Page, Refusal, fetch_page
+from prawdowid.privacy import mask_personal_data
 
 log = logging.getLogger("prawdowid")
 
@@ -222,10 +223,10 @@ async def verify(text: str) -> CheckResult:
         for c in result.claims:
             c.limitations.append(PAGE_CUT)
     result.page = CheckedPage(**page.model_dump(exclude={"text"}))
-    # ponytail: the stdout log is the check store until storage is decided; the page text is not kept.
+    # The page text is not kept; the URL is masked (an e-mail in a query string).
     log.info(
         "link check url=%s sha256=%s status=%s claims=%s",
-        page.url,
+        mask_personal_data(page.url),
         page.sha256,
         result.status,
         json.dumps(
@@ -240,7 +241,8 @@ async def verify(text: str) -> CheckResult:
 async def verify_text(text: str, location: str = "input") -> CheckResult:
     started = time.perf_counter()
     try:
-        result = await agent.run(wrap(USER_TEXT, text))
+        # Masked before the model: placeholders keep the sentence, so claims still split (docs/privacy.md).
+        result = await agent.run(wrap(USER_TEXT, mask_personal_data(text)))
     # A failed or refused request may still be billed and reports no usage: cost unknown.
     except ContentFilterError:
         log.warning("model refused model=%s", MODEL)

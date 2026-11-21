@@ -22,8 +22,9 @@ create table if not exists documents (
     fetched_at timestamptz not null,
     content_hash text not null,
     text text not null,
-    -- Retention: a page is deleted after this time (delete_expired_documents below).
-    delete_after timestamptz not null default now() + interval '90 days'
+    -- Retention: a page is deleted after this time (delete_expired_documents below). The app sets
+    -- it from RETENTION_DAYS (prawdowid/privacy.py); this default only covers manual inserts.
+    delete_after timestamptz not null default now() + interval '30 days'
 );
 
 create table if not exists chunks (

@@ -54,6 +54,10 @@ textarea:focus { border-color: var(--blue); }
             gap: .75rem 1.5rem; margin-top: .6rem; }
 .hint { flex: 1 1 18rem; margin: 0; font-size: .9rem; color: var(--muted); }
 .count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.session { margin-top: 1rem; }
+.link-btn { padding: 0; font: inherit; color: var(--blue); background: none; border: 0;
+            text-decoration: underline; cursor: pointer; }
+.link-btn[disabled] { cursor: progress; }
 
 .btn { padding: .75rem 2rem; font: inherit; font-weight: 700; color: #fff; background: var(--blue);
        border: 0; border-radius: 4px; cursor: pointer; }

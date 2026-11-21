@@ -11,8 +11,11 @@ with a note that the source base is not connected, and an opinion, forecast or q
 `not_verifiable`. `sources` is always empty. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
-paste the text. Nothing is stored; each check is logged to stdout (status, latency, input length)
-with a second line for the model call (model, input and output tokens, latency).
+paste the text. Personal data (PESEL, phone, e-mail, account and card numbers) is masked before
+the text goes to the model. Each check is logged to stdout (session, status, latency, input length)
+with a second line for the model call (model, input and output tokens, latency), and kept for 30
+days as one masked record in the check log, which the user can delete per session. Details:
+[docs/privacy.md](docs/privacy.md).
 
 ## Configuration
 
@@ -29,6 +32,7 @@ image; `docker compose` and `make dev` read it at start-up.
 | `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database and the backend runs without it. Start the database with `make db` (127.0.0.1:5433). |
 | `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `db` service (port bound to 127.0.0.1 only). Applies only when the volume is created (`docker compose --profile db down -v` to recreate). The database starts empty: seed it with `make db-seed`. |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
+| `PRAWDOWID_CHECK_LOG` | no | `logs/checks.jsonl` | Check log file (masked question, result, session id). Docker sets `/tmp/prawdowid/checks.jsonl`. See [docs/privacy.md](docs/privacy.md). |
 
 The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
 errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns
@@ -69,6 +73,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 - `compose.yaml`: both services. Only the frontend port is published.
 - `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult` (with `page`,
   `security_events`, `cost_usd`).
+- `prawdowid/privacy.py`: `mask_personal_data` and `RETENTION_DAYS`; `prawdowid/checklog.py`: the check log
+  per demo session (`DELETE /api/sessions/{id}` removes a session).
 - `prawdowid/link.py`: `fetch_page(url)`, the guarded fetch and text extraction for link input.
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
   channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function

@@ -25,6 +25,8 @@ import trafilatura
 from pydantic import BaseModel
 from pypdf import PdfReader
 
+from prawdowid.privacy import mask_personal_data
+
 log = logging.getLogger("prawdowid")
 
 MAX_REDIRECTS = 3
@@ -202,11 +204,15 @@ async def fetch_page(
     except httpx2.UnsupportedProtocol:  # a redirect to ftp:, file: and the like
         raise Refusal(BAD_URL) from None
     except (TimeoutError, httpx2.HTTPError) as exc:
-        log.warning("link fetch failed url=%s error=%r", url, exc)
+        log.warning(
+            "link fetch failed url=%s error=%s",
+            mask_personal_data(url),
+            type(exc).__name__,
+        )
         raise Refusal(UNREACHABLE, technical=True) from None
     log.info(
         "link fetched url=%s sha256=%s bytes=%d chars=%d",
-        page.url,
+        mask_personal_data(page.url),
         page.sha256,
         len(body),
         len(page.text),

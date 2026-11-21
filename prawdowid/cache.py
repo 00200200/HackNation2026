@@ -32,7 +32,7 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel
 
 from prawdowid.contract import Source
-from prawdowid.privacy import mask_personal_data
+from prawdowid.privacy import RETENTION_DAYS, mask_personal_data
 from prawdowid.rerank import Fragment, canonical_url, split_text
 
 log = logging.getLogger("prawdowid")
@@ -280,8 +280,9 @@ def _insert(doc: Document) -> bool:
     with _db() as conn:
         row = conn.execute(
             """insert into documents (doc_id, url, title, publisher, domain, source_type,
-                   licence, published_at, fetched_at, content_hash, text)
-               values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   licence, published_at, fetched_at, content_hash, text, delete_after)
+               values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                       now() + make_interval(days => %s))
                on conflict (doc_id) do nothing returning id""",
             (
                 canonical_url(doc.url),
@@ -295,6 +296,7 @@ def _insert(doc: Document) -> bool:
                 doc.fetched_at,
                 hashlib.sha256(doc.text.encode()).hexdigest(),
                 doc.text,
+                RETENTION_DAYS,
             ),
         ).fetchone()
         if row is None:

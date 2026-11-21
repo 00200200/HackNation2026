@@ -14,7 +14,7 @@ Updated: 2026-11-21, by Łukasz (Claude worker).
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
 not → verdict set in code. No sources yet, so every checkable claim is `brak wystarczających dowodów` and the rest
-`nie podlega weryfikacji`. Links (#4, branch `LukiLenkiewicz/issue4-link-input`): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls, social media, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Nothing is stored; each link check logs URL, content hash, claims and result to stdout.
+`nie podlega weryfikacji`. Links (#4, branch `LukiLenkiewicz/issue4-link-input`): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls, social media, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Each check is kept as one masked record in the check log (#17); each link check also logs the masked URL, content hash, claims and result to stdout.
 
 **Branches**
 
@@ -57,7 +57,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [x] Real eval set `evals/cases.jsonl`: 31 cases, scenarios A–E, G, I, J at least twice, labels from Demagog, Konkret24, EUvsDisinfo. Owner: Łukasz (Claude worker). Open: I cases use EUvsDisinfo, not the organiser's incident base (not available to us); EUvsDisinfo blocks automated fetch, so check I01–I03 labels by hand; J cases need a product eval switch to simulate a missing key or limit.
 - [x] Contract gaps for metrics (#15): `security_events` (the extraction call flags instructions aimed at the model; event carries no wording) and `cost_usd` per answer (token usage priced by genai-prices through PydanticAI; 0.0 when no request was sent, null when unknown). Web and Discord show a notice when an event is logged. Not measured with a real key yet. Branch `LukiLenkiewicz/issue15-contract-metrics`. Owner: Łukasz (Claude worker)
 - [x] Link input (#4): safe fetch (http/https, SSRF guard on every connection incl. redirects and DNS, ≤ 3 redirects, 10 s, 2 MB, HTML via trafilatura, PDF via pypdf), page URL kept in `CheckResult.page` for later evidence exclusion. Branch `LukiLenkiewicz/issue4-link-input`, stacked on #15, in review. Prompt injection found in a page is logged with `location="page"`. Owner: Łukasz (Claude worker). Open: page text cut to 5000 chars (same as pasted text, UNCONFIRMED choice); no eval case uses a URL yet.
-- [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
+- [x] Privacy (#17): `prawdowid/privacy.py` masks e-mail, NRB/IBAN (mod 97), phone, PESEL (checksum), card numbers (Luhn) before the extraction model and in every log; Presidio checked and not taken (only PESEL for Polish, needs spaCy). Check log `prawdowid/checklog.py` (`PRAWDOWID_CHECK_LOG`, one masked JSON line per check: session, time, channel, question, verdicts, source URLs), session id via `X-Session-Id`, `DELETE /api/sessions/{id}`, "Usuń moje sprawdzenia" on the web page. One retention constant `RETENTION_DAYS` = 30 (check log and source store `delete_after`; UNCONFIRMED choice). `docs/privacy.md` lists call sites and processors. Open: Discord has no delete command; `corpus/docs.jsonl` and Docker stdout logs are outside retention; provider data regions UNCONFIRMED. Branch `LukiLenkiewicz/issue17-privacy`. Owner: Łukasz (Claude worker)
 - [ ] Deliverables: description ≤ 4000 chars, PDF ≤ 12 slides, video ≤ 3 min, cost estimate, risks. Owner: ?
 - [ ] Optional after basics: moderator loop (scenario H), screenshots (F).
 - [ ] Team OK on the web search provider (PROPOSED below, #7); then run ~20 Polish test queries once a key exists. Owner: Łukasz (Claude worker)
@@ -107,12 +107,14 @@ Basic requirements first: the jury gives no points for extras if one of these is
     Tavily figure. LLM cost is not included.
 - 2026-11-21: The model never decides truth. It extracts claims; verdicts are set in code from evidence. (`b52c248`)
 - 2026-11-21: Model through PydanticAI, default `anthropic:claude-opus-5-5`, swappable with `PRAWDOWID_MODEL`. (`b52c248`)
+- 2026-11-21: Checks are stored only in the local check log (`prawdowid/checklog.py`, masked, 30 days, deletable per session); no database for checks. (#17)
 - 2026-11-21: No database for now; each check is logged to stdout. Storage UNDECIDED. (`96f3b46`)
 - 2026-11-21: Frontend is static HTML/CSS/JS behind nginx, no build step; backend is JSON only. (`96f3b46`)
 - 2026-11-21: Every push goes through `.githooks/pre-push` (ruff, pytest, eval, judge PASS). (`d5aa35b`)
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #17 masking before the model and in logs (cards, IBAN added), check log per demo session with delete endpoint and web button, `RETENTION_DAYS` = 30, `docs/privacy.md`. Branch `LukiLenkiewicz/issue17-privacy`.
 - 2026-11-21 Łukasz (Claude worker): #19 PR #34 Codex review fixes: per-document chunk cap before the document limit (regression test, passes on Postgres 17, old SQL returned only the long page), seed reads `.env` (`--local-db`), no full-text export of the database.
 - 2026-11-21 Łukasz (Claude worker): #19 merged `origin/LukiLenkiewicz/issue31-euvsdisinfo` (#33) to keep the stack linear; kept the newer quick eval (8 cases, 17:23 UTC) over the older full run from #31's base; quick eval rerun on the merge: macro_f1 0.111, injection 0.0, end_to_end 0.875, latency 3.4 s, $1.50 per 100.
 - 2026-11-21 Łukasz (Claude worker): #19 step 2c taken out of the pipeline (user decision): only the seed script writes to the database, web search saves to JSONL only, compose `db` is opt-in (profile `db`), backend has no `DATABASE_URL`. Branch `LukiLenkiewicz/issue19-supabase`.

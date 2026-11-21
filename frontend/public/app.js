@@ -104,12 +104,16 @@ form.addEventListener("submit", async (event) => {
   submit.textContent = "Sprawdzam…";
   result.setAttribute("aria-busy", "true");
   try {
+    const headers = { "Content-Type": "application/json" };
+    const known = sessionStorage.getItem(SESSION_KEY);
+    if (known) headers["X-Session-Id"] = known;
     const resp = await fetch("/api/checks", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ input: input.value }),
       signal: AbortSignal.timeout(75000),
     });
+    rememberSession(resp.headers.get("X-Session-Id"));
     let nodes;
     if (resp.ok) nodes = render(await resp.json());
     else if (resp.status >= 500) nodes = [box("error", "Błąd techniczny", GENERIC_ERROR)];
@@ -125,3 +129,39 @@ form.addEventListener("submit", async (event) => {
 });
 
 input.addEventListener("input", () => { count.textContent = input.value.length; });
+
+// Demo session: the API issues an id on the first check; this tab sends it back and can delete it.
+const SESSION_KEY = "prawdowid-session";
+const sessionNote = document.getElementById("session");
+const sessionStatus = document.getElementById("session-status");
+const deleteSession = document.getElementById("delete-session");
+
+function rememberSession(id) {
+  if (!id) return;
+  sessionStorage.setItem(SESSION_KEY, id);
+  sessionNote.hidden = false;
+  deleteSession.hidden = false;
+  sessionStatus.textContent = "";
+}
+
+deleteSession.addEventListener("click", async () => {
+  const id = sessionStorage.getItem(SESSION_KEY);
+  if (!id) return;
+  deleteSession.disabled = true;
+  try {
+    const resp = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) throw new Error(String(resp.status));
+    sessionStorage.removeItem(SESSION_KEY);
+    deleteSession.hidden = true;
+    sessionStatus.textContent = "Usunęliśmy sprawdzenia z tej sesji.";
+  } catch {
+    sessionStatus.textContent = "Nie udało się usunąć sprawdzeń. Spróbuj ponownie za chwilę.";
+  } finally {
+    deleteSession.disabled = false;
+  }
+});
+
+if (sessionStorage.getItem(SESSION_KEY)) sessionNote.hidden = false;
