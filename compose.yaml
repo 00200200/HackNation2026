@@ -5,6 +5,7 @@ services:
     # Compose reads these from the ignored .env at start-up; they are never part of the image.
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DATABASE_URL: ${DATABASE_URL:-}
       PRAWDOWID_MODEL: ${PRAWDOWID_MODEL:-}
       PYDANTIC_AI_NO_BANNER: "1"
     healthcheck:

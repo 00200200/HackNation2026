@@ -11,8 +11,23 @@ goes to `corpus/manifest.jsonl` when the corpus is built with `uv run python -m 
 **The corpus is not built yet:** DuckDuckGo returned no results from our machine on 2026-11-21, and
 the team will replace the provider (#7, #8).
 
-What we store: the extracted page text stays in the local cache `corpus/docs.jsonl`, which is not
-in the repo. We do not redistribute page content. Delete the file to clear the cache.
+What we store: the extracted page text, split into chunks for full-text search, goes to our
+Supabase Postgres (`documents`, `chunks`; schema in `supabase/migrations/`) when `DATABASE_URL` is
+set, else to the local cache `corpus/docs.jsonl`. Neither is in the repo and we do not redistribute
+page content. Controls on the database:
+
+- Only pages found by web search are stored, never pages from links users submit.
+- Licence per document (`licence`, UNCONFIRMED until checked, see below).
+- Retention: `delete_after` defaults to 90 days after the page was stored (UNCONFIRMED: the team
+  has not set the period; #17). `select delete_expired_documents()` deletes expired pages and their
+  chunks; the seed script runs it, and pg_cron can run it daily (command in the migration).
+- Access: row level security on with no policies, so Supabase's public keys see nothing; only the
+  backend connects, with `DATABASE_URL` from its `.env`.
+- Deletion: `delete from documents where doc_id = '<canonical url>'` removes one page and its chunks.
+  Delete `corpus/docs.jsonl` to clear the local cache.
+
+Where the data is processed: the Supabase project region (an EEA region is planned; the project
+does not exist yet, UNCONFIRMED).
 
 Licences: **UNCONFIRMED for every domain.** Nobody on the team has checked each site's terms yet.
 The column says where to check. Until it is checked we quote short passages with a link, and do not

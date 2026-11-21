@@ -24,6 +24,7 @@ image; `docker compose` and `make dev` read it at start-up.
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
+| `DATABASE_URL` | no | none | Postgres URI of the Supabase source store (Project Settings > Database > Connection string, the **session pooler** URI: the direct host is IPv6 only). Apply `supabase/migrations/` first. Without it fetched pages go to `corpus/docs.jsonl` and the database search (step 2c) is skipped and reported as unavailable. Backend only: it bypasses row level security. |
 
 The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
 errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns

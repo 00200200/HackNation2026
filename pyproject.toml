@@ -7,6 +7,7 @@ dependencies = [
     "discord-py>=2.7.1",
     "fastapi>=0.165.0",
     "httpx2>=2.16.2",
+    "psycopg[binary]>=3.3.9",
     "pydantic-ai-slim[anthropic]>=2.71.0",
     "slowapi>=0.1.10",
     "trafilatura>=2.3.1",
