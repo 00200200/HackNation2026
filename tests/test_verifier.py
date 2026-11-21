@@ -9,7 +9,6 @@ from prawdowid import verifier
 from prawdowid.contract import ClaimKind, Status, Verdict
 from prawdowid.verifier import (
     INSTRUCTIONS,
-    LINKS_NOT_SUPPORTED,
     MODEL_FAILED,
     NO_SOURCES,
     ExtractedClaim,
@@ -84,15 +83,6 @@ def test_agent_path_maps_model_output():
         Verdict.INSUFFICIENT_EVIDENCE,
         Verdict.NOT_VERIFIABLE,
     ]
-
-
-def test_bare_url_is_not_sent_to_model():
-    def never(messages, info):
-        raise AssertionError("model must not be called for a link")
-
-    result = run("https://example.com/artykul", FunctionModel(never))
-    assert result.status is Status.CANNOT_CHECK
-    assert result.message == LINKS_NOT_SUPPORTED
 
 
 @pytest.mark.parametrize(

@@ -61,8 +61,17 @@ function render(check) {
   if (check.status !== "ok") return [box("notice", "Brak oceny", check.message)];
   if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia.")];
   const nodes = check.claims.map(claimCard);
+  if (check.page) nodes.unshift(pageNote(check.page));
   if (check.unchecked_claims?.length) nodes.push(uncheckedList(check.unchecked_claims));
   return nodes;
+}
+
+// The page behind a link: what was read, not evidence for its own claims.
+function pageNote(p) {
+  const meta = [p.publisher, p.published_at].filter(Boolean).join(", ");
+  return el("p", { className: "origin" }, "Sprawdzony tekst pochodzi ze strony: ",
+    el("a", { href: p.url, textContent: p.title || p.url, rel: "noopener noreferrer", target: "_blank" }),
+    meta ? `, ${meta}` : null, ". Ta strona nie jest źródłem dowodów dla własnych twierdzeń.");
 }
 
 function uncheckedList(claims) {

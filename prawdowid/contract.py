@@ -73,9 +73,21 @@ class ClaimResult(BaseModel):
         return self.verdict.label
 
 
+class CheckedPage(BaseModel):
+    """The page a link pointed to. Its own URL is never evidence for its own claims."""
+
+    url: str
+    sha256: str
+    title: str | None
+    publisher: str | None
+    published_at: date | None
+
+
 class CheckResult(BaseModel):
     status: Status
     message: str | None = None
+    # Set when the input was a link and the page was fetched.
+    page: CheckedPage | None = None
     claims: list[ClaimResult] = []
     # Claims found but left out by the per-check cap. They have no verdict.
     unchecked_claims: list[str] = []

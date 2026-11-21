@@ -52,8 +52,8 @@ def client():
         yield TestClient(app)
 
 
-def test_http_link_is_accepted(client):
-    resp = client.post("/api/checks", json={"input": "https://example.com/artykul"})
+def test_link_to_a_private_address_is_a_notice(client):
+    resp = client.post("/api/checks", json={"input": "http://127.0.0.1:8000/admin"})
     assert resp.status_code == 200
     assert resp.json()["status"] == "cannot_check"
 

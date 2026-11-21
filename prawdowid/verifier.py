@@ -5,6 +5,7 @@ says whether each one is checkable and writes search queries for the top ones. I
 insufficient evidence.
 """
 
+import json
 import logging
 import os
 import time
@@ -15,12 +16,14 @@ from pydantic_ai.exceptions import AgentRunError, ContentFilterError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
 from prawdowid.contract import (
+    CheckedPage,
     CheckResult,
     ClaimKind,
     ClaimResult,
     Status,
     Verdict,
 )
+from prawdowid.link import Page, Refusal, fetch_page
 
 log = logging.getLogger("prawdowid")
 
@@ -29,8 +32,11 @@ MODEL = os.getenv("PRAWDOWID_MODEL") or "anthropic:claude-opus-5-5"
 MODEL_TIMEOUT_S = 45
 MODEL_MAX_RETRIES = 1
 
-LINKS_NOT_SUPPORTED = (
-    "Nie obsługujemy jeszcze linków. Wklej tekst, który chcesz sprawdzić."
+# ponytail: page text is cut to the size of a pasted text, so one link costs what one text does.
+MAX_PAGE_CHARS = 5000
+PAGE_CUT = (
+    f"Strona jest długa: sprawdziliśmy tylko jej początek ({MAX_PAGE_CHARS} znaków). "
+    "Resztę tekstu możesz wkleić osobno."
 )
 NEEDS_CLARIFICATION = (
     "Nie znaleźliśmy w tym tekście żadnego twierdzenia. "
@@ -183,10 +189,46 @@ def claim_result(
     )
 
 
+def page_text(page: Page) -> str:
+    """Page metadata first, so the model can resolve relative dates from the publication date."""
+    header = [
+        f"Tytuł: {page.title}" if page.title else None,
+        f"Wydawca: {page.publisher}" if page.publisher else None,
+        f"Data publikacji: {page.published_at}" if page.published_at else None,
+    ]
+    return "\n".join([h for h in header if h] + ["", page.text[:MAX_PAGE_CHARS]])
+
+
 async def verify(text: str) -> CheckResult:
-    """The one entry point every channel calls."""
-    if is_link(text):
-        return CheckResult(status=Status.CANNOT_CHECK, message=LINKS_NOT_SUPPORTED)
+    """The one entry point every channel calls. A link is fetched and its text checked as text."""
+    if not is_link(text):
+        return await verify_text(text)
+    try:
+        page = await fetch_page(text)
+    except Refusal as refusal:
+        status = Status.TECHNICAL_ERROR if refusal.technical else Status.CANNOT_CHECK
+        return CheckResult(status=status, message=refusal.message)
+    result = await verify_text(page_text(page))
+    if len(page.text) > MAX_PAGE_CHARS:
+        for c in result.claims:
+            c.limitations.append(PAGE_CUT)
+    result.page = CheckedPage(**page.model_dump(exclude={"text"}))
+    # ponytail: the stdout log is the check store until storage is decided; the page text is not kept.
+    log.info(
+        "link check url=%s sha256=%s status=%s claims=%s",
+        page.url,
+        page.sha256,
+        result.status,
+        json.dumps(
+            [{"claim": c.claim, "verdict": c.verdict} for c in result.claims]
+            + [{"claim": c, "verdict": None} for c in result.unchecked_claims],
+            ensure_ascii=False,
+        ),
+    )
+    return result
+
+
+async def verify_text(text: str) -> CheckResult:
     started = time.perf_counter()
     try:
         result = await agent.run(wrap(USER_TEXT, text))
