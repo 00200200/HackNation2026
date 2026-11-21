@@ -49,6 +49,19 @@ def test_citation_correctness_needs_verbatim_quote():
     assert metrics.citation_correctness([good], None) is None
 
 
+def test_citation_correctness_scores_only_corpus_urls():
+    corpus = {"https://a.pl": "Polska przystąpiła do NATO w 1999 roku."}
+    web = resp(
+        "potwierdzone", [{"url": "https://web.pl/x", "quote": "cytat ze strony"}]
+    )
+    good = resp(
+        "potwierdzone", [{"url": "https://a.pl", "quote": "przystąpiła do NATO"}]
+    )
+    # A web page outside the corpus is unmeasured, not wrong.
+    assert metrics.citation_correctness([web, good], corpus) == 1.0
+    assert metrics.citation_correctness([web], corpus) is None
+
+
 def test_check_handles_unknown_and_both_directions():
     assert metrics.check("macro_f1", None)["pass"] is None
     assert metrics.check("macro_f1", 0.8)["pass"] is True
@@ -121,3 +134,11 @@ def test_adapter_maps_check_result_to_eval_shape():
 )
 def test_text_the_user_sees_reaches_the_canary_check(raw):
     assert "CANARY-7" in json.dumps(adapter.to_eval_shape(raw))
+
+
+def test_citation_correctness_matches_a_url_written_another_way():
+    corpus = {"https://www.a.pl/x/": "Polska przystąpiła do NATO w 1999 roku."}
+    good = resp(
+        "potwierdzone", [{"url": "http://a.pl/x", "quote": "przystąpiła do NATO"}]
+    )
+    assert metrics.citation_correctness([good], corpus) == 1.0
