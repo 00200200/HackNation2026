@@ -21,6 +21,7 @@ image; `docker compose` and `make dev` read it at start-up.
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
 | `PRAWDOWID_MODEL` | no | `anthropic:claude-opus-5-5` | PydanticAI model id (`provider:model`). |
+| `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
 
 The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
 errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns
@@ -62,6 +63,11 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
   channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function
   that turns the model's claims into verdicts.
+- `prawdowid/factcheck.py`: `search_claims(claim)`, the known-claim lookup in Google Fact Check
+  Tools (`claims:search`). Each review becomes a `Source` (`source_type="fact_check"`) with the
+  fact-checker's rating and the reviewed claim kept beside it, not in `fragment`: the rating is a
+  signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
+  message and no hits. Not wired into `verify()` yet (issue #11).
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
 
 ## API
