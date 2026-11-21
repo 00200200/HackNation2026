@@ -29,6 +29,7 @@ from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
+from prawdowid import justification
 from prawdowid.contract import SecurityEvent, Source, Verdict
 from prawdowid.rerank import RELIABLE_TYPES, Fragment, Ranking
 
@@ -163,6 +164,8 @@ class Judgement(BaseModel):
     premises: list[str]
     sources: list[Source]
     limitations: list[str]
+    # Why this verdict, in code from the evidence (prawdowid/justification.py); `ClaimResult.reasoning`.
+    justification: str = ""
     # Instructions found in retrieved sources and ignored; #11 adds them to CheckResult.
     security_events: list[SecurityEvent] = []
 
@@ -488,7 +491,15 @@ def _judgement(verdict, strength, premises, evidence, limitations) -> Judgement:
         premises=premises,
         sources=[e.source for e in evidence],
         limitations=limitations,
+        justification=justification.explain(
+            verdict,
+            [(e.source, e.label.stance.value, _missing(e)) for e in evidence],
+        ),
     )
+
+
+def _missing(e: Evidence) -> str | None:
+    return e.label.missing_context if _grounded(e) else None
 
 
 def _insufficient(strength: str, limitations: list[str]) -> Judgement:
