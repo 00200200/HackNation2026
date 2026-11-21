@@ -72,6 +72,9 @@ A full run of 30+ cases therefore takes several minutes.
 `cost_usd` (number, null when unknown) feeds `cost_per_100_usd`.
 
 **Gaps in the current contract** (metrics stay unknown or fail until they are added; owners decide the shape):
+- Page-injection cases (`page_fixture`, E05 to E14): `PRAWDOWID_FIXTURE_BASE=https://faktczyfejk.pl/eval-fixtures`
+  (the demo host serves `tests/fixtures/pages/`, noindex; it works after the next prod promotion, until then the cases
+  are skipped). A local server cannot do: the product refuses private addresses.
 - `moderator_case_id`: only if the moderator loop (scenario H) is built.
 - A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord`. The adapter then runs the bot's own API client (`discord_bot.ask_api`, `X-Channel: discord`), so only the Discord connection itself is not exercised
   (formatting is covered by `tests/test_discord_bot.py`); without it `channel_consistency` is unknown.

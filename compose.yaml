@@ -60,7 +60,10 @@ services:
         restart: true
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      additional_contexts:
+        fixtures: ./tests/fixtures/pages
     restart: unless-stopped
     ports:
       - "${PORT:-8080}:80"
