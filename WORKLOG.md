@@ -25,11 +25,12 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `feat/16-eval-set` | #16 eval set (32 cases, 30 scored, J skipped) and no-corpus full eval, stacked on `feat/5-self-contained-claims`. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `d655078` (#5 merged into #16), no corpus):
-macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail: no `security_events`, verdicts
-wrong), median latency 5.0 s, end_to_end 0.94 (fail: both J cases, no eval switch to simulate a failure). Citation metrics,
-channel consistency and cost: not measured (no corpus, no second channel, no `cost_usd`). Every checkable case returns
-`brak wystarczających dowodów`: expected while there are no sources.
+**Last eval** (`evals/results/latest.json`, **full, no corpus**, 30 scored cases from `evals/cases.jsonl`, J01–J02 skipped,
+commit `3ce9bae`). Does **not** count for submission: the cache-corpus run is blocked (no corpus yet) and `coverage_ok` is false
+(J skipped). macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail: no `security_events`,
+verdicts wrong), median latency 4.1 s, end_to_end 1.00. Citation metrics, channel consistency and cost: not measured (no corpus,
+no second channel, no `cost_usd`). Every checkable case returns `brak wystarczających dowodów`, so abstention 1.00 shows nothing
+yet.
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -93,7 +94,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
-- 2026-11-21 Łukasz (Claude worker): #16 Codex review fixes on PR #23: `skip` field in `evals/run.py` (J01–J02 skipped, not scored), single-assertion inputs for B05, B06, B02, G01, G03, G04, A05, E02, new A08, I01–I03 marked as stand-ins; corpus run marked blocked.
+- 2026-11-21 Łukasz (Claude worker): #16 Codex review fixes on PR #23: `skip` field in `evals/run.py` (J01–J02 skipped, not scored), single-assertion inputs for B05, B06, B02, G01, G03, G04, A05, E02, new A08, I01–I03 marked as stand-ins; corpus run marked blocked. Full no-corpus eval on `3ce9bae`: macro_f1 0.09, end_to_end 1.00.
 - 2026-11-21 Łukasz (Claude worker): #16 `evals/cases.jsonl` with 31 labelled cases, full eval on `7ee1410` committed (macro_f1 0.09).
 - 2026-11-21 Łukasz (Claude worker): #16 merged `feat/5-self-contained-claims` (stack), full eval rerun on `d655078`: macro_f1 0.09, median latency 5.0 s.
 - 2026-11-21 Łukasz (Claude worker): #5 claims stand alone (pronouns, relative dates from the text), quotes split into attribution + quoted, queries per claim, top-N cap with `unchecked_claims`, source sentence shown in the UI. Branch `feat/5-self-contained-claims`.
