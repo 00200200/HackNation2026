@@ -94,7 +94,7 @@ a { color: var(--blue); }
 .verdict-confirmed { color: #155d2f; background: #e5f3e9; }
 .verdict-false { color: #a3111d; background: #fbe7e8; }
 .verdict-misleading { color: #7f4600; background: #fdf0dc; }
-.verdict-insufficient_evidence, .verdict-not_verifiable { color: #3d4753; background: #eceff2; }
+.verdict-insufficient_evidence, .verdict-not_verifiable, .verdict-not_checked { color: #3d4753; background: #eceff2; }
 
 .legend { margin: 3rem 0; }
 .legend h2 { font-size: 1.25rem; margin: 0 0 .75rem; }
