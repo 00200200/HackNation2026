@@ -13,6 +13,9 @@ target=$(git rev-parse origin/prod)
 [ "$target" = "$(cat "$deployed" 2>/dev/null || true)" ] && exit 0
 
 echo "deploying $(git log -1 --format='%h %s' "$target")"
+# From here on the running stack may no longer match the record: a failed deploy must not let a
+# later run skip this commit (or a return to it) as already deployed.
+rm -f "$deployed"
 git reset --quiet --hard "$target"
 docker compose up -d --build --remove-orphans --wait --wait-timeout 300
 docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
