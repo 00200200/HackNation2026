@@ -1,11 +1,10 @@
 {
- "built_at": "2026-11-21T17:46:52+00:00",
+ "built_at": "2026-11-21T21:41:28+00:00",
  "command": "uv run python -m corpus.build",
- "size_bytes": 8553020,
+ "size_bytes": 5334594,
  "summary": {
-  "documents": 2988,
+  "documents": 1158,
   "registered_domains": {
-   "demagog.org.pl": 1830,
    "www.gov.pl": 396,
    "cert.pl": 284,
    "odyseusz.gov.pl": 251,
@@ -19,7 +18,6 @@
    "europa.eu": 7
   },
   "strict_domains": {
-   "demagog.org.pl": 1830,
    "gov.pl": 741,
    "cert.pl": 284,
    "policja.pl": 45,
@@ -29,16 +27,14 @@
    "europa.eu": 7
   },
   "source_types": {
-   "fact_checker": 1845,
-   "official": 1143
+   "official": 1143,
+   "fact_checker": 15
   },
   "storage": {
-   "excerpt": 1875,
-   "full_text": 1113
+   "full_text": 1113,
+   "excerpt": 45
   },
   "sources": {
-   "demagog-fake-news": 900,
-   "demagog-wypowiedzi": 900,
    "cert-komunikaty": 284,
    "odyseusz": 251,
    "govpl-rcb": 60,
@@ -52,7 +48,6 @@
    "govpl-kprm": 30,
    "govpl-mc": 30,
    "kgsok": 30,
-   "demagog-analizy": 30,
    "govpl-mswia": 28,
    "govpl-mon": 28,
    "govpl-mi": 20,
@@ -308,31 +303,13 @@
    "note": ""
   },
   {
-   "id": "demagog-fake-news",
+   "id": "demagog",
    "domain": "demagog.org.pl",
    "registered_domain": "demagog.org.pl",
    "source_type": "fact_checker",
-   "status": "active",
-   "documents": 900,
-   "note": ""
-  },
-  {
-   "id": "demagog-wypowiedzi",
-   "domain": "demagog.org.pl",
-   "registered_domain": "demagog.org.pl",
-   "source_type": "fact_checker",
-   "status": "active",
-   "documents": 900,
-   "note": ""
-  },
-  {
-   "id": "demagog-analizy",
-   "domain": "demagog.org.pl",
-   "registered_domain": "demagog.org.pl",
-   "source_type": "fact_checker",
-   "status": "active",
-   "documents": 30,
-   "note": ""
+   "status": "excluded",
+   "documents": 0,
+   "note": "Team decision; no direct integration. Demagog's ratings reach us only as ClaimReview records through the Google Fact Check Tools API (entry google-factcheck), with the claim, the verbatim rating and the link."
   },
   {
    "id": "pravda",

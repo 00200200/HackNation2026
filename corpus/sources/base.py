@@ -10,7 +10,6 @@ from corpus.http import Blocked, FetchError, PoliteClient
 from corpus.schema import (
     EXCERPT_CHARS,
     MAX_TEXT_CHARS,
-    CitedLink,
     Doc,
     clip,
     doc_id,
@@ -106,13 +105,8 @@ def make_doc(
     title = mask_emails(" ".join(title.split()))
     if not text or not title or JOB_ADVERT.search(title):
         return None
-    for key in ("claim", "claim_author", "claim_source"):
-        if fact_check.get(key):
-            fact_check[key] = mask_emails(fact_check[key])
-    if links := fact_check.get("cited_links"):
-        fact_check["cited_links"] = [
-            CitedLink(url=link.url, text=mask_emails(link.text)) for link in links
-        ]
+    if fact_check.get("claim"):
+        fact_check["claim"] = mask_emails(fact_check["claim"])
     if source.storage == "excerpt":
         # A short fragment only; the document itself stays at `url`.
         text, _ = clip(text.replace("\n", " "), EXCERPT_CHARS)

@@ -16,12 +16,12 @@ Updated: 2026-11-21 21:50, by Michał (via Claude, session "korpus").
 not → each checkable claim runs Fact Check, EUvsDisinfo, the www.gov.pl site search and web search in parallel, then rerank and judge, verdict set in code (`prawdowid/pipeline.py`); non-checkable claims are
 `nie podlega weryfikacji`. Without keys and a corpus, every source fails and checkable claims come back `nie sprawdzono`. Links (#4, on `main` as #28): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls (incl. inline sign-in or subscribe walls), social media, URLs with a login or password, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Each check is kept as one masked record in the check log (#17); each link check logs URL (secret query values, userinfo and fragment redacted, also in the answer), content hash, claims and result to stdout.
 
-**Evidence corpus** (branch `claude/corpus-455bc1`, not merged, not wired into `verify()` yet): `make corpus`
+**Evidence corpus** (on `main` since #49, not wired into `verify()` yet): `make corpus`
 rebuilds `corpus/evidence.jsonl` from the audited source list `corpus/catalog.yaml` (robots.txt respected, 1 request/s per
-domain, page cache in `corpus/.cache/`). Build of 21.11: 2,988 records from 12 registered domains, official (gov.pl,
-CERT, Policja, Sejm ELI, IMGW, EU Official Journal, Odyseusz, GUS, SOK) and fact-checkers (Demagog, Pravda), 8.6 MB.
-Demagog (1,830 records, statements back to 01.2024) carries `claim`, verbatim `rating`, a justification fragment and
-`cited_links`; Odyseusz has 239 country profiles with the current MSZ notice and warning level.
+domain, page cache in `corpus/.cache/`). Build of 21.11: 1,158 records from 11 registered domains, official (gov.pl,
+CERT, Policja, Sejm ELI, IMGW, EU Official Journal, Odyseusz, GUS, SOK) and one fact-checker feed (Pravda, 15), 5.3 MB.
+Demagog is not a direct source (decision 21.11): its ratings come only as ClaimReview records through Google Fact Check
+Tools. Odyseusz has 239 country profiles with the current MSZ notice and warning level.
 `make corpus-check` checks the brief's thresholds; `tests/test_corpus_build.py` checks the committed file. Sources,
 licences and limits: `docs/corpus.md`. Google Fact Check and EUvsDisinfo collectors are built but skipped until the
 keys are in `.env`.
@@ -44,6 +44,7 @@ keys are in `.env`.
 | `LukiLenkiewicz/issue17-privacy` | #17 masking (`prawdowid/privacy.py`: e-mail, IBAN/NRB, card, PESEL, phone) before the extraction model and in every log, check log (`prawdowid/checklog.py`) with `DELETE /api/sessions/{id}` and a web "Usuń moje sprawdzenia" action, one `RETENTION_DAYS` = 30 across the check log, JSONL cache and source store, `docs/privacy.md`. Merged into `main` as #39. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue14-checklog` | #14 further check-log work (per-step latency, model calls, cost, security events, read back per session), on top of #39's already-shipped `checklog.py`. Merged into `main` as #43 (`8c6f396`). Owner: Łukasz (Claude worker). |
 | `claude/corpus-455bc1` | Evidence corpus (`corpus/evidence.jsonl`, `docs/corpus.md`) and corpus search (`prawdowid/index.py`, `prawdowid/corpus_search.py`, tables `corpus_*`), rebased on `main`. |
+| `claude/drop-demagog` | Demagog dropped as a direct source (catalogue, collector, web-search allowlist, docs); corpus rebuilt to 1,158 records. Owner: Michał (session "korpus"). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 | `claude/deploy-config-43a484` | Deploy config, merged into `main` as #32. |
 | `claude/pull-deploy` | Deploy by pulling `prod` on the server (`deploy/`), Actions workflow removed. |
@@ -73,9 +74,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
   - [x] Code (#8): `prawdowid/websearch.py` (search on the allowlist, fetch, trafilatura extraction, PII masking of the query), `prawdowid/safefetch.py` (per-hop allowlist, public-IP check pinned at connect, robots.txt per hop, byte caps; for #4 to reuse), `prawdowid/cache.py` (local JSONL, metadata only until a licence is confirmed, 30-day retention, delete, swap point for #19), builder `python -m prawdowid.corpus`, source list `docs/sources.md` (licences UNCONFIRMED). Branch `feat/8-web-search`.
   - [x] Provider swap (#7/#8): DuckDuckGo (`ddgs`) replaced by **Tavily** `/search` (official API, `tavily-python`), `tavily_search` in `prawdowid/websearch.py`, same `SearchProvider` contract. Live-tested: 7/8 quick-eval cases now get ≥1 allowlisted source (was 0/8). `uv remove ddgs`, `uv add tavily-python`. Owner: Łukasz (Claude worker)
   - [ ] Build the corpus: **open**, now unblocked by the provider; `uv run python -m prawdowid.corpus` needs a `TAVILY_API_KEY` in the clone that runs it.
-  - [x] Evidence corpus, no key needed: `corpus/evidence.jsonl` (2,988 records, 12 domains, official + fact-checkers), Owner: Michał (session "korpus", branch `claude/corpus-455bc1`; needs a merge)
+  - [x] Evidence corpus, no key needed: `corpus/evidence.jsonl` (1,158 records, 11 domains, official + fact-checker), Owner: Michał (session "korpus", merged as #49)
 - [ ] Keys into `.env`, then `make corpus`: Google Fact Check Tools API (`GOOGLE_FACTCHECK_API_KEY`, the same key `prawdowid/factcheck.py` needs) and EUvsDisinfo token (`EUVSDISINFO_TOKEN`, from the mentor). Owner: ?
-- [ ] The corpus is 8.6 MB of the 10 MB push limit. Growing it further (deeper Demagog archive, Google records) needs a split or a smaller text cap. Owner: ?
+- [ ] Fact-checker records in the corpus are only Pravda's 15 until `GOOGLE_FACTCHECK_API_KEY` is set and `make corpus` reruns (Demagog and Pravda ClaimReview). Owner: ?
 - [ ] Corpus search: `prawdowid/index.py` loads `corpus/evidence.jsonl` into the `db` Postgres (chunks with local e5-large embeddings, HNSW and full-text indexes; `make index`), `prawdowid/corpus_search.py` `search_corpus()` returns hybrid hits as `Source` with a verbatim fragment. Done on `claude/corpus-455bc1`; open: run the index once on the server (`docs/deploy.md`, "Search index"), wire `search_corpus()` into `verify()` (verifier owner). Owner: Michał (session "korpus")
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
@@ -198,6 +199,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał (session korpus): Demagog dropped as a direct source (user decision: Demagog only through Google Fact Check Tools): catalogue entry excluded with the reason, ClaimReview page collector and its `claim_author`/`claim_source`/`cited_links` fields removed, `demagog.org.pl` out of the web-search allowlist and `docs/sources.md`; corpus rebuilt: 1,158 records, 11 registered domains (7 with *.gov.pl as one), official 1,143 + fact-checker 15, thresholds met. Eval labels from Demagog ClaimReview kept. Branch `claude/drop-demagog`.
 - 2026-11-21 Michał: web UI as one view in the pitch deck's crimson (Sherlock-cover cloth, white page): the name "faktczyfejk" with a glass magnifier and outlined echo, one box for text or a link, the answer with sources below. Example card, legend, chips and chat preview removed; logo and favicon recoloured.
 - 2026-11-21 Łukasz (Claude worker): eval history on `LukiLenkiewicz/eval-history` (`cc58dac`): every `evals/run.py`
   run now writes `evals/results/history/<timestamp>-<sha>-<mode>.json` (full report) and appends one row to

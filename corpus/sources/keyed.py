@@ -23,7 +23,6 @@ from corpus.extract import plain_text
 from corpus.http import Blocked, FetchError, PoliteClient
 from corpus.schema import Doc, clip, parse_date, registered_domain
 from corpus.sources.base import PLATFORMS, Stopped, make_doc
-from corpus.sources.feeds import Review, review_text
 
 log = logging.getLogger("corpus")
 
@@ -31,6 +30,7 @@ FACTCHECK_API = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
 EUVSDISINFO_MCP = "https://euvsdisinfo-mcp-server.vercel.app/mcp"
 MCP_PAGE = 100  # the server's maximum page size
 CLAIM_CHARS = 600
+CLAIM_IN_TEXT = 250  # in `text`, so the rating always fits the fragment
 
 
 def _now() -> str:
@@ -38,6 +38,15 @@ def _now() -> str:
 
 
 # -- Google Fact Check Tools API ----------------------------------------------------------------
+
+
+def review_text(claim: str, rating: str, publisher: str) -> str:
+    """Rating first, in the publisher's wording (only a final full stop dropped), then the claim
+    cut so the rating always fits the fragment."""
+    return (
+        f"Ocena ({publisher}): {rating.rstrip('.')}. "
+        f"Sprawdzane twierdzenie: „{clip(claim, CLAIM_IN_TEXT)[0]}”"
+    )
 
 
 def review_docs(
@@ -57,7 +66,7 @@ def review_docs(
             if not rating:  # a claim without the verdict would be the false claim alone
                 continue
             short_claim = clip(claim_text, CLAIM_CHARS)[0]
-            text = review_text(Review(short_claim, rating, None, None, ""), publisher)
+            text = review_text(short_claim, rating, publisher)
             doc = make_doc(
                 source,
                 url=url,

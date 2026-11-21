@@ -1,6 +1,5 @@
 """HTML to clean text (trafilatura) and small markup helpers (lxml)."""
 
-import json
 import re
 
 import lxml.html
@@ -41,20 +40,3 @@ def node_text(node: lxml.html.HtmlElement | None) -> str:
     for br in node.iter("br"):
         br.tail = f" {br.tail or ''}"
     return " ".join(node.text_content().split())
-
-
-def json_ld(root: lxml.html.HtmlElement, node_type: str) -> list[dict]:
-    """schema.org nodes of one type from the page's JSON-LD blocks (also inside `@graph`)."""
-    found = []
-    for script in root.xpath('//script[@type="application/ld+json"]'):
-        try:
-            data = json.loads(script.text_content())
-        except json.JSONDecodeError:
-            continue
-        blocks = data if isinstance(data, list) else [data]
-        for block in blocks:
-            nodes = block.get("@graph", [block]) if isinstance(block, dict) else []
-            found += [
-                n for n in nodes if isinstance(n, dict) and n.get("@type") == node_type
-            ]
-    return found

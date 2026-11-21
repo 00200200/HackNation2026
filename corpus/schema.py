@@ -83,13 +83,8 @@ def parse_date(value: str | None) -> str | None:
         return None
 
 
-class CitedLink(BaseModel):
-    url: str
-    text: str  # the link text as the fact-checker wrote it
-
-
 # Fact-check fields; left out of the JSON line when empty.
-OPTIONAL_FIELDS = ("claim", "rating", "claim_author", "claim_source", "cited_links")
+OPTIONAL_FIELDS = ("claim", "rating")
 
 
 class Doc(BaseModel):
@@ -110,9 +105,6 @@ class Doc(BaseModel):
     # Fact-checks only:
     claim: str | None = None  # the reviewed claim, verbatim
     rating: str | None = None  # the fact-checker's rating, verbatim
-    claim_author: str | None = None  # public statements of public figures only
-    claim_source: str | None = None  # where that statement was first published
-    cited_links: list[CitedLink] = []  # sources the fact-check links to
 
     @field_validator("id", "url", "title", "text", "publisher", "licence", "language")
     @classmethod
