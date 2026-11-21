@@ -29,6 +29,7 @@ from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
+from prawdowid import justification
 from prawdowid.contract import SecurityEvent, Source, Verdict
 from prawdowid.factcheck import CLAIM_PREFIX, RATING_PREFIX
 from prawdowid.rerank import RELIABLE_TYPES, Fragment, Ranking
@@ -171,6 +172,8 @@ class Judgement(BaseModel):
     premises: list[str]
     sources: list[Source]
     limitations: list[str]
+    # Why this verdict, in code from the evidence (prawdowid/justification.py); `ClaimResult.reasoning`.
+    justification: str = ""
     # Instructions found in retrieved sources and ignored; #11 adds them to CheckResult.
     security_events: list[SecurityEvent] = []
 
@@ -366,6 +369,8 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
             premises,
             evidence,
             limitations + [CONFLICT],
+            cited=_cited(supports, "supports") + _cited(refutes, "refutes"),
+            conflict=True,
         )
     for verdict, side, other in (
         (Verdict.MISLEADING, context, []),
@@ -376,13 +381,21 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
             if other:
                 publishers = ", ".join(sorted(_publishers(other)))
                 limitations.append(COUNTER_EVIDENCE.format(publishers=publishers))
-            return _judgement(verdict, _strength(side), premises, evidence, limitations)
+            return _judgement(
+                verdict,
+                _strength(side),
+                premises,
+                evidence,
+                limitations,
+                cited=_cited_for(verdict, side),
+            )
     return _judgement(
         Verdict.INSUFFICIENT_EVIDENCE,
         "słaba" if evidence else "brak",
         premises,
         evidence,
         limitations + ([] if gaps else [NOT_ENOUGH]),
+        cited=_cited(gaps, "gap") + _cited(supports + refutes or evidence, "weak"),
     )
 
 
@@ -515,13 +528,17 @@ def _date_limits(evidence: list[Evidence], today: date) -> list[str]:
     return limits
 
 
-def _judgement(verdict, strength, premises, evidence, limitations) -> Judgement:
+def _judgement(
+    verdict, strength, premises, evidence, limitations, cited=(), conflict=False
+) -> Judgement:
+    """`cited` is the evidence the verdict rests on, after the filters in `decide`."""
     return Judgement(
         verdict=verdict,
         strength=strength,
         premises=premises,
         sources=_one_per_document(evidence),
         limitations=limitations,
+        justification=justification.explain(verdict, cited, conflict=conflict),
     )
 
 
@@ -531,6 +548,25 @@ def _one_per_document(evidence: list[Evidence]) -> list[Source]:
     for e in evidence:
         seen.setdefault((e.label.doc_id, e.label.stance), e.source)
     return list(seen.values())
+
+
+def _cited(evidence: list[Evidence], stance: str):
+    return [(e.source, stance, None) for e in evidence]
+
+
+def _cited_for(verdict: Verdict, side: list[Evidence]):
+    if verdict is not Verdict.MISLEADING:
+        stance = "supports" if verdict is Verdict.CONFIRMED else "refutes"
+        return _cited(side, stance)
+    # The verified words that name the missing context, not the model's paraphrase alone.
+    return [
+        (
+            e.source.model_copy(update={"fragment": e.context_span}),
+            "context",
+            e.label.missing_context,
+        )
+        for e in side
+    ]
 
 
 def _insufficient(strength: str, limitations: list[str]) -> Judgement:

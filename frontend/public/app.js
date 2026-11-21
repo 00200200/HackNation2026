@@ -153,7 +153,7 @@ function claimBlock(c) {
       : el("p", { className: "empty", textContent: "Brak źródła przy tej ocenie." }),
     el("h3", { className: "part", textContent: "Nasza ocena" }),
     el("div", { className: "assessment" },
-      el("p", { className: "explain" }, el("b", { textContent: "Wyjaśnienie modelu: " }), c.reasoning),
+      el("p", { className: "explain" }, el("b", { textContent: "Uzasadnienie: " }), c.reasoning),
       el("p", { className: "strength" }, el("b", { textContent: "Siła dowodów: " }), c.strength),
       c.premises.length ? el("ul", { className: "premises" }, ...c.premises.map((p) => el("li", { textContent: p }))) : null),
     c.limitations.length

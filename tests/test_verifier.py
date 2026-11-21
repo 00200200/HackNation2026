@@ -73,7 +73,9 @@ def test_mixed_claims_get_verdicts_from_code():
     fact, opinion = result.claims
     assert fact.verdict is Verdict.CONFIRMED
     assert fact.limitations == ["Ograniczenie."]
-    assert fact.reasoning == "Powód."
+    # The checked claim gets a justification from its verdict, not the model's note.
+    assert fact.reasoning != "Powód."
+    assert fact.reasoning == "Ocena wynika ze źródeł wymienionych poniżej."
     assert opinion.verdict is Verdict.NOT_VERIFIABLE
     assert opinion.reasoning == "Powód."
     assert opinion.limitations == []

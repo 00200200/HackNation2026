@@ -24,7 +24,7 @@ from pydantic_ai import (
 from pydantic_ai.exceptions import AgentRunError, ContentFilterError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
-from prawdowid import pipeline
+from prawdowid import justification, pipeline
 from prawdowid.contract import (
     CheckedPage,
     CheckResult,
@@ -296,11 +296,18 @@ def to_check_result(
 
 def claim_result(c: ExtractedClaim, check: pipeline.ClaimCheck | None) -> ClaimResult:
     judgement = check.judgement if check else NOT_CHECKABLE
+    # Checkable claims: why the verdict, from the evidence. `c.reason` is the model's note on
+    # checkability, so it explains only a claim that was never checked.
+    reasoning = (
+        (judgement.justification or justification.explain(judgement.verdict, []))
+        if check
+        else c.reason or justification.NOT_VERIFIABLE
+    )
     return ClaimResult(
         claim=c.claim,
         kind=c.kind,
         source_sentence=c.source_sentence,
-        reasoning=c.reason,
+        reasoning=reasoning,
         **judgement.model_dump(exclude={"security_events"}),
         steps_ms=check.steps_ms if check else {},
     )
