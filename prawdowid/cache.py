@@ -47,7 +47,6 @@ log = logging.getLogger("prawdowid")
 CACHE_PATH = Path(os.getenv("PRAWDOWID_CACHE") or "corpus/docs.jsonl")
 RETENTION_DAYS = 30
 DATABASE_ENV = "DATABASE_URL"
-LICENCE_UNCONFIRMED = "UNCONFIRMED (docs/sources.md)"
 
 CONNECT_TIMEOUT_S = 4
 STATEMENT_TIMEOUT_MS = 4000
@@ -317,7 +316,7 @@ def _insert(doc: Document) -> bool:
                 doc.publisher,
                 doc.domain,
                 doc.source_type,
-                doc.licence or LICENCE_UNCONFIRMED,
+                doc.licence,  # not null: a page without an approved licence is refused
                 doc.published_at,
                 doc.fetched_at,
                 hashlib.sha256(doc.text.encode()).hexdigest(),

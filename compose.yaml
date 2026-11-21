@@ -16,7 +16,7 @@ services:
       start_period: 5s
 
   # Step 2c source store, opt-in (`make db`). Step 2c is disabled in the pipeline until licensed
-  # sources are chosen (user decision), so the backend gets no DATABASE_URL and never needs it.
+  # sources are chosen (user decision), so no check reads it and the backend never connects to it.
   # Starts empty: the team seeds it with `make db-seed`. Schema from db/migrations/ on first start
   # of the volume. Port bound to 127.0.0.1 only. The default password is for this local-only
   # database; POSTGRES_PASSWORD applies only when the volume is created (see docs/sources.md).

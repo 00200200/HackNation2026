@@ -47,6 +47,7 @@ def doc(url="https://www.gov.pl/web/kas/sankcje"):
         fetched_at=FETCHED,
         source_type="official",
         domain="www.gov.pl",
+        licence="Synthetic test licence",  # the database refuses a page without one
         text="Akapit pierwszy.\n\nAkapit drugi.",
     )
 
@@ -172,7 +173,7 @@ def test_database_save_writes_document_and_chunks(monkeypatch):
     timeout, insert, chunks = conn.statements
     assert "statement_timeout" in timeout[0]
     assert insert[1][0] == "https://gov.pl/web/kas/sankcje"  # canonical doc id
-    assert insert[1][6] == cache.LICENCE_UNCONFIRMED
+    assert insert[1][6] == "Synthetic test licence"
     assert chunks[1] == [(7, 0, "Akapit pierwszy.\n\nAkapit drugi.")]
 
 
