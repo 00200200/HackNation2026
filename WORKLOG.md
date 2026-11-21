@@ -51,9 +51,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Deployment: public demo on https://faktczyfejk.pl. Server (OVHcloud VPS-2, Limburg) and domain (OVHcloud)
   bought; DNS A records for the domain and `www` point at the server. The stack (Caddy, nginx, API, Postgres) runs
   there from `prod` (#32), HTTPS checked from outside. Deploys: the server pulls `prod` every minute
-  (`claude/pull-deploy`, replaces the Actions workflow); its read-only deploy key `faktczyfejk-vps` is in GitHub.
-  Open: Anthropic key in the server's `.env`, the timer on the server once this is on `prod` (`docs/deploy.md`).
-  Owner: Michał
+  (#36, timer running; the first timer deploy put `66fec4a` live); read-only deploy key `faktczyfejk-vps`.
+  Open: Anthropic key in the server's `.env`; doc2json.pl behind the same Caddy (`claude/caddy-doc2json`, approved
+  by Michał). Owner: Michał
 - [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: Łukasz (Claude worker)
   - [x] Code (#8): `prawdowid/websearch.py` (search on the allowlist, fetch, trafilatura extraction, PII masking of the query), `prawdowid/safefetch.py` (per-hop allowlist, public-IP check pinned at connect, robots.txt per hop, byte caps; for #4 to reuse), `prawdowid/cache.py` (local JSONL, metadata only until a licence is confirmed, 30-day retention, delete, swap point for #19), builder `python -m prawdowid.corpus`, source list `docs/sources.md` (licences UNCONFIRMED). Branch `feat/8-web-search`.
   - [x] Provider swap (#7/#8): DuckDuckGo (`ddgs`) replaced by **Tavily** `/search` (official API, `tavily-python`), `tavily_search` in `prawdowid/websearch.py`, same `SearchProvider` contract. Live-tested: 7/8 quick-eval cases now get ≥1 allowlisted source (was 0/8). `uv remove ddgs`, `uv add tavily-python`. Owner: Łukasz (Claude worker)
@@ -171,9 +171,13 @@ Basic requirements first: the jury gives no points for extras if one of these is
   `include_published_date=True` (`Document.published_at` falls back to it when the page has no date metadata).
   `uv remove ddgs`, `uv add tavily-python`. Live proof with a real `TAVILY_API_KEY`: 7 of 8 quick-eval cases now get
   at least one allowlisted web source (was 0 of 8). (#7, #8)
+- 2026-11-21 (Michał): the VPS also hosts doc2json.pl (repo HackNation2026-2) behind this repo's Caddy, through the
+  external Docker network `edge`; its site blocks live in `caddy/Caddyfile`. (`claude/caddy-doc2json`)
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał (via Claude): `claude/caddy-doc2json`: Caddy joins the `edge` network and serves doc2json.pl;
+  doc2json.pl is active and Michał approved deploying it (relayed by the doc2json session).
 - 2026-11-21 Łukasz (Claude worker): fixed `compose.yaml` to forward `TAVILY_API_KEY` and `EUVSDISINFO_API_KEY` to the backend (PR #40's doc-only gap: base Compose had Google's key but not the other two); `docker compose config`/`--services` checked, pytest and ruff clean; removed the now-obsolete workaround text in README.md, `docs/submission/architecture.md` and `docs/submission/risks.md`. Branch `fix/compose-tavily-key`.
 - 2026-11-21 Łukasz (Claude worker): landed PR #40 (#18 deliverables, docs only) on `main` after merging `main` three times (`e0cda47`: #28, #44, #42, #30, #37; then `d03d2ee`: #38 incident matcher, #39 privacy/check log, #45 Tavily; then `8c6f396`: #43 checklog refinement, all landing in parallel) into `LukiLenkiewicz/issue18-deliverables`; every conflicted product/code file taken from `main` as-is, only README.md and WORKLOG.md hand-merged, `evals/results/latest.json` kept as `main`'s. Docs rewritten for the fully merged state across all three merges: judge and per-claim fan-out are on `main` (#30, #37); the incident matcher is shipped but its base file is empty (#38); privacy masking, check log (#39, refined by #43) and session deletion are shipped; the search provider is now Tavily, not DuckDuckGo (#45); base Compose forwards Google's key and a writable cache path by itself but still not `TAVILY_API_KEY` (web search's only provider) or `EUVSDISINFO_API_KEY`. Fixed the two line-number nits from review 6007306267 and re-verified every other file:line citation against `main`'s code after each merge (several had shifted again between merges). No eval run for this merge (user decision, `HN_SKIP_EVAL=1`); a fresh eval on the merged commit is pending.
 - 2026-11-21 Łukasz (Codex worker): #18 six submission text drafts and README run corrections on `LukiLenkiewicz/issue18-deliverables`; exact saved eval metrics and measured cost extrapolation, code-cited risk register, source terms with unconfirmed permissions marked. PDF/video and TEAM_NAME remain open; no product or eval changes. Commit: this documentation commit.
