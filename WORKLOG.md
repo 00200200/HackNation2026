@@ -63,7 +63,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
 - [ ] Deliverables: description ≤ 4000 chars, PDF ≤ 12 slides, video ≤ 3 min, cost estimate, risks. Owner: ?
 - [ ] Optional after basics: moderator loop (scenario H), screenshots (F).
-- [ ] User decision 2026-11-21: switch to Tavily (below, #7/#8 done). Still open: a live smoke run and quick eval with real Polish claims once `TAVILY_API_KEY` is set. Owner: Łukasz (Claude worker)
+- [x] User decision 2026-11-21: switch to Tavily (below, #7/#8 done). `TAVILY_API_KEY` set, live smoke run and quick eval done: see the Log line below. Open: full 31-case eval still needed before submission; `PRAWDOWID_CHECK_BUDGET_S` (25 s) is now tight for a 3-claim case once web search actually takes real time (I01 hit it in the quick eval). Owner: Łukasz (Claude worker)
 
 ## Decisions
 
@@ -126,6 +126,27 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #7/#8 live proof with a real `TAVILY_API_KEY` on `9d68288`. Smoke run, 3 cases
+  (`search_web` direct, no fetch bodies printed): real allowlisted hits with URL, domain and date each time (e.g.
+  `www.gov.pl`/2025-02-24, `demagog.org.pl`/2022-10-12, `www.ecb.europa.eu`/2025-04-28). Across the quick eval's 8
+  cases, 7 of 8 now get ≥ 1 allowlisted document from web search alone (0 of 8 with DuckDuckGo). Quick eval
+  (`evals/results/latest.json`, 8 cases, product at `9d68288`, real Anthropic/Fact Check/EUvsDisinfo keys): macro_f1
+  0.25 (same number as the `c190450` baseline, but across 3 repeated quick runs this session it ranged 0.10–0.39 —
+  LLM-call variance, not a Tavily effect), citation_coverage 1.00, abstention 0.50 (was 1.00), injection_resistance
+  0.00 (was 1.00: the canary never leaked and the event was logged every time, but `judge.decide`'s thresholds now
+  call the injection case `wprowadzające w błąd` instead of the expected `fałszywe` now that web search returns real
+  evidence to judge — a pre-existing, untuned verdict-threshold gap this task did not touch), end_to_end 0.875 (same
+  as baseline; J01 still needs the eval's missing-key switch, pre-existing gap), median 15.8 s (was 14.9 s: real
+  fetches now run instead of DuckDuckGo failing in ~10 s). `cost_per_100_usd` came back unknown from the eval's own
+  metric in every quick run today: the 3-claim I01 case (drones) sometimes exceeds `PRAWDOWID_CHECK_BUDGET_S` (25 s)
+  before its last claim's judge step finishes, and the response honestly reports `cost_usd: null` for that whole
+  check rather than an undercounted number. In the one quick run where all 8 checks finished inside budget, summing
+  each response's own `cost_usd` gave **$5.25 per 100** (was $1.65/100): web search now actually returns evidence,
+  so rerank and judge read real fragments instead of an empty result, which costs more tokens. Tavily credits: 39
+  `/search` calls (search_depth basic, 1 credit each) for that 8-case run ≈ 4.9 credits/check, not priced into
+  `cost_usd` (not an eval metric yet). One multi-claim case (I01, 3 claims) now risks the per-check time budget once
+  web search succeeds and takes real latency on every claim at once; worth revisiting before the full 31-case run.
+  PR #37 not yet pushed: waiting on the current `origin/LukiLenkiewicz/issue11-fanout` head to merge first.
 - 2026-11-21 Łukasz (Claude worker): #7/#8 swapped DuckDuckGo (`ddgs`) for Tavily `/search` in `prawdowid/websearch.py` (`tavily_search`), same `SearchProvider` contract; `Document.published_at` falls back to Tavily's `published_date`; `uv remove ddgs`, `uv add tavily-python`; offline tests updated (mocked client: hit mapping, domain filter, missing key, date parsing, error mapping). No `TAVILY_API_KEY` in this clone's `.env`: blocked on a live smoke run and eval. Branch `LukiLenkiewicz/tavily-search`.
 - 2026-11-21 Łukasz (Claude worker): #11 PR #37 Codex re-review: a retry judge outage after a first pass with no fragments left (the linked page excluded) is `nie sprawdzono`, not `brak wystarczających dowodów`; regression test. Quick eval on `c190450` (8 cases, real keys): macro_f1 0.25, abstention 1.00, injection 1.00, citation_coverage 1.00, median 14.9 s, end_to_end 0.88 (J01 still needs a no-key run), $1.65 per 100.
 - 2026-11-21 Łukasz (Claude worker): #11 PR #37 Codex review fixes: judge outage is `nie sprawdzono`, any EUvsDisinfo source (Fact Check path too) is context only, extraction and link fetch bounded by the check budget, lookups in a TaskGroup (no search task outlives its claim; provider threads finish in the background; nothing started after the deadline), a retry judge failure keeps the first-pass verdict. Quick eval on `aa9fb7e` (8 cases, real Anthropic and Fact Check keys): macro_f1 0.25, abstention 1.00, injection 1.00, citation_coverage 1.00, median 17.0 s, end_to_end 0.88 (J case), $1.72 per 100, a failed web query and already-failed sources kept in the limitations, also on a time limit.
