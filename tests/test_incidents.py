@@ -13,7 +13,7 @@ from prawdowid import app as app_module
 from prawdowid import judge, rerank, verifier
 from prawdowid.app import app, limiter
 from prawdowid.contract import CheckResult, IncidentMatch, MatchKind, Status, Verdict
-from prawdowid.discord_bot import ask_api, render
+from prawdowid.discord_bot import MESSAGE_LIMIT, ask_api, render, reply
 from prawdowid.incidents import (
     INCIDENTS_PATH,
     Incident,
@@ -213,10 +213,26 @@ def test_discord_renders_the_warning_only_when_there_is_a_match():
     text = render(check)
     assert "### Podobne znane incydenty" in text
     assert (
-        "- Drony to prowokacja. (TEST-1, podobny tekst 81%) <https://fake-news.example/drony>"
+        "- Drony to prowokacja. (TEST-1, podobny tekst 81%)\n  <https://fake-news.example/drony>"
         in text
     )
     assert "nie zmienia oceny" in text
+
+
+def test_discord_long_incident_fits_in_messages():
+    check = CheckResult(status=Status.CANNOT_CHECK, message="Nie możemy pobrać.")
+    check.incident_matches = [
+        IncidentMatch(
+            incident_id="TEST-2",
+            incident_text="Drony nad Polską. " * 200,
+            matched_on=MatchKind.TEXT,
+            url="https://fake-news.example/" + "a" * 2500,
+            similarity=0.9,
+        )
+    ]
+    parts, attachment = reply(check)
+    assert all(len(p) <= MESSAGE_LIMIT for p in parts)
+    assert attachment is not None and "a" * 2500 in attachment
 
 
 DRONES = "Drony nad Polską to ukraińska prowokacja z rosyjskimi dronami."

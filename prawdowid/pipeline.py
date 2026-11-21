@@ -98,7 +98,10 @@ async def check_claim(
                     second = await _judge(
                         claim, more, exclude_url, steps, costs, "retry_"
                     )
-                    if second.verdict is Verdict.NOT_CHECKED and candidates:
+                    # The first pass assessed evidence only when it had fragments left after
+                    # rerank (the linked page excluded): otherwise there is no verdict to keep.
+                    assessed = judge.NO_FRAGMENTS not in judgement.limitations
+                    if second.verdict is Verdict.NOT_CHECKED and assessed:
                         # The retry judge failed: the verdict from the first pass's evidence
                         # stands, judged without the extra pages.
                         judgement.limitations.append(RETRY_UNJUDGED)

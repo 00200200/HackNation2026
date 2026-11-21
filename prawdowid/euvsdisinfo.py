@@ -9,8 +9,10 @@ Docs: EUvsDisinfo MCP docs, Fibery, 2025/2026 (Streamable HTTP, JSON-RPC 2.0, AP
 """
 
 import asyncio
+import html
 import logging
 import os
+import re
 from datetime import UTC, datetime
 from typing import Any, Literal
 from urllib.parse import urlsplit
@@ -33,6 +35,7 @@ MAX_QUERY_CHARS = 200
 MAX_FRAGMENT_CHARS = 800
 MAX_TITLE_CHARS = 300
 MIN_QUERY_CHARS = 3  # the server rejects shorter queries
+AUTH_ERROR_CODE = -32001  # JSON-RPC code of HTTP 401, missing or invalid key
 _DOMAIN = ALLOWLIST["euvsdisinfo.eu"]
 
 LOOKUP_UNAVAILABLE = (
@@ -74,6 +77,10 @@ async def search_cases(query: str, *, server: Any = None) -> EuvsdisinfoLookup:
         return EuvsdisinfoLookup(limitation=LOOKUP_UNAVAILABLE)
     if items is None:
         return EuvsdisinfoLookup(limitation=LOOKUP_UNAVAILABLE)
+    if (
+        isinstance(items, dict) and "results" in items
+    ):  # live server: one page plus paging
+        items = items["results"]
     if isinstance(items, dict) and "type" in items:  # one hit comes back unwrapped
         items = [items]
     if not isinstance(items, list):
@@ -108,7 +115,16 @@ async def _search(query: str, server: Any, key: str | None) -> Any:
             log.warning(
                 "euvsdisinfo attempt %d failed: %s", attempt, type(exc).__name__
             )
+            if _is_bad_key(exc):
+                break  # a bad key stays bad: no retry
     return None
+
+
+def _is_bad_key(exc: Exception) -> bool:
+    # -32001 is the server's "missing or invalid API key" and also the MCP SDK's own
+    # request timeout ("Request 'tools/call' timed out"), which is worth a retry.
+    message = str(getattr(exc, "message", ""))
+    return getattr(exc, "code", None) == AUTH_ERROR_CODE and "timed out" not in message
 
 
 def _to_hit(item: Any, fetched_at: datetime) -> EuvsdisinfoHit | None:
@@ -118,7 +134,11 @@ def _to_hit(item: Any, fetched_at: datetime) -> EuvsdisinfoHit | None:
     ):
         return None
     # Only EUvsDisinfo's own pages carry its source type; a link elsewhere is not its case.
-    host = urlsplit(str(item.get("link") or "")).hostname or ""
+    try:
+        host = urlsplit(str(item.get("link") or "")).hostname or ""
+    except ValueError:  # e.g. "https://[broken"
+        log.warning("euvsdisinfo hit skipped: malformed link")
+        return None
     if host != "euvsdisinfo.eu" and not host.endswith(".euvsdisinfo.eu"):
         log.warning("euvsdisinfo hit skipped: link is not on euvsdisinfo.eu")
         return None
@@ -133,9 +153,16 @@ def _to_hit(item: Any, fetched_at: datetime) -> EuvsdisinfoHit | None:
             url=item["link"],
             source_type=_DOMAIN.source_type,
             # Retrieved text is untrusted data: shown and quoted, never followed.
-            fragment=content[:MAX_FRAGMENT_CHARS] if isinstance(content, str) else None,
+            fragment=_text(content)[:MAX_FRAGMENT_CHARS] or None
+            if isinstance(content, str)
+            else None,
         )
     except (KeyError, TypeError, ValidationError):
         log.warning("euvsdisinfo hit skipped: no usable link")
         return None
     return EuvsdisinfoHit(source=source, kind=item["type"])
+
+
+def _text(content: str) -> str:
+    """`content` is HTML (`<p>`, `<a>`, entities); the fragment is plain text."""
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", content)).split())

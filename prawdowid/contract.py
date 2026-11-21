@@ -113,6 +113,8 @@ class SecurityEvent(BaseModel):
     # Where they were found: "input" (the user's text), "page" (the page a link points to) or
     # "source" (a retrieved evidence page).
     location: Literal["input", "page", "source"]
+    # "patterns": the fixed pre-check in code; "model": a model's own flag (extraction or judge).
+    detector: Literal["patterns", "model"]
 
 
 class CheckResult(BaseModel):
@@ -124,6 +126,8 @@ class CheckResult(BaseModel):
     # Claims found but left out by the per-check cap. They have no verdict.
     unchecked_claims: list[str] = []
     security_events: list[SecurityEvent] = []
+    # Limits of the check as a whole, e.g. injection detection ran on patterns only.
+    limitations: list[str] = []
     # Model tokens plus paid API calls for this answer; None when it cannot be known.
     cost_usd: float | None = None
     # Shown next to the claims, also on a notice (a refused link): never sets or changes a verdict.

@@ -1,15 +1,19 @@
 """Link input, offline: fake DNS and a mock network under the real guarded client."""
 
 import asyncio
+import io
 import ipaddress
+import os
 import socket
+import subprocess
+import time
 
 import httpcore2
 import pytest
 from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
-from prawdowid import link
+from prawdowid import extract_worker, link
 from prawdowid.contract import Status
 from prawdowid.link import (
     BLOCKED,
@@ -24,7 +28,15 @@ from prawdowid.link import (
     Refusal,
     fetch_page,
 )
-from prawdowid.verifier import PAGE_CUT, ExtractedClaim, Extraction, agent, verify
+from prawdowid.verifier import (
+    MAX_PAGE_CHARS,
+    PAGE_CUT,
+    ExtractedClaim,
+    Extraction,
+    agent,
+    page_text,
+    verify,
+)
 
 DNS = {
     "news.example": "93.184.216.34",
@@ -32,6 +44,7 @@ DNS = {
     "rebind.example": "10.0.0.7",
     "localhost": "127.0.0.1",
     "twoip.example": ["93.184.216.40", "93.184.216.34"],
+    "www.facebook.com": "93.184.216.50",
 }
 ARTICLE_TEXT = (
     "Rada Ministrów przyjęła w poniedziałek projekt ustawy o obronie cywilnej. " * 5
@@ -60,12 +73,27 @@ class FakeNet(httpcore2.AsyncMockBackend):
         super().__init__([])
         self.responses = responses
         self.connected = []
+        self.read_bytes = 0
 
     async def connect_tcp(self, host, port, timeout=None, **kwargs):
         self.connected.append(host)
         if host not in self.responses:
             raise httpcore2.ConnectError(f"no route to {host}")
-        return httpcore2.AsyncMockStream([self.responses[host]])
+        chunks = self.responses[host]
+        return CountingStream(chunks if isinstance(chunks, list) else [chunks], self)
+
+
+class CountingStream(httpcore2.AsyncMockStream):
+    """Counts the bytes the client really pulled from the network."""
+
+    def __init__(self, chunks, net):
+        super().__init__(chunks)
+        self.net = net
+
+    async def read(self, max_bytes, timeout=None):
+        data = await super().read(max_bytes, timeout)
+        self.net.read_bytes += len(data)
+        return data
 
 
 @pytest.fixture(autouse=True)
@@ -353,3 +381,340 @@ def test_injection_on_a_page_is_logged_as_from_the_page(monkeypatch):
 def test_refused_link_costs_nothing():
     result = asyncio.run(verify("http://10.0.0.1/"))
     assert result.cost_usd == 0.0
+
+
+def test_redirect_body_is_never_read():
+    # 20 MB in 1 MB chunks behind a redirect; only the headers may be read.
+    head = http(302, body="", headers=["Location: http://other.example/final"])
+    head = head.replace(b"Content-Length: 0", f"Content-Length: {20 * 2**20}".encode())
+    redirect = [head] + [b"x" * 2**20] * 20
+    page, net = fetch(
+        "http://news.example/a",
+        {"93.184.216.34": redirect, "93.184.216.35": http()},
+    )
+    assert page.url == "http://other.example/final"
+    assert net.read_bytes < 2 * len(http())
+
+
+def test_invalid_redirect_location_is_refused():
+    bad = http(302, body=ARTICLE, headers=["Location: http://a:abc/"])
+    refusal, _ = fetch("http://news.example/a", {"93.184.216.34": bad})
+    assert refusal.message == link.BAD_URL
+
+
+def test_dotted_social_host_is_not_fetched():
+    refusal, net = fetch("http://www.facebook.com./posts/a", {})
+    assert refusal.message == SOCIAL_MEDIA
+    assert net.connected == []
+
+
+def test_redirect_to_social_host_opens_no_connection_to_it():
+    redirect = http(302, body="", headers=["Location: https://www.facebook.com/p/1"])
+    refusal, net = fetch(
+        "http://news.example/a",
+        {"93.184.216.34": redirect, "93.184.216.50": http()},
+    )
+    assert refusal.message == SOCIAL_MEDIA
+    assert net.connected == ["93.184.216.34"]
+
+
+SLOW_WORKER = """
+import os, sys, time
+open(os.path.join(sys.argv[0] + ".pids"), "a").write(f"{os.getpid()}\\n")
+time.sleep(60)
+"""
+
+
+@pytest.fixture
+def slow_worker(tmp_path, monkeypatch):
+    worker = tmp_path / "worker.py"
+    worker.write_text(SLOW_WORKER)
+    monkeypatch.setattr(link, "WORKER", str(worker))
+    monkeypatch.setattr(link, "DEADLINE_S", 3)
+    return tmp_path / "worker.py.pids"
+
+
+def pids(path):
+    return [int(p) for p in path.read_text().split()] if path.exists() else []
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    # A zombie still answers kill(0); ps shows it as Z.
+    state = subprocess.run(
+        ["ps", "-o", "stat=", "-p", str(pid)], check=False, capture_output=True
+    )
+    return bool(state.stdout.strip()) and not state.stdout.startswith(b"Z")
+
+
+def test_extraction_past_the_deadline_is_killed(slow_worker):
+    started = time.monotonic()
+    refusal, _ = fetch("http://news.example/a", {"93.184.216.34": http()})
+    assert refusal.technical and refusal.message == link.UNREACHABLE
+    assert time.monotonic() - started < 8
+    [pid] = pids(slow_worker)
+    assert not alive(pid)
+
+
+def test_parallel_extractions_are_capped(slow_worker, monkeypatch):
+    # Count live parsers in-process at each spawn: a waiter whose deadline ends just after a slot
+    # frees may still start a worker, so the total started is timing-dependent; the peak is not.
+    procs, peak = [], []
+    spawn = asyncio.create_subprocess_exec
+
+    async def counted(*args, **kwargs):
+        procs.append(await spawn(*args, **kwargs))
+        # Counted once this one runs: the first two both sleep 60 s, so the second sees two.
+        peak.append(sum(p.returncode is None for p in procs))
+        return procs[-1]
+
+    monkeypatch.setattr(link.asyncio, "create_subprocess_exec", counted)
+
+    async def go():
+        monkeypatch.setattr(link, "_extractions", asyncio.Semaphore(2))
+        net = FakeNet({"93.184.216.34": http()})
+        return await asyncio.gather(
+            *[fetch_page("http://news.example/a", backend=net) for _ in range(4)],
+            return_exceptions=True,
+        )
+
+    results = asyncio.run(go())
+    assert all(isinstance(r, Refusal) and r.technical for r in results)
+    assert max(peak) == 2  # two ran at once, never three
+    assert all(p.returncode is not None for p in procs)  # every parser was reaped
+    assert not any(alive(p.pid) for p in procs)
+
+
+def test_pdf_extraction_stops_at_its_page_and_text_budget():
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    content = DecodedStreamObject()
+    content.set_data(b"BT /F1 12 Tf 10 10 Td (" + b"Ala ma kota " * 100 + b") Tj ET")
+    content_ref = writer._add_object(content)
+    for _ in range(300):  # every page draws the same content stream
+        page = writer.add_blank_page(612, 792)
+        page[NameObject("/Contents")] = content_ref
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+        )
+    buf = io.BytesIO()
+    writer.write(buf)
+
+    result = extract_worker.extract_pdf(buf.getvalue())
+    assert result["kind"] == "ok"
+    one_page = 1200
+    assert len(result["text"]) <= extract_worker.MAX_TEXT_CHARS
+    assert len(result["text"]) >= extract_worker.MAX_TEXT_CHARS - one_page
+
+
+def test_long_title_and_publisher_share_the_page_budget():
+    page = link.Page(
+        url="http://news.example/a",
+        sha256="0" * 64,
+        title="T" * 10_000,
+        publisher="P" * 10_000,
+        published_at=None,
+        text="Krótki artykuł. " * 30,
+    )
+    text, cut = page_text(page)
+    assert len(text) <= MAX_PAGE_CHARS
+    assert "T" * 201 not in text and "P" * 201 not in text
+    assert not cut  # all of the article text is in
+    assert text.rstrip().endswith("Krótki artykuł.")
+
+
+def test_text_pushed_out_by_metadata_counts_as_cut():
+    page = link.Page(
+        url="http://news.example/a",
+        sha256="0" * 64,
+        title="T" * 200,
+        publisher="P" * 200,
+        published_at=None,
+        text="A" * (MAX_PAGE_CHARS - 300),
+    )
+    text, cut = page_text(page)
+    assert len(text) <= MAX_PAGE_CHARS and cut
+
+
+def test_short_page_is_not_cut():
+    page = link.Page(
+        url="http://news.example/a",
+        sha256="0" * 64,
+        title="Tytuł",
+        publisher="Wydawca",
+        published_at=None,
+        text="Krótki artykuł. " * 30,
+    )
+    assert page_text(page)[1] is False
+
+
+def test_scheme_relative_303_is_followed():
+    # The mock serves one canned answer per IP, so the redirect goes to a second host.
+    redirect = http(303, body="", headers=["Location: //other.example/final"])
+    page, _ = fetch(
+        "http://news.example/a",
+        {"93.184.216.34": redirect, "93.184.216.35": http()},
+    )
+    assert page.url == "http://other.example/final"
+
+
+def test_redirect_to_another_scheme_is_refused():
+    redirect = http(302, body="", headers=["Location: ftp://news.example/file"])
+    refusal, _ = fetch("http://news.example/a", {"93.184.216.34": redirect})
+    assert refusal.message == link.BAD_URL
+
+
+def test_crashed_worker_is_no_text(tmp_path, monkeypatch):
+    worker = tmp_path / "worker.py"
+    worker.write_text("raise SystemExit(1)\n")
+    monkeypatch.setattr(link, "WORKER", str(worker))
+    refusal, _ = fetch("http://news.example/a", {"93.184.216.34": http()})
+    assert refusal.message == NO_TEXT
+
+
+WALL = """<html><head><title>Rząd przyjął projekt</title></head><body><article>
+<h1>Rząd przyjął projekt</h1><p>{lead}</p><p>{notice}</p>
+<form action="/login" method="post"><input name="email"><input type="password" name="p">
+<button>Zaloguj</button></form></article></body></html>"""
+
+
+@pytest.mark.parametrize(
+    "notice",
+    [
+        "Zaloguj się, aby przeczytać cały artykuł.",
+        "Ten artykuł jest dostępny tylko dla subskrybentów.",
+        "Subscribe to read the full story.",
+    ],
+)
+def test_inline_access_wall_is_not_checked(notice):
+    # No password form and a lead past PREVIEW_CHARS: only the notice can refuse it.
+    body = ARTICLE.replace(ARTICLE_TEXT, ARTICLE_TEXT * 5 + "</p><p>" + notice)
+    net = FakeNet({"93.184.216.34": http(body=body)})
+
+    def never(messages, info):
+        raise AssertionError("model must not be called for a walled page")
+
+    async def guarded_fetch(url):
+        return await fetch_page(url, backend=net)
+
+    with pytest.MonkeyPatch.context() as mp, agent.override(model=FunctionModel(never)):
+        mp.setattr("prawdowid.verifier.fetch_page", guarded_fetch)
+        result = asyncio.run(verify("http://news.example/a"))
+    assert result.status is Status.CANNOT_CHECK
+    assert result.message == PAYWALL and result.claims == []
+
+
+def test_password_form_beside_a_preview_is_a_wall():
+    body = WALL.format(lead=ARTICLE_TEXT, notice="")
+    refusal, _ = fetch("http://news.example/a", {"93.184.216.34": http(body=body)})
+    assert refusal.message == PAYWALL
+
+
+def test_article_quoting_a_login_prompt_is_checked():
+    text = (ARTICLE_TEXT + " Oszuści piszą: zaloguj się na stronie banku. ") * 3
+    body = ARTICLE.replace(ARTICLE_TEXT, text)
+    page, _ = fetch("http://news.example/a", {"93.184.216.34": http(body=body)})
+    assert "zaloguj się na stronie banku" in page.text
+
+
+def test_url_secrets_never_reach_logs_or_the_page(caplog, monkeypatch):
+    argv = []
+    spawn = asyncio.create_subprocess_exec
+
+    async def record(*args, **kwargs):
+        argv.extend(args)
+        return await spawn(*args, **kwargs)
+
+    monkeypatch.setattr(link.asyncio, "create_subprocess_exec", record)
+    url = (
+        "http://news.example/a?id=7&author=Kowalski&token=SECRET1&X-Amz-Signature=SECRET2"
+        "&%61pi_key=SECRET4&accessToken=SECRET5&sessionId=SECRET6#access_token=SECRET3"
+    )
+    with caplog.at_level("INFO", logger="prawdowid"):
+        page, _ = fetch(url, {"93.184.216.34": http()})
+    assert page.url == (
+        "http://news.example/a?id=7&author=Kowalski&token=REDACTED"
+        "&X-Amz-Signature=REDACTED&%61pi_key=REDACTED&accessToken=REDACTED&sessionId=REDACTED"
+    )
+    seen = caplog.text + " ".join(map(str, argv))
+    assert "SECRET" not in seen and "news.example" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "url", ["http://user:SECRET@news.example/a", "http://SECRET@news.example/a"]
+)
+def test_url_with_credentials_is_refused(url, caplog):
+    with caplog.at_level("INFO", logger="prawdowid"):
+        refusal, net = fetch(url, {"93.184.216.34": http()})
+    assert refusal.message == link.CREDENTIALS
+    assert net.connected == [] and "SECRET" not in caplog.text
+
+
+def test_redirect_to_credentials_is_refused():
+    redirect = http(302, body="", headers=["Location: http://u:SECRET@other.example/"])
+    refusal, net = fetch(
+        "http://news.example/a", {"93.184.216.34": redirect, "93.184.216.35": http()}
+    )
+    assert refusal.message == link.CREDENTIALS
+    assert net.connected == ["93.184.216.34"]
+
+
+def test_paywall_marked_in_microdata_is_not_worked_around():
+    meta = '<meta itemprop="isAccessibleForFree" content="false">'
+    body = ARTICLE.replace("<article>", "<article>" + meta)
+    refusal, _ = fetch("http://news.example/a", {"93.184.216.34": http(body=body)})
+    assert refusal.message == PAYWALL
+
+
+FORM_NOTICE = '<form action="/sub"><p>Subscribe to read the full story.</p><button>Go</button></form>'
+
+
+def test_free_article_beside_a_newsletter_form_is_checked():
+    body = ARTICLE.replace(ARTICLE_TEXT, ARTICLE_TEXT * 5).replace(
+        "</article>", "</article>" + FORM_NOTICE
+    )
+    page, _ = fetch("http://news.example/a", {"93.184.216.34": http(body=body)})
+    assert ARTICLE_TEXT.strip() in page.text
+
+
+def test_subscribe_notice_in_a_small_form_is_a_wall():
+    # trafilatura drops a small <form> from its text, so the notice must be read from the HTML.
+    body = ARTICLE.replace("</article>", "</article>" + FORM_NOTICE)
+    net = FakeNet({"93.184.216.34": http(body=body)})
+
+    def never(messages, info):
+        raise AssertionError("model must not be called for a walled page")
+
+    async def guarded_fetch(url):
+        return await fetch_page(url, backend=net)
+
+    with pytest.MonkeyPatch.context() as mp, agent.override(model=FunctionModel(never)):
+        mp.setattr("prawdowid.verifier.fetch_page", guarded_fetch)
+        result = asyncio.run(verify("http://news.example/a"))
+    assert result.status is Status.CANNOT_CHECK and result.message == PAYWALL
+
+
+@pytest.mark.parametrize("name", ["session_id", "session-id", "SESSIONID"])
+def test_session_id_spellings_are_secret(name):
+    assert link.redact(f"http://news.example/a?{name}=SECRET&id=7") == (
+        f"http://news.example/a?{name}=REDACTED&id=7"
+    )
+
+
+def test_url_secrets_never_reach_any_log_record(caplog):
+    with caplog.at_level("INFO"):
+        page, _ = fetch("http://news.example/a?token=SECRET", {"93.184.216.34": http()})
+    assert page.url.endswith("token=REDACTED")
+    assert "SECRET" not in caplog.text and "news.example" in caplog.text
