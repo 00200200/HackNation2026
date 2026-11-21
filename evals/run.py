@@ -189,6 +189,14 @@ def main() -> int:
     args = parser.parse_args()
 
     cases = load_jsonl(args.cases)
+    # A case with "skip": "<reason>" needs a setup the harness cannot do yet; it is
+    # reported, never run or scored, and does not count towards scenario coverage.
+    skipped = [
+        {"id": c["id"], "scenario": c["scenario"], "reason": c["skip"]}
+        for c in cases
+        if c.get("skip")
+    ]
+    cases = [c for c in cases if not c.get("skip")]
     if args.quick:
         seen: set[str] = set()
         cases = [
@@ -213,6 +221,8 @@ def main() -> int:
     missing = [s for s in REQUIRED_SCENARIOS if s not in scenarios]
     if missing:
         warnings.append(f"no cases for scenarios {', '.join(missing)}")
+    if skipped:
+        warnings.append(f"skipped, not scored: {', '.join(c['id'] for c in skipped)}")
     if corpus is None:
         warnings.append("citation_correctness unknown: pass --corpus")
     if results["channel_consistency"]["value"] is None:
@@ -235,6 +245,7 @@ def main() -> int:
         "mode": "quick" if args.quick else "full",
         "timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
         "n_cases": len(cases),
+        "skipped": skipped,
         "scenarios": scenarios,
         "metrics": results,
         "cases_file": args.cases,

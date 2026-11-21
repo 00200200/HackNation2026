@@ -202,8 +202,10 @@ async def judge(claim: str, ranking: Ranking, today: date | None = None) -> Judg
         limitations.append(QUOTES_DROPPED.format(n=dropped))
     judgement = decide(evidence, limitations, today or date.today())
     if result.output.injection_found:
-        judgement.security_events = [SecurityEvent(location="source")]
-        log.warning("security_event kind=prompt_injection location=source")
+        judgement.security_events = [SecurityEvent(location="source", detector="model")]
+        log.warning(
+            "security_event kind=prompt_injection location=source detector=model"
+        )
     return judgement
 
 
