@@ -15,6 +15,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from pydantic_ai import ModelResponse, TextPart
+from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.function import FunctionModel
 
 from prawdowid import judge, link, pipeline, rerank, verifier, websearch
@@ -219,6 +220,76 @@ def test_timeout_after_retrieval_still_logs_the_injected_source(monkeypatch):
     ):
         result = asyncio.run(verifier.verify(CLAIM))
     assert result.claims[0].verdict is Verdict.NOT_CHECKED
+    assert [(e.location, e.detector) for e in result.security_events] == [
+        ("source", "patterns")
+    ]
+
+
+def test_a_retry_cut_by_the_time_limit_still_logs_the_injected_source(monkeypatch):
+    """The first search finds nothing; the retry (the claim as the query) finds the injected page
+    and its judge never answers. The retry's pages are screened before the judge: the event stays."""
+
+    async def search(query, **kwargs):
+        if query != CLAIM:
+            return websearch.WebSearch(limitation=websearch.SEARCH_UNAVAILABLE)
+        return websearch.WebSearch(
+            documents=[source(f"Polska w NATO. {INJECTED_SENTENCE}")]
+        )
+
+    async def slow_judge(messages, info):
+        await asyncio.sleep(5)
+
+    monkeypatch.setattr(websearch, "search_web", search)
+    monkeypatch.setattr(pipeline, "CHECK_BUDGET_S", 1.0)
+    monkeypatch.setattr(pipeline, "RETRY_MIN_S", 0.1)
+    with (
+        verifier.agent.override(model=reply(lambda _: extraction().model_dump_json())),
+        rerank.agent.override(model=reply(lambda _: '{"ids": [0]}')),
+        judge.agent.override(model=FunctionModel(slow_judge)),
+    ):
+        result = asyncio.run(verifier.verify(CLAIM))
+    assert (
+        "retry_judge" in result.claims[0].steps_ms
+    )  # the retry judge was reached and cut
+    assert result.claims[0].verdict is Verdict.NOT_CHECKED
+    assert [(e.location, e.detector) for e in result.security_events] == [
+        ("source", "patterns")
+    ]
+
+
+def test_a_failed_retry_judge_still_logs_the_injected_source(monkeypatch):
+    """The first pass judged a clean page (context only); the retry finds the injected page and its
+    judge fails. The first verdict stands, and the event for the retry's page is not lost."""
+    text = "Polska należy do NATO od 1999 roku."
+    clean = source(text).model_copy(update={"url": "https://gov.pl/ok"})
+    calls = []
+
+    async def search(query, **kwargs):
+        injected = source(f"Polska w NATO. {INJECTED_SENTENCE}")
+        return websearch.WebSearch(documents=[injected if query == CLAIM else clean])
+
+    def judge_model(messages):
+        calls.append(1)
+        if len(calls) > 1:
+            raise ModelHTTPError(529, "claude", "overloaded")
+        label = {
+            "doc_id": "https://gov.pl/ok",
+            "stance": "context",
+            "quote": text,
+            "missing_context": None,
+        }
+        return judge.Labels(labels=[label]).model_dump_json()
+
+    monkeypatch.setattr(websearch, "search_web", search)
+    with (
+        verifier.agent.override(model=reply(lambda _: extraction().model_dump_json())),
+        rerank.agent.override(model=reply(lambda _: '{"ids": [0, 1]}')),
+        judge.agent.override(model=reply(judge_model)),
+    ):
+        result = asyncio.run(verifier.verify(CLAIM))
+    assert len(calls) == 2  # the retry ran and its judge failed
+    assert result.claims[0].verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert pipeline.RETRY_UNJUDGED in result.claims[0].limitations
     assert [(e.location, e.detector) for e in result.security_events] == [
         ("source", "patterns")
     ]

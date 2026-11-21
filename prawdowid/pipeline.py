@@ -117,6 +117,8 @@ async def check_claim(
                 web = await _timed(steps, "retry_web", _search_web, claim)
                 if web.documents:
                     fresh = _candidates({"web": [web]})
+                    # Screened before the retry judge, which may time out or fail.
+                    events += _source_events(fresh, exclude_url)
                     more = candidates + fresh
                     second = await _judge(
                         claim, more, exclude_url, steps, runs, "retry_"
@@ -130,7 +132,6 @@ async def check_claim(
                         judgement.limitations.append(RETRY_UNJUDGED)
                     else:
                         judgement = second
-                        events += _source_events(fresh, exclude_url)
                         events += judgement.security_events
                         candidates = more
                 # Only a finished retry counts: a cut one keeps the first pass as it was.

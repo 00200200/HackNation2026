@@ -98,8 +98,11 @@ def citation_correctness(
         return None
     # Only quotes from a document the corpus holds can be checked: a web page outside it is not
     # wrong, just unmeasured here (spot-check those by hand, citation_spotcheck.md).
-    # The same document may be written differently in the corpus and in the answer.
-    docs = {canonical_url(u): text for u, text in corpus.items()}
+    # The same document may be written differently in the corpus and in the answer, and two
+    # records may share one canonical URL: keep every text, a quote from any of them is correct.
+    docs: dict[str, list[str]] = {}
+    for u, text in corpus.items():
+        docs.setdefault(canonical_url(u), []).append(text)
     quotes = [
         (canonical_url(e["url"]), e["quote"])
         for r in responses
@@ -109,7 +112,9 @@ def citation_correctness(
     ]
     if not quotes:
         return None
-    return sum(normalize(q) in normalize(docs[u]) for u, q in quotes) / len(quotes)
+    return sum(
+        any(normalize(q) in normalize(text) for text in docs[u]) for u, q in quotes
+    ) / len(quotes)
 
 
 def rate(flags: list[bool]) -> float | None:
