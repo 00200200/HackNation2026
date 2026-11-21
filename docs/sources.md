@@ -84,6 +84,15 @@ republish pages.
 | `eur-lex.europa.eu` | EUR-Lex, Urząd Publikacji UE | official EU law | EUR-Lex legal notice, UNCONFIRMED |
 | `nato.int` | NATO | official NATO statements | UNCONFIRMED |
 | `who.int` | Światowa Organizacja Zdrowia | official health data | UNCONFIRMED |
+| `policja.pl` | Policja | national police news and warnings | UNCONFIRMED |
+| `cert.pl` | CERT Polska (NASK) | national CSIRT, security warnings | UNCONFIRMED |
+| `imgw.pl` | IMGW-PIB | state weather, hydrological and Baltic warnings | UNCONFIRMED |
+| `portalpasazera.pl` | PKP Polskie Linie Kolejowe | `primary`: the rail network manager's own timetable and disruption notices (a state-owned company, not an office) | UNCONFIRMED |
+| `kgsok.pl` | Straż Ochrony Kolei | `primary`: railway guard of PKP PLK, its own notices | UNCONFIRMED |
+
+The team's list of crisis and safety pages (`corpus/seeds.txt`) is searched host by host when the
+corpus is built. Its `.gov.pl` hosts (Odyseusz, RCB, GDDKiA, ULC, UTK, GIOŚ, PAA, SAR, maritime
+offices, Wody Polskie) fall under `gov.pl`.
 
 ## Known-narrative database (`disinfo_database`)
 

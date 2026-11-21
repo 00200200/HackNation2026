@@ -8,6 +8,14 @@ from prawdowid import cache, corpus, websearch
 from tests.test_cache import doc
 
 
+def test_every_seed_host_passes_the_allowlist(tmp_path):
+    # A seed outside the allowlist would only waste searches: every hit gets filtered out.
+    assert all(websearch.allowed(f"https://{h}/") for h in corpus.search_domains())
+    seeds = tmp_path / "seeds.txt"
+    seeds.write_text("gov.pl/no-scheme\nhttps://www.cert.pl/x\n")
+    assert corpus.search_domains(seeds).count("cert.pl") == 1
+
+
 @pytest.mark.parametrize(
     "approved", [{}, {"www.gov.pl": ""}, {"www.gov.pl": "UNCONFIRMED"}]
 )
