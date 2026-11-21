@@ -28,12 +28,14 @@ image; `docker compose` and `make dev` read it at start-up.
 | `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
 | `PRAWDOWID_MODEL` | no | `anthropic:claude-opus-5-5` | PydanticAI model id (`provider:model`). |
 | `PRAWDOWID_CHECK_BUDGET_S` | no | `25` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. |
-| `PRAWDOWID_RETRY_MIN_S` | no | `10` | A claim without enough evidence is searched once more only if at least this many seconds remain. |
+| `PRAWDOWID_WEB_SEARCH_BUDGET_S` | no | `10` | Longest one web search query may take, retry included, before it counts as unavailable. |
+| `PRAWDOWID_PAGE_BUDGET_S` | no | `8` | Longest one page fetch may take (robots.txt and page); a slower page is skipped, the others are kept. |
+| `PRAWDOWID_RETRY_MIN_S` | no | `18` | A claim without enough evidence is searched once more only if at least this many seconds remain. |
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
 | `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database and the backend runs without it. Start the database with `make db` (127.0.0.1:5433). |
-| `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `db` service (port bound to 127.0.0.1 only). Applies only when the volume is created (`docker compose --profile db down -v` to recreate); URL-safe characters only. The database starts empty: seed it with `make db-seed`. |
+| `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `db` service (port bound to 127.0.0.1 only). Applies only when the volume is created (`docker compose --profile db down -v` to recreate). The database starts empty: seed it with `make db-seed`. |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 
 The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider

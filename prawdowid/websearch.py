@@ -9,6 +9,7 @@ A failed or empty search is a technical limit returned in `WebSearch.limitation`
 
 import asyncio
 import logging
+import os
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from typing import NamedTuple, Protocol
@@ -63,7 +64,14 @@ FETCH_TIMEOUT_S = 10
 ATTEMPTS = 2  # first call plus one retry
 MAX_REDIRECTS = 3
 MAX_PAGE_BYTES = 2_000_000
-PAGE_BUDGET_S = 20  # robots.txt plus the page, retry included
+# Both caps keep one claim inside the check's time budget (#11): DuckDuckGo took ~20 s to say
+# "no results" over two attempts in the full eval on f1e1684.
+SEARCH_BUDGET_S = float(
+    os.getenv("PRAWDOWID_WEB_SEARCH_BUDGET_S") or 10
+)  # retry included
+PAGE_BUDGET_S = float(
+    os.getenv("PRAWDOWID_PAGE_BUDGET_S") or 8
+)  # robots.txt and page; reads time out at 10 s, so no retry after a stall
 SAVE_BUDGET_S = 10  # saving every fetched page to the source store
 # Region "pl-pl" is passed to ddgs unchecked; UNCONFIRMED that every backend honours it.
 REGION = "pl-pl"
@@ -176,15 +184,22 @@ async def _save_all(docs: list[Document]) -> None:
 async def _search(
     query: str, domains: Sequence[str], limit: int, provider: SearchProvider
 ) -> list[SearchHit] | None:
-    """Provider call in a thread, bounded, with one retry. None when every attempt failed."""
-    for attempt in range(1, ATTEMPTS + 1):
-        try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(provider, query, domains=domains, limit=limit),
-                SEARCH_TIMEOUT_S + 5,
-            )
-        except (SearchUnavailable, TimeoutError) as exc:
-            log.warning("web search attempt %d failed: %r", attempt, exc)
+    """Provider call in a thread, with one retry while SEARCH_BUDGET_S lasts. None when every
+    attempt failed or the budget ran out."""
+    try:
+        async with asyncio.timeout(SEARCH_BUDGET_S):
+            for attempt in range(1, ATTEMPTS + 1):
+                try:
+                    return await asyncio.wait_for(
+                        asyncio.to_thread(
+                            provider, query, domains=domains, limit=limit
+                        ),
+                        SEARCH_TIMEOUT_S + 5,
+                    )
+                except (SearchUnavailable, TimeoutError) as exc:
+                    log.warning("web search attempt %d failed: %r", attempt, exc)
+    except TimeoutError:
+        log.warning("web search unavailable: over %g s", SEARCH_BUDGET_S)
     return None
 
 
@@ -215,7 +230,7 @@ async def _fetch_bounded(url: str, client: httpx2.AsyncClient) -> Document | Non
         async with asyncio.timeout(PAGE_BUDGET_S):
             return await fetch_document(url, client)
     except TimeoutError:
-        log.warning("fetch skipped %s: over %d s", url, PAGE_BUDGET_S)
+        log.warning("fetch skipped %s: over %g s", url, PAGE_BUDGET_S)
         return None
 
 

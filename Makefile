@@ -42,7 +42,7 @@ db-migrate: ## Apply db/migrations/ to the running database (safe to rerun)
 	cat db/migrations/*.sql | docker compose --profile db exec -T db psql -v ON_ERROR_STOP=1 -U prawdowid -d prawdowid
 
 db-seed: ## Seed the running database from corpus/queries.txt through web search (not run by default)
-	DATABASE_URL=postgresql://prawdowid:$${POSTGRES_PASSWORD:-prawdowid}@127.0.0.1:$${DB_PORT:-5433}/prawdowid uv run python -m prawdowid.corpus
+	uv run $(if $(wildcard .env),--env-file .env) python -m prawdowid.corpus --local-db
 
 logs: ## Follow Docker logs
 	docker compose --profile discord logs -f

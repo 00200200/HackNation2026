@@ -29,8 +29,8 @@ log = logging.getLogger("prawdowid")
 # Hyperparameters, first guesses for the 30 s median, not tuned.
 # Whole check, from the request to the last verdict (the API gives up at 60 s).
 CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 25)
-# The retry starts only with at least this much time left: search, rerank and judge again.
-RETRY_MIN_S = float(os.getenv("PRAWDOWID_RETRY_MIN_S") or 10)
+# The retry starts only with at least this much time left: a web search, rerank and judge again.
+RETRY_MIN_S = float(os.getenv("PRAWDOWID_RETRY_MIN_S") or 18)
 # EUvsDisinfo only adds context: it may not hold up the claim for its own 15 s deadline.
 EUVSDISINFO_BUDGET_S = float(os.getenv("PRAWDOWID_EUVSDISINFO_BUDGET_S") or 5)
 
@@ -139,6 +139,7 @@ async def _retrieve(
 async def _search_web(query: str) -> websearch.WebSearch:
     """An unexpected error (cache write, extraction) is a limitation of this source only."""
     try:
+        # Bounded inside: search by SEARCH_BUDGET_S, each page by PAGE_BUDGET_S.
         return await websearch.search_web(query)
     except Exception:
         log.exception("web search failed query=%r", query)

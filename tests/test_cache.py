@@ -1,10 +1,13 @@
 import asyncio
+import json
+import os
 import time
 from datetime import UTC, date, datetime
 from pathlib import Path
 
 import httpx2
 import psycopg
+import pytest
 
 from prawdowid import cache, websearch
 from prawdowid.cache import (
@@ -75,7 +78,7 @@ def test_database_down_is_a_limitation_after_one_retry(monkeypatch):
 def test_slow_database_hits_the_deadline(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
     monkeypatch.setattr(cache, "SEARCH_DEADLINE_S", 0.05)
-    monkeypatch.setattr(cache, "_search", lambda q: time.sleep(0.3) or [])
+    monkeypatch.setattr(cache, "_search", lambda q, n: time.sleep(0.3) or [])
     result = asyncio.run(search_documents("Rada UE przyjęła sankcje"))
     assert result.limitation == DATABASE_UNAVAILABLE
 
@@ -88,7 +91,7 @@ def test_matching_document_comes_back_as_source_for_rerank(monkeypatch):
         row("https://www.nato.int/b", "NATO o sankcjach."),
         row("https://www.gov.pl/a", "Zakaz importu gazu."),
     ]
-    monkeypatch.setattr(cache, "_search", lambda q: queries.append(q) or rows)
+    monkeypatch.setattr(cache, "_search", lambda q, n: queries.append(q) or rows)
     result = asyncio.run(search_documents("Rada UE przyjęła sankcje wobec Rosji"))
 
     assert result.limitation is None
@@ -252,18 +255,63 @@ def test_seed_is_the_only_database_writer(monkeypatch):
     assert [d.url for d in stored] == [doc().url]
 
 
-def test_seed_export_leaves_the_check_cache_alone(monkeypatch, tmp_path):
+def test_seed_manifest_from_database_carries_no_page_text(monkeypatch, tmp_path):
+    """Retention and deletion in the database must cover every copy of the text."""
     from prawdowid import corpus
 
     monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
     monkeypatch.chdir(tmp_path)
-    cache_file = tmp_path / "corpus" / "docs.jsonl"
-    cache.save_document(doc("https://www.gov.pl/from-a-check"), cache_file)
     monkeypatch.setattr(corpus, "stored_documents", lambda: [doc()])
     corpus.write_manifest()
-    assert [d.url for d in cache.load_documents(cache_file)] == [
-        "https://www.gov.pl/from-a-check"
+    [row] = [
+        json.loads(line)
+        for line in Path("corpus/manifest.jsonl").read_text().splitlines()
     ]
-    assert [d.url for d in cache.load_documents(Path("corpus/db-export.jsonl"))] == [
-        doc().url
+    assert row["url"] == doc().url and "text" not in row
+    assert sorted(p.name for p in Path("corpus").iterdir()) == ["manifest.jsonl"]
+
+
+def test_local_database_url_uses_compose_settings(monkeypatch):
+    from prawdowid.corpus import local_database_url
+
+    monkeypatch.setenv("POSTGRES_PASSWORD", "p@ss:w/rd")
+    monkeypatch.setenv("DB_PORT", "6000")
+    assert local_database_url() == (
+        "postgresql://prawdowid:p%40ss%3Aw%2Frd@127.0.0.1:6000/prawdowid"
+    )
+
+
+@pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"),
+    reason="needs a throwaway migrated Postgres in TEST_DATABASE_URL; the test WIPES it",
+)
+def test_long_document_does_not_crowd_out_others(monkeypatch):
+    url = os.environ["TEST_DATABASE_URL"]
+    monkeypatch.setenv("DATABASE_URL", url)
+    _wipe(url)
+    try:
+        _check_long_document_does_not_crowd_out_others()
+    finally:
+        _wipe(url)  # no test fixtures left to show up in a later manifest
+
+
+def _wipe(url):
+    with psycopg.connect(url) as conn:
+        conn.execute("truncate documents cascade")
+
+
+def _check_long_document_does_not_crowd_out_others():
+    long = doc("https://www.gov.pl/long")
+    long.text = "\n\n".join(
+        f"Sankcje wobec Rosji, akapit {i}. " * 20 for i in range(25)
+    )
+    short = doc("https://www.nato.int/short")
+    short.text = "NATO komentuje sankcje."
+    assert store_document(long) and store_document(short)
+
+    result = asyncio.run(search_documents("sankcje", limit=5))
+    assert [f.doc_id for f in result.fragments] == [
+        "https://gov.pl/long",
+        "https://nato.int/short",
     ]
+    assert result.fragments[0].source.fragment.count("\n\n") < cache.CHUNKS_PER_DOCUMENT
