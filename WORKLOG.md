@@ -21,19 +21,21 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | Branch | State |
 |---|---|
 | `main` / `origin/main` | at `d5aa35b` (pre-push gate). Local `main` is behind: `git pull` before branching. |
-| `feat/llm-verifier` | `b52c248` PydanticAI verifier, 1 commit ahead of `origin/main`, not pushed. Uncommitted: prompt tweaks in `verifier.py` (injection wording, "Sprawdź, czy X" handling), `evals/results/latest.json`. |
+| `feat/llm-verifier` | PydanticAI verifier (`b52c248`), prompt tweaks (`c27b642`), worklog, eval results. Pushed to `origin/feat/llm-verifier`, not merged into `main`. |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, quick, 4 example cases, commit `b52c248`, does not count for submission):
-macro_f1 0.40 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail), median latency 2.3 s,
+**Last eval** (`evals/results/latest.json`, quick, 4 example cases, commit `c27b642`, does not count for submission):
+macro_f1 0.33 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail), median latency 2.6 s,
 end_to_end 1.00, moderator_loop 0.00. Citation metrics, channel consistency and cost: not measured.
-A01 (simple fact) came back `nie podlega weryfikacji`; the uncommitted prompt change targets that, not re-measured.
+Every case returns `brak wystarczających dowodów`: expected while there are no sources.
+
+**Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
 ## Next (open work, take one and put your name on it)
 
 Basic requirements first: the jury gives no points for extras if one of these is missing.
 
-- [ ] Commit and push `feat/llm-verifier` through the gate (eval on the committed state, judge PASS). Owner: Łukasz
+- [ ] Merge `feat/llm-verifier` into `main` (pushed, needs a PR and a team OK). Owner: Łukasz
 - [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: ?
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
 - [ ] Second channel (Discord or other allowed one; not Telegram/WeChat) on the same `verify()`. Owner: ?
@@ -54,7 +56,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz: linked the architecture board in README, committed the quick eval on `c27b642`, pushed `feat/llm-verifier`.
 - 2026-11-21 Łukasz: added this worklog and the CLAUDE.md rule to keep it current.
+- 2026-11-21 Łukasz: `c27b642` prompt keeps injected instructions out of claims, checks yes/no questions.
 - 2026-11-21 Łukasz: `b52c248` PydanticAI agent as the verifier, offline tests with FunctionModel. Quick eval run.
 - 2026-11-21 Michał: `d5aa35b` pre-push gate, `judge` agent, jury rules, eval harness (`evals/`).
 - 2026-11-21 Łukasz: `96f3b46` (#1) service skeleton: contract, stub verifier, nginx frontend, Docker, Makefile.

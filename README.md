@@ -47,6 +47,10 @@ Run `make help` to list every target. The ones used most:
 | `make check` | `ruff format --check`, `ruff check`, `pytest` |
 | `make format` | Format and autofix |
 
+## Architecture board
+
+The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs
+
 ## Layout
 
 - `frontend/`: static `index.html`, `styles.css` and `app.js` (no build step) served by nginx.
