@@ -262,6 +262,11 @@ body.checked .status-pill { margin-bottom: 1rem; }
 .footnote { display: flex; align-items: center; gap: .6rem; }
 .foot-mark { width: 1.75rem; height: 1.75rem; display: block; flex: none; }
 
+/* Scenario I: known incidents, context only */
+.incidents { border-left: 4px solid var(--line); padding: .2rem 0 .2rem 1rem; margin-bottom: 1.5rem; overflow-wrap: anywhere; }
+.incidents h2 { font-size: 1rem; margin: 0 0 .3rem; }
+.incidents p, .incidents ul { margin: .2rem 0; }
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

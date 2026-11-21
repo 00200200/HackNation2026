@@ -13,6 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from prawdowid.contract import CheckResult, Status
+from prawdowid.incidents import match_incidents
 from prawdowid.verifier import failed, is_link, verify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:  %(name)s %(message)s")
@@ -90,6 +91,13 @@ async def create_check(request: Request, body: CheckRequest) -> CheckResult:
         if is_link(body.input):
             # Only the URL was screened, not the page, so the "patterns only" note would mislead.
             result.limitations = []
+    # Scenario I context, added after the verdicts so it cannot change them.
+    try:
+        # The final address after redirects counts too (a short link to a known page).
+        final_url = result.page.url if result.page else ""
+        result.incident_matches = match_incidents(f"{body.input} {final_url}")
+    except Exception:
+        log.exception("incident matching failed")
     # ponytail: stdout log instead of a check store until the team picks storage.
     channel = request.headers.get("x-channel", "web")
     log.info(

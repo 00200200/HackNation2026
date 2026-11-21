@@ -170,22 +170,44 @@ function copyButton(check) {
   return button;
 }
 
+// Scenario I: a known incident the input looks like. Context only, never a verdict.
+const MATCH_LABELS = { url: "ten sam adres", domain: "domena z bazy", text: "podobny tekst" };
+const INCIDENT_NOTE = "Ta treść przypomina incydenty z bazy organizatora. "
+  + "To tylko kontekst: nie zmienia oceny twierdzeń.";
+
+function incidentItem(m) {
+  const url = safeUrl(m.url);
+  const how = MATCH_LABELS[m.matched_on] + (m.similarity != null ? ` ${Math.round(m.similarity * 100)}%` : "");
+  return el("li", {}, m.incident_text, ` (${m.incident_id}, ${how})`,
+    url ? el("span", {}, " ", el("a", { href: url, textContent: "adres", rel: "noopener noreferrer", target: "_blank" })) : null);
+}
+
+function incidentWarning(matches) {
+  if (!matches?.length) return null;
+  return el("section", { className: "incidents", role: "note" },
+    el("h2", { textContent: "Podobne znane incydenty" }),
+    el("p", { textContent: INCIDENT_NOTE }),
+    el("ul", {}, ...matches.map(incidentItem)));
+}
+
 function render(check, seconds) {
+  const warning = incidentWarning(check.incident_matches);
   // Statuses other than "ok" are notices, never verdicts.
   if (check.status !== "ok") {
     const main = notice(NOTICE_TITLES[check.status] ?? "Brak oceny", check.message, NOT_A_VERDICT);
     const limits = check.limitations?.length
       ? el("ul", {}, ...check.limitations.map((l) => el("li", { textContent: l })))
       : null;
-    if (!check.security_events?.length && !limits) return main;
+    if (!check.security_events?.length && !limits && !warning) return main;
     return el("div", {},
       check.security_events?.length ? notice("Polecenia dla modelu", SECURITY_NOTE_ONLY) : null,
-      main, limits);
+      main, limits, warning);
   }
   const unchecked = check.unchecked_claims ?? [];
   if (!check.claims.length && !unchecked.length) {
-    return notice("Nie znaleźliśmy zdania do sprawdzenia",
+    const empty = notice("Nie znaleźliśmy zdania do sprawdzenia",
       "Wklej fragment z konkretnym faktem, na przykład datą, liczbą albo nazwą instytucji.");
+    return warning ? el("div", {}, empty, warning) : empty;
   }
   const events = check.security_events ?? [];
   return el("article", { className: "card" },
@@ -196,6 +218,7 @@ function render(check, seconds) {
         el("span", { className: "took", textContent: `w ${seconds} s` })),
       copyButton(check)),
     check.page ? pageNote(check.page) : null,
+    warning,
     ...check.claims.map(claimBlock),
     unchecked.length ? uncheckedList(unchecked) : null);
 }
