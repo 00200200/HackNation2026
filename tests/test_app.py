@@ -3,30 +3,48 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic_ai import ModelResponse, TextPart
+from pydantic_ai.models.function import FunctionModel
 
 from prawdowid import app as app_module
 from prawdowid.app import MAX_INPUT_CHARS, RATE_LIMIT_MESSAGE, app, limiter
 from prawdowid.contract import CheckResult, ClaimResult, Source, Status, Verdict
+from prawdowid.verifier import ExtractedClaim, Extraction, agent
+
+MIXED = Extraction(
+    claims=[
+        ExtractedClaim(claim="Fakt.", checkable=True, reason="Da się sprawdzić."),
+        ExtractedClaim(claim="Opinia.", checkable=False, reason="To opinia."),
+    ],
+    unclear=False,
+)
 
 
 @pytest.fixture
 def client():
     limiter.reset()
-    return TestClient(app)
+    model = FunctionModel(
+        lambda messages, info: ModelResponse(parts=[TextPart(MIXED.model_dump_json())])
+    )
+    with agent.override(model=model):
+        yield TestClient(app)
 
 
 def test_http_link_is_accepted(client):
     resp = client.post("/api/checks", json={"input": "https://example.com/artykul"})
     assert resp.status_code == 200
+    assert resp.json()["status"] == "cannot_check"
 
 
-def test_valid_input_returns_not_connected_notice(client):
-    resp = client.post("/api/checks", json={"input": "  Ziemia jest płaska.  "})
+def test_text_returns_claims_with_labels(client):
+    resp = client.post("/api/checks", json={"input": "  Fakt i opinia.  "})
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "cannot_check"
-    assert body["claims"] == []
-    assert "nie jest jeszcze podłączona" in body["message"]
+    assert body["status"] == "ok"
+    assert [c["verdict_label"] for c in body["claims"]] == [
+        "brak wystarczających dowodów",
+        "nie podlega weryfikacji",
+    ]
 
 
 @pytest.mark.parametrize(

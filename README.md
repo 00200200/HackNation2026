@@ -4,9 +4,27 @@ You paste a text or a link and get back, for each claim in it, a verdict and the
 it, written in plain Polish. This repository holds the service around the verification pipeline:
 the shared contract, the HTTP API and the web frontend.
 
-**Status:** the verifier is a stub. Every check returns `cannot_check` with the notice
-"Weryfikacja nie jest jeszcze podłączona…". The service never produces a verdict or a source yet.
-Nothing is stored; each check is only logged to stdout (status, latency, input length).
+**Status:** the verifier sends the text to Claude (through PydanticAI) and gets back a list of
+claims, each marked checkable or not. The model never decides whether a claim is true. There are
+no sources yet, so the verdict is set in code: a checkable claim is always `insufficient_evidence`
+with a note that the source base is not connected, and an opinion, forecast or question is
+`not_verifiable`. `sources` is always empty. Links are not supported yet and come back as
+`cannot_check`. Nothing is stored; each check is logged to stdout (status, latency, input length)
+with a second line for the model call (model, input and output tokens, latency).
+
+## Configuration
+
+Put these in `.env` in the repository root. The file is git-ignored and is not copied into the
+image; `docker compose` and `make dev` read it at start-up.
+
+| Variable | Required | Default | What it does |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
+| `PRAWDOWID_MODEL` | no | `anthropic:claude-opus-5-5` | PydanticAI model id (`provider:model`). |
+
+The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
+errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns
+`cannot_check`. Both carry a Polish message and no claims.
 
 ## Run
 
@@ -38,7 +56,8 @@ Run `make help` to list every target. The ones used most:
 - `compose.yaml`: both services. Only the frontend port is published.
 - `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult`.
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
-  channel calls.
+  channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function
+  that turns the model's claims into verdicts.
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
 
 ## API
@@ -49,7 +68,8 @@ Run `make help` to list every target. The ones used most:
 | `GET /health` | Liveness. |
 
 Input is trimmed and must be 1 to 5000 characters. A single token containing `://` counts as a
-link and must be a valid `http` or `https` URL. Links are not fetched yet. Validation errors come
+link and must be a valid `http` or `https` URL. Links are not fetched yet: a valid link returns
+`cannot_check`. Validation errors come
 back as 422 with a Polish message in `detail[0].msg`.
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
