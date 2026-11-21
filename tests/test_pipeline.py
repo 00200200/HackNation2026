@@ -429,3 +429,76 @@ def test_retry_judge_failure_after_an_excluded_first_pass_is_not_checked(monkeyp
     assert result.judgement.verdict is Verdict.NOT_CHECKED
     assert result.judgement.limitations[0] == judge.JUDGE_UNAVAILABLE
     assert pipeline.RETRY_UNJUDGED not in result.judgement.limitations
+
+
+def fake_govpl(monkeypatch, found=True):
+    """gov.pl on: returns one RCB page, or a failure."""
+    seen = []
+
+    async def search_govpl(queries, **kwargs):
+        seen.append(list(queries))
+        if not found:
+            return websearch.WebSearch(limitation=pipeline.govpl.LOOKUP_UNAVAILABLE)
+        doc = document("https://www.gov.pl/web/rcb/alert").model_copy(
+            update={"publisher": "Rządowe Centrum Bezpieczeństwa"}
+        )
+        return websearch.WebSearch(documents=[doc])
+
+    monkeypatch.setattr(pipeline.govpl, "ENABLED", True)
+    monkeypatch.setattr(pipeline.govpl, "search_govpl", search_govpl)
+    return seen
+
+
+def test_govpl_pages_meet_web_pages_at_rerank(monkeypatch, models):
+    gov = fake_govpl(monkeypatch)
+    skipped = []
+
+    async def search(query, **kwargs):
+        skipped.append(kwargs.get("skip_hosts"))
+        return websearch.WebSearch(limitation=websearch.SEARCH_UNAVAILABLE)
+
+    monkeypatch.setattr(websearch, "search_web", search)
+    result = pipeline_check(["web 1"], ["RCB alert"])
+    assert gov == [["RCB alert"]]
+    assert skipped == [pipeline.govpl.HOSTS]
+    assert result.judgement.verdict is Verdict.CONFIRMED
+    assert [s.publisher for s in result.judgement.sources] == [
+        "Rządowe Centrum Bezpieczeństwa"
+    ]
+
+
+def test_govpl_without_its_own_queries_searches_the_first_web_query(
+    monkeypatch, models
+):
+    gov = fake_govpl(monkeypatch)
+    fake_search(monkeypatch, found=lambda q: False)
+    pipeline_check(["web 1", "web 2"], [])
+    pipeline_check([], [])
+    pipeline_check(["web 1"], [" "])
+    assert gov == [["web 1"], ["Twierdzenie."], ["web 1"]]
+
+
+def test_govpl_switched_off_sends_its_queries_to_the_web(monkeypatch, models):
+    gov = fake_govpl(monkeypatch)
+    monkeypatch.setattr(pipeline.govpl, "ENABLED", False)
+    seen = fake_search(monkeypatch)
+    pipeline_check(["web 1"], ["RCB alert"])
+    assert gov == [] and seen == ["web 1", "RCB alert"]
+
+
+def test_govpl_failing_with_every_other_source_is_not_checked(monkeypatch, models):
+    fake_govpl(monkeypatch, found=False)
+    fake_search(monkeypatch, found=lambda q: False)
+    result = pipeline_check(["web 1"], ["RCB alert"])
+    assert result.judgement.verdict is Verdict.NOT_CHECKED
+    assert pipeline.govpl.LOOKUP_UNAVAILABLE in result.judgement.limitations
+
+
+def pipeline_check(queries, govpl_queries):
+    async def go():
+        deadline = asyncio.get_running_loop().time() + 30
+        return await pipeline.check_claim(
+            "Twierdzenie.", queries, deadline, govpl_queries=govpl_queries
+        )
+
+    return asyncio.run(go())

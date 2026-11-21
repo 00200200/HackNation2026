@@ -7,11 +7,12 @@ the shared contract, the HTTP API and the web frontend.
 **Status:** the verifier sends the text to Claude (through PydanticAI) and gets back a list of
 claims, each marked checkable or not. The model never decides whether a claim is true. Each
 checkable claim then goes through `prawdowid/pipeline.py` in parallel with the others: Google Fact
-Check, EUvsDisinfo known narratives (context only, never a verdict on its own) and web search on
+Check, EUvsDisinfo known narratives (context only, never a verdict on its own), the www.gov.pl site
+search (ministry and RCB pages; web search leaves www.gov.pl to it) and web search on
 allowlisted domains (our own database, #19, is out of the pipeline for now), then
 rerank and a judge that labels quotes; the verdict is set in code (`judge.decide`). The whole check
 has one time budget (`PRAWDOWID_CHECK_BUDGET_S`, 25 s). A claim that runs out of time, or whose
-web search, Fact Check and EUvsDisinfo all fail, comes back `not_checked` with the reason, never as a verdict. An
+web search, gov.pl, Fact Check and EUvsDisinfo all fail, comes back `not_checked` with the reason, never as a verdict. An
 opinion, forecast or question is `not_verifiable`. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
@@ -41,6 +42,7 @@ path. Other tuning variables need an explicit Compose environment override.
 | `PRAWDOWID_CHECK_BUDGET_S` | no | `25` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. |
 | `PRAWDOWID_WEB_SEARCH_BUDGET_S` | no | `10` | Longest one web search query may take, retry included, before it counts as unavailable. |
 | `PRAWDOWID_PAGE_BUDGET_S` | no | `8` | Longest one page fetch may take (robots.txt and page); a slower page is skipped, the others are kept. |
+| `PRAWDOWID_GOVPL` | no | `1` | `0` switches off the www.gov.pl site search (`prawdowid/govpl.py`); its queries then go to web search, which searches www.gov.pl again. See [docs/sources.md](docs/sources.md). |
 | `PRAWDOWID_RETRY_MIN_S` | no | `18` | A claim without enough evidence is searched once more only if at least this many seconds remain. |
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
