@@ -45,7 +45,13 @@ uv run python -m evals.run --only FC-C02,A01                   # just these case
 - Ctrl-C stops new cases from starting; the ones in flight finish and the partial file keeps every finished case.
 
 Each run writes `evals/results/latest.json` (commit this one: it is the "test results with data to reproduce"
-deliverable) and `.git/eval-latest.json`, which the pre-push hook reads.
+deliverable) and `.git/eval-latest.json`, which the pre-push hook reads. It also writes a full report to
+`evals/results/history/<timestamp>-<sha>-<mode>.json` and appends one row to `evals/results/HISTORY.md` (both
+tracked; only the `run-*.partial.jsonl` progress file is git-ignored), so every session can see every past run, not
+only the latest one. `--note "<text>"` fills that row's notes column. **Read `evals/results/HISTORY.md`, not only
+`latest.json`; check the commit and notes before concluding anything** — see `docs/eval-notes.md` for why some past
+runs are distorted (timeouts, missing keys, a too-tight time budget). On a merge conflict in `HISTORY.md` from
+parallel branches each appending a run, keep both rows (same rule as `WORKLOG.md`).
 
 ## Product contract and how the eval maps it
 
