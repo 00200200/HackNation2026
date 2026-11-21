@@ -25,9 +25,9 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `feat/16-eval-set` | #16 eval set (31 cases) and full eval, stacked on `feat/5-self-contained-claims`. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `7ee1410`, no corpus):
+**Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `d655078` (#5 merged into #16), no corpus):
 macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail: no `security_events`, verdicts
-wrong), median latency 2.8 s, end_to_end 0.94 (fail: both J cases, no eval switch to simulate a failure). Citation metrics,
+wrong), median latency 5.0 s, end_to_end 0.94 (fail: both J cases, no eval switch to simulate a failure). Citation metrics,
 channel consistency and cost: not measured (no corpus, no second channel, no `cost_usd`). Every checkable case returns
 `brak wystarczających dowodów`: expected while there are no sources.
 
@@ -94,6 +94,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 ## Log (newest first, append only)
 
 - 2026-11-21 Łukasz (Claude worker): #16 `evals/cases.jsonl` with 31 labelled cases, full eval on `7ee1410` committed (macro_f1 0.09).
+- 2026-11-21 Łukasz (Claude worker): #16 merged `feat/5-self-contained-claims` (stack), full eval rerun on `d655078`: macro_f1 0.09, median latency 5.0 s.
 - 2026-11-21 Łukasz (Claude worker): #5 claims stand alone (pronouns, relative dates from the text), quotes split into attribution + quoted, queries per claim, top-N cap with `unchecked_claims`, source sentence shown in the UI. Branch `feat/5-self-contained-claims`.
 - 2026-11-21 Łukasz (Claude worker): #6 review fixes on PR #21: 15 s overall deadline for the Fact Check lookup (httpx2 timeouts are per read), reviewed claim no longer in `Source.fragment` or title.
 - 2026-11-21 Łukasz (Claude worker): #6 `prawdowid/factcheck.py`, Google Fact Check lookup with offline MockTransport tests; `httpx2` moved to runtime deps. Branch `feat/6-factcheck`.
