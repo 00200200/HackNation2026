@@ -8,8 +8,10 @@ the shared contract, the HTTP API and the web frontend.
 claims, each marked checkable or not. The model never decides whether a claim is true. There are
 no sources yet, so the verdict is set in code: a checkable claim is always `insufficient_evidence`
 with a note that the source base is not connected, and an opinion, forecast or question is
-`not_verifiable`. `sources` is always empty. Links are not supported yet and come back as
-`cannot_check`. Nothing is stored; each check is logged to stdout (status, latency, input length)
+`not_verifiable`. `sources` is always empty. A link is fetched (`prawdowid/link.py`) and the page's
+main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
+private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
+paste the text. Nothing is stored; each check is logged to stdout (status, latency, input length)
 with a second line for the model call (model, input and output tokens, latency).
 
 ## Configuration
@@ -25,7 +27,8 @@ image; `docker compose` and `make dev` read it at start-up.
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
 | `DOMAIN` | with `compose.prod.yaml` | none | Public domain Caddy gets the HTTPS certificate for (`compose.prod.yaml`, see `docs/deploy.md`). |
-| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | with `compose.prod.yaml` | none | Database, user and password of the `db` service. `compose.prod.yaml` passes them to the backend as `DATABASE_URL`. |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | with `compose.prod.yaml` | none | Database, user and password of the `db` service. `compose.prod.yaml` passes them to the backend as `DATABASE_URL`. `POSTGRES_PASSWORD` is also the password of the local `sourcedb` service (default `prawdowid`, port bound to 127.0.0.1 only), applied only when its `sourcedb_data` volume is created; see [deletion instructions](docs/sources.md). `make db-seed` refuses until the team approves sources for full-text storage; see [the prerequisite](docs/sources.md#full-text-seed-approval). |
+| `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database and the backend runs without it. Start the database with `make db` (127.0.0.1:5433). |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 
 The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
@@ -97,8 +100,11 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 | `GET /health` | Liveness. |
 
 Input is trimmed and must be 1 to 5000 characters. A single token containing `://` counts as a
-link and must be a valid `http` or `https` URL. Links are not fetched yet: a valid link returns
-`cannot_check`. Validation errors come
+link and must be a valid `http` or `https` URL. The page is fetched only from public addresses
+(checked on every connection, so redirects and DNS cannot reach private, loopback or link-local
+hosts), with at most 3 redirects, a 10 s deadline and a 2 MB cap; HTML goes through trafilatura,
+PDF through pypdf, and the first 5000 characters go to the verifier. `CheckResult.page` carries the
+page URL, content hash, title, publisher and date, never the page text. Validation errors come
 back as 422 with a Polish message in `detail[0].msg`.
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
