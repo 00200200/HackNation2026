@@ -121,6 +121,8 @@ Basic requirements first: the jury gives no points for extras if one of these is
   navy hat. Vector files without font dependencies in `docs/brand/` (`znak.svg`, `znak-na-czerwonym.svg` for red
   backgrounds, `awatar.svg` for the Discord bot); `frontend/public/favicon.svg` uses `znak.svg`. Tagline: "Fakt ma
   przypis." We never claim to be "the source of truth": the brief rules out the role of an automatic judge of truth.
+  Typeface: Figtree (SIL OFL), self-hosted in `frontend/public/fonts/` because the CSP allows no font hosts; the web
+  hero and the pitch deck share the same look (giant title with an outlined echo, chat preview, verdict card).
 - 2026-11-21: Public demo on one EU VPS (OVHcloud VPS-2, Limburg, Germany) with `docker compose` and Caddy
   (automatic HTTPS) in front of nginx. No Vercel. A push to `prod` deploys through GitHub Actions; `prod` only
   takes commits already on `main`. DNS has only an A record: behind Docker's userland proxy all IPv6 visitors
@@ -130,6 +132,8 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał: web answer in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić tej informacji." plus sources), the same text in copy-to-chat; example chips use the organiser's questions.
+- 2026-11-21 Michał: web UI matched to the pitch deck: Figtree, flat red hero with the outlined title echo, labelled chat preview, verdict card with sources one per row and quotes on a red rule.
 - 2026-11-21 Łukasz (Claude worker): merged `main` into `feat/16-eval-set` (PR #23); both eval sets kept, #16 cases renamed `FC-*` (73 cases). Quick eval on `69f1f82`: abstention 1.00, median 4.1 s, macro_f1 0.10, end_to_end 0.89.
 - 2026-11-21 Łukasz (Claude worker): #16 Codex review fixes on PR #23: `skip` field in `evals/run.py` (J01–J02 skipped, not scored), single-assertion inputs for B05, B06, B02, G01, G03, G04, A05, E02, new A08, I01–I03 marked as stand-ins; corpus run marked blocked. Full no-corpus eval on `3ce9bae`: macro_f1 0.09, end_to_end 1.00.
 - 2026-11-21 Łukasz (Claude worker): #16 `evals/cases.jsonl` with 31 labelled cases, full eval on `7ee1410` committed (macro_f1 0.09).

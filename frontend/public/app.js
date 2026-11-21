@@ -25,6 +25,15 @@ const SOURCE_TYPES = {
   incident_base: "baza incydentów dezinformacji",
   news: "serwis informacyjny",
 };
+// First words of the answer, in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić…"),
+// picked from the verdict set in code. The reasons stay in the sources and limitations.
+const ANSWER_LEAD = {
+  confirmed: "Tak.",
+  false: "Nie.",
+  misleading: "To wprowadza w błąd.",
+  insufficient_evidence: "Nie udało mi się potwierdzić tej informacji.",
+  not_verifiable: "Tego nie da się sprawdzić: to opinia, prognoza albo pytanie bez faktu do sprawdzenia.",
+};
 // Enter sends only with a hardware keyboard; on touch keyboards it adds a new line.
 const ENTER_SENDS = window.matchMedia("(hover: hover) and (pointer: fine)");
 let busy = false;
@@ -102,12 +111,19 @@ function uncheckedList(claims) {
     el("ul", {}, ...claims.map((t) => el("li", { textContent: t }))));
 }
 
+function answerText(c) {
+  const publishers = [...new Set(c.sources.map((s) => s.publisher).filter(Boolean))];
+  const named = publishers.length ? `${publishers.length === 1 ? "Źródło" : "Źródła"}: ${publishers.join(", ")}.` : null;
+  return [ANSWER_LEAD[c.verdict] ?? `${c.verdict_label}.`, named].filter(Boolean).join(" ");
+}
+
 function claimBlock(c) {
   return el("div", { className: "claim" },
     el("h2", { className: "claim-text", textContent: `„${c.claim}”` }),
     origin(c),
     el("p", { className: "claim-meta" },
       el("span", { className: `verdict verdict-${c.verdict}`, textContent: c.verdict_label })),
+    el("p", { className: "answer", textContent: answerText(c) }),
     el("h3", { className: "part", textContent: "Co mówią źródła" }),
     c.sources.length
       ? el("ol", { className: "sources" }, ...c.sources.map(sourceItem))
@@ -124,10 +140,12 @@ function claimBlock(c) {
 }
 
 function chatText(check) {
+  // Same answer as on the page, so the web and a pasted reply never disagree. Without a link the first
+  // limitation says why (no sources connected, a source down), so the reply never reads as "nothing exists".
   const lines = check.claims.map((c) => {
     const link = c.sources.map((s) => safeUrl(s.url)).find(Boolean);
     const reason = !link && c.limitations[0] ? ` ${c.limitations[0]}` : "";
-    return `„${c.claim}”: ${c.verdict_label}.${link ? ` Źródło: ${link}` : reason}`;
+    return `„${c.claim}”: ${answerText(c)}${link ? ` ${link}` : reason}`;
   });
   return [...lines, "Odpowiedź z faktczyfejk.pl (prototyp)"].join("\n");
 }

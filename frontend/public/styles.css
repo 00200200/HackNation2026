@@ -1,3 +1,11 @@
+/* Figtree, SIL Open Font License 1.1 (fonts/OFL.txt). Self-hosted: the CSP allows no third-party hosts. */
+@font-face {
+  font-family: "Figtree";
+  src: url("/fonts/Figtree.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
 :root {
   --red: #d4213d;
   --red-deep: #b01a33;
@@ -8,8 +16,7 @@
   --soft: #f8f9fb;
   --pink-bg: #fff4f6;
   --dark-red: #8c1028;
-  --sans: "Archivo", "Avenir Next", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
-  --display: "Archivo", "Avenir Next Condensed", "Bahnschrift", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font: "Figtree", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -18,7 +25,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--navy);
-  font: 1.0625rem/1.5 var(--sans);
+  font: 1.0625rem/1.5 var(--font);
 }
 
 .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.25rem; }
@@ -27,67 +34,54 @@ body {
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .skip { position: absolute; left: -999px; }
-.skip:focus { left: 1rem; top: 1rem; z-index: 2; padding: .5rem 1rem; background: #fff; color: var(--navy); }
+.skip:focus { left: 1rem; top: 1rem; z-index: 3; padding: .5rem 1rem; background: #fff; color: var(--navy); }
 :focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
 a { color: var(--red-deep); }
 
-/* Hero: red poster field with print grain */
-.hero {
-  position: relative;
-  background: var(--red) url("/grain.svg");
-  background-blend-mode: multiply;
-  color: #fff;
-  padding: 1.75rem 0 5.5rem;
-}
-.hero::before { content: ""; position: absolute; inset: 0; background: rgba(212, 33, 61, .78); pointer-events: none; }
-.hero > .wrap { position: relative; }
+/* Hero: flat red poster. The one loud element is the title and its outlined echo. */
+.hero { background: var(--red); color: #fff; padding: 1.75rem 0 4.5rem; overflow-x: clip; }
+.hero > .wrap { max-width: 88rem; padding: 0 clamp(1.25rem, 3vw, 2.5rem); }
 .hero :focus-visible { outline-color: #fff; }
 .hero a { color: #fff; }
 
 .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.brand { display: inline-flex; align-items: center; gap: .7rem; text-decoration: none; }
-.brand-mark { width: 2.75rem; height: 2.75rem; flex: none; }
-.brand-name { font-family: var(--display); font-stretch: 62%; font-weight: 900; font-size: 2rem; letter-spacing: .01em; }
-.top nav a { font-weight: 600; text-decoration: none; padding: .5rem 0; }
+.brand { display: inline-flex; align-items: center; gap: .65rem; text-decoration: none; }
+.brand-mark { width: 2.6rem; height: 2.6rem; flex: none; }
+.brand-name { font-weight: 800; font-size: 1.35rem; letter-spacing: -.01em; }
+.top nav a { font-weight: 700; text-decoration: none; padding: .5rem 0; }
 .top nav a:hover { text-decoration: underline; }
 
-.hero-body { max-width: 55rem; margin: 5rem auto 0; text-align: center; }
-.hero h1 {
-  margin: 0;
-  font-family: var(--display);
-  font-stretch: 62%;
-  font-weight: 900;
-  font-size: clamp(4.5rem, 15vw, 11rem);
-  line-height: .82;
-  letter-spacing: -.02em;
-  text-wrap: balance;
+.hero-body {
+  display: grid;
+  grid-template-columns: minmax(0, 44rem) minmax(0, 1fr);
+  grid-template-areas: "title title" "main chat";
+  column-gap: 3rem;
+  margin-top: clamp(2rem, 6vh, 4.5rem);
 }
-.hero h1 sup { font-size: .25em; letter-spacing: 0; vertical-align: top; position: relative; top: .35em; margin-left: .15em; }
+.hero h1, .echo { font-weight: 900; font-size: clamp(3.75rem, 12vw, 12rem); line-height: .86; letter-spacing: -.045em; }
+.hero h1 { grid-area: title; margin: 0; position: relative; z-index: 1; }
+.hero h1 sup { font-size: .24em; letter-spacing: 0; vertical-align: top; position: relative; top: .3em; margin-left: .12em; }
 .hero h1 sup a { text-decoration: none; display: inline-block; border-radius: .25em; }
-.title-mark { width: 1.35em; height: 1.35em; display: block; transform: rotate(6deg); }
-.lead { margin: 1.75rem auto 1.25rem; max-width: 39rem; font-size: clamp(1.15rem, 2.2vw, 1.4rem); line-height: 1.45; font-weight: 500; text-wrap: pretty; }
-.status-pill { display: inline-block; margin: 0 0 1.75rem; padding: .35rem .8rem; border-radius: 999px; background: #fff; color: var(--red-deep); font-size: .85rem; font-weight: 800; }
+.title-mark { width: 1.3em; height: 1.3em; display: block; transform: rotate(6deg); }
 
-/* Laptops and projectors (720–820 px tall): keep the input above the fold */
-@media (max-height: 820px) and (min-width: 561px) {
-  .hero-body { margin-top: 2rem; }
-  .hero h1 { font-size: clamp(4rem, 11vw, 7.5rem); }
-  .lead { margin-top: 1.25rem; }
-  .status-pill { margin-bottom: 1.25rem; }
-}
+/* Outlined copies of the title under it, as on the slides; decoration only, hidden from assistive tech.
+   Every text block above it sits on solid red (see "knock-out" below), so no outline crosses white text. */
+/* margin-top keeps the title's descenders (y, j) clear of the first outline */
+.echo { grid-row: 2; grid-column: 1 / -1; align-self: start; margin-top: .14em; display: grid; white-space: nowrap; pointer-events: none; user-select: none; }
+.echo span { color: transparent; -webkit-text-stroke: 2px rgba(255, 255, 255, .55); }
+.echo span + span { -webkit-text-stroke-color: rgba(255, 255, 255, .28); }
 
-/* After the first check the poster steps back so the answer sits near the top */
-body.checked .hero { padding-bottom: 3rem; }
-body.checked .hero-body { margin-top: 1.5rem; }
-body.checked .hero h1 { font-size: clamp(3rem, 7vw, 5rem); }
-body.checked .lead { display: none; }
-body.checked .status-pill { margin: 1rem 0 1.25rem; }
+.hero-main { grid-area: main; position: relative; z-index: 1; padding-top: 1.75rem; }
+/* Knock-out: text blocks over the echo get the hero red behind them, keeping white text at 5.1:1 */
+.lead, .hint, .examples > span, .status-pill, .chip, .chat-caption { background-color: var(--red); }
+.lead, .hint { width: fit-content; }
+.lead { margin: 0 0 1.1rem; max-width: 38rem; font-size: clamp(1.15rem, 1.8vw, 1.4rem); line-height: 1.45; font-weight: 500; text-wrap: pretty; }
+.status-pill { display: inline-block; margin: 0 0 1.5rem; padding: .3rem .8rem; border-radius: 999px; border: 1.5px solid rgba(255, 255, 255, .8); font-size: .85rem; font-weight: 700; }
 
 .ask {
   display: flex; gap: .5rem; align-items: flex-end;
-  padding: .6rem; border-radius: 1.4rem; background: #fff;
-  box-shadow: 0 1.5rem 3.75rem rgba(80, 0, 15, .3);
-  text-align: left;
+  padding: .55rem; border-radius: 1.4rem; background: #fff;
+  box-shadow: 0 1.5rem 3.75rem rgba(80, 0, 15, .32);
 }
 .ask textarea {
   flex: 1; min-width: 0; min-height: 3.25rem; max-height: 14rem;
@@ -95,51 +89,102 @@ body.checked .status-pill { margin: 1rem 0 1.25rem; }
   font: inherit; font-size: 1.2rem; padding: .85rem 1rem; resize: none;
   field-sizing: content;
 }
+.ask textarea::placeholder { color: #6b7385; }
 .ask textarea:focus { outline: none; }
-.ask:focus-within { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--navy), 0 1.5rem 3.75rem rgba(80, 0, 15, .3); }
+.ask:focus-within { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--navy), 0 1.5rem 3.75rem rgba(80, 0, 15, .32); }
 .ask :focus-visible { outline-color: var(--navy); }
 .ask-btn {
-  flex: none; min-height: 3.25rem; border: 0; border-radius: .9rem; padding: 0 1.9rem;
-  background: var(--red); color: #fff; cursor: pointer;
-  font-family: var(--display); font-stretch: 75%; font-weight: 900; font-size: 1.4rem;
+  flex: none; min-height: 3.25rem; border: 0; border-radius: .95rem; padding: 0 1.8rem;
+  background: var(--navy); color: #fff; cursor: pointer;
+  font: inherit; font-weight: 800; font-size: 1.2rem;
 }
-.ask-btn:hover { background: var(--red-deep); }
+.ask-btn:hover { background: #18335a; }
 .ask-btn[aria-disabled="true"] { opacity: .7; cursor: progress; }
 
 .form-error { display: inline-block; margin: .9rem 0 0; padding: .4rem .9rem; border-radius: 999px; background: #fff; color: var(--navy); font-weight: 700; }
 .form-error[hidden] { display: none; }
 
-@media (max-width: 560px) {
-  .top nav { display: none; }
-  .hero-body { margin-top: 3rem; }
-  .ask { flex-direction: column; align-items: stretch; }
-  .ask-btn { min-height: 3rem; }
-}
-
-.hint { margin: .9rem 0 0; font-size: .95rem; color: #fff; }
+.hint { margin: .85rem 0 0; font-size: .92rem; }
 .count { margin-left: .5rem; font-variant-numeric: tabular-nums; }
 .enter-hint { display: none; }
 @media (hover: hover) and (pointer: fine) { .enter-hint { display: inline; } }
 
-.examples { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; align-items: center; margin-top: 1.4rem; font-size: .95rem; }
-.examples span { font-weight: 600; }
+.examples { display: flex; flex-wrap: wrap; gap: .55rem; align-items: center; margin-top: 1.3rem; font-size: .95rem; }
+.examples span { font-weight: 700; margin-right: .2rem; }
 .chip {
   min-height: 2.5rem; padding: .45rem .95rem; border-radius: 999px; cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, .65); background: rgba(255, 255, 255, .1);
+  border: 1.5px solid rgba(255, 255, 255, .7);
   color: #fff; font: inherit; font-weight: 600;
 }
 .chip:hover { background: var(--red-deep); }
 .chip[aria-disabled="true"] { opacity: .6; cursor: progress; }
 
+/* Chat preview: what an answer looks like in a messenger. A labelled example, never a live result. */
+.chat-demo { grid-area: chat; position: relative; z-index: 1; margin: 2.5rem 0 0; display: grid; gap: 1rem; align-content: start; justify-items: end; }
+.bubble { max-width: 26rem; overflow-wrap: anywhere; padding: 1rem 1.2rem; border-radius: 1.3rem; box-shadow: 0 1.25rem 3rem rgba(60, 0, 12, .3); }
+.bubble p { margin: 0; }
+.bubble p + p { margin-top: .5rem; }
+.bubble-user { background: #fff; color: var(--navy); border-bottom-right-radius: .35rem; margin-right: 2.5rem; font-size: 1.1rem; }
+.bubble-bot { background: var(--navy); color: #fff; border-bottom-left-radius: .35rem; font-size: 1.05rem; }
+.bubble-label { font-size: .8rem; font-weight: 700; color: var(--muted); }
+.bubble-bot .bubble-label { color: #c9d1de; }
+.bubble-tag { margin-left: .35rem; padding: .1rem .5rem; border-radius: 999px; background: rgba(255, 255, 255, .14); color: #fff; }
+.bubble-link { color: #c9d1de; font-size: .9rem; text-decoration: underline; }
+.chat-caption { max-width: 26rem; font-size: .85rem; text-align: right; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .echo span { animation: slide-in .9s cubic-bezier(.2, .7, .2, 1) both; }
+  .echo span + span { animation-delay: .12s; }
+  .bubble { animation: rise .5s cubic-bezier(.2, .7, .2, 1) both; }
+  .bubble-user { animation-delay: .5s; }
+  .bubble-bot { animation-delay: 1.1s; }
+}
+@keyframes slide-in { from { opacity: 0; transform: translateX(-6%); } }
+@keyframes rise { from { opacity: 0; transform: translateY(.75rem) scale(.98); } }
+
+/* Below desktop width the chat preview steps aside; the example card further down shows the same answer */
+@media (max-width: 1080px) {
+  .hero-body { grid-template-columns: minmax(0, 1fr); grid-template-areas: "title" "main"; }
+  .chat-demo { display: none; }
+}
+@media (max-width: 560px) {
+  .top nav { display: none; }
+  .ask { flex-direction: column; align-items: stretch; }
+  .ask-btn { min-height: 3rem; }
+}
+/* Laptops and projectors (720–820 px tall): keep the input above the fold */
+@media (max-height: 820px) and (min-width: 561px) {
+  .hero-body { margin-top: 1.75rem; }
+  .hero h1, .echo { font-size: clamp(3.75rem, 9vw, 8rem); }
+  .hero-main { padding-top: 1.25rem; }
+  .status-pill { margin-bottom: 1.1rem; }
+}
+
+/* After the first check the poster steps back so the answer sits near the top */
+body.checked .hero { padding-bottom: 2.5rem; }
+body.checked .hero-body { margin-top: 1.25rem; grid-template-areas: "title title" "main main"; }
+body.checked .hero h1 { font-size: clamp(3rem, 6vw, 4.75rem); }
+body.checked .echo, body.checked .chat-demo, body.checked .lead { display: none; }
+body.checked .hero-main { padding-top: 1rem; max-width: 50rem; }
+body.checked .status-pill { margin-bottom: 1rem; }
+
 /* Results */
 .results { padding: 3.5rem 0 4rem; }
-.example > h2, .legend > h2 { margin: 0 0 1.5rem; font-family: var(--display); font-stretch: 62%; font-weight: 900; font-size: clamp(2.6rem, 6vw, 4rem); line-height: .9; }
+.example-intro h2, .legend > h2 { margin: 0 0 1.25rem; font-weight: 900; font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1; letter-spacing: -.035em; }
 #result:empty { display: none; }
 #result { margin-bottom: 3.5rem; scroll-margin-top: 1rem; }
 .example[hidden] { display: none; }
-.example-note { margin: -.75rem 0 1.25rem; color: var(--muted); max-width: 44rem; }
+.example-note { margin: 0 0 1rem; color: var(--muted); max-width: 44rem; }
+.example-intro { margin-bottom: 1.5rem; }
+/* Wide screens: the explanation beside the card, as on the verdict slide */
+@media (min-width: 1080px) {
+  .results > .wrap { max-width: 76rem; }
+  .example { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: 3.5rem; align-items: start; }
+  .example-intro { margin: 1rem 0 0; }
+  #result, .legend { max-width: 60rem; margin-left: auto; margin-right: auto; }
+}
 
-.card { background: #fff; border-radius: 1.75rem; padding: 2rem 2.25rem; box-shadow: 0 1.5rem 3.75rem rgba(11, 31, 58, .08); }
+.card { background: #fff; border-radius: 1.75rem; padding: 2rem 2.25rem; box-shadow: 0 1.5rem 3.75rem rgba(11, 31, 58, .09); }
 @media (max-width: 640px) { .card { padding: 1.4rem 1.2rem; border-radius: 1.25rem; } }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
 .card-title { margin: 0; font-weight: 700; }
@@ -148,32 +193,39 @@ body.checked .status-pill { margin: 1rem 0 1.25rem; }
 .card, .notice { overflow-wrap: anywhere; }
 .tag { margin-left: .5rem; font-size: .8rem; font-weight: 700; background: var(--bg); color: var(--muted); padding: .2rem .6rem; border-radius: 999px; }
 .copy-btn { border: 0; border-radius: .75rem; background: var(--navy); color: #fff; font: inherit; font-weight: 700; font-size: .95rem; padding: .65rem 1rem; cursor: pointer; min-height: 2.75rem; }
+.copy-btn:hover { background: #18335a; }
 
-.claim { padding: 1.6rem 0; border-bottom: 1px solid var(--line); }
+.claim { padding: 1.75rem 0; border-bottom: 1px solid var(--line); }
 .claim:last-child { border-bottom: 0; padding-bottom: .25rem; }
-.claim-text { margin: 0 0 .7rem; font-size: clamp(1.25rem, 2.6vw, 1.6rem); font-weight: 800; line-height: 1.25; text-wrap: pretty; }
+.claim-text { margin: 0 0 .8rem; font-size: clamp(1.35rem, 2.6vw, 1.75rem); font-weight: 800; line-height: 1.2; letter-spacing: -.015em; text-wrap: pretty; }
 .claim-meta { margin: 0 0 .25rem; }
+.claim-meta .verdict { font-size: 1rem; padding: .35rem .95rem; }
 .origin { margin: 0 0 .5rem; font-size: .9rem; color: var(--muted); }
 .kind { display: inline-block; margin-right: .5rem; padding: 0 .4rem; border-radius: 3px;
         background: var(--soft); border: 1px solid var(--line); color: var(--navy); }
 .unchecked { padding-top: 1.6rem; border-top: 1px solid var(--line); }
 .unchecked h2 { font-size: 1.15rem; margin: 0 0 .5rem; }
-.part { margin: 1.4rem 0 .6rem; font-size: 1rem; font-weight: 800; }
+/* The plain-language answer, in the organiser's format; the details below back it up */
+.answer { margin: .9rem 0 0; font-size: 1.15rem; font-weight: 600; line-height: 1.4; }
+.part { margin: 1.5rem 0 .65rem; font-size: 1rem; font-weight: 800; }
 
-.sources { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 1rem; }
-.source { background: var(--soft); border-radius: 1rem; padding: 1rem 1.1rem; }
-.quote { margin: 0 0 .6rem; font-size: 1.02rem; }
-.source-head { margin: 0 0 .25rem; font-size: .9rem; }
-.source-head a { color: var(--navy); }
+/* Sources as on the verdict slide: one per row, the quote marked with a red rule */
+.sources { margin: 0; padding: 0; list-style: none; display: grid; gap: .75rem; }
+.source { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem 1.15rem; background: #fff; }
+.quote { margin: 0 0 .6rem; padding-left: .85rem; border-left: 3px solid var(--red); font-size: 1.02rem; }
+.source-head { margin: 0 0 .25rem; font-size: .92rem; }
+.source-head a { color: var(--navy); font-weight: 700; }
 .ref { color: var(--red); font-weight: 800; }
 .source-meta { margin: 0; font-size: .82rem; color: var(--muted); }
 .empty { margin: 0; color: var(--muted); }
 
+.assessment { background: var(--soft); border-radius: 1rem; padding: .9rem 1.1rem; }
 .assessment p { margin: 0 0 .4rem; color: var(--muted); }
+.assessment p:last-child { margin-bottom: 0; }
 .assessment b { color: var(--navy); font-weight: 700; }
 .premises { margin: 0; padding-left: 1.2rem; color: var(--muted); font-size: .95rem; }
 
-.unknown { margin: 1rem 0 0; background: var(--pink-bg); color: var(--dark-red); border-radius: .9rem; padding: .9rem 1rem; }
+.unknown { margin: 1rem 0 0; background: var(--pink-bg); color: var(--dark-red); border: 1px dashed #efb3bf; border-radius: .9rem; padding: .9rem 1rem; }
 .unknown-title { margin: 0; font-size: 1rem; font-weight: 800; }
 .unknown ul { margin: .25rem 0 0; padding-left: 1.2rem; }
 
@@ -202,13 +254,11 @@ body.checked .status-pill { margin: 1rem 0 1.25rem; }
 @media (max-width: 640px) { .legend dl > div { grid-template-columns: 1fr; } }
 
 /* Footer */
-.foot { position: relative; background: var(--red) url("/grain.svg"); background-blend-mode: multiply; color: #fff; padding: 3rem 0 2.5rem; }
-.foot::before { content: ""; position: absolute; inset: 0; background: rgba(212, 33, 61, .78); }
-.foot > .wrap { position: relative; }
+.foot { background: var(--red); color: #fff; padding: 3rem 0 2.5rem; }
 .foot p { margin: 0 0 .6rem; color: #fff; font-size: .95rem; }
 .foot a { color: #fff; }
 .foot :focus-visible { outline-color: #fff; }
-.foot-slogan { font-family: var(--display); font-stretch: 62%; font-weight: 900; font-size: clamp(2.5rem, 6vw, 3.5rem); line-height: 1; margin-bottom: 1.25rem !important; }
+.foot-slogan { font-weight: 900; font-size: clamp(2.5rem, 6vw, 3.75rem); line-height: 1; letter-spacing: -.04em; margin-bottom: 1.25rem !important; }
 .footnote { display: flex; align-items: center; gap: .6rem; }
 .foot-mark { width: 1.75rem; height: 1.75rem; display: block; flex: none; }
 
