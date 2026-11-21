@@ -11,7 +11,7 @@ from corpus.sources.apis import (
     collect_sejm_eli,
 )
 from corpus.sources.eurlex import collect_eurlex
-from corpus.sources.feeds import collect_claim_reviews, collect_feed
+from corpus.sources.feeds import collect_feed
 from corpus.sources.keyed import collect_euvsdisinfo, collect_google_factcheck
 from corpus.sources.lists import collect_news_list, collect_pages
 
@@ -19,7 +19,6 @@ COLLECTORS: dict[str, Callable[[Source, PoliteClient], list[Doc]]] = {
     "news_list": collect_news_list,
     "pages": collect_pages,
     "feed": collect_feed,
-    "claim_reviews": collect_claim_reviews,
     "sejm_eli": collect_sejm_eli,
     "imgw_warnings": collect_imgw_warnings,
     "odyseusz": collect_odyseusz,

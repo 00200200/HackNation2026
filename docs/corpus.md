@@ -16,8 +16,7 @@ make corpus          # uv run python -m corpus.build: fetch every active source,
 make corpus-check    # uv run python -m corpus.check: counts and the brief's thresholds
 ```
 
-Each site gets at most one request per second, so a first build takes about an hour (most of
-it is the Demagog archive). Pages are cached in `corpus/.cache/` (not in git). A rebuild fetches
+Each site gets at most one request per second, so a first build takes about half an hour. Pages are cached in `corpus/.cache/` (not in git). A rebuild fetches
 again every list, feed and API answer older than the source's update interval (1 hour for IMGW
 warnings, 6 hours for Odyseusz, a day for news); article pages are reused until
 `make corpus ARGS=--refresh`. `ARGS="--only odyseusz"` rebuilds one source and keeps the rest.
@@ -42,27 +41,25 @@ Build of 21.11.2026 (numbers from `make corpus-check`):
 | kgsok.pl | Komenda Główna Straży Ochrony Kolei | official | 30 | fragment |
 | sejm.gov.pl | Dziennik Ustaw through the Sejm ELI API: 19 consolidated texts, 1 act | official | 20 | full text, cut at 30,000 characters |
 | europa.eu | Official Journal of the EU through the Publications Office | official | 7 | full text, cut at 40,000 characters |
-| demagog.org.pl | Stowarzyszenie Demagog: 900 statements (01.2024–11.2026), 900 fake-news checks (04.2025–11.2026), 30 analyses | fact-checker | 1,830 | claim, rating, justification fragment, cited links |
 | pravda.org.pl | Stowarzyszenie Pravda | fact-checker | 15 | fragment |
 
-2,988 records, 12 registered domains, two source types (1,143 official, 1,845 fact-checker), 8.6 MB.
+1,158 records, 11 registered domains, two source types (1,143 official, 15 fact-checker), 5.3 MB.
 The brief asks for at least 100 records, 10 domains and two types.
 
 We count registered domains with the Public Suffix List, where `gov.pl` is a suffix. All pages of
 www.gov.pl are one domain; sejm.gov.pl and odyseusz.gov.pl are separate domains. Counted strictly,
-with every `*.gov.pl` name as one domain, the corpus has 8.
+with every `*.gov.pl` name as one domain, the corpus has 7.
 
 Each record has `id`, `url`, `title`, `publisher`, `published_at` (null when the page states no
 date), `retrieved_at`, `source_type`, `licence`, `language` and `text`, plus `source_id` (the
-catalogue entry), `storage` and `truncated`. Fact-check records also carry `claim` (the reviewed
-claim, verbatim), `rating` (the fact-checker's label, verbatim as published, e.g. "Fałsz",
-"Fałsz.", "Manipulacja", "Brakujący kontekst": normalise before comparing) and `cited_links` (the
-links in the fact-checker's justification, URL and link text, without tracking parameters; links
-to social platforms, post archives, the fact-checker's own site and domains on the
-disinformation list are left out). For Demagog's statements of public figures they also carry
-`claim_author` and `claim_source` (where the statement was first published). The `text` of a
-fact-check is the rating, the claim (cut at 250 characters) and the start of the justification,
-at most 500 characters in all.
+catalogue entry), `storage` and `truncated`. Records from the Google Fact Check Tools API also
+carry `claim` (the reviewed claim, verbatim) and `rating` (the fact-checker's label, verbatim as
+published, e.g. "Fałsz", "Manipulacja", "Brakujący kontekst": normalise before comparing); their
+`text` is the rating and the claim cut at 250 characters.
+
+Demagog is not collected directly (team decision, 21.11.2026). Its ratings reach the corpus and
+the live check only as ClaimReview records through the Google Fact Check Tools API, which needs a
+key (see below).
 
 ## Admission, update and exclusion
 
@@ -77,12 +74,12 @@ The rules are in `corpus/catalog.yaml` under `rules`. In short:
   the verifier can prefer recent material and flag old material as archival.
 - **Exclude** a source when robots.txt disallows it, the site refuses scripted clients, it stays
   unreachable for longer than one interval, it loses its fact-checker status, or its terms stop
-  allowing a fragment. Excluded entries stay in the catalogue with the reason and date. One document
+  allowing a fragment. The team can also exclude a source by decision, as with Demagog, which is
+  taken only through Google Fact Check Tools. Excluded entries stay in the catalogue with the reason and date. One document
   is removed by adding its URL to `removed_urls` with a reason and rebuilding.
 
-Fact-checker status read on 21.11.2026: Demagog is an EFCSN verified member until 25.05.2027 and,
-by its own statement, an IFCN signatory (IFCN's list could not be read by a script, so this part is
-UNCONFIRMED). Pravda is an EFCSN verified member until 23.02.2028.
+Fact-checker status read on 21.11.2026: Pravda is an EFCSN verified member until 23.02.2028, and
+Demagog (queried only through Google Fact Check Tools) until 25.05.2027.
 
 ## Licences and what we store
 
@@ -101,7 +98,7 @@ metadata, a fragment of at most 500 characters and the link, under the right of 
 | IMGW-PIB | Data terms: free reuse with two required sentences (below) | full text |
 | odyseusz.gov.pl | Official material of MSZ (art. 4 pt 2) and public sector information. The site states no licence; the organiser (MSZ) named it as a source to collect (mentor, 21.11.2026) | full text, cut at 8,000 characters |
 | kgsok.pl, pravda.org.pl | No licence stated | fragment |
-| demagog.org.pl | No licence; robots.txt `Content-Signal: search=yes, ai-train=no, use=reference` | claim, rating, fragment |
+| Google Fact Check Tools (Demagog, Pravda) | Google APIs Terms of Service; ClaimReview metadata published by the fact-checkers | claim, rating, link |
 
 Duties for every screen that shows a quote: name the publisher, link the document and give its
 licence (each record carries it). Text under CC BY-SA 4.0 that we adapt stays under CC BY-SA 4.0.
@@ -121,14 +118,12 @@ The IMGW terms treat publication funded by advertising as commercial use; this s
 - Two portals are read through the JSON their own pages load: Odyseusz (a single-page app; the
   exception in the catalogue's exclusion rule) and the Publications Office's Cellar API for EU acts
   (the EUR-Lex website answers scripts with a challenge, the API does not).
-- PAP (www.pap.pl) answers scripts with a bot challenge, so PAP dispatches are not fetched. When a
-  Demagog fact-check links a dispatch, the link and its link text are in `cited_links`.
+- PAP (www.pap.pl) answers scripts with a bot challenge, so PAP dispatches are not fetched.
 
 ## Personal data, retention and deletion
 
-- The corpus holds only material the publishers made public. Who made a claim is stored only for
-  public statements of public figures (Demagog's statements section), never for posts of private
-  people; social media links are left out of `cited_links`. Job adverts, which list contact
+- The corpus holds only material the publishers made public. Who made a reviewed claim is never
+  stored, because it is often a private person. Job adverts, which list contact
   persons, are skipped. E-mail addresses in texts are masked. `make corpus-check` fails on an
   e-mail address, a number that passes the PESEL checksum, a "contact persons" block, or a record
   from a domain on the disinformation list. Embassy contact lists and flags from Odyseusz are left
@@ -146,7 +141,7 @@ The IMGW terms treat publication funded by advertising as commercial use; this s
 
 | Source | Variable | Without it |
 |---|---|---|
-| Google Fact Check Tools API (`claims:search`), reviews by the admitted fact-checkers | `GOOGLE_FACTCHECK_API_KEY` | skipped, noted in the manifest |
+| Google Fact Check Tools API (`claims:search`), reviews by Demagog and Pravda | `GOOGLE_FACTCHECK_API_KEY` | skipped, noted in the manifest |
 | EUvsDisinfo cases (organiser's MCP server) | `EUVSDISINFO_TOKEN` | skipped, noted in the manifest |
 
 Put them in `.env`; `make corpus` reads it. Neither has been run against the live service yet, so
@@ -161,7 +156,8 @@ On the organiser's list but not collected: `www.gov.pl/web/gov/ostrzezenia` (fil
 utk.gov.pl (robots.txt disallows all clients except Googlebot), ulc.gov.pl, drogi.gddkia.gov.pl and
 sar.gov.pl (bot challenge on every page), monitoring.paa.gov.pl, meteo.imgw.pl, hydro.imgw.pl and
 baltyk.imgw.pl (map apps; the IMGW warnings come from its API instead), portalpasazera.pl (timetable
-app). Also excluded: FakeHunter (PAP), AFP Fact Check and EDMO (they refuse scripted clients),
+app). Also excluded: Demagog as a direct source (its ratings come through Google Fact Check
+Tools), FakeHunter (PAP), AFP Fact Check and EDMO (they refuse scripted clients),
 Konkret24 (the footer reserves redistribution; fact-checker status not confirmed). NASK, the
 maritime offices in Gdynia and Szczecin and OKO.press are listed as candidates with what is
 missing. GIOŚ air quality is meant for a live lookup at check time, because a stored copy would be
@@ -169,10 +165,10 @@ out of date within the hour. Details and dates: `corpus/catalog.yaml`.
 
 ## Limits
 
-- News sources cover the latest pages of each list, not the full archive. Demagog is collected
-  from the first 15 pages of its statements and fake-news feeds. Older fact-checks need the
-  Google Fact Check Tools API key (it returns Demagog's ClaimReview records) or a deeper build;
-  the file must stay under the 10 MB push limit.
+- News sources cover the latest pages of each list, not the full archive; the file must stay
+  under the 10 MB push limit.
+- Without `GOOGLE_FACTCHECK_API_KEY` the corpus has only 15 fact-checker records (Pravda's feed);
+  Demagog's ratings appear once the key is set and `make corpus` runs again.
 - IMGW warnings and Odyseusz notices change within hours. The stored copy is a snapshot with its
   retrieval time; for questions about the present the verifier should ask these services live. A
   build with `--only` keeps the other sources' records as they are, the IMGW snapshot included.

@@ -17,7 +17,7 @@ from corpus.schema import (
 )
 from corpus.sources.apis import hydro_warning, meteo_warning
 from corpus.sources.eurlex import act_header
-from corpus.sources.feeds import parse_feed, parse_review, review_text, without_tracking
+from corpus.sources.feeds import parse_feed
 from corpus.sources.lists import (
     page_title,
     parse_cert,
@@ -100,20 +100,6 @@ def test_main_text_of_an_advisory_keeps_the_warning():
     assert main_text("<html><body></body></html>", "https://a.pl/") is None
 
 
-def test_claim_review_without_a_marked_summary_falls_back_to_the_description():
-    page = fixture("demagog_claimreview.html")
-    review = parse_review(page, "https://demagog.org.pl/wypowiedzi/x/")
-    assert review.rating == "Fałsz"
-    assert review.links == []  # links are read only from the marked summary
-    text = review_text(review, "Stowarzyszenie Demagog")
-    assert text.startswith(
-        "Ocena (Stowarzyszenie Demagog): Fałsz. Sprawdzane twierdzenie: „Potępiam"
-    )
-    assert text.endswith("Wyjaśniamy, gdzie można zgłosić oszustwo.")
-    empty = parse_review("<html><head></head><body>x</body></html>", "https://a.pl/")
-    assert (empty.claim, empty.rating, review_text(empty, "X")) == (None, None, "")
-
-
 def test_eurlex_header_gives_the_act_title_and_journal_date():
     title, published = act_header(fixture("eurlex_act.html"))
     assert title.startswith(
@@ -144,18 +130,7 @@ def test_feed_entries_have_utc_dates_and_plain_summaries():
     assert "<" not in items[0].lead
 
 
-def test_feed_boilerplate_is_dropped_and_a_page_that_is_not_a_feed_has_no_entries():
-    xml = (
-        '<rss version="2.0"><channel><item><title>T</title><link>https://a.pl/t</link>'
-        "<description>&lt;p&gt;Artykuł &lt;a href='x'&gt;T&lt;/a&gt; pochodzi z serwisu Demagog.&lt;/p&gt;"
-        "</description></item></channel></rss>"
-    )
-    assert (
-        parse_feed(xml, drop=r"Artykuł .{0,300}? pochodzi z serwisu Demagog\s*\.")[
-            0
-        ].lead
-        == ""
-    )
+def test_a_page_that_is_not_a_feed_has_no_entries():
     assert parse_feed("<html><body>Just a moment...</body></html>") == []
 
 
@@ -238,59 +213,3 @@ def test_record_validation_and_jsonl_round_trip(tmp_path):
         Doc(**{**fields, "published_at": "21.11.2026"})
     with pytest.raises(ValueError):
         Doc(**{**fields, "source_type": "blog"})
-
-
-def test_cited_links_lose_tracking_and_skip_posts_archives_and_banned_domains():
-    assert (
-        without_tracking("https://kross.pl/r?srsltid=Afm1&x=1#top")
-        == "https://kross.pl/r?x=1"
-    )
-    assert (
-        without_tracking("https://a.pl/x?utm_source=fb&id=5") == "https://a.pl/x?id=5"
-    )
-    assert (
-        without_tracking("https://sip.lex.pl/art-239?utm_=")
-        == "https://sip.lex.pl/art-239"
-    )
-    summary = (
-        '<div class="summary-text"><a href="https://www.threads.com/@a/post/1">1</a>'
-        '<a href="https://archive.is/abc">2</a><a href="https://fb.watch/x">3</a>'
-        '<a href="https://news.example-outlet.ru/a">4</a><a href="/inny-tekst/">5</a>'
-        '<a href="http://m.in">m.in</a>'
-        '<a href="https://www.gov.pl/web/x?fbclid=1">komunikat</a></div>'
-    )
-    review = parse_review(
-        f"<html><body>{summary}</body></html>",
-        "https://demagog.org.pl/fake_news/x/",
-        '//div[@class="summary-text"]',
-        frozenset({"example-outlet.ru"}),
-    )
-    assert [(link.url, link.text) for link in review.links] == [
-        ("https://www.gov.pl/web/x", "komunikat")
-    ]
-
-
-def test_odd_claim_review_shapes_do_not_break_the_parser():
-    page = (
-        '<html><head><script type="application/ld+json">{"@type": "ClaimReview",'
-        ' "claimReviewed": ["lista"], "itemReviewed": "tekst", "author": [],'
-        ' "reviewRating": {"alternateName": ["Fałsz", "False"]}}</script></head><body></body></html>'
-    )
-    review = parse_review(page, "https://demagog.org.pl/x/")
-    assert (review.rating, review.author, review.first_appearance) == (
-        "Fałsz",
-        None,
-        None,
-    )
-    assert review.claim == "lista"
-
-
-def test_query_keeps_everything_but_tracking_as_written():
-    assert (
-        without_tracking("https://titania.saeima.lv/x?OpenDocument")
-        == "https://titania.saeima.lv/x?OpenDocument"
-    )
-    assert (
-        without_tracking("https://eur-lex.europa.eu/x?uri=CELEX%3A32022R0350&utm=a")
-        == "https://eur-lex.europa.eu/x?uri=CELEX%3A32022R0350"
-    )

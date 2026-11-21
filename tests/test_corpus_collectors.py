@@ -22,7 +22,7 @@ from corpus.sources.apis import (
 )
 from corpus.sources.base import Stopped
 from corpus.sources.eurlex import collect_eurlex
-from corpus.sources.feeds import collect_claim_reviews, collect_feed
+from corpus.sources.feeds import collect_feed
 from corpus.sources.lists import (
     collect_news_list,
     collect_pages,
@@ -195,105 +195,39 @@ def test_feed_keeps_only_title_date_and_summary():
     assert len(calls) == 2  # robots.txt and the feed: no article is opened
 
 
-DEMAGOG_PAGE = "https://demagog.org.pl/wypowiedzi/przyklad/"
-DEMAGOG_FEED = "https://demagog.org.pl/wypowiedzi/feed/"
+FEED = "https://pravda.org.pl/rss/"
 
 
-def demagog_feed(*links: str) -> str:
+def rss(*links: str) -> str:
     items = "".join(
         f"<item><title>Gdzie zgłosić oszustwo?</title><link>{link}</link>"
-        "<pubDate>Thu, 19 Nov 2026 15:17:17 +0000</pubDate></item>"
+        "<pubDate>Thu, 19 Nov 2026 15:17:17 +0000</pubDate>"
+        "<description>Wyjaśniamy, gdzie zgłosić oszustwo.</description></item>"
         for link in links
     )
     return f'<rss version="2.0"><channel>{items}</channel></rss>'
 
 
-def demagog_source(**params):
+def feed_source(**params):
     return source(
-        id="demagog",
-        domain="demagog.org.pl",
-        publisher="Stowarzyszenie Demagog",
+        id="pravda",
+        domain="pravda.org.pl",
+        publisher="Stowarzyszenie Pravda",
         source_type="fact_checker",
         storage="excerpt",
-        params={
-            "feeds": [DEMAGOG_FEED],
-            "summary_xpath": '//div[contains(@class, "summary-text")]',
-            **params,
-        },
+        params={"feeds": [FEED], **params},
     )
-
-
-def test_claim_reviews_keep_claim_rating_justification_and_cited_sources():
-    client = offline_client(
-        {
-            DEMAGOG_FEED: demagog_feed(DEMAGOG_PAGE),
-            DEMAGOG_PAGE: fixture("demagog_claimreview.html"),
-        }
-    )
-    (doc,) = collect_claim_reviews(demagog_source(public_claimants=True), client)
-    assert doc.title == "Gdzie zgłosić oszustwo?"
-    assert doc.claim.startswith(
-        "Potępiam wszystkie próby oszustw finansowych w Internecie."
-    )
-    assert doc.rating == "Fałsz"
-    assert doc.claim_author == "Dariusz Standerski"
-    assert doc.claim_source == "https://x.com/DStanderski/status/2123032433628995860"
-    assert doc.text.startswith(
-        "Ocena (Stowarzyszenie Demagog): Fałsz. Sprawdzane twierdzenie: „Potępiam"
-    )
-    assert "” Zawetowana nowelizacja ustawy" in doc.text
-    assert doc.published_at == "2026-11-19T15:17:17+00:00"
-    assert len(doc.text) <= EXCERPT_CHARS + 1 and doc.truncated
-    cited = [link.url for link in doc.cited_links]
-    assert cited[0].startswith("https://orka.sejm.gov.pl/")
-    assert len(cited) == len(set(cited))  # the same act linked twice is kept once
-    assert not any(
-        "facebook.com" in u or "patronite.pl" in u for u in cited
-    )  # site chrome
-
-
-def test_claimant_is_left_out_unless_the_section_holds_public_statements():
-    client = offline_client(
-        {
-            DEMAGOG_FEED: demagog_feed(DEMAGOG_PAGE),
-            DEMAGOG_PAGE: fixture("demagog_claimreview.html"),
-        }
-    )
-    (doc,) = collect_claim_reviews(demagog_source(), client)
-    assert doc.claim_author is None and doc.claim_source is None
-    assert doc.rating == "Fałsz"
-
-
-def test_long_claim_never_pushes_the_rating_and_justification_out():
-    page = fixture("demagog_claimreview.html").replace(
-        "Potępiam wszystkie próby oszustw", "Bardzo długie twierdzenie " * 30, 1
-    )
-    client = offline_client(
-        {DEMAGOG_FEED: demagog_feed(DEMAGOG_PAGE), DEMAGOG_PAGE: page}
-    )
-    (doc,) = collect_claim_reviews(demagog_source(), client)
-    assert doc.text.startswith("Ocena (Stowarzyszenie Demagog): Fałsz. Sprawdzane")
-    assert "Zawetowana nowelizacja" in doc.text
-    assert len(doc.text) <= EXCERPT_CHARS + 1
-    assert len(doc.claim) <= 601  # the structured field keeps more of the claim
 
 
 def test_feed_pages_end_at_the_first_failing_page_and_a_block_stops_the_source():
-    second = "https://demagog.org.pl/wypowiedzi/druga/"
-    routes = {
-        DEMAGOG_FEED: demagog_feed(DEMAGOG_PAGE),
-        f"{DEMAGOG_FEED}?paged=2": demagog_feed(second),
-        DEMAGOG_PAGE: fixture("demagog_claimreview.html"),
-        second: fixture("demagog_claimreview.html"),
-    }
-    docs = collect_claim_reviews(demagog_source(pages=4), offline_client(routes))
-    assert [d.url for d in docs] == [
-        DEMAGOG_PAGE,
-        second,
-    ]  # page 3 is missing: stop there
-    routes[f"{DEMAGOG_FEED}?paged=2"] = (429, "")
+    first, second = "https://pravda.org.pl/a/", "https://pravda.org.pl/b/"
+    feeds = [FEED] + [f"{FEED}?paged={n}" for n in (2, 3, 4)]
+    routes = {FEED: rss(first), feeds[1]: rss(second)}
+    docs = collect_feed(feed_source(feeds=feeds), offline_client(routes))
+    assert [d.url for d in docs] == [first, second]  # page 3 is missing: stop there
+    routes[feeds[1]] = (429, "")
     with pytest.raises(Blocked):
-        collect_claim_reviews(demagog_source(pages=4), offline_client(routes))
+        collect_feed(feed_source(feeds=feeds), offline_client(routes))
 
 
 def eli_query(kind: str, phrase: str) -> str:

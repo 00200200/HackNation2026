@@ -97,8 +97,7 @@ def problems(
     for doc in docs:
         if doc.storage == "excerpt" and len(doc.text) > EXCERPT_CHARS + 1:
             found.append(f"{doc.id}: excerpt has {len(doc.text)} characters")
-        fields = [doc.text, doc.title, doc.claim or "", doc.claim_author or ""]
-        fields += [doc.claim_source or ""] + [link.text for link in doc.cited_links]
+        fields = [doc.text, doc.title, doc.claim or ""]
         if any(EMAIL_RE.search(value) for value in fields):
             found.append(f"{doc.id}: e-mail address in the text")
         if any(
