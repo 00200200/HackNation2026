@@ -1,8 +1,8 @@
 {
-  "commit": "355256918c1147e0d8ec7896222f9b8111417c7a",
+  "commit": "8801a017e623b72d183c7b6dc87ece914d54ac25",
   "dirty": false,
   "mode": "quick",
-  "timestamp": "2026-11-21T15:46:35+00:00",
+  "timestamp": "2026-11-21T15:59:42+00:00",
   "n_cases": 4,
   "scenarios": [
     "A",
@@ -37,7 +37,7 @@
       "pass": false
     },
     "median_latency_s": {
-      "value": 3.9212181869661435,
+      "value": 5.036785270553082,
       "target": "<= 30.0",
       "pass": true
     },
@@ -80,7 +80,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.51
+        3.86
       ],
       "errors": []
     },
@@ -92,7 +92,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        4.21
+        6.21
       ],
       "errors": []
     },
@@ -104,7 +104,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.64
+        3.19
       ],
       "errors": []
     },
@@ -116,7 +116,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        6.33
+        6.31
       ],
       "errors": []
     }
