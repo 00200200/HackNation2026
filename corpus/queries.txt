@@ -1,0 +1,13 @@
+# Seed queries for the demo corpus (python -m prawdowid.corpus): one per line, each run on every
+# allowlisted domain. Topics the MSZ brief names: disinformation about Poland, the EU, the war in
+# Ukraine, elections, health and the economy. Not eval cases.
+dezinformacja
+wojna w Ukrainie
+sankcje wobec Rosji
+wybory
+szczepienia
+inflacja
+uchodźcy z Ukrainy
+NATO wschodnia flanka
+Unia Europejska budżet
+migracja granica z Białorusią
