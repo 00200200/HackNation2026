@@ -8,51 +8,66 @@ and forwards `/api/` and `/health` to the backend. Only Caddy publishes ports (8
 browser --HTTPS--> caddy :443 --> frontend (nginx) :80 --> backend (FastAPI) :8000 --> db (Postgres + pgvector) :5432
 ```
 
-A push to the `prod` branch deploys: GitHub Actions copies the checked-out code to
-`/opt/faktczyfejk` on the server over SSH and runs `docker compose up -d --build` there.
+A push to the `prod` branch deploys. Every minute the server fetches `prod`; when it has moved, the
+server checks the new commit out in `/opt/faktczyfejk` and runs `docker compose up -d --build`
+there. No CI service is involved, and a failed deploy is retried on the next run.
 
 | File | Role |
 |---|---|
 | `compose.yaml` | backend and frontend, also used for local runs |
 | `compose.prod.yaml` | production overlay: Caddy, Postgres with pgvector, no host port on nginx, real client IP for the rate limit |
 | `caddy/Caddyfile` | HTTPS site for `DOMAIN` |
-| `.github/workflows/deploy.yml` | deploy on push to `prod`, or by hand from the Actions tab |
-| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*` (never committed, never copied by deploys) |
+| `deploy/pull-deploy.sh` | deploys `origin/prod` when it moves |
+| `deploy/faktczyfejk-deploy.service`, `.timer` | run the script every minute as `ubuntu` |
+| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*` (never committed; deploys leave it alone) |
 
 ## What you need
 
 - A server in the EU with Ubuntu 24.04, at least 2 vCPU and 4 GB RAM, and a public IPv4 address.
 - The domain, with a DNS zone you can edit.
-- Two SSH keys on your laptop, one for you and one for GitHub Actions:
-  ```bash
-  ssh-keygen -t ed25519 -N "" -f ~/.ssh/faktczyfejk
-  ssh-keygen -t ed25519 -N "" -f ~/.ssh/faktczyfejk_ci
-  ```
-- An Anthropic API key, and admin rights on the GitHub repository.
+- An SSH key on your laptop: `ssh-keygen -t ed25519 -N "" -f ~/.ssh/faktczyfejk`.
+- An Anthropic API key, and admin rights on the GitHub repository (to add the server's deploy key).
 
 ## 1. Server access
 
 The provider sends the login user and a password (OVHcloud: user `ubuntu`, password from a link
 in the delivery email). OVHcloud makes you change that password at the first login, which
-`ssh-copy-id` cannot do, so log in once by hand first, then install both public keys with the new
-password and log in with your key:
+`ssh-copy-id` cannot do, so log in once by hand first, then install your public key with the new
+password and log in with it:
 
 ```bash
 ssh ubuntu@SERVER_IPV4          # set the new password when asked; the session may close
 ssh-copy-id -i ~/.ssh/faktczyfejk.pub ubuntu@SERVER_IPV4
-ssh-copy-id -i ~/.ssh/faktczyfejk_ci.pub ubuntu@SERVER_IPV4
 ssh -i ~/.ssh/faktczyfejk ubuntu@SERVER_IPV4
 ```
 
 ## 2. Server setup (once)
 
-On the server:
+On the server, install Docker and give the server a read-only key for the repository:
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
-sudo apt-get install -y rsync
 sudo usermod -aG docker ubuntu
+ssh-keygen -t ed25519 -N "" -C faktczyfejk-vps -f ~/.ssh/github_deploy
+printf 'Host github.com\n  IdentityFile ~/.ssh/github_deploy\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+ssh-keygen -lf ~/.ssh/known_hosts | grep github.com
+```
+
+The last line must show GitHub's published ED25519 fingerprint
+(`gh api meta --jq .ssh_key_fingerprints.SHA256_ED25519` on your laptop). Then, on your laptop, add
+the server's public key as a read-only deploy key:
+
+```bash
+ssh -i ~/.ssh/faktczyfejk ubuntu@SERVER_IPV4 'cat ~/.ssh/github_deploy.pub' > /tmp/faktczyfejk-vps.pub
+gh repo deploy-key add /tmp/faktczyfejk-vps.pub --title faktczyfejk-vps -R 00200200/HackNation2026
+```
+
+Back on the server, clone `prod` and write the configuration:
+
+```bash
 sudo install -d -o ubuntu -g ubuntu /opt/faktczyfejk
+git clone --branch prod git@github.com:00200200/HackNation2026.git /opt/faktczyfejk
 cd /opt/faktczyfejk
 printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
 chmod 600 .env
@@ -60,15 +75,14 @@ nano .env      # paste the Anthropic key after ANTHROPIC_API_KEY=
 ```
 
 The database password is generated on the server and never leaves it; hex keeps it safe inside
-the `DATABASE_URL` that Compose builds for the backend.
+the `DATABASE_URL` that Compose builds for the backend. `COMPOSE_FILE` makes every
+`docker compose` command in `/opt/faktczyfejk` load both Compose files. Empty `PRAWDOWID_MODEL`
+means the default model. `get.docker.com` is Docker's install script; Docker recommends its apt
+repository for long-lived production hosts: https://docs.docker.com/engine/install/ubuntu/.
 
-Log out and in again so the `docker` group applies. `get.docker.com` is Docker's install script;
-Docker recommends its apt repository for long-lived production hosts:
-https://docs.docker.com/engine/install/ubuntu/. `COMPOSE_FILE` makes every `docker compose`
-command in `/opt/faktczyfejk` load both Compose files. Empty `PRAWDOWID_MODEL` means the default
-model. If you turn on the provider's firewall, allow 22/tcp, 80/tcp, 443/tcp and 443/udp, and on a
+If you turn on the provider's firewall, allow 22/tcp, 80/tcp, 443/tcp and 443/udp, and on a
 stateless one (OVHcloud Edge Network Firewall) also "TCP established", or the server's own outgoing
-connections (image pulls, Let's Encrypt, the Anthropic API) stop working.
+connections (git fetch, image pulls, Let's Encrypt, the Anthropic API) stop working.
 
 ## 3. DNS
 
@@ -94,21 +108,23 @@ dig +short AAAA www.faktczyfejk.pl
 Caddy requests the certificate as soon as it starts, and repeated failures run into Let's Encrypt
 rate limits, so wait for DNS first.
 
-## 4. GitHub variables and secret (once)
+## 4. Automatic deploys (once)
 
-On your laptop, with `gh` logged in as a repository admin:
+Log out and in again so the `docker` group applies, then on the server:
 
 ```bash
-gh variable set DEPLOY_DOMAIN --body faktczyfejk.pl
-gh variable set DEPLOY_HOST --body SERVER_IPV4
-gh variable set DEPLOY_USER --body ubuntu
-gh variable set DEPLOY_KNOWN_HOSTS --body "$(ssh-keyscan -t ed25519 SERVER_IPV4 2>/dev/null)"
-gh secret set DEPLOY_SSH_KEY < ~/.ssh/faktczyfejk_ci
+sudo cp /opt/faktczyfejk/deploy/faktczyfejk-deploy.service /opt/faktczyfejk/deploy/faktczyfejk-deploy.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now faktczyfejk-deploy.timer
 ```
 
-`DEPLOY_KNOWN_HOSTS` pins the server's host key, so a deploy stops if the key changes. Compare
-`ssh-keygen -lf <(gh variable get DEPLOY_KNOWN_HOSTS)` with the fingerprint you accepted at your
-first login.
+The first run builds and starts the stack: right away if the server has been up for more than a
+minute, otherwise a minute after boot. Copy the two unit files again and run
+`sudo systemctl daemon-reload` whenever they change in the repository.
+
+The service runs the script from the checkout, so `prod` must never move back to a commit without
+`deploy/`. If it does, every run fails with "cannot open" until you check out a newer `prod` by hand:
+`git -C /opt/faktczyfejk fetch origin prod && git -C /opt/faktczyfejk reset --hard origin/prod`.
 
 ## 5. Deploy
 
@@ -123,13 +139,20 @@ git switch main && git pull
 git push origin main:prod
 ```
 
-The push starts the "Deploy" workflow (Actions tab). It fails if a service does not become running
-or healthy within 5 minutes, or if `https://DEPLOY_DOMAIN/health` does not answer afterwards. To
-redeploy without a new commit, for example after editing `.env` on the server, run it by hand with
-`gh workflow run Deploy --ref prod`, or Actions → Deploy → Run workflow with `prod` selected. The
-job only runs for `prod`; started from any other branch it is skipped.
+The server picks the new commit up within about a minute, then builds it and waits up to 5 minutes
+for every service to be healthy and for `https://DOMAIN/health` to answer. On the server:
 
-To roll back, revert the bad commit on `main` and push `main:prod` again.
+```bash
+journalctl -u faktczyfejk-deploy -n 30 --no-pager   # "deploying ...", "deployed ..." or the error
+cat /opt/faktczyfejk/.git/deployed-commit           # the last commit that deployed successfully
+sudo systemctl start faktczyfejk-deploy             # run a check now instead of waiting
+```
+
+A failed build changes nothing, the previous containers keep serving. A deploy that fails later,
+at the health wait or the HTTPS check, has already replaced the containers, so the demo may answer
+with errors until a fix reaches `prod`; the checked-out commit is then ahead of `deployed-commit`.
+After editing `.env`, apply it with `docker compose up -d` in `/opt/faktczyfejk`. To roll back,
+revert the bad commit on `main` and push `main:prod` again.
 
 ## 6. Check it
 
@@ -154,6 +177,7 @@ docker compose ps
 docker compose logs -f --tail 100       # all services
 docker compose logs -f backend          # one line per check: status, latency, input length
 docker compose logs caddy | grep -i certificate
+journalctl -u faktczyfejk-deploy -n 50 --no-pager
 ```
 
 ## Database
@@ -164,8 +188,7 @@ volume `db_data`, its port is not published, and the backend gets
 with an empty volume Postgres creates the `vector` and `pg_trgm` extensions. The application does
 not use the database yet: tables and loading the corpus come with the search work.
 
-On the server, in `/opt/faktczyfejk`. Backups go to `~/backups`, never into `/opt/faktczyfejk`:
-every deploy deletes files there that are not in git.
+On the server, in `/opt/faktczyfejk`. Backups go to `~/backups`, outside the checkout:
 
 ```bash
 # SQL shell
@@ -184,6 +207,8 @@ docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB
 - No IPv6 (see "DNS").
 - One server, no failover. `restart: unless-stopped` brings the containers back after a crash or
   a reboot, but if the server is down, so is the demo.
+- A deploy that keeps failing is retried every minute until `prod` gets a fix; the journal shows
+  why. Compose has no automatic rollback (see "Deploy").
 - Container logs live in Docker's json-file logs without rotation and disappear when a container
   is recreated, which every deploy that rebuilds an image does.
 - The database has no automatic backups and lives on the same server as everything else. Take a
@@ -208,13 +233,19 @@ For `localhost` Caddy uses its own local certificate authority, hence `-k`.
 
 ## After the event
 
-On the server, take a final `pg_dump` if the data should be kept (see "Database"), then
-`cd /opt/faktczyfejk && docker compose down -v`, which also deletes the database and certificate
-volumes. Then:
+On the server, take a final `pg_dump` if the data should be kept (see "Database"), then:
+
+```bash
+sudo systemctl disable --now faktczyfejk-deploy.timer
+cd /opt/faktczyfejk && docker compose down -v      # also deletes the database and certificate volumes
+```
+
+Then:
 
 1. Cancel the server in the provider's panel. An OVHcloud VPS renews every month until you switch
    renewal off or cancel it. (Hetzner bills a server until it is deleted, even when it is
    switched off: [Hetzner billing FAQ](https://docs.hetzner.com/cloud/billing/faq/).)
-2. In GitHub: `gh secret delete DEPLOY_SSH_KEY` and delete the four `DEPLOY_*` variables. Revoke
-   the Anthropic API key that was on the server.
+2. In GitHub, remove the `faktczyfejk-vps` deploy key (`gh repo deploy-key list -R 00200200/HackNation2026`,
+   then `gh repo deploy-key delete <id> -R 00200200/HackNation2026`). Revoke the Anthropic API key that
+   was on the server.
 3. Remove the DNS records, and switch off the domain's automatic renewal if you do not keep it.
