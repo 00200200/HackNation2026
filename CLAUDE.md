@@ -4,6 +4,14 @@ Hackathon repository. The challenge, stack and team roles are not fixed in this 
 read them from the brief, the code and the conversation. If something blocks a decision, ask once
 and keep working on what does not depend on it.
 
+## Worklog
+
+`WORKLOG.md` is the shared state of the project: what works, branches, last eval, open work with
+owners, decisions and a dated log. Read it before starting a task. Update it in the same commit when
+you finish a task, take or drop an item from "Next", change a decision or run an eval: keep "Now"
+and "Next" true, append one line to "Log" (date, who, what, commit). Before taking an item, check
+nobody owns it. Parallel branches: on merge conflicts in `WORKLOG.md`, keep both log lines.
+
 ## Workflow
 
 | Situation | Use |

@@ -10,7 +10,7 @@ install: ## Install Python dependencies
 	uv sync
 
 dev: ## Run the API locally with reload on :8000 (no frontend)
-	uv run uvicorn prawdowid.app:app --reload
+	PYDANTIC_AI_NO_BANNER=1 uv run $(if $(wildcard .env),--env-file .env) uvicorn prawdowid.app:app --reload
 
 test: ## Run tests
 	uv run pytest

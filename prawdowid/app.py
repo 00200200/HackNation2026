@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from prawdowid.contract import CheckResult, Status
-from prawdowid.verifier import verify
+from prawdowid.verifier import is_link, verify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:  %(name)s %(message)s")
 log = logging.getLogger("prawdowid")
@@ -40,12 +40,12 @@ class CheckRequest(BaseModel):
     def _valid_input(cls, value: str) -> str:
         value = value.strip()
         if not value:
-            raise PydanticCustomError("empty", "Wpisz tekst albo wklej link.")
+            raise PydanticCustomError("empty", "Wpisz tekst do sprawdzenia.")
         if len(value) > MAX_INPUT_CHARS:
             raise PydanticCustomError(
                 "too_long", f"Treść jest za długa. Limit to {MAX_INPUT_CHARS} znaków."
             )
-        if "://" in value and not any(c.isspace() for c in value):
+        if is_link(value):
             try:
                 _http_url.validate_python(value)
             except ValidationError:
