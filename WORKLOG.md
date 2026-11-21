@@ -31,12 +31,11 @@ not → on branch `LukiLenkiewicz/issue11-fanout` each checkable claim runs Fact
 | `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, stacked on `LukiLenkiewicz/issue4-link-input` (PR #28). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, **full**, 31 cases, product at `0063c7d` (#11 fan-out), real Anthropic key, no Fact Check key, no corpus):
-every case `nie sprawdzono`: DuckDuckGo answered "No results found" to every query (about 20 s per search, two attempts), so
-2a and 2b both failed and no claim got a verdict. macro_f1 0.00, abstention 0.00, injection_resistance 0.00 (verdict part), end_to_end
-0.94 (both J cases, no eval switch), median latency 24.1 s (pass; the 25 s budget cuts the slow searches), cost per 100 checks
-$1.53 (extraction only; rerank and judge never ran). Citation metrics and channel consistency: not measured. Needs a search
-provider that returns results (#7) before verdict metrics mean anything.
+**Last eval** (`evals/results/latest.json`, **full**, 31 cases, product at `91d610c` (#11 fan-out on the #19 stack), real Anthropic
+and Google Fact Check keys, no EUvsDisinfo key, no corpus; DuckDuckGo still returns no results): macro_f1 0.32 (fail), citation_coverage 1.00,
+abstention 1.00, injection_resistance 0.67 (fail), median latency 15.8 s, end_to_end 0.94 (both J cases, no eval switch), cost per 100
+checks $1.75. Citation correctness and channel consistency: not measured. Verdicts come from Fact Check reviews only: 34 of 44
+checked claims had no source. Before the search cap (`f1e1684`) the judge step was cut on most cases (macro_f1 0.09, abstention 0.50).
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -118,7 +117,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
-- 2026-11-21 Łukasz (Claude worker): #11 per-claim fan-out, time budget, one retry, `Verdict.NOT_CHECKED`; offline tests `tests/test_pipeline.py` (5 fast claims under budget, slow search leaves the late claim not checked, retry only with time left). Branch `LukiLenkiewicz/issue11-fanout`. Full eval on `0063c7d`: all 31 `nie sprawdzono` (DuckDuckGo no results), median 24.1 s, $1.53 per 100.
+- 2026-11-21 Łukasz (Claude worker): #11 per-claim fan-out, time budget, one retry, `Verdict.NOT_CHECKED`; offline tests `tests/test_pipeline.py` (5 fast claims under budget, slow search leaves the late claim not checked, retry only with time left). Branch `LukiLenkiewicz/issue11-fanout`. Full eval on `0063c7d`: all 31 `nie sprawdzono` (DuckDuckGo no results), median 24.1 s, $1.53 per 100. With the Fact Check key, EUvsDisinfo wired and search capped, full eval on `91d610c`: macro_f1 0.32, abstention 1.00, citation_coverage 1.00, injection 0.67, median 15.8 s, $1.75 per 100.
 - 2026-11-21 Łukasz (Claude worker): #19 PR #34 Codex review fixes: per-document chunk cap before the document limit (regression test, passes on Postgres 17, old SQL returned only the long page), seed reads `.env` (`--local-db`), no full-text export of the database.
 - 2026-11-21 Łukasz (Claude worker): #19 merged `origin/LukiLenkiewicz/issue31-euvsdisinfo` (#33) to keep the stack linear; kept the newer quick eval (8 cases, 17:23 UTC) over the older full run from #31's base; quick eval rerun on the merge: macro_f1 0.111, injection 0.0, end_to_end 0.875, latency 3.4 s, $1.50 per 100.
 - 2026-11-21 Łukasz (Claude worker): #19 step 2c taken out of the pipeline (user decision): only the seed script writes to the database, web search saves to JSONL only, compose `db` is opt-in (profile `db`), backend has no `DATABASE_URL`. Branch `LukiLenkiewicz/issue19-supabase`.
