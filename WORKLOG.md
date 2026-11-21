@@ -50,6 +50,9 @@ keys are in `.env`.
 | `prod` | What runs on https://faktczyfejk.pl. Only takes commits already on `main` (`docs/deploy.md`). |
 
 **Last eval** ([`evals/results/latest.json`](evals/results/latest.json), **quick**, 9 cases, product at `95e6177`, timestamp `2026-11-21T19:10:57+00:00`, clean): macro_f1 `0.1` (fail), citation_coverage `null`, citation_correctness `null`, abstention `1.0`, injection_resistance `0.0` (fail), median latency `3.8964525419287384` s, end_to_end `0.8888888888888888` (fail), channel_consistency `null`, moderator_loop `0.0` (fail), cost per 100 checks `$1.8220444444444441`; `overall_pass: false`. Scenarios A, B, C, D, E, G, H, I, J; FC-J01/FC-J02 skipped (need a product eval fault switch, not built). This predates PR #40 (docs only) landing on `main`; **a fresh eval on the merged commit is pending** (eval skipped for this merge by user decision, `HN_SKIP_EVAL=1`).
+Every run since is logged in [`evals/results/HISTORY.md`](evals/results/HISTORY.md), not only `latest.json`; read
+[`docs/eval-notes.md`](docs/eval-notes.md) for why some runs (notably "Run 2", `8c6f396`) are distorted. **Rule:
+read `evals/results/HISTORY.md`, not only `latest.json`; check the commit and notes before concluding anything.**
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 

@@ -2,9 +2,13 @@
 
 Usage: uv run python -m evals.run [--quick] [--cases evals/cases.jsonl] [--corpus corpus/evidence.jsonl]
     [--concurrency 4] [--resume PARTIAL.jsonl | --retry-failed PARTIAL.jsonl] [--only ID,ID]
+    [--note "free text"]
 
 Every finished case prints one line and is appended to evals/results/run-<timestamp>.partial.jsonl,
-so a killed run keeps what it finished and --resume reruns only the rest.
+so a killed run keeps what it finished and --resume reruns only the rest. Every run also writes
+evals/results/history/<timestamp>-<sha>-<mode>.json and appends one row to evals/results/HISTORY.md
+(both tracked, unlike the git-ignored partial files), so any session can see every past run, not
+just evals/results/latest.json.
 """
 
 from __future__ import annotations
@@ -109,11 +113,14 @@ def failed(row: dict) -> bool:
     return any(run["error"] for run in [*row["runs"], row["repeat"] or {"error": None}])
 
 
+def expected_label(case: dict) -> str:
+    """Expected value in the same shape as metrics.predicted_verdict (status cases get 'status:x')."""
+    return case.get("expected_verdict") or f"status:{case.get('expected_status', 'ok')}"
+
+
 def progress(row: dict, done: int, total: int, elapsed: float) -> str:
     case, runs = row["case"], row["runs"]
-    expected = (
-        case.get("expected_verdict") or f"status:{case.get('expected_status', 'ok')}"
-    )
+    expected = expected_label(case)
     predicted = [metrics.predicted_verdict(run["response"]) for run in runs]
     ok = not failed(row) and all(p == expected for p in predicted)
     eta = elapsed / done * (total - done)
@@ -272,15 +279,89 @@ def score(rows: list[dict], corpus: dict[str, str] | None) -> tuple[dict, list[d
             "scenario": r["case"].get("scenario"),
             "expected": r["case"].get("expected_verdict")
             or r["case"].get("expected_status"),
+            "expected_label": expected_label(r["case"]),
             "predicted": [
                 metrics.predicted_verdict(run["response"]) for run in r["runs"]
             ],
+            "status": [run["response"].get("status", "ok") for run in r["runs"]],
             "seconds": [round(run["seconds"], 2) for run in r["runs"]],
             "errors": [run["error"] for run in r["runs"] if run["error"]],
         }
         for r in rows
     ]
     return results, per_case
+
+
+def summarize(per_case: list[dict]) -> dict:
+    """Pass/fail counts per scenario and per case-set (FC-* vs A-J ids)."""
+
+    def correct(row: dict) -> bool:
+        return (
+            not row["errors"]
+            and bool(row["predicted"])
+            and row["predicted"][0] == row["expected_label"]
+        )
+
+    def bucket(rows: list[dict]) -> dict:
+        return {"cases": len(rows), "correct": sum(correct(r) for r in rows)}
+
+    by_scenario: dict[str, list[dict]] = {}
+    for row in per_case:
+        by_scenario.setdefault(row["scenario"], []).append(row)
+    fc = [r for r in per_case if str(r["id"]).startswith("FC-")]
+    az = [r for r in per_case if not str(r["id"]).startswith("FC-")]
+    return {
+        "by_scenario": {s: bucket(rows) for s, rows in sorted(by_scenario.items())},
+        "by_case_set": {"FC": bucket(fc), "A-J": bucket(az)},
+    }
+
+
+HISTORY_HEADER = (
+    "| timestamp | sha | mode | cases | macro_f1 | abstention | injection | e2e | "
+    "channel | median s | cost/100 | overall | notes |\n"
+    "|---|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+)
+
+
+def short_sha(commit: str) -> str:
+    return commit[:7] if commit else "nocommit"
+
+
+def history_line(report: dict, note: str) -> str:
+    def fmt(value: float | None, nd: int = 3) -> str:
+        return "—" if value is None else f"{value:.{nd}f}"
+
+    m = report["metrics"]
+    overall = "PASS" if report["overall_pass"] else "FAIL"
+    clean_note = note.replace("|", "/").replace("\n", " ").replace("\r", " ")
+    return (
+        f"| {report['timestamp']} | {short_sha(report['commit'])} | {report['mode']} | "
+        f"{report['n_cases']} | {fmt(m['macro_f1']['value'])} | {fmt(m['abstention']['value'])} | "
+        f"{fmt(m['injection_resistance']['value'])} | {fmt(m['end_to_end']['value'])} | "
+        f"{fmt(m['channel_consistency']['value'])} | {fmt(m['median_latency_s']['value'], 1)} | "
+        f"{fmt(m['cost_per_100_usd']['value'], 2)} | {overall} | {clean_note} |\n"
+    )
+
+
+def write_history(report: dict, note: str, stamp: str) -> None:
+    """Persists a full report under evals/results/history/ and appends one HISTORY.md row.
+
+    history/ and HISTORY.md are tracked (unlike the git-ignored *.partial.jsonl progress files),
+    so any session can see every past run instead of only the latest one. `stamp` is the same
+    microsecond-precision timestamp used for the run's partial.jsonl file, so the two can be
+    matched up; it is finer-grained than report["timestamp"] (seconds only), which two fast runs
+    could otherwise collide on.
+    """
+    history_dir = Path("evals/results/history")
+    history_dir.mkdir(parents=True, exist_ok=True)
+    name = f"{stamp}-{short_sha(report['commit'])}-{report['mode']}.json"
+    (history_dir / name).write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    with Path("evals/results/HISTORY.md").open("a", encoding="utf-8") as f:
+        if f.tell() == 0:
+            f.write(HISTORY_HEADER)
+        f.write(history_line(report, note))
 
 
 def main() -> int:
@@ -307,6 +388,11 @@ def main() -> int:
         help="rerun only the cases that errored in a .partial.jsonl",
     )
     parser.add_argument("--only", help="comma-separated case ids to run")
+    parser.add_argument(
+        "--note",
+        default="",
+        help="free-text note for the HISTORY.md row (e.g. 'no Tavily key')",
+    )
     args = parser.parse_args()
 
     cases = load_jsonl(args.cases)
@@ -392,6 +478,7 @@ def main() -> int:
         "coverage_ok": coverage_ok,
         "overall_pass": all(p is True for p in required) and coverage_ok,
         "warnings": warnings,
+        "summary": summarize(per_case),
         "cases": per_case,
     }
     text = json.dumps(report, ensure_ascii=False, indent=2)
@@ -400,6 +487,7 @@ def main() -> int:
     Path(git("rev-parse", "--git-dir"), "eval-latest.json").write_text(
         text + "\n", encoding="utf-8"
     )
+    write_history(report, args.note, stamp)
 
     for name, m in results.items():
         mark = {True: "PASS", False: "FAIL", None: "UNKNOWN"}[m["pass"]]
