@@ -5,6 +5,8 @@ const count = document.getElementById("count");
 const submit = document.getElementById("submit");
 const result = document.getElementById("result");
 
+const SECURITY_NOTE = "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je i sprawdziliśmy resztę.";
+const SECURITY_NOTE_ONLY = "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je.";
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 
 function el(tag, attrs = {}, ...children) {
@@ -58,11 +60,25 @@ function claimCard(c) {
 
 function render(check) {
   // Statuses other than "ok" are notices, never verdicts.
-  if (check.status !== "ok") return [box("notice", "Brak oceny", check.message)];
+  if (check.status !== "ok") {
+    const notice = [box("notice", "Brak oceny", check.message)];
+    if (check.security_events?.length) notice.unshift(box("notice", "Polecenia dla modelu", SECURITY_NOTE_ONLY));
+    return notice;
+  }
   if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia.")];
-  const nodes = check.claims.map(claimCard);
+  const nodes = check.security_events?.length ? [box("notice", "Polecenia dla modelu", SECURITY_NOTE)] : [];
+  nodes.push(...check.claims.map(claimCard));
+  if (check.page) nodes.unshift(pageNote(check.page));
   if (check.unchecked_claims?.length) nodes.push(uncheckedList(check.unchecked_claims));
   return nodes;
+}
+
+// The page behind a link: what was read, not evidence for its own claims.
+function pageNote(p) {
+  const meta = [p.publisher, p.published_at].filter(Boolean).join(", ");
+  return el("p", { className: "origin" }, "Sprawdzony tekst pochodzi ze strony: ",
+    el("a", { href: p.url, textContent: p.title || p.url, rel: "noopener noreferrer", target: "_blank" }),
+    meta ? `, ${meta}` : null, ". Ta strona nie jest źródłem dowodów dla własnych twierdzeń.");
 }
 
 function uncheckedList(claims) {

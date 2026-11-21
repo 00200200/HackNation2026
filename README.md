@@ -8,8 +8,10 @@ the shared contract, the HTTP API and the web frontend.
 claims, each marked checkable or not. The model never decides whether a claim is true. There are
 no sources yet, so the verdict is set in code: a checkable claim is always `insufficient_evidence`
 with a note that the source base is not connected, and an opinion, forecast or question is
-`not_verifiable`. `sources` is always empty. Links are not supported yet and come back as
-`cannot_check`. Nothing is stored; each check is logged to stdout (status, latency, input length)
+`not_verifiable`. `sources` is always empty. A link is fetched (`prawdowid/link.py`) and the page's
+main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
+private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
+paste the text. Nothing is stored; each check is logged to stdout (status, latency, input length)
 with a second line for the model call (model, input and output tokens, latency).
 
 ## Configuration
@@ -64,7 +66,9 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   a strict Content-Security-Policy.
 - `Dockerfile`: the backend image (Python 3.13, uv, runs as `nobody`).
 - `compose.yaml`: both services. Only the frontend port is published.
-- `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult`.
+- `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult` (with `page`,
+  `security_events`, `cost_usd`).
+- `prawdowid/link.py`: `fetch_page(url)`, the guarded fetch and text extraction for link input.
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
   channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function
   that turns the model's claims into verdicts.
@@ -89,8 +93,11 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 | `GET /health` | Liveness. |
 
 Input is trimmed and must be 1 to 5000 characters. A single token containing `://` counts as a
-link and must be a valid `http` or `https` URL. Links are not fetched yet: a valid link returns
-`cannot_check`. Validation errors come
+link and must be a valid `http` or `https` URL. The page is fetched only from public addresses
+(checked on every connection, so redirects and DNS cannot reach private, loopback or link-local
+hosts), with at most 3 redirects, a 10 s deadline and a 2 MB cap; HTML goes through trafilatura,
+PDF through pypdf, and the first 5000 characters go to the verifier. `CheckResult.page` carries the
+page URL, content hash, title, publisher and date, never the page text. Validation errors come
 back as 422 with a Polish message in `detail[0].msg`.
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
