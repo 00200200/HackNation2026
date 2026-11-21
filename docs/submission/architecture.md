@@ -92,12 +92,9 @@ in [sources.md](sources.md).
 [Frontend Dockerfile](../../frontend/Dockerfile) serves static files with nginx.
 [compose.yaml](../../compose.yaml) publishes only the frontend by default, with backend health
 checks. The Discord service and local PostgreSQL service are opt-in profiles. Compose now
-forwards the extraction model setting, Anthropic key, `GOOGLE_FACTCHECK_API_KEY` and
-`PRAWDOWID_INCIDENTS_PATH`, and already points the check log and source cache at a writable `/tmp`
-path for the non-root `nobody` user. It does **not** forward `TAVILY_API_KEY` or
-`EUVSDISINFO_API_KEY`: without the first, step 2b (now the only web search provider) returns
-"unavailable" for every claim in this Docker path. The
-[README run instructions](../../README.md#run) show an override for both keys.
+forwards the extraction model setting, Anthropic key, `GOOGLE_FACTCHECK_API_KEY`,
+`TAVILY_API_KEY`, `EUVSDISINFO_API_KEY` and `PRAWDOWID_INCIDENTS_PATH`, and already points the
+check log and source cache at a writable `/tmp` path for the non-root `nobody` user.
 
 The API runs without PostgreSQL. Step 2c, the own source store, is explicitly disabled in
 `pipeline._retrieve`. Its seed-only path uses psycopg, local PostgreSQL, a `simple` full-text index

@@ -140,7 +140,7 @@ The IMGW terms treat publication funded by advertising as commercial use; this s
 - Access: the corpus is a file in the repository; who can read or change it is decided by the
   repository's permissions. It contains no data from the people who use the service.
 - Deletion on request: add the URL to `removed_urls` with the reason and date, run `make corpus`,
-  commit. The record disappears from `docs.jsonl` and from every index built from it.
+  commit. The record disappears from `evidence.jsonl` and from every index built from it.
 
 ## Sources that need a key
 

@@ -1,8 +1,10 @@
 # Deploy
 
-The public demo runs on one Linux server in the EU with Docker Compose. Caddy gets and renews
-the HTTPS certificate and proxies every request to the nginx frontend, which serves the static UI
-and forwards `/api/` and `/health` to the backend. Only Caddy publishes ports (80 and 443).
+The public demo runs on one Linux server in the EU with Docker Compose. Caddy is the server's only
+reverse proxy: it gets and renews the HTTPS certificates and proxies faktczyfejk.pl to the nginx
+frontend, which serves the static UI and forwards `/api/` and `/health` to the backend. It also
+serves other projects on the server (see "Other projects on this server"). Only Caddy publishes
+ports (80 and 443).
 
 ```
 browser --HTTPS--> caddy :443 --> frontend (nginx) :80 --> backend (FastAPI) :8000 --> db (Postgres + pgvector) :5432
@@ -16,7 +18,7 @@ there. No CI service is involved, and a failed deploy is retried on the next run
 |---|---|
 | `compose.yaml` | backend and frontend, also used for local runs |
 | `compose.prod.yaml` | production overlay: Caddy, Postgres with pgvector, no host port on nginx, real client IP for the rate limit |
-| `caddy/Caddyfile` | HTTPS site for `DOMAIN` |
+| `caddy/Caddyfile` | HTTPS sites: `DOMAIN` and `www`, doc2json.pl and `www` |
 | `deploy/pull-deploy.sh` | deploys `origin/prod` when it moves |
 | `deploy/faktczyfejk-deploy.service`, `.timer` | run the script every minute as `ubuntu` |
 | `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*` (never committed; deploys leave it alone) |
@@ -48,6 +50,7 @@ On the server, install Docker and give the server a read-only key for the reposi
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker ubuntu
+sudo docker network create edge     # shared with other projects Caddy serves, see "Other projects"
 ssh-keygen -t ed25519 -N "" -C faktczyfejk-vps -f ~/.ssh/github_deploy
 printf 'Host github.com\n  IdentityFile ~/.ssh/github_deploy\n  IdentitiesOnly yes\n' >> ~/.ssh/config
 ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
@@ -216,6 +219,25 @@ docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < ~/backups/prawdowid-YYYY-MM-DD.dump
 ```
 
+## Other projects on this server
+
+Caddy here is the server's only reverse proxy, so it also serves doc2json.pl (repository
+HackNation2026-2). That project runs from `/opt/doc2json` with its own Compose file; its web
+container `doc2json-web` joins the external Docker network `edge` and publishes no ports, and Caddy
+reaches it as `doc2json-web:80`. Its site blocks live in `caddy/Caddyfile` in this repository, so
+changing them is a PR here and a push to `prod`, like any other change. DNS: `A` records for
+`doc2json.pl` and `www.doc2json.pl` pointing at the server, and no other `A` or `AAAA` records for
+those names. Caddy gets each domain's certificate on its own; until doc2json.pl resolves to the
+server, its certificate requests fail without affecting faktczyfejk.pl.
+
+Caddy reaches this stack's nginx as `faktczyfejk-frontend`, an alias on this project's own network,
+so a container called `frontend` on `edge` cannot take its traffic. Still, give containers on `edge`
+unique names and never `frontend` or `caddy`. Caddy's admin API listens only on its own loopback
+(127.0.0.1:2019), so other containers on `edge` cannot reconfigure it.
+
+To add another project the same way: put its web container on `edge` under a unique name, add a
+site block to `caddy/Caddyfile`, and point the domain's `A` records at the server.
+
 ## Known limits
 
 - The rate limit counts per IP address (10 checks per minute), so people behind one NAT, such as
@@ -241,16 +263,19 @@ docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB
 With Docker Desktop and ports 80 and 443 free on your machine:
 
 ```bash
+docker network create edge      # once; the overlay expects it
 DOMAIN=localhost POSTGRES_DB=prawdowid POSTGRES_USER=prawdowid POSTGRES_PASSWORD=local \
   docker compose -f compose.yaml -f compose.prod.yaml up --build
 curl -k https://localhost/health
 ```
 
-For `localhost` Caddy uses its own local certificate authority, hence `-k`.
+For `localhost` Caddy uses its own local certificate authority, hence `-k`. It also tries to get
+public certificates for doc2json.pl from your laptop; those requests fail, which is harmless.
 
 ## After the event
 
-On the server, take a final `pg_dump` if the data should be kept (see "Database"), then:
+This also takes doc2json.pl offline: its proxy and certificate live in this stack. On the server,
+take a final `pg_dump` if the data should be kept (see "Database"), then:
 
 ```bash
 sudo systemctl disable --now faktczyfejk-deploy.timer
