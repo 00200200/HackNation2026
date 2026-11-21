@@ -65,8 +65,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   that turns the model's claims into verdicts.
 - `prawdowid/factcheck.py`: `search_claims(claim)`, the known-claim lookup in Google Fact Check
   Tools (`claims:search`). Each review becomes a `Source` (`source_type="fact_check"`) with the
-  fact-checker's rating kept beside it as a signal, not a verdict. 8 s timeout, one retry on a
-  network error or 5xx. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
+  fact-checker's rating and the reviewed claim kept beside it, not in `fragment`: the rating is a
+  signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
   message and no hits. Not wired into `verify()` yet (issue #11).
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
 

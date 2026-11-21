@@ -60,6 +60,8 @@ def test_known_claim_returns_its_review_as_a_source():
     assert hit.source.published_at == date(2021, 3, 4)
     assert str(hit.source.url) == "https://demagog.org.pl/fake_news/mikroczipy/"
     assert hit.source.source_type == "fact_check"
+    # The reviewed claim is the disputed statement, never shown as the source's quote.
+    assert hit.source.fragment is None
 
     [request] = calls
     assert request.url.params["query"] == "Szczepionki mają mikroczipy"
@@ -134,3 +136,40 @@ def test_broken_encoding_retries_then_is_a_limit():
     lookup, calls = run(broken)
     assert len(calls) == 2
     assert lookup.limitation == LOOKUP_UNAVAILABLE
+
+
+def test_review_without_title_never_uses_the_claim_as_title():
+    body = {
+        "claims": [
+            {
+                "text": "Fałszywe twierdzenie.",
+                "claimReview": [{"url": "https://x.pl/a"}],
+            }
+        ]
+    }
+    lookup, _ = run(lambda r: httpx2.Response(200, json=body))
+    assert lookup.hits[0].source.title == "https://x.pl/a"
+
+
+def test_trickling_response_hits_the_overall_deadline(monkeypatch):
+    # Each chunk arrives well inside the per-read timeout, so only the overall deadline stops it.
+    monkeypatch.setattr(factcheck, "DEADLINE_S", 0.2)
+
+    async def trickle():
+        for byte in b'{"claims": []}' * 100:
+            await asyncio.sleep(0.01)
+            yield bytes([byte])
+
+    async def go():
+        transport = httpx2.MockTransport(
+            lambda r: httpx2.Response(200, content=trickle())
+        )
+        async with httpx2.AsyncClient(transport=transport) as client:
+            loop = asyncio.get_running_loop()
+            start = loop.time()
+            lookup = await search_claims("x", client=client)
+            return lookup, loop.time() - start
+
+    lookup, elapsed = asyncio.run(go())
+    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert elapsed < 1
