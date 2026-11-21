@@ -23,6 +23,7 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `main` / `origin/main` | at `75c1583`: skeleton (#1), verifier (#2), worklog (#3), web UI and eval set (#29), Tavily proposal (#20), Fact Check lookup (#21), deploy config (#32), self-contained claims (#22), FC eval cases (#23), pitch-deck web UI (#35). |
 | `feat/ui-frontend` | merged into `main` as #29. |
 | `feat/7-search-provider` | #7 search provider research, WORKLOG only. Merged into `main` as #20. Owner: Łukasz (Claude worker). |
+| `LukiLenkiewicz/issue9-rerank` | #9 step 3 rerank and dedupe, PR #25 against `main` (#24 merged). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 | `claude/deploy-config-43a484` | Deploy config, merged into `main` as #32. |
 | `claude/pull-deploy` | Deploy by pulling `prod` on the server (`deploy/`), Actions workflow removed. |
@@ -52,6 +53,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: ?
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
+  - [x] Step 3 (#9): `prawdowid/rerank.py`, per claim: drops the linked page (`exclude_url`) and repeated canonical URLs (IDNA host, NFC, percent-encoding normalised; fetched text wins over a title-only hit for the same URL), reads at most `PRAWDOWID_RERANK_MAX_DOCUMENTS` (30) documents × `PRAWDOWID_RERANK_MAX_DOC_CHARS` (20k), splits page text into fragments of ≤ `PRAWDOWID_FRAGMENT_CHARS` (800), drops only exact duplicates (same words; a changed number, date or negation keeps both), interleaves documents and sends at most `PRAWDOWID_RERANK_MAX_FRAGMENTS` (60), Claude Haiku via PydanticAI orders them, top `PRAWDOWID_RERANK_TOP_K` (12) kept with `doc_id` = canonical URL. Model failure or no key: unranked order plus a limitation. Not wired into `verify()` (#11). Ranking quality not measured, no key yet. Owner: Łukasz (Claude worker)
 - [x] Second channel (#13): Discord `/sprawdz` bot, `prawdowid/discord_bot.py`, calls the same `POST /api/checks` with `X-Channel: discord`, branch `LukiLenkiewicz/issue13-discord`. Not run against real Discord (token not used by the worker); eval `channel_consistency` needs `PRAWDOWID_EXTRA_CHANNELS=discord` and multi-channel cases. Owner: Łukasz (Claude worker)
 - [x] Real eval set `evals/cases.jsonl`: ≥ 30 cases, scenarios A–E, G, I, J at least twice, labelled sources. Owner:
   Michał. Branch `feat/eval-cases`: 41 cases in the mentor's question style, all five verdict classes; labels from
@@ -138,6 +140,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (via Claude): merged `main` (#24 squashed) into `LukiLenkiewicz/issue9-rerank` (PR #25), retargeted PR #25 to `main`; WORKLOG conflicts resolved by keeping both sides.
+- 2026-11-21 Łukasz (Claude worker): #9 PR #25 review fixes: Unicode/IDN URL exclusion, fetched text over title-only hits, exact dedupe keeps conflicting facts, input budget before splitting.
+- 2026-11-21 Łukasz (Claude worker): #9 `prawdowid/rerank.py` dedupe and rerank of evidence per claim (Claude Haiku listwise, stdlib dedupe), offline FunctionModel tests. Branch `LukiLenkiewicz/issue9-rerank`.
 - 2026-11-21 Łukasz (via Claude): merged `main` into `LukiLenkiewicz/issue13-discord` (PR #24); WORKLOG conflict resolved by keeping both sides.
 - 2026-11-21 Michał (via Claude): merged #29, #20, #21 (WORKLOG conflicts resolved, judge PASS each) and #32 (deploy
   config); `prod` created at `8ff84db`. The Actions deploy job was not started (account billing), so `prod` was
