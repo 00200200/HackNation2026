@@ -15,6 +15,7 @@ from prawdowid.verifier import ExtractedClaim, Extraction, agent
 
 PESEL = "44051401359"
 PHONE = "+48 600 100 200"
+WHEN = {"started_at": datetime.now(UTC), "latency_ms": 1}
 TEXT = (
     f"Jan Kowalski, PESEL {PESEL}, tel. {PHONE}, twierdzi, że PKB Polski wzrósł o 3%."
 )
@@ -114,7 +115,7 @@ def test_records_past_retention_are_dropped(check_log):
         json.dumps({"session": "old-0001", "time": old.isoformat()}) + "\n"
     )
     result = CheckResult(status=Status.TECHNICAL_ERROR, message="x")
-    checklog.record("new-0001", "web", "pytanie", result)
+    checklog.record("new-0001", "web", "pytanie", result, **WHEN)
     assert [r["session"] for r in records(check_log)] == ["new-0001"]
 
 
@@ -125,6 +126,7 @@ def test_damaged_lines_never_block_logging_or_deletion(check_log):
         "web",
         "pytanie",
         CheckResult(status=Status.TECHNICAL_ERROR, message="x"),
+        **WHEN,
     )
     assert [r["session"] for r in records(check_log)] == ["s-000001"]
     assert checklog.delete_session("s-000001") == 1
@@ -180,12 +182,12 @@ def test_concurrent_writers_keep_every_record(check_log):
     from concurrent.futures import ThreadPoolExecutor
 
     result = CheckResult(status=Status.TECHNICAL_ERROR, message="x")
-    checklog.record("gone-0001", "web", "pytanie", result)
+    checklog.record("gone-0001", "web", "pytanie", result, **WHEN)
 
     def write(i):
         if i % 5 == 0:
             checklog.delete_session("gone-0001")
-        checklog.record(f"s-{i:06d}", "web", "pytanie", result)
+        checklog.record(f"s-{i:06d}", "web", "pytanie", result, **WHEN)
 
     with ThreadPoolExecutor(8) as pool:
         list(pool.map(write, range(40)))  # re-raises a delete_session crash
@@ -200,13 +202,21 @@ def test_claims_and_sources_are_masked_in_the_check_log(check_log):
         claim=f"PESEL {PESEL} należy do posła.",
         verdict="unverified",
         sources=[
-            type("S", (), {"url": "https://example.org/?mail=jan.kowalski@example.com"})
+            type(
+                "S",
+                (),
+                {
+                    "url": "https://example.org/?mail=jan.kowalski@example.com",
+                    "source_type": "news",
+                },
+            )
         ],
+        limitations=[f"PESEL {PESEL}"],
     )
     result = CheckResult.model_construct(
         status=Status.OK, claims=[claim], unchecked_claims=[f"tel. {PHONE}"]
     )
-    checklog.record("s-000001", "web", "pytanie", result)
+    checklog.record("s-000001", "web", "pytanie", result, **WHEN)
     text = check_log.read_text()
     assert (
         PESEL not in text and "jan.kowalski" not in text and "600 100 200" not in text

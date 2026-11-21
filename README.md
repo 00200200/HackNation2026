@@ -29,9 +29,11 @@ domain's licence is confirmed, none today), one record per URL, dropped after 30
 
 Put these in `.env` in the repository root. The file is git-ignored and is not copied into the
 image. `make dev` loads it into the API environment. Compose reads it for interpolation but only
-forwards variables declared in `compose.yaml`: the backend gets `ANTHROPIC_API_KEY` and
-`PRAWDOWID_MODEL`. The optional retrieval keys need the override shown under Run; other tuning
-variables need an explicit Compose environment override too.
+forwards variables declared in `compose.yaml`: the backend gets `ANTHROPIC_API_KEY`,
+`PRAWDOWID_MODEL`, `GOOGLE_FACTCHECK_API_KEY` and `PRAWDOWID_INCIDENTS_PATH`, and its check log and
+source cache already point at a writable `/tmp` path. `TAVILY_API_KEY` (step 2b web search, the
+only provider for it) and `EUVSDISINFO_API_KEY` are **not** forwarded by the base stack; see the
+override under Run. Other tuning variables need an explicit Compose environment override too.
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
@@ -75,23 +77,23 @@ Open http://localhost:8080. Stop with `make down`. Use another port with `make u
 
 Without `make`: `docker compose up --build -d`.
 
-The base stack does not forward Google or EUvsDisinfo keys, and its non-root backend has no
-writable default cache directory. To enable optional retrieval keys from `.env` and use a writable
-temporary cache, run this instead of `make up` (the quoted heredoc contains variable names, not
-secret values):
+The base stack forwards `GOOGLE_FACTCHECK_API_KEY` and already points the check log and source
+cache at a writable `/tmp` path, but **not** `TAVILY_API_KEY`: without it, step 2b (the only web
+search provider) returns "unavailable" for every claim. `EUVSDISINFO_API_KEY` is not forwarded
+either. To enable both from `.env`, run this instead of `make up` (the quoted heredoc contains
+variable names, not secret values):
 
 ```bash
 docker compose -f compose.yaml -f - up --build -d <<'YAML'
 services:
   backend:
     environment:
-      GOOGLE_FACTCHECK_API_KEY: ${GOOGLE_FACTCHECK_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       EUVSDISINFO_API_KEY: ${EUVSDISINFO_API_KEY:-}
-      PRAWDOWID_CACHE: /tmp/prawdowid/docs.jsonl
 YAML
 ```
 
-This cache is lost when the backend container is replaced. Add `--profile discord` before `up`
+Add `--profile discord` before `up`
 to start the bot too. Set `DISCORD_BOT_TOKEN` in `.env`, install the application in your Discord
 server with slash-command access, then use `/sprawdz tekst:`. Live Discord transport has not
 been verified in the saved eval; a token alone does not prove the bot is installed.

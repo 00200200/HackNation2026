@@ -4,7 +4,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, HttpUrl, computed_field, model_validator
+from pydantic import BaseModel, Field, HttpUrl, computed_field, model_validator
 
 
 class Verdict(StrEnum):
@@ -58,6 +58,14 @@ class Source(BaseModel):
     fragment: str | None = None
 
 
+class ModelCall(BaseModel):
+    """One model answer, kept in the check log only."""
+
+    model: str | None
+    input_tokens: int
+    output_tokens: int
+
+
 class ClaimResult(BaseModel):
     claim: str
     kind: ClaimKind
@@ -70,6 +78,8 @@ class ClaimResult(BaseModel):
     premises: list[str]
     sources: list[Source]
     limitations: list[str]
+    # Check log only (prawdowid/checklog.py): never sent to a channel.
+    steps_ms: dict[str, int] = Field(default={}, exclude=True)
 
     @computed_field
     @property
@@ -132,6 +142,9 @@ class CheckResult(BaseModel):
     cost_usd: float | None = None
     # Shown next to the claims, also on a notice (a refused link): never sets or changes a verdict.
     incident_matches: list[IncidentMatch] = []
+    # Check log only (prawdowid/checklog.py): never sent to a channel.
+    steps_ms: dict[str, int] = Field(default={}, exclude=True)
+    model_calls: list[ModelCall] = Field(default=[], exclude=True)
 
     @model_validator(mode="after")
     def _non_ok_is_a_notice(self) -> "CheckResult":
