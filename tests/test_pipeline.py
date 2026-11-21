@@ -18,6 +18,10 @@ from prawdowid.verifier import ExtractedClaim, Extraction
 
 QUOTE = "Rząd potwierdza to w oficjalnym komunikacie."
 USAGE = RequestUsage(input_tokens=1000, output_tokens=100)
+OPUS, HAIKU, SONNET = (
+    float(ModelResponse(parts=[], usage=USAGE, model_name=m).cost().total_price)
+    for m in ("claude-opus-5-5", "claude-haiku-5-5", "claude-sonnet-5-5")
+)
 
 
 def document(url: str) -> Document:
@@ -112,11 +116,7 @@ def test_five_claims_with_fast_sources_finish_under_budget(monkeypatch, models):
     assert elapsed < 1.5 < pipeline.CHECK_BUDGET_S
     assert {s.fragment for c in result.claims for s in c.sources} == {QUOTE}
     # Extraction (opus) plus rerank (haiku) and judge (sonnet) for each claim.
-    opus, haiku, sonnet = (
-        float(ModelResponse(parts=[], usage=USAGE, model_name=m).cost().total_price)
-        for m in ("claude-opus-5-5", "claude-haiku-5-5", "claude-sonnet-5-5")
-    )
-    assert result.cost_usd == pytest.approx(opus + 5 * (haiku + sonnet))
+    assert result.cost_usd == pytest.approx(OPUS + 5 * (HAIKU + SONNET))
 
 
 def test_slow_search_leaves_the_late_claim_not_checked(monkeypatch, models):
@@ -130,8 +130,8 @@ def test_slow_search_leaves_the_late_claim_not_checked(monkeypatch, models):
     assert late.verdict is Verdict.NOT_CHECKED
     assert late.verdict_label == "nie sprawdzono"
     assert late.limitations == [pipeline.TIME_LIMIT.format(budget=1.0)]
-    # A request may have been cut off: the price is unknown.
-    assert result.cost_usd is None
+    # The late claim was cut during the free search: no model request to price.
+    assert result.cost_usd == pytest.approx(OPUS + 2 * (HAIKU + SONNET))
 
 
 def check(claim, queries, budget_s, exclude_url=None):

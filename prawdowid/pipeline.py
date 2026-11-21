@@ -72,9 +72,9 @@ async def check_claim(
             judgement = await _judge(claim, candidates, exclude_url, steps, costs)
             events += judgement.security_events
     except TimeoutError:
-        # A request cut off mid-flight may still be billed.
+        # `costs` is None for a model request cut mid-flight, 0 when only search was cut.
         return _done(
-            claim, _not_checked(TIME_LIMIT.format(budget=CHECK_BUDGET_S)), [None], steps
+            claim, _not_checked(TIME_LIMIT.format(budget=CHECK_BUDGET_S)), costs, steps
         )
 
     # With no queries the first pass already searched the claim itself.
@@ -99,7 +99,6 @@ async def check_claim(
                     limits.pop("web", None)
         except TimeoutError:
             log.info("retry cut by the time limit claim=%r", claim)
-            costs.append(None)
             cut = True
 
     if len(limits) == 3 and not candidates:  # 2a, 2b and 2c all failed
@@ -164,17 +163,27 @@ async def _judge(
     prefix: str = "",
 ) -> judge.Judgement:
     """Steps 3 to 5. The linked page is never evidence for its own claims."""
-    with capture_run_messages() as messages:
-        ranking = await _timed(
+    ranking = await _priced(
+        costs,
+        _timed(
             steps,
             prefix + "rerank",
             rerank.rerank(claim, candidates, exclude_url=exclude_url),
-        )
-    costs.append(_cost(messages))
+        ),
+    )
+    return await _priced(
+        costs, _timed(steps, prefix + "judge", judge.judge(claim, ranking))
+    )
+
+
+async def _priced(costs: list[float | None], aw):
+    """Adds the price of the model run inside `aw` to `costs`, also when the time limit cuts it:
+    a request without an answer may be billed, so its price is unknown (None)."""
     with capture_run_messages() as messages:
-        judgement = await _timed(steps, prefix + "judge", judge.judge(claim, ranking))
-    costs.append(_cost(messages))
-    return judgement
+        try:
+            return await aw
+        finally:
+            costs.append(_cost(messages))
 
 
 def _needs_more(judgement: judge.Judgement) -> bool:
