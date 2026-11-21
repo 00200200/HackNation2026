@@ -22,7 +22,7 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 |---|---|
 | `main` / `origin/main` | at `7ee1410`: skeleton (#1), pre-push gate, PydanticAI verifier (#2), worklog and eval results (#3). |
 | `feat/7-search-provider` | #7 search provider research, WORKLOG only. PR open, not merged. Owner: Łukasz (Claude worker). |
-| `feat/16-eval-set` | #16 eval set (31 cases) and full eval, stacked on `feat/5-self-contained-claims`. PR open, not merged. Owner: Łukasz (Claude worker). |
+| `feat/16-eval-set` | #16 eval set (32 cases, 30 scored, J skipped) and no-corpus full eval, stacked on `feat/5-self-contained-claims`. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
 **Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `d655078` (#5 merged into #16), no corpus):
@@ -43,7 +43,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
 - [ ] Second channel (Discord or other allowed one; not Telegram/WeChat) on the same `verify()`. Owner: ?
-- [x] Real eval set `evals/cases.jsonl`: 31 cases, scenarios A–E, G, I, J at least twice, labels from Demagog, Konkret24, EUvsDisinfo. Owner: Łukasz (Claude worker). Open: I cases use EUvsDisinfo, not the organiser's incident base (not available to us); EUvsDisinfo blocks automated fetch, so check I01–I03 labels by hand; J cases need a product eval switch to simulate a missing key or limit.
+- [ ] Real eval set `evals/cases.jsonl` (#16, PR #23): 32 cases, 30 scored (A8 B6 C2 D4 E3 G4 I3), labels from Demagog, Konkret24, EUvsDisinfo. Owner: Łukasz (Claude worker). **Not done:** (1) the cache-corpus run is BLOCKED: no corpus exists yet (search is DuckDuckGo-only in #8 and returns nothing here; provider changes later), so committed results are no-corpus runs and do not count for submission; (2) J01–J02 are `skip`ped, not scored: the harness reaches the product only over HTTP, so a missing-key or rate-limit fault needs a product eval switch (not built); (3) I01–I03 are EUvsDisinfo stand-ins, not the organiser's incident base (not available to us).
 - [ ] Contract gaps for metrics: `security_events`, `cost_usd` per answer. Owner: ?
 - [ ] Link input (fetch page, treat it as untrusted source text). Owner: ?
 - [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
@@ -93,6 +93,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #16 Codex review fixes on PR #23: `skip` field in `evals/run.py` (J01–J02 skipped, not scored), single-assertion inputs for B05, B06, B02, G01, G03, G04, A05, E02, new A08, I01–I03 marked as stand-ins; corpus run marked blocked.
 - 2026-11-21 Łukasz (Claude worker): #16 `evals/cases.jsonl` with 31 labelled cases, full eval on `7ee1410` committed (macro_f1 0.09).
 - 2026-11-21 Łukasz (Claude worker): #16 merged `feat/5-self-contained-claims` (stack), full eval rerun on `d655078`: macro_f1 0.09, median latency 5.0 s.
 - 2026-11-21 Łukasz (Claude worker): #5 claims stand alone (pronouns, relative dates from the text), quotes split into attribution + quoted, queries per claim, top-N cap with `unchecked_claims`, source sentence shown in the UI. Branch `feat/5-self-contained-claims`.
