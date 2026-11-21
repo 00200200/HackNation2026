@@ -68,8 +68,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 - `compose.yaml`: both services. Only the frontend port is published.
 - `compose.prod.yaml`, `caddy/Caddyfile`: production overlay. Caddy serves HTTPS in front of nginx
   and is then the only service with published ports; `db` is Postgres 18 with pgvector and pg_trgm.
-- `.github/workflows/deploy.yml`: a push to the `prod` branch deploys to the demo server; setup in
-  `docs/deploy.md`.
+- `deploy/`: the server's deploy script and systemd timer. The demo server picks up a push to the
+  `prod` branch within about a minute and then builds and starts it; setup in `docs/deploy.md`.
 - `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult`.
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
   channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function
