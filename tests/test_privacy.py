@@ -252,3 +252,22 @@ def test_a_broken_log_call_is_not_raised_by_the_filter():
         record = logging.LogRecord("prawdowid", logging.INFO, "", 0, msg, args, None)
         assert MaskingFilter().filter(record) is True
         assert PESEL not in record.getMessage()
+
+
+def test_a_check_running_during_deletion_is_not_written(check_log):
+    started = datetime.now(UTC)
+    assert checklog.delete_session("s-000001") == 0
+    result = CheckResult(status=Status.TECHNICAL_ERROR, message="x")
+    checklog.record(
+        "s-000001", "web", "pytanie", result, started_at=started, latency_ms=1
+    )
+    assert records(check_log) == []
+    # A check started after the deletion is written again.
+    checklog.record(
+        "s-000001",
+        "web",
+        "pytanie",
+        result,
+        **{**WHEN, "started_at": datetime.now(UTC)},
+    )
+    assert [r["session"] for r in records(check_log)] == ["s-000001"]

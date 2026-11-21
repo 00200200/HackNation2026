@@ -223,6 +223,8 @@ async def _save_all(docs: list[Document]) -> None:
                 await asyncio.to_thread(save_document, d)
     except TimeoutError:
         log.warning("source store save stopped: over %d s", SAVE_BUDGET_S)
+    except OSError as exc:  # after TimeoutError, its subclass
+        log.warning("source store save failed: %s", type(exc).__name__)
 
 
 async def _search(

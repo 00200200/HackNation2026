@@ -21,4 +21,5 @@ def check_log(monkeypatch, tmp_path):
 
     path = tmp_path / "checks.jsonl"
     monkeypatch.setattr(checklog, "CHECK_LOG", path)
+    monkeypatch.setattr(checklog, "DELETED", {})
     return path

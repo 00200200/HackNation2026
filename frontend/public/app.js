@@ -308,7 +308,7 @@ form.addEventListener("submit", async (event) => {
   show(waiting).then(reveal);
   try {
     const headers = { "Content-Type": "application/json" };
-    const known = sessionStorage.getItem(SESSION_KEY);
+    const known = storedSession();
     if (known) headers["X-Session-Id"] = known;
     const resp = await fetch("/api/checks", {
       method: "POST",
@@ -349,16 +349,30 @@ const sessionNote = document.getElementById("session");
 const sessionStatus = document.getElementById("session-status");
 const deleteSession = document.getElementById("delete-session");
 
+// Browsers may deny storage (SecurityError); then the id lives in memory for this page only.
+let sessionId = null;
+try { sessionId = sessionStorage.getItem(SESSION_KEY); } catch { /* storage denied */ }
+function storedSession() {
+  return sessionId;
+}
+function storeSession(id) {
+  sessionId = id;
+  try {
+    if (id) sessionStorage.setItem(SESSION_KEY, id);
+    else sessionStorage.removeItem(SESSION_KEY);
+  } catch { /* kept in memory */ }
+}
+
 function rememberSession(id) {
   if (!id) return;
-  sessionStorage.setItem(SESSION_KEY, id);
+  storeSession(id);
   sessionNote.hidden = false;
   deleteSession.hidden = false;
   sessionStatus.textContent = "";
 }
 
 deleteSession.addEventListener("click", async () => {
-  const id = sessionStorage.getItem(SESSION_KEY);
+  const id = storedSession();
   if (!id) return;
   deleteSession.disabled = true;
   try {
@@ -367,7 +381,7 @@ deleteSession.addEventListener("click", async () => {
       signal: AbortSignal.timeout(10000),
     });
     if (!resp.ok) throw new Error(String(resp.status));
-    sessionStorage.removeItem(SESSION_KEY);
+    storeSession(null);
     deleteSession.hidden = true;
     sessionStatus.textContent = "Usunęliśmy sprawdzenia z tej sesji.";
   } catch {
@@ -377,4 +391,4 @@ deleteSession.addEventListener("click", async () => {
   }
 });
 
-if (sessionStorage.getItem(SESSION_KEY)) sessionNote.hidden = false;
+if (storedSession()) sessionNote.hidden = false;

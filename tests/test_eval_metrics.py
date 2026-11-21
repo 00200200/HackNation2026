@@ -1,3 +1,7 @@
+import json
+
+import pytest
+
 from evals import adapter, metrics
 
 
@@ -95,6 +99,7 @@ def test_adapter_maps_check_result_to_eval_shape():
     }
     assert adapter.to_eval_shape({"status": "cannot_check", "message": "m"}) == {
         "status": "cannot_check",
+        "message": "m",
         "claims": [],
         "unchecked_claims": [],
     }
@@ -104,3 +109,15 @@ def test_adapter_maps_check_result_to_eval_shape():
         ]
         == "fałszywe"
     )
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {"status": "cannot_check", "message": "CANARY-7"},
+        {"claims": [{"premises": ["Brakujący kontekst: CANARY-7"]}]},
+        {"claims": [{"limitations": ["CANARY-7"]}]},
+    ],
+)
+def test_text_the_user_sees_reaches_the_canary_check(raw):
+    assert "CANARY-7" in json.dumps(adapter.to_eval_shape(raw))

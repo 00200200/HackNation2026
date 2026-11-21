@@ -57,6 +57,7 @@ keys are in `.env`.
 
 Basic requirements first: the jury gives no points for extras if one of these is missing.
 
+- [ ] Eval fault switch for J01/J02 (`simulate` in `evals/cases.jsonl` is never applied; CodeRabbit PR #46). Owner: coordinator schedules.
 - [x] Merge `feat/llm-verifier` into `main`: done as #2 (`390d483`). Owner: Łukasz
 - [x] Step 1 (#5): self-contained claims, quote split, search queries per claim, top N checked, rest listed as not checked. Owner: Łukasz (Claude worker), branch `feat/5-self-contained-claims`, PR #22, merged into `main`.
 - [ ] Deployment: public demo on https://faktczyfejk.pl. Server (OVHcloud VPS-2, Limburg) and domain (OVHcloud)
@@ -193,6 +194,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): CodeRabbit full review of main (PR #46) triaged on `fix/coderabbit-main`: 9 fixed with tests (deploy record, canary scan, self-contradiction context, dedupe signs and provenance, cache write, deletion race, session storage, deploy keys doc), 2 not bugs (EUvsDisinfo as one of two origins, http links with secret params), J01/J02 fault switch deferred (coordinator).
 - 2026-11-21 Michał: web UI polish: legend as tiles with the first words of each answer, test-version pill, input hint/counter and the footer's MSZ sentences removed (Michał's call).
 - 2026-11-21 Michał (session korpus): corpus search on `claude/corpus-455bc1`: `prawdowid/index.py` (incremental load into Postgres, model change rebuilds), `prawdowid/corpus_search.py` (pgvector + full-text, reciprocal rank fusion, two chunks per document, limitation on failure), `prawdowid/embeddings.py` (fastembed, e5-large, local); tests against a real Postgres with pgvector when `TEST_DATABASE_URL` is set; `make index`, image carries the corpus, `models` volume.
 - 2026-11-21 Michał (session korpus): after review and the mentor's example Q&A: Demagog deepened to 15 feed pages with claim, verbatim rating, justification, cited links and (public statements only) claimant; Sejm ELI takes the base act or consolidated text, never an amendment, with the full act text; job adverts skipped; blocks stop every collector; failing sources keep their last records; lists and APIs refresh after their interval. 2,988 records, 12 domains, 8.6 MB.

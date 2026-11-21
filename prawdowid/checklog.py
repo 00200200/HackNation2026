@@ -22,6 +22,10 @@ from prawdowid.privacy import RETENTION_DAYS, mask_personal_data
 log = logging.getLogger("prawdowid")
 
 CHECK_LOG = Path(os.getenv("PRAWDOWID_CHECK_LOG") or "logs/checks.jsonl")
+# When each session was last deleted: a check that started before that is never written, so a
+# deletion also covers checks still running. ponytail: in memory, one uvicorn process (Dockerfile);
+# a restart forgets it but also ends every running check. Move it into the log for several workers.
+DELETED: dict[str, datetime] = {}
 
 
 def record(
@@ -75,6 +79,8 @@ def record(
         ],
         "unchecked_claims": [mask_personal_data(c) for c in result.unchecked_claims],
     }
+    if session in DELETED and started_at <= DELETED[session]:
+        return
     try:
         # ponytail: rewrites the file on every check to apply retention; fine for a demo log.
         _rewrite(_fresh, [entry])
@@ -92,7 +98,8 @@ def read_session(session: str) -> list[dict]:
 
 
 def delete_session(session: str) -> int:
-    """Delete every record of the session. Number of records deleted."""
+    """Delete every record of the session, also of checks still running. Number deleted."""
+    DELETED[session] = datetime.now(UTC)
     return _rewrite(lambda r: r["session"] != session)
 
 
