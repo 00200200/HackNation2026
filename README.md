@@ -20,13 +20,20 @@ the text goes to the model. Each check is logged to stdout (session, status, lat
 with a second line for the model call (model, input and output tokens, latency), and kept for 30
 days as one masked record in the check log, which the user can delete per session. A link check
 also logs the final URL with secret query values removed and personal data masked, the page's
-SHA-256, and the text and verdict of every claim. The page text itself is never logged. Details:
-[docs/privacy.md](docs/privacy.md).
+SHA-256, and the text and verdict of every claim. The page text itself is never logged. Successful
+web evidence fetches are cached in `corpus/docs.jsonl` as metadata only (full text only once a
+domain's licence is confirmed, none today), one record per URL, dropped after 30 days. Details:
+[docs/privacy.md](docs/privacy.md), [submission risks](docs/submission/risks.md).
 
 ## Configuration
 
 Put these in `.env` in the repository root. The file is git-ignored and is not copied into the
-image; `docker compose` and `make dev` read it at start-up.
+image. `make dev` loads it into the API environment. Compose reads it for interpolation but only
+forwards variables declared in `compose.yaml`: the backend gets `ANTHROPIC_API_KEY`,
+`PRAWDOWID_MODEL`, `GOOGLE_FACTCHECK_API_KEY` and `PRAWDOWID_INCIDENTS_PATH`, and its check log and
+source cache already point at a writable `/tmp` path. `TAVILY_API_KEY` (step 2b web search, the
+only provider for it) and `EUVSDISINFO_API_KEY` are **not** forwarded by the base stack; see the
+override under Run. Other tuning variables need an explicit Compose environment override too.
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
@@ -47,13 +54,20 @@ image; `docker compose` and `make dev` read it at start-up.
 | `PRAWDOWID_CHECK_LOG` | no | `logs/checks.jsonl` | Check log file (masked question, result, session id). Docker sets `/tmp/prawdowid/checks.jsonl`. See [docs/privacy.md](docs/privacy.md). |
 | `PRAWDOWID_INCIDENTS_PATH` | no | `prawdowid/data/incidents.json` (empty) | Scenario I incident base, a `.json` or `.csv` file; format in `prawdowid/incidents.py`. Put the file in `incidents/` (git-ignored) and set a path relative to the repository root, e.g. `incidents/base.csv`: `make dev` reads it from the repository, Docker from `/app/incidents/base.csv`, where `compose.yaml` mounts `incidents/` read-only. The file must be readable by every user (the container runs as `nobody`). Read on the first check and kept: restart the backend after changing it. A match is shown next to the claims and never changes a verdict. |
 
-The model call has at most one retry and shares the check's time budget (`PRAWDOWID_CHECK_BUDGET_S`, 25 s), inside the API's 60 s limit. Provider
-errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns
-`cannot_check`. Both carry a Polish message and no claims.
+The extraction call has a 45 s provider request timeout and at most one SDK retry, but shares
+the 25 s whole-check deadline with URL fetching and per-claim checks, inside the API's 60 s
+limit. Extraction errors and a missing model key return `technical_error`; a
+model refusal returns `cannot_check`. Both carry a Polish message and no claims. Retrieval
+failures are reported per claim. A judge-model outage becomes `not_checked` with a limitation;
+a failed retry judgement can retain the first-pass assessment with a warning when first-pass
+candidates existed.
 
 ## Run
 
-Needs Docker with Compose.
+Needs Docker with Compose and an Anthropic key in ignored `.env` for live model calls.
+The model IDs listed above and in [architecture](docs/submission/architecture.md) are literal code
+defaults; availability of those IDs on your account is UNCONFIRMED. Without working model
+credentials, the UI opens but verification returns a technical notice.
 
 ```bash
 make up
@@ -62,6 +76,33 @@ make up
 Open http://localhost:8080. Stop with `make down`. Use another port with `make up PORT=9000`.
 
 Without `make`: `docker compose up --build -d`.
+
+The base stack forwards `GOOGLE_FACTCHECK_API_KEY` and already points the check log and source
+cache at a writable `/tmp` path, but **not** `TAVILY_API_KEY`: without it, step 2b (the only web
+search provider) returns "unavailable" for every claim. `EUVSDISINFO_API_KEY` is not forwarded
+either. To enable both from `.env`, run this instead of `make up` (the quoted heredoc contains
+variable names, not secret values):
+
+```bash
+docker compose -f compose.yaml -f - up --build -d <<'YAML'
+services:
+  backend:
+    environment:
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      EUVSDISINFO_API_KEY: ${EUVSDISINFO_API_KEY:-}
+YAML
+```
+
+Add `--profile discord` before `up`
+to start the bot too. Set `DISCORD_BOT_TOKEN` in `.env`, install the application in your Discord
+server with slash-command access, then use `/sprawdz tekst:`. Live Discord transport has not
+been verified in the saved eval; a token alone does not prove the bot is installed.
+
+For the local API, install [uv](https://docs.astral.sh/uv/getting-started/installation/), run
+`make install`, then `make dev`; `.env` is loaded by that target. Open the API docs at
+http://127.0.0.1:8000/docs. In another terminal, `make discord` loads the same `.env` and calls
+the local API. This path does not serve the web frontend. PostgreSQL is optional and disabled
+in checks; do not seed it until source permissions are confirmed.
 
 Public deployment with HTTPS on a server: [docs/deploy.md](docs/deploy.md).
 
@@ -134,6 +175,14 @@ back as 422 with a Polish message in `detail[0].msg`.
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
 their own copy of the labels.
+
+## Submission drafts
+
+Submission drafts: [description](docs/submission/description.md),
+[architecture and exact test results](docs/submission/architecture.md),
+[sources](docs/submission/sources.md), [risks](docs/submission/risks.md),
+[cost](docs/submission/cost.md), [Polish slide outline](docs/submission/slides-outline.md).
+The PDF and demo video remain open human work under [#18](https://github.com/00200200/HackNation2026/issues/18).
 
 ## Pre-push gate
 
