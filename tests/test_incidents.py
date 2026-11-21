@@ -1,17 +1,19 @@
 """Scenario I matcher. INCIDENTS below is a test-only fixture, never shipped as data."""
 
+import asyncio
 import json
 
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
 from prawdowid import app as app_module
-from prawdowid import verifier
+from prawdowid import judge, rerank, verifier
 from prawdowid.app import app, limiter
-from prawdowid.contract import CheckResult, IncidentMatch, MatchKind, Status
-from prawdowid.discord_bot import render
+from prawdowid.contract import CheckResult, IncidentMatch, MatchKind, Status, Verdict
+from prawdowid.discord_bot import ask_api, render
 from prawdowid.incidents import (
     INCIDENTS_PATH,
     Incident,
@@ -21,6 +23,7 @@ from prawdowid.incidents import (
 from prawdowid.link import Page, Refusal
 from prawdowid.verifier import agent
 from tests.test_app import MIXED
+from tests.test_pipeline import QUOTE, every_fragment, fake_search, model, supports_all
 
 INCIDENTS = (
     Incident(
@@ -59,6 +62,46 @@ def test_text_similarity_match_on_one_sentence_of_a_longer_text():
 def test_unrelated_text_and_empty_base_match_nothing():
     assert match_incidents("Polska jest w UE od 2004 roku.", INCIDENTS) == []
     assert match_incidents("https://fake-news.example/drony", ()) == []
+
+
+def test_short_or_different_texts_never_match_on_characters_alone():
+    # Character ratio 0.76: accepting refugees is not annexing territory.
+    assert match_incidents("Polska przyjmie uchodźców z Ukrainy.", INCIDENTS) == []
+    assert match_incidents("Polska przekaże uchodźcom z Ukrainy", INCIDENTS) == []
+    # Ratio 0.89, but four letters are no narrative.
+    assert match_incidents("test", (Incident(id="S", text="tekst"),)) == []
+    assert (
+        match_incidents("Polska przejmie zachodnią Ukrainę!", INCIDENTS)[0].incident_id
+        == "TEST-2"
+    )
+
+
+def test_inflected_and_slogan_texts_still_match():
+    base = (
+        Incident(id="R", text="Rosja wysyła drony nad Polskę."),
+        Incident(id="S", text="Szczepionki powodują autyzm."),
+    )
+    for text, expected in [
+        ("Rosja wysłała drona nad Polskę.", "R"),
+        ("Szczepionki powodują autyzm!", "S"),
+    ]:
+        assert [m.incident_id for m in match_incidents(text, base)] == [expected]
+
+
+def test_url_parentheses_are_kept_unless_they_wrap_the_link():
+    base = (
+        Incident(id="P", text="X.", url="https://pl.wikipedia.org/wiki/Dron_(wojsko)"),
+    )
+    for text in (
+        "https://pl.wikipedia.org/wiki/Dron_(wojsko)",
+        "Patrz https://pl.wikipedia.org/wiki/Dron_(wojsko).",
+        "(źródło: https://pl.wikipedia.org/wiki/Dron_(wojsko)).",
+        "Zobacz „https://pl.wikipedia.org/wiki/Dron_(wojsko)”.",
+        "Zobacz »https://pl.wikipedia.org/wiki/Dron_(wojsko)«.",
+    ):
+        assert [m.incident_id for m in match_incidents(text, base)] == ["P"], text
+    [m] = match_incidents("(zobacz http://www.fake-news.example/drony)", INCIDENTS)
+    assert m.matched_on == MatchKind.URL
 
 
 def test_shipped_base_is_empty():
@@ -174,3 +217,76 @@ def test_discord_renders_the_warning_only_when_there_is_a_match():
         in text
     )
     assert "nie zmienia oceny" in text
+
+
+DRONES = "Drony nad Polską to ukraińska prowokacja z rosyjskimi dronami."
+
+
+@pytest.mark.parametrize(
+    "text, matched_on",
+    [
+        (DRONES, MatchKind.TEXT),
+        ("Zobacz https://fake-news.example/drony i oceń.", MatchKind.URL),
+    ],
+)
+def test_scenario_i_warning_next_to_an_evidence_verdict_on_both_channels(
+    monkeypatch, text, matched_on
+):
+    """Scenario I acceptance, offline: fixed evidence gives a real verdict, the incident warning
+    is added on web and Discord, and verdict and evidence are those of a text with no match."""
+    limiter.reset()
+    monkeypatch.setattr(
+        app_module, "match_incidents", lambda t: match_incidents(t, INCIDENTS)
+    )
+    fake_search(monkeypatch)
+    extraction = verifier.Extraction(
+        claims=[
+            verifier.ExtractedClaim(
+                claim="Drony to ukraińska prowokacja.",
+                kind=MIXED.claims[0].kind,
+                source_sentence="Drony to ukraińska prowokacja.",
+                checkable=True,
+                reason="Da się sprawdzić.",
+                queries=["drony prowokacja"],
+            )
+        ],
+        other_claims=[],
+        unclear=False,
+    )
+
+    async def via_discord(t):
+        transport = httpx2.ASGITransport(app=app)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://api") as c:
+            return await ask_api(t, c)
+
+    def same(claims):
+        # Everything but the fetch time of the (fake) pages, which runs per check.
+        return [
+            c.model_dump(exclude={"sources": {"__all__": {"fetched_at"}}})
+            for c in claims
+        ]
+
+    def web(t):
+        return CheckResult.model_validate(
+            TestClient(app).post("/api/checks", json={"input": t}).json()
+        )
+
+    with (
+        agent.override(model=model(lambda _: extraction.model_dump_json())),
+        rerank.agent.override(model=model(every_fragment)),
+        judge.agent.override(model=model(supports_all)),
+    ):
+        plain = web("Fakt bez incydentu.")
+        results = [web(text), asyncio.run(via_discord(text))]
+
+    assert plain.incident_matches == []
+    [claim] = plain.claims
+    assert claim.verdict is Verdict.CONFIRMED
+    assert {s.fragment for s in claim.sources} == {QUOTE}
+    for result in results:
+        assert [(m.incident_id, m.matched_on) for m in result.incident_matches] == [
+            ("TEST-1", matched_on)
+        ]
+        assert same(result.claims) == same(plain.claims)
+        shown = render(result)
+        assert "### Podobne znane incydenty" in shown and QUOTE in shown
