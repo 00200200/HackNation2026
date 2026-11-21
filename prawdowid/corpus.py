@@ -3,7 +3,8 @@
     uv run python -m prawdowid.corpus [--target 120]
 
 Pages go to the PostgreSQL store (`prawdowid/cache.py`) when `DATABASE_URL` is set, else to the
-local JSONL cache. This script is the only writer of the database; checks never write to it. With the database, expired pages are deleted first (retention).
+local JSONL cache, which keeps text only for a domain with a confirmed licence (none yet), so that
+fallback holds metadata only. This script is the only writer of the database; checks never write to it. With the database, expired pages are deleted first (retention).
 `corpus/manifest.jsonl` (committed) lists every stored document without its text (url, publisher,
 domain, type, licence, dates), so the source list stays auditable. Page text from the database is
 never exported: retention and deletion in the database cover every stored copy.

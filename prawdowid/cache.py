@@ -164,7 +164,7 @@ def delete_document(url: str, path: Path = CACHE_PATH) -> bool:
 def _write(path: Path, docs: list[Document]) -> None:
     """Rewrite the file. Text of unlicensed records is dropped here, old records included."""
     # ponytail: whole-file rewrite, one writer process at a time (two concurrent savers can
-    # lose a record). Fine for the demo corpus; the Supabase store (#19) replaces it.
+    # lose a record). Fine for the demo cache; the licensed corpus goes to the PostgreSQL store.
     docs = [d if d.licence else d.model_copy(update={"text": ""}) for d in docs]
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")

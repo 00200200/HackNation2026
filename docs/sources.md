@@ -36,8 +36,11 @@ do not redistribute page content. Controls on the database:
 - Retention: `delete_after` defaults to 90 days after the page was stored (UNCONFIRMED: the team
   has not set the period; #17). `select delete_expired_documents()` deletes expired pages and their
   chunks; the seed script runs it first.
-- Access: the database is reachable only on the compose network and on 127.0.0.1; no service is
-  given `DATABASE_URL`, only the seed script on the host.
+- Access: the database is reachable only on the compose network and on 127.0.0.1; in the local
+  stack no service is given `DATABASE_URL`, only the seed script on the host. In production,
+  `compose.prod.yaml` gives the backend `DATABASE_URL` for its own `db` service, which has no step
+  2c schema; checks never call `search_documents`, so nothing reads it today. Before step 2c is
+  enabled the two need separate variables or one shared schema (open, team decision).
 - Deletion: `delete from documents where doc_id = '<canonical url>'` removes one page and its
   chunks. To delete only the local source store, run `docker compose -f compose.yaml --profile sourcedb rm -sf sourcedb`,
   then `docker volume rm <project>_sourcedb_data` (replace `<project>` with the Compose project name).

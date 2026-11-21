@@ -39,7 +39,8 @@ create index if not exists chunks_tsv on chunks using gin (tsv);
 create index if not exists documents_delete_after on documents (delete_after);
 
 -- Access control: the database is reachable only on the compose network and on 127.0.0.1
--- (compose.yaml). No service gets DATABASE_URL; only the seed script on the host connects.
+-- (compose.yaml). No local service gets DATABASE_URL; only the seed script on the host connects.
+-- compose.prod.yaml gives the backend DATABASE_URL for its own db, without this schema.
 
 -- Deletion procedure: drops expired pages (chunks go with them). The seed script runs it first.
 create or replace function delete_expired_documents()
