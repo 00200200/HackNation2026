@@ -9,7 +9,7 @@ Rules and jury criteria: `.claude/skills/hacknation-judging/SKILL.md`. Metrics: 
 
 ## Now (snapshot, edit in place)
 
-Updated: 2026-11-21 13:30, by Łukasz (via Claude).
+Updated: 2026-11-21, by Łukasz (Claude worker).
 
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
@@ -20,14 +20,14 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 
 | Branch | State |
 |---|---|
-| `main` / `origin/main` | at `d5aa35b` (pre-push gate). Local `main` is behind: `git pull` before branching. |
-| `feat/llm-verifier` | PydanticAI verifier (`b52c248`), prompt tweaks (`c27b642`), worklog, eval results. Pushed to `origin/feat/llm-verifier`, not merged into `main`. |
+| `main` / `origin/main` | at `7ee1410`: skeleton (#1), pre-push gate, PydanticAI verifier (#2), worklog and eval results (#3). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, quick, 4 example cases, commit `c27b642`, does not count for submission):
-macro_f1 0.33 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail), median latency 2.6 s,
-end_to_end 1.00, moderator_loop 0.00. Citation metrics, channel consistency and cost: not measured.
-Every case returns `brak wystarczających dowodów`: expected while there are no sources.
+**Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `7ee1410`, no corpus):
+macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail: no `security_events`, verdicts
+wrong), median latency 2.8 s, end_to_end 0.94 (fail: both J cases, no eval switch to simulate a failure). Citation metrics,
+channel consistency and cost: not measured (no corpus, no second channel, no `cost_usd`). Every checkable case returns
+`brak wystarczających dowodów`: expected while there are no sources.
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -35,11 +35,11 @@ Every case returns `brak wystarczających dowodów`: expected while there are no
 
 Basic requirements first: the jury gives no points for extras if one of these is missing.
 
-- [ ] Merge `feat/llm-verifier` into `main` (pushed, needs a PR and a team OK). Owner: Łukasz
+- [x] Merge `feat/llm-verifier` into `main` (#2, #3). Owner: Łukasz
 - [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: ?
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
 - [ ] Second channel (Discord or other allowed one; not Telegram/WeChat) on the same `verify()`. Owner: ?
-- [ ] Real eval set `evals/cases.jsonl`: ≥ 30 cases, scenarios A–E, G, I, J at least twice, labelled sources. Owner: ?
+- [x] Real eval set `evals/cases.jsonl`: 31 cases, scenarios A–E, G, I, J at least twice, labels from Demagog, Konkret24, EUvsDisinfo. Owner: Łukasz (Claude worker). Open: I cases use EUvsDisinfo, not the organiser's incident base (not available to us); EUvsDisinfo blocks automated fetch, so check I01–I03 labels by hand; J cases need a product eval switch to simulate a missing key or limit.
 - [ ] Contract gaps for metrics: `security_events`, `cost_usd` per answer. Owner: ?
 - [ ] Link input (fetch page, treat it as untrusted source text). Owner: ?
 - [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
@@ -56,6 +56,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #16 `evals/cases.jsonl` with 31 labelled cases, full eval on `7ee1410` committed (macro_f1 0.09).
 - 2026-11-21 Łukasz: linked the architecture board in README, committed the quick eval on `c27b642`, pushed `feat/llm-verifier`.
 - 2026-11-21 Łukasz: added this worklog and the CLAUDE.md rule to keep it current.
 - 2026-11-21 Łukasz: `c27b642` prompt keeps injected instructions out of claims, checks yes/no questions.
