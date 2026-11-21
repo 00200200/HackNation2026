@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import threading
 import time
 import urllib.request
 
@@ -42,6 +43,7 @@ PASSTHROUGH = (
 )
 
 _last_call = 0.0
+_turn = threading.Lock()  # concurrent cases still start one by one
 
 
 def supports(channel: str) -> bool:
@@ -51,10 +53,11 @@ def supports(channel: str) -> bool:
 def wait_turn() -> None:
     """Sleep so that consecutive requests respect the API rate limit."""
     global _last_call
-    delay = _last_call + MIN_INTERVAL_S - time.monotonic()
-    if delay > 0:
-        time.sleep(delay)
-    _last_call = time.monotonic()
+    with _turn:
+        delay = _last_call + MIN_INTERVAL_S - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+        _last_call = time.monotonic()
 
 
 def to_eval_shape(raw: dict) -> dict:
