@@ -26,10 +26,12 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 | `claude/deploy-config-43a484` | Deploy config: `compose.prod.yaml` (Caddy, HTTPS, Postgres with pgvector), `caddy/Caddyfile`, `.github/workflows/deploy.yml`, `docs/deploy.md`. Goes to `main` through a PR. |
 
-**Last eval** (`evals/results/latest.json`, quick, 4 example cases, commit `c27b642`, does not count for submission):
-macro_f1 0.33 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail), median latency 2.6 s,
-end_to_end 1.00, moderator_loop 0.00. Citation metrics, channel consistency and cost: not measured.
-Every case returns `brak wystarczających dowodów`: expected while there are no sources.
+**Last eval** (`evals/results/latest.json`, **full, no corpus**, 30 scored cases from `evals/cases.jsonl`, J01–J02 skipped,
+commit `3ce9bae`). Does **not** count for submission: the cache-corpus run is blocked (no corpus yet) and `coverage_ok` is false
+(J skipped). macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail: no `security_events`,
+verdicts wrong), median latency 4.1 s, end_to_end 1.00. Citation metrics, channel consistency and cost: not measured (no corpus,
+no second channel, no `cost_usd`). Every checkable case returns `brak wystarczających dowodów`, so abstention 1.00 shows nothing
+yet.
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -52,6 +54,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
   Michał. Branch `feat/eval-cases`: 41 cases in the mentor's question style, all five verdict classes; labels from
   Demagog ClaimReview ratings (fetched 2026-11-21) and official pages (NATO, MON, europa.eu); an independent label check
   ran and its findings are fixed. J cases fail until the fault switch below exists.
+- [ ] Second eval set (#16, PR #23): 32 cases with ids `FC-*` appended to `evals/cases.jsonl`, 30 scored (A8 B6 C2 D4 E3 G4 I3), labels from Demagog, Konkret24, EUvsDisinfo. Owner: Łukasz (Claude worker). **Not done:** (1) the cache-corpus run is BLOCKED: no corpus exists yet, so committed results are no-corpus runs and do not count for submission; (2) FC-J01–FC-J02 are `skip`ped, not scored, until the fault switch below exists; (3) FC-I01–FC-I03 are EUvsDisinfo stand-ins, not the organiser's incident base (not available to us).
 - [ ] Eval gaps to close once retrieval exists: C cases carry one Demagog rating each, not two credible sources
   disagreeing on the same measure; E cases put the injection in the submitted text, none in a fetched source page.
   Owner: ?
@@ -127,6 +130,10 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): merged `main` into `feat/16-eval-set` (PR #23); both eval sets kept, #16 cases renamed `FC-*` (73 cases). Quick eval on `69f1f82`: abstention 1.00, median 4.1 s, macro_f1 0.10, end_to_end 0.89.
+- 2026-11-21 Łukasz (Claude worker): #16 Codex review fixes on PR #23: `skip` field in `evals/run.py` (J01–J02 skipped, not scored), single-assertion inputs for B05, B06, B02, G01, G03, G04, A05, E02, new A08, I01–I03 marked as stand-ins; corpus run marked blocked. Full no-corpus eval on `3ce9bae`: macro_f1 0.09, end_to_end 1.00.
+- 2026-11-21 Łukasz (Claude worker): #16 `evals/cases.jsonl` with 31 labelled cases, full eval on `7ee1410` committed (macro_f1 0.09).
+- 2026-11-21 Łukasz (Claude worker): #16 merged `feat/5-self-contained-claims` (stack), full eval rerun on `d655078`: macro_f1 0.09, median latency 5.0 s.
 - 2026-11-21 Łukasz (Claude worker): merged `main` (#29 web UI) into `feat/5-self-contained-claims`; claim origin line and unchecked-claims list ported into the new UI. Quick eval on `6689ad6`: abstention 1.00, median 3.87 s, macro_f1 0.10, end_to_end 0.89 (no sources yet).
 - 2026-11-21 Łukasz (Claude worker): #5 review fixes on PR #22: reject hyperparameters below 1, latency numbers marked UNCONFIRMED, quote test fixture uses only names from its input.
 - 2026-11-21 Łukasz (Claude worker): #5 claims stand alone (pronouns, relative dates from the text), quotes split into attribution + quoted, queries per claim, top-N cap with `unchecked_claims`, source sentence shown in the UI. Branch `feat/5-self-contained-claims`.
