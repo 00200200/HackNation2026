@@ -7,10 +7,10 @@ the shared contract, the HTTP API and the web frontend.
 **Status:** the verifier sends the text to Claude (through PydanticAI) and gets back a list of
 claims, each marked checkable or not. The model never decides whether a claim is true. Each
 checkable claim then goes through `prawdowid/pipeline.py` in parallel with the others: Google Fact
-Check, web search on allowlisted domains and our own database (not connected yet, #19), then
+Check and web search on allowlisted domains (our own database, #19, is out of the pipeline for now), then
 rerank and a judge that labels quotes; the verdict is set in code (`judge.decide`). The whole check
 has one time budget (`PRAWDOWID_CHECK_BUDGET_S`, 25 s). A claim that runs out of time, or whose
-web search fails with Fact Check and the database unavailable too, comes back `not_checked` with the reason, never as a verdict. An
+web search and Fact Check both fail, comes back `not_checked` with the reason, never as a verdict. An
 opinion, forecast or question is `not_verifiable`. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to

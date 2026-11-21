@@ -159,13 +159,12 @@ def test_no_retry_without_time_left(monkeypatch, models):
     result = check(claim, ["model 1"], budget_s=pipeline.RETRY_MIN_S - 1)
     assert seen == ["model 1"]
     assert "retry_web" not in result.steps_ms
-    # Fact Check without a key, web empty, database not connected: no verdict.
+    # Fact Check without a key and web empty: no verdict.
     assert result.judgement.verdict is Verdict.NOT_CHECKED
     assert result.judgement.limitations == [
         pipeline.SOURCES_FAILED,
         pipeline.factcheck.LOOKUP_UNAVAILABLE,
         websearch.SEARCH_UNAVAILABLE,
-        pipeline.DATABASE_NOT_CONNECTED,
     ]
 
 

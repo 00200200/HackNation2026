@@ -1,8 +1,8 @@
 """Steps 2 to 5 for one claim, under the time budget of the whole check.
 
-Step 2 runs three lookups at once: 2a Google Fact Check (`factcheck.search_claims`), 2b web search
-and fetch (`websearch.search_web`, one search per query of the claim) and 2c our own database
-(`search_database`). Their candidates go to step 3 (`rerank.rerank`, the linked page left out) and
+Step 2 runs two lookups at once: 2a Google Fact Check (`factcheck.search_claims`) and 2b web search
+and fetch (`websearch.search_web`, one search per query of the claim). Step 2c (our own database,
+#19) is out of the pipeline for now (team decision). The 2a and 2b candidates go to step 3 (`rerank.rerank`, the linked page left out) and
 steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
 remains, the web is searched once more with a rewritten query and the claim is judged again.
 
@@ -39,10 +39,6 @@ SOURCES_FAILED = (
     "Nie sprawdzono: żadne źródło nie zwróciło wyników ani nie odpowiedziało, "
     "więc nie wydajemy werdyktu."
 )
-DATABASE_NOT_CONNECTED = (
-    "Nasza baza źródeł nie jest jeszcze podłączona, "
-    "więc nie szukaliśmy w zapisanych wcześniej stronach."
-)
 
 
 class ClaimCheck(BaseModel):
@@ -50,12 +46,6 @@ class ClaimCheck(BaseModel):
     # Reranker and judge calls; None when a request may be billed but its price is unknown.
     cost_usd: float | None
     steps_ms: dict[str, int]
-
-
-async def search_database(claim: str) -> tuple[list[Source], str | None]:
-    """Step 2c. ponytail: the Supabase store (#19, `cache.search_documents`) is not in this branch
-    yet; this call site returns no sources and a limitation until it is merged."""
-    return [], DATABASE_NOT_CONNECTED
 
 
 async def check_claim(
@@ -101,7 +91,7 @@ async def check_claim(
             log.info("retry cut by the time limit claim=%r", claim)
             cut = True
 
-    if len(limits) == 3 and not candidates:  # 2a, 2b and 2c all failed
+    if len(limits) == 2 and not candidates:  # 2a and 2b both failed
         reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
         judgement = _not_checked(reason)
     # The main reason first, then what each source said.
@@ -116,24 +106,22 @@ async def check_claim(
 async def _retrieve(
     claim: str, queries: list[str], steps: dict[str, int]
 ) -> tuple[list[Source], dict[str, str]]:
-    """Steps 2a, 2b and 2c at once: candidates and the limitation of each failed source."""
-    lookup, webs, (db_sources, db_limit) = await asyncio.gather(
+    """Steps 2a and 2b at once: candidates and the limitation of each failed source."""
+    lookup, webs = await asyncio.gather(
         _timed(steps, "factcheck", _search_claims(claim)),
         _timed(
             steps,
             "web",
             asyncio.gather(*(_search_web(q) for q in queries or [claim])),
         ),
-        _timed(steps, "database", search_database(claim)),
+        # Step 2c plugs in here: `search_documents` on the #19 branch (not merged) when it is back in the pipeline.
     )
     documents = [d for w in webs for d in w.documents]
-    candidates = (
-        [h.source for h in lookup.hits]
-        + [d.to_source(fragment=d.text) for d in documents]
-        + db_sources
-    )
+    candidates = [h.source for h in lookup.hits] + [
+        d.to_source(fragment=d.text) for d in documents
+    ]
     web_limit = None if documents else next((w.limitation for w in webs), None)
-    limits = {"factcheck": lookup.limitation, "web": web_limit, "database": db_limit}
+    limits = {"factcheck": lookup.limitation, "web": web_limit}
     return candidates, {k: v for k, v in limits.items() if v}
 
 
