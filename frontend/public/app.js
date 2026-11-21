@@ -4,8 +4,6 @@ const input = document.getElementById("input");
 const submit = document.getElementById("submit");
 const formError = document.getElementById("form-error");
 const result = document.getElementById("result");
-const example = document.getElementById("przyklad");
-const chips = document.querySelectorAll("[data-example]");
 
 const SECURITY_NOTE = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
 const SOURCE_SECURITY_NOTE = "W źródłach są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
@@ -238,7 +236,6 @@ function calm() {
 // Resolves once the new content is in the DOM, so callers can scroll to it.
 function show(node) {
   const swap = () => {
-    example.hidden = true;
     document.body.classList.add("checked");
     result.replaceChildren(node);
   };
@@ -270,7 +267,7 @@ async function errorMessage(resp) {
 // screen readers may skip updates made while it is set, and the waiting notice should be heard.
 function setBusy(value) {
   busy = value;
-  [submit, ...chips].forEach((control) => control.setAttribute("aria-disabled", String(value)));
+  submit.setAttribute("aria-disabled", String(value));
 }
 
 // Cleared first so the same message is announced again on a repeated attempt.
@@ -304,7 +301,7 @@ form.addEventListener("submit", async (event) => {
   seconds.setAttribute("aria-hidden", "true");
   waiting.append(seconds);
   const timer = setInterval(() => { seconds.textContent = `${elapsed()} s`; }, 1000);
-  submit.textContent = "Sprawdzamy…";
+  submit.setAttribute("aria-label", "Sprawdzamy…");
   show(waiting).then(reveal);
   try {
     const headers = { "Content-Type": "application/json" };
@@ -324,7 +321,7 @@ form.addEventListener("submit", async (event) => {
     show(notice("Błąd połączenia", GENERIC_ERROR, NOT_A_VERDICT));
   } finally {
     clearInterval(timer);
-    submit.textContent = "Sprawdź";
+    submit.setAttribute("aria-label", "Sprawdź");
     setBusy(false);
   }
 });
@@ -337,11 +334,6 @@ input.addEventListener("keydown", (event) => {
   }
 });
 
-chips.forEach((chip) => chip.addEventListener("click", () => {
-  if (busy) return;
-  input.value = chip.dataset.example;
-  form.requestSubmit();
-}));
 
 // Demo session: the API issues an id on the first check; this tab sends it back and can delete it.
 const SESSION_KEY = "prawdowid-session";

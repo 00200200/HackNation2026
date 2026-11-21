@@ -198,6 +198,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał: web UI as one view in the pitch deck's crimson (Sherlock-cover cloth, white page): the name "faktczyfejk" with a glass magnifier and outlined echo, one box for text or a link, the answer with sources below. Example card, legend, chips and chat preview removed; logo and favicon recoloured.
 - 2026-11-21 Łukasz (Claude worker): eval history on `LukiLenkiewicz/eval-history` (`cc58dac`): every `evals/run.py`
   run now writes `evals/results/history/<timestamp>-<sha>-<mode>.json` (full report) and appends one row to
   `evals/results/HISTORY.md` (both tracked), plus a per-scenario/per-case-set (FC-* vs A-J) summary in the report;
