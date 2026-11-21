@@ -70,6 +70,14 @@ KIND_LABELS = {
     ClaimKind.ATTRIBUTION: "Kto co powiedział",
     ClaimKind.QUOTED: "Treść cytatu",
 }
+SECURITY_NOTE = (
+    "Treść zawierała polecenia skierowane do modelu. "
+    "Zignorowaliśmy je i sprawdziliśmy resztę."
+)
+SECURITY_NOTE_ONLY = (
+    "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je."
+)
+PAGE_NOTE = "Ta strona nie jest źródłem dowodów dla własnych twierdzeń."
 UNCHECKED_NOTE = (
     "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
     "Tych nie oceniliśmy. Możesz wkleić je osobno."
@@ -128,11 +136,32 @@ def render(check: CheckResult) -> str:
     # Statuses other than "ok" are notices, never verdicts.
     if check.status is not Status.OK:
         notice = f"**Brak oceny.** {_safe(check.message or '')}"
+        if check.security_events:
+            notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
         return "\n\n".join([notice, *warning])
     if not check.claims and not check.unchecked_claims:
         notice = "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
         return "\n\n".join([notice, *warning])
-    sections = warning + [_claim(n, c) for n, c in enumerate(check.claims, 1)]
+    sections = (
+        [f"**Polecenia dla modelu.** {SECURITY_NOTE}"] if check.security_events else []
+    )
+    if check.page:
+        p = check.page
+        meta = ", ".join(
+            part
+            for part in (
+                p.publisher and _safe(p.publisher),
+                p.published_at and p.published_at.isoformat(),
+            )
+            if part
+        )
+        sections.insert(
+            0,
+            f"Sprawdzony tekst pochodzi ze strony: {_safe(p.title or p.url)}"
+            + (f", {meta}" if meta else "")
+            + f" <{p.url}>. {PAGE_NOTE}",
+        )
+    sections += warning + [_claim(n, c) for n, c in enumerate(check.claims, 1)]
     if check.unchecked_claims:
         sections.append(
             "\n".join(

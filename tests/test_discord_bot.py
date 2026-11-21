@@ -14,6 +14,7 @@ from prawdowid.contract import (
     CheckResult,
     ClaimKind,
     ClaimResult,
+    SecurityEvent,
     Source,
     Status,
     Verdict,
@@ -114,6 +115,21 @@ def test_only_unchecked_claims_and_attribution_tag():
     claim = CHECK.claims[1].model_copy(update={"kind": ClaimKind.ATTRIBUTION})
     text = render(CheckResult(status=Status.OK, claims=[claim]))
     assert "-# [Kto co powiedział] W tekście:" in text
+
+
+def test_security_event_is_shown_first():
+    flagged = CHECK.model_copy(
+        update={"security_events": [SecurityEvent(location="input")]}
+    )
+    assert render(flagged).startswith("**Polecenia dla modelu.**")
+    assert "Polecenia dla modelu" not in render(CHECK)
+    only = CheckResult(
+        status=Status.NEEDS_CLARIFICATION,
+        message="Brak twierdzeń.",
+        security_events=[SecurityEvent(location="input")],
+    )
+    assert render(only).startswith("**Polecenia dla modelu.**")
+    assert "sprawdziliśmy resztę" not in render(only)
 
 
 def test_non_ok_status_is_a_notice_not_a_verdict():
@@ -218,3 +234,24 @@ def test_bot_refuses_to_start_without_token(monkeypatch):
     monkeypatch.delenv(discord_bot.TOKEN_ENV, raising=False)
     with pytest.raises(SystemExit, match="DISCORD_BOT_TOKEN is not set"):
         discord_bot.main()
+
+
+def test_render_names_the_checked_page():
+    from prawdowid.contract import CheckedPage
+
+    check = CHECK.model_copy(
+        update={
+            "page": CheckedPage(
+                url="https://news.example/a",
+                sha256="0" * 64,
+                title="Rząd *przyjął* projekt",
+                publisher="Gazeta",
+                published_at=date(2026, 11, 16),
+            )
+        }
+    )
+    first = render(check).split("\n\n")[0]
+    assert first.startswith(
+        "Sprawdzony tekst pochodzi ze strony: Rząd \\*przyjął\\* projekt"
+    )
+    assert "Gazeta, 2026-11-16 <https://news.example/a>" in first

@@ -8,6 +8,7 @@ from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
 from prawdowid import app as app_module
+from prawdowid import verifier
 from prawdowid.app import app, limiter
 from prawdowid.contract import CheckResult, IncidentMatch, MatchKind, Status
 from prawdowid.discord_bot import render
@@ -17,6 +18,7 @@ from prawdowid.incidents import (
     load_incidents,
     match_incidents,
 )
+from prawdowid.link import Page, Refusal
 from prawdowid.verifier import agent
 from tests.test_app import MIXED
 
@@ -123,15 +125,38 @@ def test_match_is_a_separate_field_and_verdicts_stay_the_same(client):
     assert matched["claims"] == plain["claims"]
 
 
-def test_link_keeps_its_notice_and_shows_the_match(client):
+def test_refused_link_keeps_its_notice_and_shows_the_match(client, monkeypatch):
+    async def refuse(url):
+        raise Refusal("Nie możemy pobrać tej strony.")
+
+    monkeypatch.setattr(verifier, "fetch_page", refuse)
     body = _check(client, "https://fake-news.example/drony")
     assert body["status"] == "cannot_check"
     assert body["claims"] == []
     assert body["incident_matches"][0]["matched_on"] == "url"
 
 
+def test_short_link_matches_on_the_final_url_after_redirects(client, monkeypatch):
+    async def fetched(url):
+        return Page(
+            url="https://fake-news.example/drony",
+            sha256="0" * 64,
+            title=None,
+            publisher=None,
+            published_at=None,
+            text="Fakt. Opinia.",
+        )
+
+    monkeypatch.setattr(verifier, "fetch_page", fetched)
+    body = _check(client, "https://short.example/x")
+    assert body["status"] == "ok"
+    assert [m["matched_on"] for m in body["incident_matches"]] == ["url"]
+
+
 def test_discord_renders_the_warning_only_when_there_is_a_match():
-    check = CheckResult(status=Status.CANNOT_CHECK, message="Nie obsługujemy linków.")
+    check = CheckResult(
+        status=Status.CANNOT_CHECK, message="Nie możemy pobrać tej strony."
+    )
     assert "incydent" not in render(check)
     check.incident_matches = [
         IncidentMatch(
