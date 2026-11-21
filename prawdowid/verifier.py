@@ -51,6 +51,10 @@ MODEL_FAILED = (
     "Nie udało się przeprowadzić sprawdzenia, bo model językowy nie odpowiedział. "
     "Spróbuj ponownie za chwilę."
 )
+TIMED_OUT = (
+    "Sprawdzenie trwało za długo, więc je przerwaliśmy. "
+    "Spróbuj ponownie albo wklej krótszy tekst."
+)
 MODEL_REFUSED = (
     "Model językowy odmówił analizy tego tekstu, więc nie możemy go sprawdzić."
 )
@@ -220,7 +224,15 @@ async def verify(text: str) -> CheckResult:
     if not is_link(text):
         return await verify_text(text, deadline=deadline)
     try:
-        page = await fetch_page(text)
+        async with asyncio.timeout_at(deadline) as budget:
+            page = await fetch_page(text)
+    except TimeoutError:
+        if not budget.expired():
+            raise
+        log.warning("link fetch cut by the check budget")
+        return CheckResult(
+            status=Status.TECHNICAL_ERROR, message=TIMED_OUT, cost_usd=0.0
+        )
     except Refusal as refusal:
         status = Status.TECHNICAL_ERROR if refusal.technical else Status.CANNOT_CHECK
         # No model request was sent.
@@ -257,7 +269,15 @@ async def verify_text(
     """`deadline` is `loop.time()` when the whole check must end; `exclude_url` the linked page."""
     started = time.perf_counter()
     try:
-        result = await agent.run(wrap(USER_TEXT, text))
+        # The extraction shares the check's budget: its own 45 s would overrun it.
+        async with asyncio.timeout_at(deadline) as budget:
+            result = await agent.run(wrap(USER_TEXT, text))
+    except TimeoutError:
+        if not budget.expired():
+            raise  # not our budget: the API answers with a technical error
+        # The cut request may still be billed: cost unknown.
+        log.warning("extraction cut by the check budget model=%s", MODEL)
+        return CheckResult(status=Status.TECHNICAL_ERROR, message=TIMED_OUT)
     # A failed or refused request may still be billed and reports no usage: cost unknown.
     except ContentFilterError:
         log.warning("model refused model=%s", MODEL)
