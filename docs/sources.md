@@ -11,22 +11,24 @@ goes to `corpus/manifest.jsonl` when the corpus is built with `uv run python -m 
 **The corpus is not built yet:** DuckDuckGo returned no results from our machine on 2026-11-21, and
 the team will replace the provider (#7, #8).
 
-What we store: the extracted page text, split into chunks for full-text search, goes to our local
-PostgreSQL (`documents`, `chunks`; schema in `db/migrations/`, compose service `db`) when
-`DATABASE_URL` is set, else to the local cache `corpus/docs.jsonl`. Neither is in the repo and we
-do not redistribute page content. The database starts empty; the team seeds it with `make db-seed`
-(`python -m prawdowid.corpus` with `DATABASE_URL` set; queries in `corpus/queries.txt`). Controls:
+What we store: web search saves the extracted text of every fetched page to the local cache
+`corpus/docs.jsonl`. Our own database (step 2c: local PostgreSQL, tables `documents` and `chunks`,
+schema in `db/migrations/`, compose service `db`) is **disabled in the pipeline** until the team
+chooses licensed sources: checks never read or write it. It starts empty; only the seed script
+writes to it (`make db-seed`, queries in `corpus/queries.txt`). Neither store is in the repo and we
+do not redistribute page content. Controls on the database:
 
-- Only pages found by web search are stored, never pages from links users submit.
+- Only pages found by the seed's web search are stored, never pages from links users submit.
 - Licence per document (`licence`, UNCONFIRMED until checked, see below).
 - Retention: `delete_after` defaults to 90 days after the page was stored (UNCONFIRMED: the team
   has not set the period; #17). `select delete_expired_documents()` deletes expired pages and their
   chunks; the seed script runs it first.
-- Access: the database is reachable only on the compose network and on 127.0.0.1; the backend is the
-  only service given `DATABASE_URL`.
+- Access: the database is reachable only on the compose network and on 127.0.0.1; no service is
+  given `DATABASE_URL`, only the seed script on the host.
 - Deletion: `delete from documents where doc_id = '<canonical url>'` removes one page and its
-  chunks. `docker compose down -v` deletes the whole database volume. Delete `corpus/docs.jsonl` to
-  clear the local cache.
+  chunks. `docker compose --profile db down -v` deletes the whole database volume. Delete
+  `corpus/docs.jsonl` to clear the local cache. After a seed, the database export for
+  `evals.run --corpus` is `corpus/db-export.jsonl`.
 
 Where the data is processed: on the machine that runs the compose stack.
 

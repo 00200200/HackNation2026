@@ -24,8 +24,8 @@ image; `docker compose` and `make dev` read it at start-up.
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
-| `DATABASE_URL` | no | none (Docker: the `db` service) | Postgres URI of the source store (step 2c). `make up` starts the `db` service and sets it for the backend. For `make dev`, run `make db` and set `postgresql://prawdowid:prawdowid@127.0.0.1:5433/prawdowid`. Without it, fetched pages go to `corpus/docs.jsonl` and the database search is skipped and reported as unavailable. |
-| `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `db` service (port bound to 127.0.0.1 only). Applies only when the volume is created (`docker compose down -v` to recreate); URL-safe characters only. The database starts empty: seed it with `make db-seed`. |
+| `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database and the backend runs without it. Start the database with `make db` (127.0.0.1:5433). |
+| `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `db` service (port bound to 127.0.0.1 only). Applies only when the volume is created (`docker compose --profile db down -v` to recreate); URL-safe characters only. The database starts empty: seed it with `make db-seed`. |
 
 The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
 errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns

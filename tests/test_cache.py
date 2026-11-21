@@ -1,6 +1,7 @@
 import asyncio
 import time
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 import httpx2
 import psycopg
@@ -11,8 +12,8 @@ from prawdowid.cache import (
     Document,
     build_tsquery,
     group_by_document,
-    save_document,
     search_documents,
+    store_document,
 )
 from prawdowid.rerank import split_all
 from tests.test_websearch import html
@@ -129,7 +130,7 @@ def test_group_by_document_keeps_rank_order():
 def test_failed_database_save_never_raises(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
     monkeypatch.setattr(psycopg, "connect", connect_failing([]))
-    assert save_document(doc()) is False
+    assert store_document(doc()) is False
 
 
 class FakeConnection:
@@ -161,7 +162,9 @@ def test_database_save_writes_document_and_chunks(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
     conn = FakeConnection(returned_id=7)
     monkeypatch.setattr(psycopg, "connect", lambda *a, **k: conn)
-    assert save_document(doc("http://www.gov.pl/web/kas/sankcje/?utm_source=x")) is True
+    assert (
+        store_document(doc("http://www.gov.pl/web/kas/sankcje/?utm_source=x")) is True
+    )
 
     timeout, insert, chunks = conn.statements
     assert "statement_timeout" in timeout[0]
@@ -174,8 +177,16 @@ def test_known_url_is_not_saved_twice(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
     conn = FakeConnection(returned_id=None)
     monkeypatch.setattr(psycopg, "connect", lambda *a, **k: conn)
-    assert save_document(doc()) is False
+    assert store_document(doc()) is False
     assert len(conn.statements) == 2  # no chunk insert
+
+
+def test_checks_never_write_to_the_database(monkeypatch, tmp_path):
+    """Step 2c is disabled: web search saves only to the JSONL cache, even with DATABASE_URL."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
+    monkeypatch.setattr(psycopg, "connect", connect_failing(calls := []))
+    assert cache.save_document(doc(), tmp_path / "docs.jsonl") is True
+    assert calls == []
 
 
 def test_user_submitted_link_page_is_never_saved(monkeypatch):
@@ -219,3 +230,40 @@ def test_slow_store_does_not_hold_up_web_search(monkeypatch):
     result, elapsed = asyncio.run(go())
     assert len(result.documents) == 1
     assert elapsed < 0.3
+
+
+def test_seed_is_the_only_database_writer(monkeypatch):
+    from prawdowid import corpus
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
+    monkeypatch.setattr(corpus, "queries", lambda: ["sankcje"])
+    monkeypatch.setattr(corpus, "ALLOWLIST", {"gov.pl": None})
+    monkeypatch.setattr(corpus, "stored_documents", list)
+    stored, saves = [], []
+
+    async def fake_search(query, *, domains, limit, save):
+        saves.append(save)
+        return websearch.WebSearch(documents=[doc()])
+
+    monkeypatch.setattr(corpus, "search_web", fake_search)
+    monkeypatch.setattr(corpus, "store_document", stored.append)
+    asyncio.run(corpus.build(target=10))
+    assert saves == [False]
+    assert [d.url for d in stored] == [doc().url]
+
+
+def test_seed_export_leaves_the_check_cache_alone(monkeypatch, tmp_path):
+    from prawdowid import corpus
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
+    monkeypatch.chdir(tmp_path)
+    cache_file = tmp_path / "corpus" / "docs.jsonl"
+    cache.save_document(doc("https://www.gov.pl/from-a-check"), cache_file)
+    monkeypatch.setattr(corpus, "stored_documents", lambda: [doc()])
+    corpus.write_manifest()
+    assert [d.url for d in cache.load_documents(cache_file)] == [
+        "https://www.gov.pl/from-a-check"
+    ]
+    assert [d.url for d in cache.load_documents(Path("corpus/db-export.jsonl"))] == [
+        doc().url
+    ]

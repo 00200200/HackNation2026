@@ -2,11 +2,11 @@
 
     uv run python -m prawdowid.corpus [--target 120]
 
-Pages go to the source cache (`prawdowid/cache.py`): the Postgres database when `DATABASE_URL` is
-set, else the local JSONL file. With the database, expired pages are deleted first (retention).
+Pages go to the PostgreSQL store (`prawdowid/cache.py`) when `DATABASE_URL` is set, else to the
+local JSONL cache. This script is the only writer of the database; checks never write to it. With the database, expired pages are deleted first (retention).
 `corpus/manifest.jsonl` (committed) lists every stored document without its text (url, publisher,
 domain, type, licence, dates), so the source list stays auditable. With the database it also
-exports the full text to `corpus/docs.jsonl` for `evals.run --corpus`.
+exports the full text to `corpus/db-export.jsonl` for `evals.run --corpus`.
 """
 
 import argparse
@@ -17,10 +17,19 @@ import os
 from collections import Counter
 from pathlib import Path
 
-from prawdowid.cache import CACHE_PATH, DATABASE_ENV, delete_expired, load_documents
+from prawdowid.cache import (
+    DATABASE_ENV,
+    delete_expired,
+    load_documents,
+    store_document,
+    stored_documents,
+)
 from prawdowid.websearch import ALLOWLIST, search_web
 
 MANIFEST = Path("corpus/manifest.jsonl")
+# Full-text export of the database for `evals.run --corpus` (ignored by git). Not CACHE_PATH:
+# web search keeps appending to that file during checks.
+EXPORT = Path("corpus/db-export.jsonl")
 # Seed queries, one per line; "#" starts a comment. Committed so the seed is reproducible.
 QUERIES = Path("corpus/queries.txt")
 
@@ -30,25 +39,37 @@ def queries(path: Path = QUERIES) -> list[str]:
     return [line for line in lines if line and not line.startswith("#")]
 
 
+def _use_database() -> bool:
+    return bool(os.getenv(DATABASE_ENV))
+
+
 async def build(target: int) -> None:
+    documents = stored_documents if _use_database() else load_documents
     for topic in queries():
         for domain in ALLOWLIST:
-            if len(load_documents()) >= target:
+            if len(documents()) >= target:
                 return
-            result = await search_web(topic, domains=[domain], limit=5)
+            # The seed is the only writer of the database: search itself saves only to JSONL.
+            result = await search_web(
+                topic, domains=[domain], limit=5, save=not _use_database()
+            )
+            if _use_database():
+                for d in result.documents:
+                    await asyncio.to_thread(store_document, d)
             print(f"{domain:22} {topic:32} {len(result.documents)} docs")
 
 
 def write_manifest() -> None:
-    docs = load_documents()
-    if os.getenv(DATABASE_ENV):
-        # Full-text export of the database for `evals.run --corpus` (ignored by git).
-        CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with CACHE_PATH.open("w", encoding="utf-8") as f:
+    if _use_database():
+        docs = stored_documents()
+        EXPORT.parent.mkdir(parents=True, exist_ok=True)
+        with EXPORT.open("w", encoding="utf-8") as f:
             for d in docs:
                 f.write(
                     json.dumps(d.model_dump(mode="json"), ensure_ascii=False) + "\n"
                 )
+    else:
+        docs = load_documents()
     MANIFEST.parent.mkdir(parents=True, exist_ok=True)
     with MANIFEST.open("w", encoding="utf-8") as f:
         for d in docs:
@@ -65,7 +86,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", type=int, default=120)
     logging.basicConfig(level=logging.WARNING)
-    if os.getenv(DATABASE_ENV):
+    if _use_database():
         print(f"retention: {delete_expired()} expired documents deleted")
     asyncio.run(build(parser.parse_args().target))
     write_manifest()

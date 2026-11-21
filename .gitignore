@@ -231,3 +231,4 @@ CLAUDE.local.md
 
 # Source cache: full page text, local only (see prawdowid/cache.py)
 corpus/docs.jsonl
+corpus/db-export.jsonl

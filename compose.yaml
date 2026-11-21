@@ -5,8 +5,6 @@ services:
     # Compose reads these from the ignored .env at start-up; they are never part of the image.
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      # Always the compose database; DATABASE_URL in .env is for `make dev` on the host.
-      DATABASE_URL: postgresql://prawdowid:${POSTGRES_PASSWORD:-prawdowid}@db:5432/prawdowid
       PRAWDOWID_MODEL: ${PRAWDOWID_MODEL:-}
       PYDANTIC_AI_NO_BANNER: "1"
     healthcheck:
@@ -15,16 +13,15 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
-    # Started, not healthy: without the database a check still runs and says so (scenario J).
-    depends_on:
-      db:
-        condition: service_started
 
-  # Step 2c source store. Starts empty: the team seeds it with `make db-seed`.
-  # Schema from db/migrations/ on first start of the volume. Port bound to 127.0.0.1 only, for
-  # `make dev`. The default password is for this local-only database; POSTGRES_PASSWORD applies
-  # only when the volume is created (`docker compose down -v` to recreate), URL-safe characters only.
+  # Step 2c source store, opt-in (`make db`). Step 2c is disabled in the pipeline until licensed
+  # sources are chosen (user decision), so the backend gets no DATABASE_URL and never needs it.
+  # Starts empty: the team seeds it with `make db-seed`. Schema from db/migrations/ on first start
+  # of the volume. Port bound to 127.0.0.1 only. The default password is for this local-only
+  # database; POSTGRES_PASSWORD applies only when the volume is created (`docker compose
+  # --profile db down -v` to recreate), URL-safe characters only.
   db:
+    profiles: [db]
     image: postgres:17
     restart: unless-stopped
     environment:

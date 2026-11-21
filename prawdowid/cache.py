@@ -1,15 +1,18 @@
-"""Source cache and step 2c: every page fetched by web search, and full-text search over them.
+"""Source cache, and step 2c: our own PostgreSQL store with full-text search.
 
-With `DATABASE_URL` set (local PostgreSQL from compose.yaml, schema in `db/migrations/`) pages go
-to the `documents` and `chunks` tables and `search_documents` searches them per claim. Without it
-pages go to the local JSONL file `corpus/docs.jsonl` (ignored by git: full page text, not
-redistributed) and the database search reports itself unavailable, so the check goes on with
-steps 2a and 2b. The JSONL line format (`url`, `text`, ...) is what `evals.run --corpus` reads;
-`prawdowid.corpus` exports the database to it.
+Step 2c is **disabled in the pipeline** (user decision, 2026-11-21) until the team chooses licensed
+sources: checks never write to the database and nothing in `verify()` calls `search_documents`.
 
-Only web search (#8) calls `save_document`. Pages from links the user submits (#4) are never saved:
-they are fetched with `websearch.fetch_document`, which does not save.
+- `save_document` / `load_documents`: the local JSONL cache `corpus/docs.jsonl` (ignored by git:
+  full page text, not redistributed). Web search (#8) saves every fetched page here. Its line format
+  (`url`, `text`, ...) is what `evals.run --corpus` reads; the seed exports the database in the
+  same format to `corpus/db-export.jsonl`.
+- `store_document` / `stored_documents`: the PostgreSQL store (`DATABASE_URL`, schema in
+  `db/migrations/`). Only the seed script `prawdowid.corpus` writes to it.
+- `search_documents(claim)`: per-claim search of the store for rerank (#9). Without `DATABASE_URL`,
+  or when the database fails, it returns the "database unavailable" limitation, never a verdict.
 
+Pages from links the user submits (#4) are never saved: `websearch.fetch_document` does not save.
 psycopg 3: a document and its chunks go in one transaction, and the ranked search is one SQL query.
 """
 
@@ -123,12 +126,6 @@ class DatabaseSearch(BaseModel):
 
 
 def load_documents(path: Path = CACHE_PATH) -> list[Document]:
-    if os.getenv(DATABASE_ENV):
-        with _db() as conn:
-            rows = conn.execute(
-                f"select {_COLUMNS} from documents where delete_after > now() order by id"
-            )
-            return [Document(**row) for row in rows]
     if not path.exists():
         return []
     with path.open(encoding="utf-8") as f:
@@ -136,16 +133,7 @@ def load_documents(path: Path = CACHE_PATH) -> list[Document]:
 
 
 def save_document(doc: Document, path: Path = CACHE_PATH) -> bool:
-    """Store the document unless its URL is stored already. True when it was added.
-
-    A database failure is logged and returns False: losing one cached page never fails a check.
-    """
-    if os.getenv(DATABASE_ENV):
-        try:
-            return _insert(doc)
-        except psycopg.Error as exc:
-            log.warning("source store save failed %s: %r", doc.url, exc)
-            return False
+    """Append the document unless its URL is cached already. True when it was added."""
     # ponytail: rereads the file on every save; fine for a local demo cache.
     if any(d.url == doc.url for d in load_documents(path)):
         return False
@@ -153,6 +141,27 @@ def save_document(doc: Document, path: Path = CACHE_PATH) -> bool:
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(doc.model_dump(mode="json"), ensure_ascii=False) + "\n")
     return True
+
+
+def stored_documents() -> list[Document]:
+    """Every unexpired document in the database."""
+    with _db() as conn:
+        rows = conn.execute(
+            f"select {_COLUMNS} from documents where delete_after > now() order by id"
+        )
+        return [Document(**row) for row in rows]
+
+
+def store_document(doc: Document) -> bool:
+    """Insert the document and its chunks unless its doc id is stored. True when it was added.
+
+    A database failure is logged and returns False: losing one page never stops the seed.
+    """
+    try:
+        return _insert(doc)
+    except psycopg.Error as exc:
+        log.warning("source store save failed %s: %r", doc.url, exc)
+        return False
 
 
 def delete_expired() -> int:
