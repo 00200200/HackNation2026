@@ -1,0 +1,53 @@
+# Deploys the prod branch to the demo server: copies the checked-out code over SSH and rebuilds
+# the stack with the production overlay. Server setup, variables and the secret: docs/deploy.md.
+name: Deploy
+
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # A manual run started from any other branch must not put that branch on the demo.
+    if: github.ref == 'refs/heads/prod'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: /opt/faktczyfejk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Copy code
+        # .env and the Docker volumes exist only on the server; --delete drops files removed in git.
+        run: rsync -az --delete --exclude .git --exclude .env ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+
+      - name: Build and start
+        # --wait fails the job if a service does not become running or healthy in time.
+        # The reload picks up Caddyfile changes without dropping connections.
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose up -d --build --remove-orphans --wait --wait-timeout 300 && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile"
+
+      - name: Check HTTPS
+        # Caddy has no healthcheck, so this is what shows the certificate and the public path work.
+        run: curl -fsS --connect-timeout 10 --max-time 20 --retry 10 --retry-delay 3 --retry-all-errors "https://$DEPLOY_DOMAIN/health"
