@@ -4,6 +4,7 @@ const input = document.getElementById("input");
 const submit = document.getElementById("submit");
 const formError = document.getElementById("form-error");
 const result = document.getElementById("result");
+const chips = document.querySelectorAll("[data-example]");
 
 const SECURITY_NOTE = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
 const SOURCE_SECURITY_NOTE = "W źródłach są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
@@ -28,6 +29,18 @@ const SOURCE_TYPES = {
 };
 // First words of the answer, in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić…"),
 // picked from the verdict set in code. The reasons stay in the sources and limitations.
+const VERDICT_MEANING = {
+  confirmed: "Wiarygodne źródła mówią to samo.",
+  false: "Wiarygodne źródła mówią coś przeciwnego.",
+  misleading: "Fakty się zgadzają, ale bez kontekstu, czasu albo miejsca wprowadzają w błąd.",
+  insufficient_evidence: "Za mało źródeł, żeby rozstrzygnąć. Nie zgadujemy.",
+  not_verifiable: "Opinia, prognoza albo pytanie bez faktu do sprawdzenia.",
+  not_checked: "To nie jest ocena: źródła nie odpowiedziały albo zabrakło czasu.",
+};
+// A source older than this is flagged as archival, as the brief asks. Same default as the backend's
+// ARCHIVE_DAYS in prawdowid/judge.py, which then also lists it under "Czego nie ustaliliśmy".
+const ARCHIVAL_DAYS = 730;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const ANSWER_LEAD = {
   confirmed: "Tak.",
   false: "Nie.",
@@ -84,6 +97,10 @@ function sourceItem(s, i) {
   const title = url
     ? el("a", { href: url, textContent: `„${s.title}”`, rel: "noopener noreferrer", target: "_blank" })
     : `„${s.title}”`;
+  // published_at is a date (YYYY-MM-DD): read the year from the text, so no time zone can shift it.
+  const year = s.published_at ? Number(String(s.published_at).slice(0, 4)) : null;
+  const age = s.published_at ? (Date.now() - Date.parse(`${s.published_at}T00:00:00Z`)) / DAY_MS : NaN;
+  const archival = Boolean(year) && age > ARCHIVAL_DAYS;
   const meta = [
     host,
     s.published_at ? `opublikowano ${plDate(s.published_at)}` : "bez daty publikacji",
@@ -94,7 +111,9 @@ function sourceItem(s, i) {
     s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null,
     el("p", { className: "source-head" }, el("span", { className: "ref", textContent: `[${i + 1}]` }), " ",
       s.publisher ? el("b", { textContent: s.publisher }) : null, s.publisher ? ", " : null, title),
-    el("p", { className: "source-meta", textContent: meta }));
+    el("p", { className: "source-meta" },
+      archival ? el("span", { className: "archival", textContent: `materiał archiwalny, ${year}` }) : null,
+      archival ? " " : null, meta));
 }
 
 // Claims from a quote: who said it, and what was said. Plain statements get no tag.
@@ -125,7 +144,8 @@ function claimBlock(c) {
     el("h2", { className: "claim-text", textContent: `„${c.claim}”` }),
     origin(c),
     el("p", { className: "claim-meta" },
-      el("span", { className: `verdict verdict-${c.verdict}`, textContent: c.verdict_label })),
+      el("span", { className: `verdict verdict-${c.verdict}`, textContent: c.verdict_label }),
+      VERDICT_MEANING[c.verdict] ? el("span", { className: "verdict-meaning", textContent: VERDICT_MEANING[c.verdict] }) : null),
     el("p", { className: "answer", textContent: answerText(c) }),
     el("h3", { className: "part", textContent: "Co mówią źródła" }),
     c.sources.length
@@ -187,6 +207,21 @@ function incidentWarning(matches) {
     el("ul", {}, ...matches.map(incidentItem)));
 }
 
+// One chip per verdict with its count, so a long answer can be read at a glance.
+function summary(claims) {
+  const counts = new Map();
+  claims.forEach((c) => counts.set(c.verdict, { label: c.verdict_label, n: (counts.get(c.verdict)?.n ?? 0) + 1 }));
+  if (counts.size < 2) return null;
+  return el("p", { className: "summary" }, ...[...counts].map(([v, { label, n }]) =>
+    el("span", { className: `verdict verdict-${v} small`, textContent: `${n} × ${label}` })));
+}
+
+// Measured time, and the model cost the API reports for this answer (models only; search credits excluded).
+const USD = new Intl.NumberFormat("pl-PL", { style: "currency", currency: "USD", maximumFractionDigits: 4 });
+function costLine(seconds, cost) {
+  return typeof cost === "number" ? `w ${seconds} s, koszt modelu ${USD.format(cost)}` : `w ${seconds} s`;
+}
+
 function render(check, seconds) {
   const warning = incidentWarning(check.incident_matches);
   // Statuses other than "ok" are notices, never verdicts.
@@ -211,8 +246,10 @@ function render(check, seconds) {
     events.some((e) => e.location !== "source") ? notice("Polecenia dla modelu", SECURITY_NOTE) : null,
     events.some((e) => e.location === "source") ? notice("Polecenia w źródle", SOURCE_SECURITY_NOTE) : null,
     el("div", { className: "card-head" },
-      el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
-        el("span", { className: "took", textContent: `w ${seconds} s` })),
+      el("div", {},
+        el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
+          el("span", { className: "took", textContent: costLine(seconds, check.cost_usd) })),
+        summary(check.claims)),
       copyButton(check)),
     check.page ? pageNote(check.page) : null,
     warning,
@@ -267,7 +304,7 @@ async function errorMessage(resp) {
 // screen readers may skip updates made while it is set, and the waiting notice should be heard.
 function setBusy(value) {
   busy = value;
-  submit.setAttribute("aria-disabled", String(value));
+  [submit, ...chips].forEach((control) => control.setAttribute("aria-disabled", String(value)));
 }
 
 // Cleared first so the same message is announced again on a repeated attempt.
@@ -296,7 +333,7 @@ form.addEventListener("submit", async (event) => {
   setBusy(true);
   const started = Date.now();
   const elapsed = () => Math.max(1, Math.round((Date.now() - started) / 1000));
-  const waiting = notice("Sprawdzamy", "Analizujemy wiadomość.");
+  const waiting = notice("Sprawdzamy", "Szukamy w Google Fact Check, EUvsDisinfo, na www.gov.pl i w wyszukiwarce ograniczonej do zaufanych stron. Może to potrwać kilkadziesiąt sekund.");
   const seconds = el("p", { className: "note", textContent: "0 s" });
   seconds.setAttribute("aria-hidden", "true");
   waiting.append(seconds);
@@ -384,3 +421,12 @@ deleteSession.addEventListener("click", async () => {
 });
 
 if (storedSession()) sessionNote.hidden = false;
+
+chips.forEach((chip) => chip.addEventListener("click", () => {
+  if (busy) return;
+  input.value = chip.dataset.example;
+  fieldError("");
+  // The chips hide once a check starts, so keep keyboard focus in the box.
+  input.focus();
+  form.requestSubmit();
+}));
