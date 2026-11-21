@@ -24,6 +24,7 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `feat/7-search-provider` | #7 search provider research, WORKLOG only. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `feat/16-eval-set` | #16 eval set (31 cases) and full eval, stacked on `feat/5-self-contained-claims`. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue9-rerank` | #9 step 3 rerank and dedupe, stacked on `LukiLenkiewicz/issue13-discord` (PR #24). PR open, not merged. Owner: Łukasz (Claude worker). |
+| `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, stacked on `LukiLenkiewicz/issue9-rerank` (PR #25). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
 **Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `d655078` (#5 merged into #16), no corpus):
@@ -44,6 +45,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
   - [x] Step 3 (#9): `prawdowid/rerank.py`, per claim: drops the linked page (`exclude_url`) and repeated canonical URLs, splits page text into fragments of ≤ `PRAWDOWID_FRAGMENT_CHARS` (800), drops near-duplicates (word-trigram Jaccard ≥ 0.8), interleaves documents and sends at most `PRAWDOWID_RERANK_MAX_FRAGMENTS` (60), Claude Haiku via PydanticAI orders them, top `PRAWDOWID_RERANK_TOP_K` (12) kept with `doc_id` = canonical URL. Model failure or no key: unranked order plus a limitation. Not wired into `verify()` (#11). Ranking quality not measured, no key yet. Owner: Łukasz (Claude worker)
+  - [x] Steps 4 and 5 (#10): `prawdowid/judge.py`. Claude Sonnet via PydanticAI labels each reranked fragment supports/refutes/context with an exact quote, `doc_id` and the missing context it names; code drops quotes whose words (≥ 3, in order, whole words; case and punctuation ignored) are not in the title or fragment of the cited document, shows the document's own span, ignores a publisher that labels both sides and sets the verdict in `decide()` (table in its docstring). Model failure or no key: `brak wystarczających dowodów` plus a limitation. Not wired into `verify()` (#11), so scenarios A–D in the quick eval are not measured yet. Owner: Łukasz (Claude worker)
 - [x] Second channel (#13): Discord `/sprawdz` bot, `prawdowid/discord_bot.py`, calls the same `POST /api/checks` with `X-Channel: discord`, branch `LukiLenkiewicz/issue13-discord`. Not run against real Discord (token not used by the worker); eval `channel_consistency` needs `PRAWDOWID_EXTRA_CHANNELS=discord` and multi-channel cases. Owner: Łukasz (Claude worker)
 - [x] Real eval set `evals/cases.jsonl`: 31 cases, scenarios A–E, G, I, J at least twice, labels from Demagog, Konkret24, EUvsDisinfo. Owner: Łukasz (Claude worker). Open: I cases use EUvsDisinfo, not the organiser's incident base (not available to us); EUvsDisinfo blocks automated fetch, so check I01–I03 labels by hand; J cases need a product eval switch to simulate a missing key or limit.
 - [ ] Contract gaps for metrics: `security_events`, `cost_usd` per answer. Owner: ?
@@ -55,6 +57,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Decisions
 
+- 2026-11-21: Verdict rules (#10, `judge.decide`). A side counts when one `official`/`primary`/`fact_check` source or two independent publishers back it with a verified quote. Both sides count: `brak wystarczających dowodów`, conflict shown (scenario C). Named missing context counts: `wprowadzające w błąd` (B). Else refute: `fałszywe`, support: `potwierdzone`, nothing: `brak wystarczających dowodów`. Sources older than `PRAWDOWID_ARCHIVE_DAYS` (730) get an archival warning. Thresholds are UNCONFIRMED guesses; corpus source-type labels are not fixed yet.
 - 2026-11-21: Verdicts are per claim. One extraction call returns ranked, self-contained claims with a source sentence and search queries; the top `PRAWDOWID_MAX_CHECKED_CLAIMS` (default 5) come in full (source sentence, reason, queries) and get a verdict; every other claim comes as one short sentence in `unchecked_claims`, no verdict. Full detail for all claims took 83 s on a 4837-char text; this shape took 30.8 s. Queries per claim: `PRAWDOWID_QUERIES_PER_CLAIM` (default 3). Defaults are UNCONFIRMED guesses, not tuned. (#5)
 - 2026-11-21: **PROPOSED, needs team OK** (#7). Web search for step 2b: **Tavily** `/search` as the provider, called
   with `include_domains` (allowlist, `include_domains_mode=restrict`) and `language="pl"`, through the official
@@ -95,6 +98,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #10 `prawdowid/judge.py` steps 4 and 5, model labels with quotes, verdict rules in code, offline FunctionModel tests per rule. Branch `LukiLenkiewicz/issue10-judge`.
 - 2026-11-21 Łukasz (Claude worker): #9 `prawdowid/rerank.py` dedupe and rerank of evidence per claim (Claude Haiku listwise, stdlib dedupe), offline FunctionModel tests. Branch `LukiLenkiewicz/issue9-rerank`.
 - 2026-11-21 Łukasz (Claude worker): #13 merged `origin/feat/16-eval-set` (stack tip) into `LukiLenkiewicz/issue13-discord` (`59c3eaf`); Discord renders `kind`, `source_sentence` and `unchecked_claims` like the web form. Quick eval without an API key: every case `technical_error`, not committed.
 - 2026-11-21 Łukasz (Claude worker): #13 Discord bot (discord.py 2.7.1) on the same API and `verify()`, offline formatter and web/Discord consistency tests, `make discord`, compose profile `discord`. Branch `LukiLenkiewicz/issue13-discord`.
