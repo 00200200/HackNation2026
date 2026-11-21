@@ -304,7 +304,7 @@ async function errorMessage(resp) {
 // screen readers may skip updates made while it is set, and the waiting notice should be heard.
 function setBusy(value) {
   busy = value;
-  [submit, ...chips].forEach((control) => control.setAttribute("aria-disabled", String(value)));
+  [submit, ...chips, deleteSession].forEach((control) => control.setAttribute("aria-disabled", String(value)));
 }
 
 // Cleared first so the same message is announced again on a repeated attempt.
@@ -400,7 +400,8 @@ function rememberSession(id) {
 
 deleteSession.addEventListener("click", async () => {
   const id = storedSession();
-  if (!id) return;
+  // Not while a check runs: its response would bring the deleted session back.
+  if (!id || busy) return;
   deleteSession.disabled = true;
   try {
     const resp = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
@@ -410,6 +411,7 @@ deleteSession.addEventListener("click", async () => {
     if (!resp.ok) throw new Error(String(resp.status));
     storeSession(null);
     deleteSession.hidden = true;
+    input.focus();
     sessionStatus.textContent = "Usunęliśmy sprawdzenia z tej sesji.";
   } catch {
     sessionStatus.textContent = "Nie udało się usunąć sprawdzeń. Spróbuj ponownie za chwilę.";
