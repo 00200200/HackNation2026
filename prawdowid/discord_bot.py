@@ -333,7 +333,11 @@ class Bot(discord.Client):
                 await send(interaction, last, file=file)
             except discord.HTTPException:
                 log.exception("attachment refused")
-                await send(interaction, f"{last}\n\n{ATTACHMENT_FAILED}")
+                # Separate messages: `last` alone can fill Discord's 2000 characters.
+                # ATTACHED points to the file that failed, so the notice replaces it.
+                if last != ATTACHED:
+                    await send(interaction, last)
+                await send(interaction, ATTACHMENT_FAILED)
 
     async def setup_hook(self) -> None:
         # Created here so the client lives in the bot's event loop.

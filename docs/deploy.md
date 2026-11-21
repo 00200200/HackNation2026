@@ -21,7 +21,7 @@ there. No CI service is involved, and a failed deploy is retried on the next run
 | `caddy/Caddyfile` | HTTPS sites: `DOMAIN` and `www`, doc2json.pl and `www` |
 | `deploy/pull-deploy.sh` | deploys `origin/prod` when it moves |
 | `deploy/faktczyfejk-deploy.service`, `.timer` | run the script every minute as `ubuntu` |
-| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*` (never committed; deploys leave it alone) |
+| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*`, for the bot `COMPOSE_PROFILES`, `DISCORD_BOT_TOKEN` (never committed; deploys leave it alone) |
 
 ## What you need
 
@@ -175,6 +175,30 @@ The second answer must contain `"status":"ok"`. Without a valid Anthropic key it
 and run one check. On the server,
 `docker compose logs frontend | grep 'POST /api/checks' | tail -n 3` must show your public IPv4
 address, not a `172.x` one: that is the address the backend rate limit counts.
+
+## Discord bot
+
+The second channel, the `/sprawdz` bot (`prawdowid/discord_bot.py`), runs in the `discord`
+service. It uses the backend image and calls the backend at `http://backend:8000` over the Compose
+network, so it needs no port and no Caddy route. It is off until the server's `.env` has both
+lines:
+
+```
+COMPOSE_PROFILES=discord
+DISCORD_BOT_TOKEN=...
+```
+
+Both are needed because the deploy waits for every container: a bot started without a token exits,
+and that can fail the deploy. Apply with `docker compose up -d` in `/opt/faktczyfejk`, then check with
+`docker compose logs discord`: discord.py logs that it connected to the gateway. Install the bot in
+the test server with the OAuth2 URL Generator in the developer portal, scopes `bot` and
+`applications.commands`. The bot registers `/sprawdz` globally when it starts.
+
+A wrong token makes the bot exit and restart in a loop (`restart: unless-stopped`). The deploy's
+`--wait` may then pass or fail depending on timing, so after changing the token check that
+`docker compose ps discord` shows it `running` for more than a minute. To switch the bot off,
+remove `COMPOSE_PROFILES=discord` from `.env` and run `docker compose rm -sf discord`: without the
+profile Compose leaves a running bot container alone, even with `--remove-orphans`.
 
 ## Logs and status
 

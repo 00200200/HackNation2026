@@ -44,6 +44,34 @@ back as `nie sprawdzono` with the reason.
 - **Two channels, one API:** the web page and the Discord command `/sprawdz` call the same
   `POST /api/checks`.
 
+## Try it on Discord
+
+The second channel is a Discord bot with one command, `/sprawdz`. It sends your text to the same
+`POST /api/checks` as the web form and posts the same answer back as Discord messages.
+
+1. Join the test server: DISCORD_INVITE_URL (the team adds the link here once the server exists).
+2. In any channel there, type `/sprawdz`, pick the command, paste the text into `tekst` and press
+   Enter.
+3. The bot shows that it is thinking and answers within about a minute. A long answer comes as
+   several messages; if it needs more than five, the full answer is attached as `odpowiedz.md`.
+
+Answers are posted in the channel, so everyone on the server sees them. All Discord users share
+one rate limit of 10 checks a minute, because the API sees every check as coming from the bot.
+
+### If the bot is offline
+
+Then Discord counts as a demo adapter, which the brief's section 5 allows. You run the same code
+on your machine with your own bot:
+
+1. Create an application at https://discord.com/developers/applications, add a bot to it and put
+   its token in `.env` as `DISCORD_BOT_TOKEN`.
+2. Invite the bot to a server you own: OAuth2 → URL Generator, scopes `bot` and
+   `applications.commands`, then open the generated link.
+3. Run `make dev` in one terminal and `make discord` in another, or `make up DISCORD=1` for Docker.
+4. Use `/sprawdz` as above.
+
+One recorded run of the same question through both channels: [scenario G](docs/submission/scenario-g.md).
+
 Measured results live in [`evals/results/HISTORY.md`](evals/results/HISTORY.md), one row per eval
 run with its commit and notes. Read [`docs/eval-notes.md`](docs/eval-notes.md) before quoting a number.
 
@@ -131,7 +159,9 @@ and already points the check log and source cache at a writable `/tmp` path.
 Add `--profile discord` before `up`
 to start the bot too. Set `DISCORD_BOT_TOKEN` in `.env`, install the application in your Discord
 server with slash-command access, then use `/sprawdz tekst:`. Live Discord transport has not
-been verified in the saved eval; a token alone does not prove the bot is installed.
+been verified in the saved eval; a token alone does not prove the bot is installed. On the public
+server the bot runs once `.env` there sets `COMPOSE_PROFILES=discord` and the token
+([docs/deploy.md](docs/deploy.md#discord-bot)).
 
 For the local API, install [uv](https://docs.astral.sh/uv/getting-started/installation/), run
 `make install`, then `make dev`; `.env` is loaded by that target. Open the API docs at

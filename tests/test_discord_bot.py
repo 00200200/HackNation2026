@@ -461,9 +461,15 @@ def test_short_answer_is_sent_whole_without_attachment(monkeypatch):
 
 
 def test_refused_attachment_ends_with_a_notice(monkeypatch):
-    sent = slash(monkeypatch, five_claims(), refuse_files=True)
+    check = five_claims()
+    parts, _ = reply(check)
+    sent = slash(monkeypatch, check, refuse_files=True)
     assert all(f is None for _, f, _ in sent)
-    assert sent[-1][0].endswith(discord_bot.ATTACHMENT_FAILED)
+    # The notice replaces the pointer to the refused file, so the 5-message cap holds.
+    assert [t for t, _, _ in sent] == [*parts[:-1], discord_bot.ATTACHMENT_FAILED]
+    # Own message: the part before it can already be at Discord's limit (#59 review).
+    assert sent[-1][0] == discord_bot.ATTACHMENT_FAILED
+    assert all(len(text) <= MESSAGE_LIMIT for text, _, _ in sent)
 
 
 def test_render_names_the_checked_page():
@@ -486,3 +492,26 @@ def test_render_names_the_checked_page():
     )
     assert "projekt, Gazeta, 2026-11-16\n  <https://news.example/a>\n" in first
     assert first.endswith(discord_bot.PAGE_NOTE)
+
+
+def test_refused_attachment_notice_never_pushes_a_full_message_over_the_limit(
+    monkeypatch,
+):
+    """#59 review: the last part can sit at the limit when only a long URL needs the file."""
+    url = "https://example.com/" + "a" * 1990
+    claim = CHECK.claims[0].model_copy(
+        update={"sources": [CHECK.claims[0].sources[0].model_copy(update={"url": url})]}
+    )
+    notice_room = MESSAGE_LIMIT - len(discord_bot.ATTACHMENT_FAILED) - 2
+    while True:
+        check = CHECK.model_copy(update={"claims": [claim]})
+        parts, full = reply(check)
+        if len(parts[-1]) > notice_room:
+            break
+        claim = claim.model_copy(
+            update={"limitations": [*claim.limitations, "Ograniczenie " + "x" * 20]}
+        )
+    assert full is not None and len(parts) <= MAX_MESSAGES
+    sent = slash(monkeypatch, check, refuse_files=True)
+    assert all(len(text) <= MESSAGE_LIMIT for text, _, _ in sent)
+    assert [t for t, _, _ in sent] == [*parts, discord_bot.ATTACHMENT_FAILED]

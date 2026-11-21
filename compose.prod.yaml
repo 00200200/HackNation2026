@@ -55,6 +55,13 @@ services:
       db:
         condition: service_healthy
 
+  # Second channel, the Discord /sprawdz bot from compose.yaml (same image as the backend, calls it
+  # at backend:8000 over the Compose network). Runs only when the server's .env sets
+  # COMPOSE_PROFILES=discord and DISCORD_BOT_TOKEN: the deploy waits for every container, and a
+  # bot that exits for want of a token would fail each deploy.
+  discord:
+    restart: unless-stopped
+
   db:
     image: pgvector/pgvector:0.8.7-pg18
     restart: unless-stopped
