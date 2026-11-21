@@ -77,6 +77,25 @@ class ClaimResult(BaseModel):
         return self.verdict.label
 
 
+class MatchKind(StrEnum):
+    """How the input matched a known incident, strongest first."""
+
+    URL = "url"
+    DOMAIN = "domain"
+    TEXT = "text"
+
+
+class IncidentMatch(BaseModel):
+    """A known incident the input looks like (scenario I). Context only, never a verdict."""
+
+    incident_id: str
+    incident_text: str
+    matched_on: MatchKind
+    url: str | None = None
+    # Text similarity 0..1 (difflib ratio), only for a text match.
+    similarity: float | None = None
+
+
 class CheckedPage(BaseModel):
     """The page a link pointed to. Its own URL is never evidence for its own claims."""
 
@@ -111,6 +130,8 @@ class CheckResult(BaseModel):
     limitations: list[str] = []
     # Model tokens plus paid API calls for this answer; None when it cannot be known.
     cost_usd: float | None = None
+    # Shown next to the claims, also on a notice (a refused link): never sets or changes a verdict.
+    incident_matches: list[IncidentMatch] = []
 
     @model_validator(mode="after")
     def _non_ok_is_a_notice(self) -> "CheckResult":
