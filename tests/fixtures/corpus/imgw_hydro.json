@@ -1,0 +1,63 @@
+[
+ {
+  "opublikowano": "2026-04-17 08:45:56",
+  "stopień": "-1",
+  "data_od": "2026-04-17 08:46:51",
+  "data_do": "9999-12-31 23:59:59",
+  "prawdopodobienstwo": "90",
+  "numer": "21",
+  "biuro": "Biuro Prognoz Hydrologicznych we Wrocławiu, Wydział Prognoz i Opracowań Hydrologicznych w Poznaniu",
+  "zdarzenie": "Susza hydrologiczna",
+  "przebieg": "W związku z występującymi niskimi przepływami wody, w kolejnych dniach w zlewni górnej Warty z Liswartą, spodziewane jest dalsze utrzymywanie się przepływów wody poniżej SNQ.",
+  "komentarz": "Ostrzeżenie wydawane jest w sytuacji, gdy aktualne lub prognozowane wartości przepływu na stacjach wodowskazowych uznanych za reprezentatywne układają się poniżej SNQ przez minimum 10 dni w obrębie jednego obszaru hydrologicznego (który obejmuje grupę zlewni monitorowanych przez PSHM).",
+  "obszary": [
+   {
+    "wojewodztwo": "łódzkie",
+    "opis": "łódzkie, Warta górna z Liswartą, susza hydrologiczna",
+    "kod_zlewni": [
+     "Z_P_LD_1816",
+     "R_P_LD_18_A",
+     "Z_P_LD_18_A"
+    ]
+   },
+   {
+    "wojewodztwo": "opolskie",
+    "opis": "opolskie, Warta górna z Liswartą, susza hydrologiczna",
+    "kod_zlewni": [
+     "Z_P_OP_1816"
+    ]
+   },
+   {
+    "wojewodztwo": "śląskie",
+    "opis": "śląskie, Warta górna z Liswartą, susza hydrologiczna",
+    "kod_zlewni": [
+     "R_P_SL_18",
+     "Z_P_SL_18_B",
+     "Z_P_SL_18_A",
+     "Z_P_SL_1816"
+    ]
+   }
+  ]
+ },
+ {
+  "opublikowano": "2026-04-30 08:57:51",
+  "stopień": "-1",
+  "data_od": "2026-04-30 08:58:42",
+  "data_do": "9999-12-31 23:59:59",
+  "prawdopodobienstwo": "90",
+  "numer": "27",
+  "biuro": "Biuro Prognoz Hydrologicznych we Wrocławiu, Wydział Prognoz i Opracowań Hydrologicznych w Poznaniu",
+  "zdarzenie": "Susza hydrologiczna",
+  "przebieg": "W związku z występującymi niskimi przepływami wody, w kolejnych dniach w zlewni Iny, spodziewane jest dalsze utrzymywanie się przepływów wody poniżej SNQ.",
+  "komentarz": "Ostrzeżenie wydawane jest w sytuacji, gdy aktualne lub prognozowane wartości przepływu na stacjach wodowskazowych uznanych za reprezentatywne układają się poniżej SNQ przez minimum 10 dni w obrębie jednego obszaru hydrologicznego (który obejmuje grupę zlewni monitorowanych przez PSHM).",
+  "obszary": [
+   {
+    "wojewodztwo": "zachodniopomorskie",
+    "opis": "zachodniopomorskie, Ina i Płonia, susza hydrologiczna",
+    "kod_zlewni": [
+     "Z_P_ZP_198"
+    ]
+   }
+  ]
+ }
+]

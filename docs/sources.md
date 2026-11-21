@@ -1,5 +1,9 @@
 # Source list
 
+The committed evidence corpus (`corpus/evidence.jsonl`, built without any key from an audited
+catalogue of official sources and fact-checkers, searched by `prawdowid/corpus_search.py`) is
+described separately in [`docs/corpus.md`](corpus.md). This page covers web search and its cache.
+
 Web search (step 2b, `prawdowid/websearch.py`) only returns pages from the domains below. A host
 matches its own entry or the closest parent entry (`nik.gov.pl` falls under `gov.pl`). The list
 lives in `ALLOWLIST`; `tests/test_websearch.py` fails when a domain there is missing here.

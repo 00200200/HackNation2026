@@ -238,3 +238,6 @@ logs/
 # Scenario I incident base from the organiser: local only, mounted into the backend (compose.yaml)
 incidents/*
 !incidents/README.md
+
+# Corpus build: raw page cache (rebuilt by `make corpus`)
+corpus/.cache/

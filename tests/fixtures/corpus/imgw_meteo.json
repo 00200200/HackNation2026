@@ -1,0 +1,33 @@
+[
+ {
+  "id": "Sk20261121110027236",
+  "nazwa_zdarzenia": "Oblodzenie",
+  "stopien": "1",
+  "prawdopodobienstwo": "70",
+  "obowiazuje_do": "2026-11-22 08:00:00",
+  "obowiazuje_od": "2026-11-22 01:00:00",
+  "opublikowano": "2026-11-21 12:00:00",
+  "tresc": "Miejscami po opadach deszczu ze śniegiem i śniegu, mokre nawierzchnie dróg i chodników mogą ulegać oblodzeniu. Temperatura powietrza obniży się do -1°C, przy gruncie do -3°C.",
+  "komentarz": "Brak.",
+  "biuro": "Centralne Biuro Prognoz Meteorologicznych w Warszawie",
+  "teryt": [
+   "2263",
+   "3201",
+   "3203",
+   "3213",
+   "3215",
+   "3216",
+   "3261",
+   "2215",
+   "3209",
+   "2201",
+   "2202",
+   "2203",
+   "2205",
+   "2206",
+   "2208",
+   "2212",
+   "2213"
+  ]
+ }
+]

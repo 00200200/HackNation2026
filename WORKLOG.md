@@ -9,12 +9,22 @@ Rules and jury criteria: `.claude/skills/hacknation-judging/SKILL.md`. Metrics: 
 
 ## Now (snapshot, edit in place)
 
-Updated: 2026-11-21, by Łukasz (Claude worker), landing PR #40 (docs only).
+Updated: 2026-11-21 21:50, by Michał (via Claude, session "korpus").
 
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
 not → each checkable claim runs Fact Check and web search in parallel, then rerank and judge, verdict set in code (`prawdowid/pipeline.py`); non-checkable claims are
 `nie podlega weryfikacji`. Without keys and a corpus, every source fails and checkable claims come back `nie sprawdzono`. Links (#4, on `main` as #28): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls (incl. inline sign-in or subscribe walls), social media, URLs with a login or password, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Each check is kept as one masked record in the check log (#17); each link check logs URL (secret query values, userinfo and fragment redacted, also in the answer), content hash, claims and result to stdout.
+
+**Evidence corpus** (branch `claude/corpus-455bc1`, not merged, not wired into `verify()` yet): `make corpus`
+rebuilds `corpus/evidence.jsonl` from the audited source list `corpus/catalog.yaml` (robots.txt respected, 1 request/s per
+domain, page cache in `corpus/.cache/`). Build of 21.11: 2,988 records from 12 registered domains, official (gov.pl,
+CERT, Policja, Sejm ELI, IMGW, EU Official Journal, Odyseusz, GUS, SOK) and fact-checkers (Demagog, Pravda), 8.6 MB.
+Demagog (1,830 records, statements back to 01.2024) carries `claim`, verbatim `rating`, a justification fragment and
+`cited_links`; Odyseusz has 239 country profiles with the current MSZ notice and warning level.
+`make corpus-check` checks the brief's thresholds; `tests/test_corpus_build.py` checks the committed file. Sources,
+licences and limits: `docs/corpus.md`. Google Fact Check and EUvsDisinfo collectors are built but skipped until the
+keys are in `.env`.
 
 **Branches**
 
@@ -33,6 +43,7 @@ not → each checkable claim runs Fact Check and web search in parallel, then re
 | `LukiLenkiewicz/issue12-incidents` | #12 scenario I incident matcher (`prawdowid/incidents.py`), wired in `app.py` after `verify()`, never sets a verdict. Merged into `main` as #38. **Shipped empty** per the PR's own title: the organiser's incident file is not available yet, so the base is empty and nothing matches in practice. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue17-privacy` | #17 masking (`prawdowid/privacy.py`: e-mail, IBAN/NRB, card, PESEL, phone) before the extraction model and in every log, check log (`prawdowid/checklog.py`) with `DELETE /api/sessions/{id}` and a web "Usuń moje sprawdzenia" action, one `RETENTION_DAYS` = 30 across the check log, JSONL cache and source store, `docs/privacy.md`. Merged into `main` as #39. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue14-checklog` | #14 further check-log work (per-step latency, model calls, cost, security events, read back per session), on top of #39's already-shipped `checklog.py`. Merged into `main` as #43 (`8c6f396`). Owner: Łukasz (Claude worker). |
+| `claude/corpus-455bc1` | Evidence corpus (`corpus/evidence.jsonl`, `docs/corpus.md`) and corpus search (`prawdowid/index.py`, `prawdowid/corpus_search.py`, tables `corpus_*`), rebased on `main`. |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 | `claude/deploy-config-43a484` | Deploy config, merged into `main` as #32. |
 | `claude/pull-deploy` | Deploy by pulling `prod` on the server (`deploy/`), Actions workflow removed. |
@@ -58,6 +69,10 @@ Basic requirements first: the jury gives no points for extras if one of these is
   - [x] Code (#8): `prawdowid/websearch.py` (search on the allowlist, fetch, trafilatura extraction, PII masking of the query), `prawdowid/safefetch.py` (per-hop allowlist, public-IP check pinned at connect, robots.txt per hop, byte caps; for #4 to reuse), `prawdowid/cache.py` (local JSONL, metadata only until a licence is confirmed, 30-day retention, delete, swap point for #19), builder `python -m prawdowid.corpus`, source list `docs/sources.md` (licences UNCONFIRMED). Branch `feat/8-web-search`.
   - [x] Provider swap (#7/#8): DuckDuckGo (`ddgs`) replaced by **Tavily** `/search` (official API, `tavily-python`), `tavily_search` in `prawdowid/websearch.py`, same `SearchProvider` contract. Live-tested: 7/8 quick-eval cases now get ≥1 allowlisted source (was 0/8). `uv remove ddgs`, `uv add tavily-python`. Owner: Łukasz (Claude worker)
   - [ ] Build the corpus: **open**, now unblocked by the provider; `uv run python -m prawdowid.corpus` needs a `TAVILY_API_KEY` in the clone that runs it.
+  - [x] Evidence corpus, no key needed: `corpus/evidence.jsonl` (2,988 records, 12 domains, official + fact-checkers), Owner: Michał (session "korpus", branch `claude/corpus-455bc1`; needs a merge)
+- [ ] Keys into `.env`, then `make corpus`: Google Fact Check Tools API (`GOOGLE_FACTCHECK_API_KEY`, the same key `prawdowid/factcheck.py` needs) and EUvsDisinfo token (`EUVSDISINFO_TOKEN`, from the mentor). Owner: ?
+- [ ] The corpus is 8.6 MB of the 10 MB push limit. Growing it further (deeper Demagog archive, Google records) needs a split or a smaller text cap. Owner: ?
+- [ ] Corpus search: `prawdowid/index.py` loads `corpus/evidence.jsonl` into the `db` Postgres (chunks with local e5-large embeddings, HNSW and full-text indexes; `make index`), `prawdowid/corpus_search.py` `search_corpus()` returns hybrid hits as `Source` with a verbatim fragment. Done on `claude/corpus-455bc1`; open: run the index once on the server (`docs/deploy.md`, "Search index"), wire `search_corpus()` into `verify()` (verifier owner). Owner: Michał (session "korpus")
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
   - [x] Step 3 (#9): `prawdowid/rerank.py`, per claim: drops the linked page (`exclude_url`) and repeated canonical URLs (IDNA host, NFC, percent-encoding normalised; fetched text wins over a title-only hit for the same URL), reads at most `PRAWDOWID_RERANK_MAX_DOCUMENTS` (30) documents × `PRAWDOWID_RERANK_MAX_DOC_CHARS` (20k), splits page text into fragments of ≤ `PRAWDOWID_FRAGMENT_CHARS` (800), drops only exact duplicates (same words; a changed number, date or negation keeps both), interleaves documents and sends at most `PRAWDOWID_RERANK_MAX_FRAGMENTS` (60), Claude Haiku via PydanticAI orders them, top `PRAWDOWID_RERANK_TOP_K` (12) kept with `doc_id` = canonical URL. Model failure or no key: unranked order plus a limitation. Not wired into `verify()` (#11). Ranking quality not measured, no key yet. Owner: Łukasz (Claude worker)
@@ -173,9 +188,14 @@ Basic requirements first: the jury gives no points for extras if one of these is
   at least one allowlisted web source (was 0 of 8). (#7, #8)
 - 2026-11-21 (Michał): the VPS also hosts doc2json.pl (repo HackNation2026-2) behind this repo's Caddy, through the
   external Docker network `edge`; its site blocks live in `caddy/Caddyfile`. (`claude/caddy-doc2json`)
+- 2026-11-21 (Michał): Corpus search embeddings are computed locally with `intfloat/multilingual-e5-large` (fastembed, ONNX, MIT): no key, no per-query cost, text stays on the server. Hybrid ranking: pgvector cosine and Postgres full-text (`simple`, prefix terms) merged by reciprocal rank fusion. (`claude/corpus-455bc1`)
+- 2026-11-21: Corpus: `corpus/evidence.jsonl` in git is the auditable source of truth, rebuilt by `make corpus`; any search index is built from it. Full text only under a licence or terms that allow it, otherwise a fragment of at most 500 characters and the link. robots.txt and bot protection are always respected. Domains are counted with the Public Suffix List (all of www.gov.pl is one domain). (branch `claude/corpus-455bc1`)
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał (session korpus): corpus search on `claude/corpus-455bc1`: `prawdowid/index.py` (incremental load into Postgres, model change rebuilds), `prawdowid/corpus_search.py` (pgvector + full-text, reciprocal rank fusion, two chunks per document, limitation on failure), `prawdowid/embeddings.py` (fastembed, e5-large, local); tests against a real Postgres with pgvector when `TEST_DATABASE_URL` is set; `make index`, image carries the corpus, `models` volume.
+- 2026-11-21 Michał (session korpus): after review and the mentor's example Q&A: Demagog deepened to 15 feed pages with claim, verbatim rating, justification, cited links and (public statements only) claimant; Sejm ELI takes the base act or consolidated text, never an amendment, with the full act text; job adverts skipped; blocks stop every collector; failing sources keep their last records; lists and APIs refresh after their interval. 2,988 records, 12 domains, 8.6 MB.
+- 2026-11-21 Michał (session korpus): evidence corpus on `claude/corpus-455bc1`: polite HTTP client, collectors for gov.pl, CERT, Policja, Sejm ELI, IMGW, EU Official Journal (Cellar), Odyseusz, GUS, SOK, Demagog, Pravda, plus Google Fact Check and EUvsDisinfo (need keys); `corpus/catalog.yaml`, `make corpus`, `make corpus-check`, `docs/corpus.md`, offline tests on saved pages. 1,794 records, 12 domains.
 - 2026-11-21 Michał (via Claude): `claude/caddy-doc2json`: Caddy joins the `edge` network and serves doc2json.pl;
   doc2json.pl is active and Michał approved deploying it (relayed by the doc2json session).
 - 2026-11-21 Łukasz (Claude worker): fixed `compose.yaml` to forward `TAVILY_API_KEY` and `EUVSDISINFO_API_KEY` to the backend (PR #40's doc-only gap: base Compose had Google's key but not the other two); `docker compose config`/`--services` checked, pytest and ruff clean; removed the now-obsolete workaround text in README.md, `docs/submission/architecture.md` and `docs/submission/risks.md`. Branch `fix/compose-tavily-key`.

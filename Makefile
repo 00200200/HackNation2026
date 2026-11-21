@@ -1,10 +1,10 @@
 PORT ?= 8080
 export PORT
 
-.PHONY: help install dev discord test lint format check up down logs db db-migrate db-seed
+.PHONY: help install dev discord test lint format check up down logs db db-migrate db-seed corpus corpus-check index
 
 help: ## List targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-13s %s\n", $$1, $$2}'
 
 install: ## Install Python dependencies
 	uv sync
@@ -46,3 +46,12 @@ db-seed: ## Seed the running database from corpus/queries.txt through web search
 
 logs: ## Follow Docker logs
 	docker compose --profile discord logs -f
+
+corpus: ## Rebuild corpus/evidence.jsonl from corpus/catalog.yaml (fetches the sources, cached)
+	uv run $(if $(wildcard .env),--env-file .env) python -m corpus.build $(ARGS)
+
+corpus-check: ## Check corpus/evidence.jsonl against the brief's thresholds
+	uv run python -m corpus.check
+
+index: ## Load corpus/evidence.jsonl into Postgres for search (needs DATABASE_URL)
+	uv run $(if $(wildcard .env),--env-file .env) python -m prawdowid.index corpus/evidence.jsonl
