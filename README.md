@@ -27,7 +27,7 @@ image; `docker compose` and `make dev` read it at start-up.
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
 | `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database and the backend runs without it. Start the database with `make db` (127.0.0.1:5433). |
-| `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `db` service (port bound to 127.0.0.1 only). Applies only when the volume is created (`docker compose --profile db down -v` to recreate). The database starts empty: seed it with `make db-seed`. |
+| `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `sourcedb` service (port bound to 127.0.0.1 only). Applies only when its own `sourcedb_data` volume is created; see [deletion instructions](docs/sources.md). The database starts empty. `make db-seed` refuses until the team approves sources for full-text storage; see [the prerequisite](docs/sources.md#full-text-seed-approval). |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 
 The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider

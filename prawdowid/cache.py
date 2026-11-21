@@ -161,7 +161,7 @@ def store_document(doc: Document) -> bool:
     try:
         return _insert(doc)
     except psycopg.Error as exc:
-        log.warning("source store save failed %s: %r", doc.url, exc)
+        log.warning("source store save failed: %s", type(exc).__name__)
         return False
 
 
@@ -323,5 +323,7 @@ async def _search_with_retry(query: str, documents: int) -> list[dict] | None:
         try:
             return await asyncio.to_thread(_search, query, documents)
         except psycopg.Error as exc:
-            log.warning("database search attempt %d failed: %r", attempt, exc)
+            log.warning(
+                "database search attempt %d failed: %s", attempt, type(exc).__name__
+            )
     return None

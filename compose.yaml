@@ -18,10 +18,9 @@ services:
   # sources are chosen (user decision), so the backend gets no DATABASE_URL and never needs it.
   # Starts empty: the team seeds it with `make db-seed`. Schema from db/migrations/ on first start
   # of the volume. Port bound to 127.0.0.1 only. The default password is for this local-only
-  # database; POSTGRES_PASSWORD applies only when the volume is created (`docker compose
-  # --profile db down -v` to recreate).
-  db:
-    profiles: [db]
+  # database; POSTGRES_PASSWORD applies only when the volume is created (see docs/sources.md).
+  sourcedb:
+    profiles: [sourcedb]
     image: postgres:17
     restart: unless-stopped
     environment:
@@ -29,7 +28,7 @@ services:
       POSTGRES_DB: prawdowid
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prawdowid}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - sourcedb_data:/var/lib/postgresql/data
       - ./db/migrations:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:${DB_PORT:-5433}:5432"
@@ -59,4 +58,4 @@ services:
         restart: true
 
 volumes:
-  pgdata:
+  sourcedb_data:

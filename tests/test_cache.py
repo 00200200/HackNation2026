@@ -241,6 +241,10 @@ def test_seed_is_the_only_database_writer(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
     monkeypatch.setattr(corpus, "queries", lambda: ["sankcje"])
     monkeypatch.setattr(corpus, "ALLOWLIST", {"gov.pl": None})
+    monkeypatch.setattr(
+        corpus, "APPROVED_SOURCES", {"www.gov.pl": "Synthetic test licence"}
+    )
+    monkeypatch.setattr(corpus, "delete_expired", lambda: 0)
     monkeypatch.setattr(corpus, "stored_documents", list)
     stored, saves = [], []
 
