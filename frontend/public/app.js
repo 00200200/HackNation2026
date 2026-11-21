@@ -33,9 +33,19 @@ function sourceItem(s) {
     s.fragment ? el("q", { className: "fragment", textContent: s.fragment }) : null);
 }
 
+// Claims from a quote: who said it, and what was said. Plain statements get no tag.
+const KIND_LABELS = { attribution: "Kto co powiedział", quoted: "Treść cytatu" };
+
+function origin(c) {
+  return el("p", { className: "origin" },
+    KIND_LABELS[c.kind] ? el("span", { className: "kind", textContent: KIND_LABELS[c.kind] }) : null,
+    `W tekście: ${c.source_sentence}`);
+}
+
 function claimCard(c) {
   return el("article", { className: "claim" },
     el("h2", { className: "claim-text", textContent: c.claim }),
+    origin(c),
     el("p", {}, "Ocena: ",
       el("span", { className: `verdict verdict-${c.verdict}`, textContent: c.verdict_label })),
     el("h3", { textContent: "Uzasadnienie" }), el("p", { textContent: c.reasoning }),
@@ -49,8 +59,18 @@ function claimCard(c) {
 function render(check) {
   // Statuses other than "ok" are notices, never verdicts.
   if (check.status !== "ok") return [box("notice", "Brak oceny", check.message)];
-  if (!check.claims.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia.")];
-  return check.claims.map(claimCard);
+  if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia.")];
+  const nodes = check.claims.map(claimCard);
+  if (check.unchecked_claims?.length) nodes.push(uncheckedList(check.unchecked_claims));
+  return nodes;
+}
+
+function uncheckedList(claims) {
+  return el("section", { className: "unchecked" },
+    el("h2", { textContent: "Niesprawdzone twierdzenia" }),
+    el("p", { textContent: "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
+      + "Tych nie oceniliśmy. Możesz wkleić je osobno." }),
+    list(claims));
 }
 
 async function errorMessage(resp) {

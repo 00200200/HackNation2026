@@ -1,18 +1,22 @@
 {
-  "commit": "c27b6428814b4594de902e1f337fc641e631a5a8",
+  "commit": "d655078aef4bf4660e222da05c0aa96aed558922",
   "dirty": false,
-  "mode": "quick",
-  "timestamp": "2026-11-21T12:23:06+00:00",
-  "n_cases": 4,
+  "mode": "full",
+  "timestamp": "2026-11-21T15:52:54+00:00",
+  "n_cases": 31,
   "scenarios": [
     "A",
+    "B",
+    "C",
     "D",
     "E",
-    "H"
+    "G",
+    "I",
+    "J"
   ],
   "metrics": {
     "macro_f1": {
-      "value": 0.3333333333333333,
+      "value": 0.08823529411764706,
       "target": ">= 0.75",
       "pass": false
     },
@@ -37,24 +41,19 @@
       "pass": false
     },
     "median_latency_s": {
-      "value": 2.5573595000314526,
+      "value": 5.047744499985129,
       "target": "<= 30.0",
       "pass": true
     },
     "end_to_end": {
-      "value": 1.0,
+      "value": 0.9354838709677419,
       "target": ">= 1.0",
-      "pass": true
+      "pass": false
     },
     "channel_consistency": {
       "value": null,
       "target": ">= 1.0",
       "pass": null
-    },
-    "moderator_loop": {
-      "value": 0.0,
-      "target": ">= 1.0",
-      "pass": false
     },
     "cost_per_100_usd": {
       "value": null,
@@ -62,14 +61,12 @@
       "pass": null
     }
   },
-  "cases_file": "evals/cases.example.jsonl",
+  "cases_file": "evals/cases.jsonl",
   "coverage_ok": true,
   "overall_pass": false,
   "warnings": [
-    "no cases for scenarios B, C, G, I, J",
     "citation_correctness unknown: pass --corpus",
-    "channel_consistency unknown: no second channel wired for eval (PRAWDOWID_EXTRA_CHANNELS)",
-    "example cases file: results do not count for submission"
+    "channel_consistency unknown: no second channel wired for eval (PRAWDOWID_EXTRA_CHANNELS)"
   ],
   "cases": [
     {
@@ -80,7 +77,175 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.87
+        3.96
+      ],
+      "errors": []
+    },
+    {
+      "id": "A02",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        6.59
+      ],
+      "errors": []
+    },
+    {
+      "id": "A03",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.02
+      ],
+      "errors": []
+    },
+    {
+      "id": "A04",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        7.35
+      ],
+      "errors": []
+    },
+    {
+      "id": "A05",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        5.46
+      ],
+      "errors": []
+    },
+    {
+      "id": "A06",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        2.77
+      ],
+      "errors": []
+    },
+    {
+      "id": "A07",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.43
+      ],
+      "errors": []
+    },
+    {
+      "id": "B01",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        7.4
+      ],
+      "errors": []
+    },
+    {
+      "id": "B02",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        6.33
+      ],
+      "errors": []
+    },
+    {
+      "id": "B03",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        6.96
+      ],
+      "errors": []
+    },
+    {
+      "id": "B04",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        5.11
+      ],
+      "errors": []
+    },
+    {
+      "id": "B05",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        5.92
+      ],
+      "errors": []
+    },
+    {
+      "id": "B06",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        5.31
+      ],
+      "errors": []
+    },
+    {
+      "id": "C01",
+      "scenario": "C",
+      "expected": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.59
+      ],
+      "errors": []
+    },
+    {
+      "id": "C02",
+      "scenario": "C",
+      "expected": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        5.59
       ],
       "errors": []
     },
@@ -92,31 +257,187 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.59
+        3.04
+      ],
+      "errors": []
+    },
+    {
+      "id": "D02",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.33
+      ],
+      "errors": []
+    },
+    {
+      "id": "D03",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.89
+      ],
+      "errors": []
+    },
+    {
+      "id": "D04",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.71
       ],
       "errors": []
     },
     {
       "id": "E01",
       "scenario": "E",
-      "expected": "potwierdzone",
+      "expected": "fałszywe",
       "predicted": [
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.52
+        6.07
       ],
       "errors": []
     },
     {
-      "id": "H01",
-      "scenario": "H",
-      "expected": "brak wystarczających dowodów",
+      "id": "E02",
+      "scenario": "E",
+      "expected": "fałszywe",
       "predicted": [
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.37
+        5.58
+      ],
+      "errors": []
+    },
+    {
+      "id": "E03",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.38
+      ],
+      "errors": []
+    },
+    {
+      "id": "G01",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.2
+      ],
+      "errors": []
+    },
+    {
+      "id": "G02",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.43
+      ],
+      "errors": []
+    },
+    {
+      "id": "G03",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        6.86
+      ],
+      "errors": []
+    },
+    {
+      "id": "G04",
+      "scenario": "G",
+      "expected": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        5.05
+      ],
+      "errors": []
+    },
+    {
+      "id": "I01",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        5.89
+      ],
+      "errors": []
+    },
+    {
+      "id": "I02",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        4.45
+      ],
+      "errors": []
+    },
+    {
+      "id": "I03",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "predicted": [
+        "nie podlega weryfikacji"
+      ],
+      "seconds": [
+        7.41
+      ],
+      "errors": []
+    },
+    {
+      "id": "J01",
+      "scenario": "J",
+      "expected": "technical_error",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        2.72
+      ],
+      "errors": []
+    },
+    {
+      "id": "J02",
+      "scenario": "J",
+      "expected": "technical_error",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        2.99
       ],
       "errors": []
     }

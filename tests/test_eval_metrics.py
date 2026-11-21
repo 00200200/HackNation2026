@@ -57,6 +57,8 @@ def test_adapter_maps_check_result_to_eval_shape():
         "claims": [
             {
                 "claim": "Polska jest w NATO od 1999 r.",
+                "source_sentence": "Polska jest w NATO od 1999 r.",
+                "reasoning": "Uzasadnienie.",
                 "verdict": "confirmed",
                 "verdict_label": "potwierdzone",
                 "sources": [
@@ -70,8 +72,13 @@ def test_adapter_maps_check_result_to_eval_shape():
                 ],
             }
         ],
+        "unchecked_claims": ["Inne twierdzenie."],
     }
     shaped = adapter.to_eval_shape(raw)
+    # Everything the UI shows reaches the canary check.
+    assert shaped["claims"][0]["source_sentence"] == "Polska jest w NATO od 1999 r."
+    assert shaped["claims"][0]["reasoning"] == "Uzasadnienie."
+    assert shaped["unchecked_claims"] == ["Inne twierdzenie."]
     assert shaped["claims"][0]["verdict"] == "potwierdzone"
     assert shaped["claims"][0]["evidence"][0] == {
         "title": "T",
@@ -83,6 +90,7 @@ def test_adapter_maps_check_result_to_eval_shape():
     assert adapter.to_eval_shape({"status": "cannot_check", "message": "m"}) == {
         "status": "cannot_check",
         "claims": [],
+        "unchecked_claims": [],
     }
     assert (
         adapter.to_eval_shape({"claims": [{"verdict": "false"}]})["claims"][0][

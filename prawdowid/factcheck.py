@@ -8,6 +8,7 @@ never a verdict.
 Docs: https://developers.google.com/fact-check/tools/api/reference/rest/v1alpha1/claims/search
 """
 
+import asyncio
 import logging
 import os
 from datetime import UTC, date, datetime
@@ -21,7 +22,10 @@ log = logging.getLogger("prawdowid")
 
 URL = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
 KEY_ENV = "GOOGLE_FACTCHECK_API_KEY"
+# httpx2 timeouts are per operation (connect, each read chunk), not per response: a server that
+# trickles bytes never trips them. DEADLINE_S caps the whole lookup, retry included.
 TIMEOUT_S = 8
+DEADLINE_S = 15
 ATTEMPTS = 2  # first call plus one retry
 PAGE_SIZE = 10
 SOURCE_TYPE = "fact_check"
@@ -63,11 +67,16 @@ async def search_claims(
     # Header, not ?key=, so the key never shows up in logged URLs.
     headers = {"x-goog-api-key": key}
 
-    if client:
-        resp = await _get(client, params, headers)
-    else:
-        async with httpx2.AsyncClient() as http:
-            resp = await _get(http, params, headers)
+    try:
+        async with asyncio.timeout(DEADLINE_S):
+            if client:
+                resp = await _get(client, params, headers)
+            else:
+                async with httpx2.AsyncClient() as http:
+                    resp = await _get(http, params, headers)
+    except TimeoutError:
+        log.warning("factcheck unavailable: no answer within %s s", DEADLINE_S)
+        return FactCheckLookup(limitation=LOOKUP_UNAVAILABLE)
     if resp is None:
         return FactCheckLookup(limitation=LOOKUP_UNAVAILABLE)
 
@@ -114,13 +123,15 @@ def _to_hit(found: dict, review: dict, fetched_at: datetime) -> FactCheckHit | N
     reviewed_claim = found.get("text")
     try:
         source = Source(
-            title=review.get("title") or reviewed_claim or review["url"],
+            # Never the reviewed claim: it is the disputed statement, not the review's words.
+            title=review.get("title") or review["url"],
             publisher=publisher.get("name") or publisher.get("site") or "",
             published_at=_date(review.get("reviewDate")),
             fetched_at=fetched_at,
             url=review["url"],
             source_type=SOURCE_TYPE,
-            fragment=reviewed_claim,
+            # No excerpt of the review page yet; the reviewed claim stays in FactCheckHit.
+            fragment=None,
         )
     except (KeyError, ValidationError):
         log.warning("factcheck review skipped: no usable url")

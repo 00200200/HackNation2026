@@ -10,7 +10,14 @@ from pydantic_ai.models.function import FunctionModel
 
 from prawdowid import discord_bot
 from prawdowid.app import app, limiter
-from prawdowid.contract import CheckResult, ClaimResult, Source, Status, Verdict
+from prawdowid.contract import (
+    CheckResult,
+    ClaimKind,
+    ClaimResult,
+    Source,
+    Status,
+    Verdict,
+)
 from prawdowid.discord_bot import (
     CONNECTION_ERROR,
     MAX_MESSAGES,
@@ -27,6 +34,8 @@ CHECK = CheckResult(
     claims=[
         ClaimResult(
             claim="@everyone Polska jest w **UE** od 2004 roku.",
+            kind=ClaimKind.QUOTED,
+            source_sentence="Minister: Polska jest w UE od 2004 roku.",
             verdict=Verdict.CONFIRMED,
             reasoning="Źródło urzędowe podaje datę akcesji.",
             strength="Wysoka: źródło pierwotne.",
@@ -46,6 +55,8 @@ CHECK = CheckResult(
         ),
         ClaimResult(
             claim="To dobra decyzja.",
+            kind=ClaimKind.STATEMENT,
+            source_sentence="To dobra decyzja.",
             verdict=Verdict.NOT_VERIFIABLE,
             reasoning="To opinia.",
             strength="Nie dotyczy.",
@@ -54,6 +65,7 @@ CHECK = CheckResult(
             limitations=[],
         ),
     ],
+    unchecked_claims=["Inne twierdzenie."],
 )
 
 
@@ -69,6 +81,10 @@ def test_render_shows_every_section_of_the_contract():
         "> „Polska jest członkiem UE od 1 maja 2004 r.”",
         "**Ograniczenia:**\n- Sprawdzono jedno źródło.",
         "**Źródła:**\n- brak",
+        "-# [Treść cytatu] W tekście: Minister: Polska jest w UE od 2004 roku.",
+        "-# W tekście: To dobra decyzja.",
+        "### Niesprawdzone twierdzenia",
+        "- Inne twierdzenie.",
     ):
         assert expected in text
 
@@ -156,7 +172,17 @@ def test_ask_api_connection_error_becomes_notice():
 def test_same_input_same_result_on_web_and_discord():
     """Scenario G offline: the Discord path and the web form get the same CheckResult."""
     extraction = Extraction(
-        claims=[ExtractedClaim(claim="Fakt.", checkable=True, reason="Da się.")],
+        claims=[
+            ExtractedClaim(
+                claim="Fakt.",
+                kind=ClaimKind.STATEMENT,
+                source_sentence="Fakt.",
+                checkable=True,
+                reason="Da się.",
+                queries=["fakt"],
+            )
+        ],
+        other_claims=["Inne."],
         unclear=False,
     )
     model = FunctionModel(

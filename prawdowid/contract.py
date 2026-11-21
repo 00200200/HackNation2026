@@ -36,6 +36,14 @@ class Status(StrEnum):
     NEEDS_CLARIFICATION = "needs_clarification"
 
 
+class ClaimKind(StrEnum):
+    """A quote "X said that Y" gives two claims: that X said it, and Y as quoted content."""
+
+    STATEMENT = "statement"
+    ATTRIBUTION = "attribution"
+    QUOTED = "quoted"
+
+
 class Source(BaseModel):
     title: str
     publisher: str
@@ -48,6 +56,9 @@ class Source(BaseModel):
 
 class ClaimResult(BaseModel):
     claim: str
+    kind: ClaimKind
+    # Sentence of the input the claim comes from: shows what was checked, never evidence.
+    source_sentence: str
     verdict: Verdict
     reasoning: str
     # Type of strength is not decided yet (scale, label or score); plain string until it is.
@@ -66,9 +77,12 @@ class CheckResult(BaseModel):
     status: Status
     message: str | None = None
     claims: list[ClaimResult] = []
+    # Claims found but left out by the per-check cap. They have no verdict.
+    unchecked_claims: list[str] = []
 
     @model_validator(mode="after")
     def _non_ok_is_a_notice(self) -> "CheckResult":
-        if self.status is not Status.OK and (self.claims or not self.message):
+        has_claims = self.claims or self.unchecked_claims
+        if self.status is not Status.OK and (has_claims or not self.message):
             raise ValueError("non-ok status needs a message and no claims")
         return self

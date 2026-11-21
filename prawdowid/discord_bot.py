@@ -19,7 +19,7 @@ from discord.utils import escape_markdown, escape_mentions
 from pydantic import ValidationError
 
 from prawdowid.app import MAX_INPUT_CHARS, TECHNICAL_ERROR_MESSAGE
-from prawdowid.contract import CheckResult, ClaimResult, Source, Status
+from prawdowid.contract import CheckResult, ClaimKind, ClaimResult, Source, Status
 
 log = logging.getLogger("prawdowid.discord")
 
@@ -56,9 +56,22 @@ def _source(s: Source) -> list[str]:
     return lines
 
 
+# Claims from a quote: who said it, and what was said. Plain statements get no tag.
+KIND_LABELS = {
+    ClaimKind.ATTRIBUTION: "Kto co powiedział",
+    ClaimKind.QUOTED: "Treść cytatu",
+}
+UNCHECKED_NOTE = (
+    "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
+    "Tych nie oceniliśmy. Możesz wkleić je osobno."
+)
+
+
 def _claim(n: int, c: ClaimResult) -> str:
+    kind = f"[{KIND_LABELS[c.kind]}] " if c.kind in KIND_LABELS else ""
     lines = [
         f"### {n}. {_safe(c.claim)}",
+        f"-# {kind}W tekście: {_safe(c.source_sentence)}",
         f"Ocena: **{c.verdict_label}**",
         f"**Uzasadnienie:** {_safe(c.reasoning)}",
         f"**Siła dowodów:** {_safe(c.strength)}",
@@ -77,9 +90,20 @@ def render(check: CheckResult) -> str:
     # Statuses other than "ok" are notices, never verdicts.
     if check.status is not Status.OK:
         return f"**Brak oceny.** {_safe(check.message or '')}"
-    if not check.claims:
+    if not check.claims and not check.unchecked_claims:
         return "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
-    return "\n\n".join(_claim(n, c) for n, c in enumerate(check.claims, 1))
+    sections = [_claim(n, c) for n, c in enumerate(check.claims, 1)]
+    if check.unchecked_claims:
+        sections.append(
+            "\n".join(
+                [
+                    "### Niesprawdzone twierdzenia",
+                    UNCHECKED_NOTE,
+                    *_bullets(check.unchecked_claims),
+                ]
+            )
+        )
+    return "\n\n".join(sections)
 
 
 def split(text: str) -> list[str]:
