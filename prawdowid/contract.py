@@ -8,12 +8,17 @@ from pydantic import BaseModel, Field, HttpUrl, computed_field, model_validator
 
 
 class Verdict(StrEnum):
+    """Outcome for one claim.
+
+    `not_checked` is not a verdict: the time limit ran out, every source failed, or the
+    judge model did not answer, and the claim's limitations say which.
+    """
+
     CONFIRMED = "confirmed"
     FALSE = "false"
     MISLEADING = "misleading"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
     NOT_VERIFIABLE = "not_verifiable"
-    # Not a verdict: the time limit ran out or every source failed. Limitations say which.
     NOT_CHECKED = "not_checked"
 
     @property

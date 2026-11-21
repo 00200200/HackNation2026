@@ -1,7 +1,7 @@
 PORT ?= 8080
 export PORT
 
-.PHONY: help install dev discord test lint format check up down logs db db-migrate db-seed corpus corpus-check index
+.PHONY: help install dev discord test lint format check openapi up down logs db db-migrate db-seed corpus corpus-check index
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-13s %s\n", $$1, $$2}'
@@ -27,6 +27,9 @@ format: ## Format and autofix
 	uv run ruff check --fix .
 
 check: lint test ## Lint and test
+
+openapi: ## Regenerate docs/openapi.json from the app (tests fail while it is stale)
+	uv run python -c "import json, pathlib; from prawdowid.app import app; pathlib.Path('docs/openapi.json').write_text(json.dumps(app.openapi(), indent=2, ensure_ascii=False) + '\n', encoding='utf-8')"
 
 up: ## Build and start frontend + backend in Docker (add DISCORD=1 for the Discord bot)
 	docker compose $(if $(DISCORD),--profile discord) up --build -d

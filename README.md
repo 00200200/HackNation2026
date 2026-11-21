@@ -135,7 +135,7 @@ been verified in the saved eval; a token alone does not prove the bot is install
 
 For the local API, install [uv](https://docs.astral.sh/uv/getting-started/installation/), run
 `make install`, then `make dev`; `.env` is loaded by that target. Open the API docs at
-http://127.0.0.1:8000/docs. In another terminal, `make discord` loads the same `.env` and calls
+http://127.0.0.1:8000/api/docs. In another terminal, `make discord` loads the same `.env` and calls
 the local API. This path does not serve the web frontend. PostgreSQL is optional and disabled
 in checks; do not seed it until source permissions are confirmed.
 
@@ -146,10 +146,11 @@ Run `make help` to list every target. The ones used most:
 | Target | What it does |
 |---|---|
 | `make up` / `make down` / `make logs` | Docker stack: frontend on `PORT` (default 8080), backend internal only |
-| `make dev` | API alone on http://127.0.0.1:8000 with reload (docs at `/docs`) |
+| `make dev` | API alone on http://127.0.0.1:8000 with reload (docs at `/api/docs`) |
 | `make discord` | Discord bot against `make dev`; `make up DISCORD=1` runs it in Docker |
 | `make check` | `ruff format --check`, `ruff check`, `pytest` |
 | `make format` | Format and autofix |
+| `make openapi` | Regenerate `docs/openapi.json` from the app |
 | `make corpus` / `make corpus-check` | Rebuild the evidence corpus from its source catalogue / check it against the brief's thresholds |
 | `make index` | Load `corpus/evidence.jsonl` into Postgres for search (needs `DATABASE_URL`) |
 
@@ -161,7 +162,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 
 - `frontend/`: static `index.html`, `styles.css` and `app.js` (no build step) served by nginx.
   nginx also proxies `/api/` and `/health` to the backend, caps request bodies at 64 KB and sets
-  a strict Content-Security-Policy.
+  a strict Content-Security-Policy (wider only for `/api/docs`, which loads Swagger UI from
+  cdn.jsdelivr.net).
 - `Dockerfile`: the backend image (Python 3.13, uv, runs as `nobody`).
 - `compose.yaml`: both services. Only the frontend port is published.
 - `compose.prod.yaml`, `caddy/Caddyfile`: production overlay. Caddy serves HTTPS in front of nginx
@@ -188,7 +190,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   database or an error returns a `limitation`. Not wired into `verify()` yet.
   `prawdowid/index.py` builds the tables (`make index`), `prawdowid/embeddings.py` holds the
   local embedding model.
-- `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
+- `prawdowid/app.py`: the API, input validation, rate limit, the `technical_error` path and the
+  OpenAPI docs (`docs/openapi.json` is its committed spec).
 - `prawdowid/discord_bot.py`: the second channel, a `/sprawdz tekst:` slash command (discord.py).
   It sends the same `POST /api/checks` as the web form, with `X-Channel: discord`, and renders the
   `CheckResult` with the same sections (verdict, reasoning, strength, premises, sources with
@@ -205,7 +208,18 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 | Method and path | What it does |
 |---|---|
 | `POST /api/checks` | Body `{"input": "..."}`. Returns `CheckResult`. 60 s timeout on `verify`; 10 requests per minute per client IP. |
+| `GET /api/openapi.json` | The OpenAPI spec. |
+| `GET /api/docs` | Interactive docs (Swagger UI) for the spec. |
 | `GET /health` | Liveness. |
+
+**Adding a channel.** The spec is the contract: https://faktczyfejk.pl/api/openapi.json, with
+interactive docs at https://faktczyfejk.pl/api/docs, and a copy in
+[`docs/openapi.json`](docs/openapi.json) that needs no running server. After an API change
+run `make openapi`; a test fails while the copy is stale. A channel sends `POST /api/checks`
+with `X-Channel: <its name>` (a name missing from `CHANNELS` in `prawdowid/app.py` is logged
+as `other`) and, to keep its checks together, the `X-Session-Id` it got back. The Discord bot
+([`prawdowid/discord_bot.py`](prawdowid/discord_bot.py)) sends `X-Channel: discord`; the web
+page ([`frontend/public/app.js`](frontend/public/app.js)) sends the session id back.
 
 Input is trimmed and must be 1 to 5000 characters. A single token containing `://` counts as a
 link and must be a valid `http` or `https` URL. The page is fetched only from public addresses
@@ -217,8 +231,8 @@ is killed at the deadline; at most 2 run at once per API process. The parsers st
 pages, 20,000 characters and 20 MB decompressed per stream; on Linux the child is also capped at
 1 GB of memory and 15 s of CPU. Title, publisher, date and text together are cut to 5000
 characters for the verifier. `CheckResult.page` carries the
-page URL, content hash, title, publisher and date, never the page text. Validation errors come
-back as 422 with a Polish message in `detail[0].msg`.
+page URL, content hash, title, publisher and date, never the page text. An `input` that is
+empty, too long or not a valid link comes back as 422 with a Polish message in `detail[0].msg`.
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
 their own copy of the labels.

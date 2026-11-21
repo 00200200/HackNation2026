@@ -33,6 +33,10 @@ so their visibility depends on the Discord channel. Sources:
 [styles](../../frontend/public/styles.css), [nginx](../../frontend/nginx.conf),
 [Discord](../../prawdowid/discord_bot.py), [contract](../../prawdowid/contract.py).
 
+The API contract is published as an OpenAPI spec: [`docs/openapi.json`](../openapi.json) in the
+repository, `/api/openapi.json` on the running service and interactive docs at `/api/docs`. A
+new channel sends the same request and needs no verification logic of its own.
+
 The API validates text and HTTP(S) links. The URL path resolves and checks public addresses on
 each connection, including redirects, then extracts HTML with trafilatura or PDF text with pypdf.
 Social media, access barriers and unsupported files return notices asking for pasted text.

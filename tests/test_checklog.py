@@ -92,6 +92,23 @@ def test_a_successful_check_leaves_one_complete_record(api):
     assert "steps_ms" not in body["claims"][0]
 
 
+@pytest.mark.parametrize(
+    ("sent", "logged"),
+    [
+        ({}, "web"),
+        ({"X-Channel": "discord"}, "discord"),
+        ({"x-channel": "discord"}, "discord"),
+        ({"X-Channel": "slack"}, "other"),
+    ],
+)
+def test_channel_header_has_a_default_and_a_fallback(api, sent, logged):
+    # The session header is lowercase here: header names are case-insensitive.
+    headers = {"x-session-id": "channel-0001", **sent}
+    api.post("/api/checks", json={"input": TEXT}, headers=headers)
+    [rec] = api.get("/api/sessions/channel-0001").json()
+    assert rec["channel"] == logged
+
+
 def test_a_failed_check_leaves_one_record(api, monkeypatch):
     async def broken(text):
         raise RuntimeError("boom")
