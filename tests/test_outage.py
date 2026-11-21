@@ -122,6 +122,28 @@ def test_found_evidence_stands_when_fact_check_is_down(monkeypatch, models):
     assert pipeline.factcheck.LOOKUP_UNAVAILABLE in result.judgement.limitations
 
 
+def test_gov_pl_down_blocks_an_abstention_only_for_a_government_claim(monkeypatch):
+    monkeypatch.setattr(pipeline.govpl, "ENABLED", True)
+    fact_check(monkeypatch, down=False)
+    web(monkeypatch, lambda q: websearch.WebSearch())
+
+    async def search_govpl(queries):
+        return websearch.WebSearch(limitation=pipeline.govpl.LOOKUP_UNAVAILABLE)
+
+    monkeypatch.setattr(pipeline.govpl, "search_govpl", search_govpl)
+
+    async def run(govpl_queries):
+        deadline = asyncio.get_running_loop().time() + 30
+        return await pipeline.check_claim(
+            CLAIM, ["a"], deadline, govpl_queries=govpl_queries
+        )
+
+    government = asyncio.run(run(["RCB alert"]))
+    assert government.outage and "www.gov.pl" in government.judgement.limitations[0]
+    other = asyncio.run(run([]))
+    assert other.judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE and not other.outage
+
+
 def test_web_search_answers_nothing_is_no_limitation(monkeypatch):
     async def go():
         return await websearch.search_web(
@@ -260,8 +282,15 @@ def test_eval_traffic_with_the_token_simulates_the_model_outage(monkeypatch):
     body = api_check({"X-Eval-Fault": "llm_unavailable", "X-Eval-Token": "secret"})
     assert body["status"] == "technical_error"
     assert body["message"] == verifier.MODEL_FAILED and body["claims"] == []
-    # The switch ends with the request.
-    assert not faults.active(faults.LLM_UNAVAILABLE)
+
+
+def test_the_switch_ends_with_its_block():
+    async def go():
+        with faults.simulate(faults.LLM_UNAVAILABLE):
+            inside = faults.active(faults.LLM_UNAVAILABLE)
+        return inside, faults.active(faults.LLM_UNAVAILABLE)
+
+    assert asyncio.run(go()) == (True, False)
 
 
 def test_eval_traffic_with_the_token_simulates_the_fact_check_outage(monkeypatch):

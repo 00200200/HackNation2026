@@ -59,7 +59,7 @@ smoke test against plain DuckDuckGo got 0/8.
 
 ## Levers for the next run (not yet done)
 
-- Raise `PRAWDOWID_CHECK_BUDGET_S` (currently 25 s; try ~45 s) so claims stop timing out into
+- Raise `PRAWDOWID_CHECK_BUDGET_S` (was 25 s; the default is 40 s since #63) so claims stop timing out into
   `nie sprawdzono`.
 - Wire the #49 evidence corpus into `verify()` so `citation_correctness` can be measured.
 - Tighten the B/C rules in `decide()`, plus Dominik's #30 must-fix (the evidence gap should be

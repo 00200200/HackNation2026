@@ -28,8 +28,10 @@ not as a guess.
 
 Answers follow the organiser's sample format: the first words come from the verdict, then the
 sources by name. "Skopiuj odpowiedź na czat" copies the same text. A technical failure or a
-request to clarify is a grey notice, never a verdict, and a claim whose sources all failed comes
-back as `nie sprawdzono` with the reason.
+request to clarify is a grey notice, never a verdict. When Fact Check, the whole web search (or
+gov.pl for a government claim) was down and the evidence is not enough, the claim is `nie sprawdzono`
+with the outage as the reason, and when no claim got a verdict for that reason the whole answer is a
+technical error ("Nie mogę teraz sprawdzić ..."). A source that answered with nothing is no outage.
 
 ## How it works
 
@@ -77,8 +79,8 @@ Put these in `.env` in the repository root. The file is git-ignored and is not c
 image. `make dev` loads it into the API environment. Compose reads it for interpolation but only
 forwards variables declared in `compose.yaml`: the backend gets `ANTHROPIC_API_KEY`,
 `PRAWDOWID_MODEL`, `GOOGLE_FACTCHECK_API_KEY`, `TAVILY_API_KEY`, `EUVSDISINFO_API_KEY` and
-`PRAWDOWID_INCIDENTS_PATH`, and its check log and source cache already point at a writable `/tmp`
-path. Other tuning variables need an explicit Compose environment override.
+`PRAWDOWID_INCIDENTS_PATH`, its check log sits on the `checklog` volume (`/var/lib/prawdowid`, kept across
+deploys) and its source cache points at a writable `/tmp` path. Other tuning variables need an explicit Compose environment override.
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
@@ -93,7 +95,7 @@ path. Other tuning variables need an explicit Compose environment override.
 | `PRAWDOWID_RETRY_MIN_S` | no | `18` | A claim without enough evidence is searched once more only if at least this many seconds remain. |
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
-| `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
+| `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is reported as unavailable, which counts as an outage: a claim without enough other evidence is then `nie sprawdzono`, not "brak wystarczających dowodów". |
 | `TAVILY_API_KEY` | no | none | Tavily API key (`tavily-python`) for web search on allowlisted domains (step 2b). Without it the web search is skipped and reported as unavailable. |
 | `DOMAIN` | with `compose.prod.yaml` | none | Public domain Caddy gets the HTTPS certificate for (`compose.prod.yaml`, see `docs/deploy.md`). |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | with `compose.prod.yaml` | none | Database, user and password of the `db` service. `compose.prod.yaml` passes them to the backend as `DATABASE_URL`. `POSTGRES_PASSWORD` is also the password of the local `sourcedb` service (default `prawdowid`, port bound to 127.0.0.1 only), applied only when its `sourcedb_data` volume is created; see [deletion instructions](docs/sources.md). `make db-seed` refuses until the team approves sources for full-text storage; see [the prerequisite](docs/sources.md#full-text-seed-approval). |
@@ -108,7 +110,9 @@ The extraction call has a 45 s provider request timeout and at most one SDK retr
 the 40 s whole-check deadline with URL fetching and per-claim checks, inside the API's 60 s
 limit. Extraction errors and a missing model key return `technical_error`; a
 model refusal returns `cannot_check`. Both carry a Polish message and no claims. Retrieval
-failures are reported per claim. A judge-model outage becomes `not_checked` with a limitation;
+failures are listed per claim; an outage of a source that could decide the verdict (see above) or a
+judge-model outage makes the claim `not_checked`, and the whole answer a `technical_error` when no
+claim has a verdict;
 a failed retry judgement can retain the first-pass assessment with a warning when first-pass
 candidates existed.
 

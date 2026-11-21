@@ -56,6 +56,7 @@ RETRY_UNJUDGED = (
 )
 FACTCHECK_DOWN = "bazy Google Fact Check"
 WEB_DOWN = "wyszukiwarki internetowej"
+GOVPL_DOWN = "wyszukiwarki portalu www.gov.pl"
 OUTAGE = (
     "Nie mogę teraz sprawdzić {what} z powodu błędu dostępu. To awaria techniczna, "
     "a nie wynik sprawdzenia: nie wydajemy werdyktu, a brak odpowiedzi nie znaczy, "
@@ -148,7 +149,7 @@ async def check_claim(
 
     limits = _limits(found)
     outage = judgement.verdict is Verdict.NOT_CHECKED  # the judge did not answer
-    down = _deciders_down(found)
+    down = _deciders_down(found, govpl_decides=bool(govpl_queries))
     if len(limits) == len(found) and not candidates:  # every source failed
         outage = not cut
         reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
@@ -247,14 +248,18 @@ def _limits(found: dict) -> dict[str, str]:
     return {k: v for k, v in limits.items() if v}
 
 
-def _deciders_down(found: dict) -> list[str]:
-    """The sources that can decide a verdict and failed (not: answered with no hits)."""
+def _deciders_down(found: dict, govpl_decides: bool) -> list[str]:
+    """The sources that can decide a verdict and failed (not: answered with no hits). The gov.pl
+    search decides only for a claim about the Polish government (the model gave it gov.pl queries);
+    web search leaves www.gov.pl to it."""
     down = []
     if "factcheck" in found and found["factcheck"].limitation:
         down.append(FACTCHECK_DOWN)
     # Every query failed at the provider: one query that found nothing is an answer.
     if found["web"] and all(w.failed for w in found["web"]):
         down.append(WEB_DOWN)
+    if govpl_decides and "govpl" in found and found["govpl"].limitation:
+        down.append(GOVPL_DOWN)
     return down
 
 
