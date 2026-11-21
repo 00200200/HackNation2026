@@ -1,7 +1,7 @@
 """Step 3: dedupe and rerank evidence for one claim.
 
-Candidates come as `Source` items from step 2a (fact-check reviews), 2b (web pages) and 2c (saved
-pages). Pages are split into fragments, duplicates are dropped, and a model orders the fragments by
+Candidates come as `Source` items from step 2a (fact-check reviews) and 2b (web pages); 2c (saved
+pages, #19) is out of the pipeline for now. Pages are split into fragments, duplicates are dropped, and a model orders the fragments by
 relevance to the claim; the top K go to the judge. Every fragment keeps the canonical URL of its
 document as `doc_id`, so a quote can be traced back. The page the user linked is never evidence for
 its own claims.

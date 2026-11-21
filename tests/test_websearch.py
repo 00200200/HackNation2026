@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import date
 from pathlib import Path
 
@@ -262,3 +263,21 @@ def test_slow_page_is_cut_off(monkeypatch):
         )
 
     assert asyncio.run(go()).limitation == NOTHING_FETCHED
+
+
+def test_a_hanging_provider_is_cut_by_the_search_budget(monkeypatch):
+    monkeypatch.setattr(websearch, "SEARCH_BUDGET_S", 0.2)
+
+    def hanging(query, *, domains, limit):
+        time.sleep(1)
+        return []
+
+    async def go():
+        started = time.perf_counter()
+        result = await websearch.search_web("sankcje", provider=hanging)
+        return result, time.perf_counter() - started
+
+    # asyncio.run then waits for the thread to end; the search itself does not.
+    result, elapsed = asyncio.run(go())
+    assert elapsed < 0.8
+    assert result.limitation == websearch.SEARCH_UNAVAILABLE

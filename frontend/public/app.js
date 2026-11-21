@@ -6,6 +6,7 @@ const submit = document.getElementById("submit");
 const result = document.getElementById("result");
 
 const SECURITY_NOTE = "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je i sprawdziliśmy resztę.";
+const SOURCE_SECURITY_NOTE = "W źródłach znaleźliśmy polecenia skierowane do modelu. Zignorowaliśmy je i sprawdziliśmy resztę.";
 const SECURITY_NOTE_ONLY = "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je.";
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 
@@ -87,7 +88,10 @@ function render(check) {
     return [...notice, ...warning];
   }
   if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia."), ...warning];
-  const nodes = check.security_events?.length ? [box("notice", "Polecenia dla modelu", SECURITY_NOTE)] : [];
+  const events = check.security_events || [];
+  const nodes = [];
+  if (events.some((e) => e.location !== "source")) nodes.push(box("notice", "Polecenia dla modelu", SECURITY_NOTE));
+  if (events.some((e) => e.location === "source")) nodes.push(box("notice", "Polecenia w źródle", SOURCE_SECURITY_NOTE));
   nodes.push(...warning, ...check.claims.map(claimCard));
   if (check.page) nodes.unshift(pageNote(check.page));
   if (check.unchecked_claims?.length) nodes.push(uncheckedList(check.unchecked_claims));

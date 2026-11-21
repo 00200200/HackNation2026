@@ -9,6 +9,7 @@ A failed or empty search is a technical limit returned in `WebSearch.limitation`
 
 import asyncio
 import logging
+import os
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from typing import NamedTuple, Protocol
@@ -28,9 +29,9 @@ log = logging.getLogger("prawdowid")
 
 
 class Domain(NamedTuple):
-    source_type: (
-        str  # "official" (primary) or "fact_check" / "news" (reliable secondary)
-    )
+    # "official" (primary) or "fact_check" / "news" (reliable secondary); "disinfo_database": a
+    # known-narrative match, context that never decides on its own.
+    source_type: str
     # None: take the site name from the page (blanket entries such as gov.pl).
     publisher: str | None
 
@@ -46,7 +47,9 @@ ALLOWLIST = {
     "nbp.pl": Domain("official", "Narodowy Bank Polski"),
     "europa.eu": Domain("official", None),
     "eur-lex.europa.eu": Domain("official", "EUR-Lex, Urząd Publikacji UE"),
-    "euvsdisinfo.eu": Domain("official", "EUvsDisinfo (ESDZ)"),
+    # Official EU body, but a match only says the claim resembles a documented narrative: not a
+    # reliable type in judge.decide, so it needs a second independent origin to count.
+    "euvsdisinfo.eu": Domain("disinfo_database", "EUvsDisinfo (ESDZ)"),
     "nato.int": Domain("official", "NATO"),
     "who.int": Domain("official", "Światowa Organizacja Zdrowia"),
     "demagog.org.pl": Domain("fact_check", "Demagog"),
@@ -61,7 +64,15 @@ FETCH_TIMEOUT_S = 10
 ATTEMPTS = 2  # first call plus one retry
 MAX_REDIRECTS = 3
 MAX_PAGE_BYTES = 2_000_000
-PAGE_BUDGET_S = 20  # robots.txt plus the page, retry included
+# Both caps keep one claim inside the check's time budget (#11): DuckDuckGo took ~20 s to say
+# "no results" over two attempts in the full eval on f1e1684.
+SEARCH_BUDGET_S = float(
+    os.getenv("PRAWDOWID_WEB_SEARCH_BUDGET_S") or 10
+)  # retry included
+PAGE_BUDGET_S = float(
+    os.getenv("PRAWDOWID_PAGE_BUDGET_S") or 8
+)  # robots.txt and page; reads time out at 10 s, so no retry after a stall
+SAVE_BUDGET_S = 10  # saving every fetched page to the source store
 # Region "pl-pl" is passed to ddgs unchecked; UNCONFIRMED that every backend honours it.
 REGION = "pl-pl"
 # DuckDuckGo only (team decision). Not "auto": that falls back to scraping other engines.
@@ -156,23 +167,39 @@ async def search_web(
     # Two hits may redirect to the same page.
     docs = list({d.url: d for d in docs if d}.values())
     if save:
-        for d in docs:
-            save_document(d)
+        await _save_all(docs)
     return WebSearch(documents=docs, limitation=None if docs else NOTHING_FETCHED)
+
+
+async def _save_all(docs: list[Document]) -> None:
+    """Best effort, bounded in total: a slow store never holds up the check."""
+    try:
+        async with asyncio.timeout(SAVE_BUDGET_S):
+            for d in docs:
+                await asyncio.to_thread(save_document, d)
+    except TimeoutError:
+        log.warning("source store save stopped: over %d s", SAVE_BUDGET_S)
 
 
 async def _search(
     query: str, domains: Sequence[str], limit: int, provider: SearchProvider
 ) -> list[SearchHit] | None:
-    """Provider call in a thread, bounded, with one retry. None when every attempt failed."""
-    for attempt in range(1, ATTEMPTS + 1):
-        try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(provider, query, domains=domains, limit=limit),
-                SEARCH_TIMEOUT_S + 5,
-            )
-        except (SearchUnavailable, TimeoutError) as exc:
-            log.warning("web search attempt %d failed: %r", attempt, exc)
+    """Provider call in a thread, with one retry while SEARCH_BUDGET_S lasts. None when every
+    attempt failed or the budget ran out."""
+    try:
+        async with asyncio.timeout(SEARCH_BUDGET_S):
+            for attempt in range(1, ATTEMPTS + 1):
+                try:
+                    return await asyncio.wait_for(
+                        asyncio.to_thread(
+                            provider, query, domains=domains, limit=limit
+                        ),
+                        SEARCH_TIMEOUT_S + 5,
+                    )
+                except (SearchUnavailable, TimeoutError) as exc:
+                    log.warning("web search attempt %d failed: %r", attempt, exc)
+    except TimeoutError:
+        log.warning("web search unavailable: over %g s", SEARCH_BUDGET_S)
     return None
 
 
@@ -203,7 +230,7 @@ async def _fetch_bounded(url: str, client: httpx2.AsyncClient) -> Document | Non
         async with asyncio.timeout(PAGE_BUDGET_S):
             return await fetch_document(url, client)
     except TimeoutError:
-        log.warning("fetch skipped %s: over %d s", url, PAGE_BUDGET_S)
+        log.warning("fetch skipped %s: over %g s", url, PAGE_BUDGET_S)
         return None
 
 

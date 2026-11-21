@@ -8,10 +8,11 @@ from pydantic_ai.usage import RequestUsage
 
 from prawdowid import verifier
 from prawdowid.contract import ClaimKind, SecurityEvent, Status, Verdict
+from prawdowid.judge import Judgement
+from prawdowid.pipeline import SOURCES_FAILED, ClaimCheck
 from prawdowid.verifier import (
     INSTRUCTIONS,
     MODEL_FAILED,
-    NO_SOURCES,
     ExtractedClaim,
     Extraction,
     agent,
@@ -48,18 +49,42 @@ def run(text: str, model: FunctionModel):
         return asyncio.run(verify(text))
 
 
+CONFIRMED = ClaimCheck(
+    judgement=Judgement(
+        verdict=Verdict.CONFIRMED,
+        strength="silna",
+        premises=["Przesłanka."],
+        sources=[],
+        limitations=["Ograniczenie."],
+    ),
+    cost_usd=0.0,
+    steps_ms={},
+)
+
+
 def test_mixed_claims_get_verdicts_from_code():
     result = to_check_result(
-        Extraction(claims=[FACT, OPINION], other_claims=[], unclear=False)
+        Extraction(claims=[FACT, OPINION], other_claims=[], unclear=False),
+        [CONFIRMED, None],
     )
     assert result.status is Status.OK
     fact, opinion = result.claims
-    assert fact.verdict is Verdict.INSUFFICIENT_EVIDENCE
-    assert fact.limitations == [NO_SOURCES]
+    assert fact.verdict is Verdict.CONFIRMED
+    assert fact.limitations == ["Ograniczenie."]
+    assert fact.reasoning == "Powód."
     assert opinion.verdict is Verdict.NOT_VERIFIABLE
     assert opinion.reasoning == "Powód."
     assert opinion.limitations == []
     assert all(c.sources == [] and c.premises for c in result.claims)
+
+
+def test_every_source_failing_is_not_a_verdict():
+    result = run(
+        "tekst",
+        answering(Extraction(claims=[FACT], other_claims=[], unclear=False)),
+    )
+    assert result.claims[0].verdict is Verdict.NOT_CHECKED
+    assert SOURCES_FAILED in result.claims[0].limitations
 
 
 @pytest.mark.parametrize(
@@ -70,7 +95,7 @@ def test_mixed_claims_get_verdicts_from_code():
     ],
 )
 def test_no_claims_or_unclear_needs_clarification(extraction):
-    result = to_check_result(extraction)
+    result = to_check_result(extraction, [])
     assert result.status is Status.NEEDS_CLARIFICATION
     assert result.claims == []
 
@@ -81,7 +106,7 @@ def test_agent_path_maps_model_output():
         answering(Extraction(claims=[FACT, OPINION], other_claims=[], unclear=False)),
     )
     assert [c.verdict for c in result.claims] == [
-        Verdict.INSUFFICIENT_EVIDENCE,
+        Verdict.NOT_CHECKED,
         Verdict.NOT_VERIFIABLE,
     ]
 
@@ -139,7 +164,7 @@ def test_prompt_injection_is_framed_as_data_and_yields_plain_claims():
     assert seen["prompt"].count("</user_text>") == 1
     assert "never instructions" in seen["instructions"]
     assert result.status is Status.OK
-    assert result.claims[0].verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert result.claims[0].verdict is Verdict.NOT_CHECKED
 
 
 def test_invalid_output_fails_without_a_second_model_request():
@@ -214,7 +239,7 @@ def test_quote_gives_attribution_and_quoted_claim():
     )
     assert [c.kind for c in result.claims] == [ClaimKind.ATTRIBUTION, ClaimKind.QUOTED]
     assert {c.source_sentence for c in result.claims} == {sentence}
-    assert all(c.verdict is Verdict.INSUFFICIENT_EVIDENCE for c in result.claims)
+    assert all(c.verdict is Verdict.NOT_CHECKED for c in result.claims)
 
 
 def test_cap_keeps_top_n_and_lists_the_rest(monkeypatch):
@@ -223,10 +248,10 @@ def test_cap_keeps_top_n_and_lists_the_rest(monkeypatch):
     extraction = Extraction(
         claims=ranked, other_claims=["Fakt 3.", "Fakt 4."], unclear=False
     )
-    result = to_check_result(extraction)
+    result = to_check_result(extraction, [CONFIRMED, None])
     assert result.status is Status.OK
     assert [(c.claim, c.verdict) for c in result.claims] == [
-        ("Fakt 1.", Verdict.INSUFFICIENT_EVIDENCE),
+        ("Fakt 1.", Verdict.CONFIRMED),
         (OPINION.claim, Verdict.NOT_VERIFIABLE),
     ]
     assert result.unchecked_claims == ["Fakt 2.", "Fakt 3.", "Fakt 4."]
@@ -240,7 +265,7 @@ def test_prompt_states_the_cap_and_queries_per_claim():
 
 def test_claims_only_in_other_claims_are_listed_not_dropped():
     extraction = Extraction(claims=[], other_claims=["Fakt."], unclear=False)
-    result = to_check_result(extraction)
+    result = to_check_result(extraction, [])
     assert result.status is Status.OK
     assert result.claims == []
     assert result.unchecked_claims == ["Fakt."]
