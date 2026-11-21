@@ -197,6 +197,12 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): eval history on `LukiLenkiewicz/eval-history` (`cc58dac`): every `evals/run.py`
+  run now writes `evals/results/history/<timestamp>-<sha>-<mode>.json` (full report) and appends one row to
+  `evals/results/HISTORY.md` (both tracked), plus a per-scenario/per-case-set (FC-* vs A-J) summary in the report;
+  `--note` flag. Backfilled HISTORY.md with the 3 runs known so far (reconstructed rows marked as such, real row for
+  `95e6177`) and added `docs/eval-notes.md` explaining why `8c6f396`'s runs are distorted. README/WORKLOG/skill now
+  point at HISTORY.md, not only `latest.json`. No eval run (user decision).
 - 2026-11-21 Łukasz (Claude worker): eval runner on `LukiLenkiewicz/eval-parallel`: `--concurrency N` (default 4, thread pool; requests still start 6.5 s apart for the API's 10/minute limit), one flushed line per finished case with ETA, `evals/results/run-<ts>.partial.jsonl` (git-ignored) appended per case, `--resume` / `--retry-failed` / `--only`, one retry on 429/5xx/timeout. Live smoke: 3 cases, concurrency 3, local backend. No full eval run.
 - 2026-11-21 Łukasz (Claude worker): CodeRabbit full review of main (PR #46) triaged on `fix/coderabbit-main`: 9 fixed with tests (deploy record, canary scan, self-contradiction context, dedupe signs and provenance, cache write, deletion race, session storage, deploy keys doc), 2 not bugs (EUvsDisinfo as one of two origins, http links with secret params), J01/J02 fault switch deferred (coordinator).
 - 2026-11-21 Michał: web UI polish: legend as tiles with the first words of each answer, test-version pill, input hint/counter and the footer's MSZ sentences removed (Michał's call).
