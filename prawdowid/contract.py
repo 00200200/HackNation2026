@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, HttpUrl, model_validator
+from pydantic import BaseModel, HttpUrl, computed_field, model_validator
 
 
 class Verdict(StrEnum):
@@ -55,6 +55,11 @@ class ClaimResult(BaseModel):
     premises: list[str]
     sources: list[Source]
     limitations: list[str]
+
+    @computed_field
+    @property
+    def verdict_label(self) -> str:
+        return self.verdict.label
 
 
 class CheckResult(BaseModel):

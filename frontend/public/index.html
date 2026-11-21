@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prawdowid – sprawdź wiarygodność informacji</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#tresc">Przejdź do treści</a>
+
+  <header class="top">
+    <div class="wrap top-inner">
+      <div class="brand">
+        <span class="flag" aria-hidden="true"></span>
+        <span>
+          <span class="brand-name">Prawdowid</span>
+          <span class="brand-tag">Sprawdź wiarygodność informacji</span>
+        </span>
+      </div>
+      <span class="top-meta">HackNation 2026</span>
+    </div>
+  </header>
+
+  <div class="prototype">
+    <div class="wrap">
+      <strong>Wersja testowa.</strong> Weryfikacja nie jest jeszcze podłączona, więc na razie nie
+      dostaniesz oceny.
+    </div>
+  </div>
+
+  <main id="tresc" class="wrap grid">
+    <section class="panel" aria-labelledby="material-title">
+      <div class="panel-head">
+        <h1 id="material-title">Materiał do sprawdzenia</h1>
+        <button type="button" class="btn-ghost" id="example">Pokaż przykład</button>
+      </div>
+
+      <form id="check-form" novalidate>
+        <label for="input">Tekst albo link</label>
+        <textarea id="input" name="input" maxlength="5000" required
+                  aria-describedby="input-hint input-count"
+                  placeholder="Wklej fragment artykułu, wpis albo link do strony…"></textarea>
+        <p class="count" id="input-count" aria-live="off"><span id="count">0</span> / 5000</p>
+        <p class="hint" id="input-hint">
+          Linki muszą zaczynać się od http:// lub https://. Nie wpisuj danych osobowych.
+        </p>
+        <button type="submit" class="btn" id="submit">Sprawdź</button>
+        <noscript><p class="hint">Do działania strony potrzebny jest JavaScript.</p></noscript>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="result-title">
+      <div class="panel-head">
+        <h2 id="result-title">Wynik</h2>
+      </div>
+      <div id="result" aria-live="polite">
+        <div class="empty">
+          <p class="empty-title">Tu pojawi się wynik</p>
+          <p>Dla każdego twierdzenia zobaczysz ocenę, uzasadnienie i źródła.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap">
+      Prototyp przygotowany na HackNation 2026. Nie jest to oficjalny serwis administracji
+      publicznej.
+    </div>
+  </footer>
+</body>
+</html>

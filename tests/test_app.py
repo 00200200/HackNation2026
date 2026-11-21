@@ -1,48 +1,32 @@
 import asyncio
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
 from prawdowid import app as app_module
-from prawdowid import checklog
 from prawdowid.app import MAX_INPUT_CHARS, RATE_LIMIT_MESSAGE, app, limiter
+from prawdowid.contract import CheckResult, ClaimResult, Source, Status, Verdict
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("PRAWDOWID_DB_PATH", str(tmp_path / "checks.sqlite3"))
+def client():
     limiter.reset()
-    with TestClient(app) as c:
-        yield c
+    return TestClient(app)
 
 
-def test_valid_input_is_stored_and_returned(client):
-    resp = client.post(
-        "/api/checks", json={"input": "  Ziemia jest płaska.  ", "session_id": "s1"}
-    )
+def test_http_link_is_accepted(client):
+    resp = client.post("/api/checks", json={"input": "https://example.com/artykul"})
+    assert resp.status_code == 200
+
+
+def test_valid_input_returns_not_connected_notice(client):
+    resp = client.post("/api/checks", json={"input": "  Ziemia jest płaska.  "})
     assert resp.status_code == 200
     body = resp.json()
-    assert body["result"]["status"] == "cannot_check"
-    assert body["result"]["claims"] == []
-    assert body["result"]["message"]
-
-    stored = client.get(f"/api/checks/{body['id']}").json()
-    assert stored["input"] == "Ziemia jest płaska."
-    assert stored["session_id"] == "s1"
-    assert stored["channel"] == "api"
-    assert stored["result"] == body["result"]
-    assert [c["id"] for c in client.get("/api/checks").json()] == [body["id"]]
-
-
-def test_web_page_shows_not_connected_notice(client):
-    resp = client.post("/", data={"input": "https://example.com/artykul"})
-    assert resp.status_code == 200
-    assert 'class="notice"' in resp.text
-    assert "nie możemy teraz ocenić tej treści" in resp.text
-    assert 'class="verdict"' not in resp.text
-    row = checklog.list_all()[0]
-    assert row["channel"] == "web"
-    assert row["session_id"] == resp.cookies["prawdowid_session"]
+    assert body["status"] == "cannot_check"
+    assert body["claims"] == []
+    assert "nie jest jeszcze podłączona" in body["message"]
 
 
 @pytest.mark.parametrize(
@@ -55,10 +39,10 @@ def test_web_page_shows_not_connected_notice(client):
         "javascript://alert(1)",
     ],
 )
-def test_invalid_input_is_rejected(client, text):
-    assert client.post("/api/checks", json={"input": text}).status_code == 422
-    assert client.post("/", data={"input": text}).status_code == 422
-    assert checklog.list_all() == []
+def test_invalid_input_is_rejected_with_polish_message(client, text):
+    resp = client.post("/api/checks", json={"input": text})
+    assert resp.status_code == 422
+    assert resp.json()["detail"][0]["type"] in {"empty", "too_long", "bad_url"}
 
 
 def test_verify_exception_yields_technical_error_and_is_logged(
@@ -70,29 +54,9 @@ def test_verify_exception_yields_technical_error_and_is_logged(
     monkeypatch.setattr(app_module, "verify", broken)
     resp = client.post("/api/checks", json={"input": "Coś do sprawdzenia"})
     assert resp.status_code == 200
-    assert resp.json()["result"]["status"] == "technical_error"
+    assert resp.json()["status"] == "technical_error"
     assert "boom" not in resp.text
     assert "verify failed" in caplog.text
-    assert checklog.list_all()[0]["status"] == "technical_error"
-
-
-def test_session_deletion_removes_rows(client):
-    for session in ["a", "a", "b"]:
-        client.post("/api/checks", json={"input": "Tekst", "session_id": session})
-    assert client.delete("/api/sessions/a").json() == {"deleted": 2}
-    assert [c["session_id"] for c in client.get("/api/checks").json()] == ["b"]
-
-
-def test_unknown_check_is_404(client):
-    assert client.get("/api/checks/missing").status_code == 404
-
-
-def test_web_form_is_rate_limited(client):
-    for _ in range(10):
-        assert client.post("/", data={"input": "Tekst"}).status_code == 200
-    resp = client.post("/", data={"input": "Tekst"})
-    assert resp.status_code == 429
-    assert RATE_LIMIT_MESSAGE in resp.text
 
 
 def test_verify_timeout_yields_technical_error(client, monkeypatch):
@@ -102,5 +66,40 @@ def test_verify_timeout_yields_technical_error(client, monkeypatch):
     monkeypatch.setattr(app_module, "verify", slow)
     monkeypatch.setattr(app_module, "VERIFY_TIMEOUT_S", 0.01)
     resp = client.post("/api/checks", json={"input": "Tekst"})
-    assert resp.json()["result"]["status"] == "technical_error"
-    assert checklog.list_all()[0]["status"] == "technical_error"
+    assert resp.json()["status"] == "technical_error"
+
+
+def test_rate_limit(client):
+    for _ in range(10):
+        assert client.post("/api/checks", json={"input": "Tekst"}).status_code == 200
+    resp = client.post("/api/checks", json={"input": "Tekst"})
+    assert resp.status_code == 429
+    assert resp.json() == {"detail": RATE_LIMIT_MESSAGE}
+
+
+def test_claim_serializes_polish_verdict_label():
+    claim = ClaimResult(
+        claim="c",
+        verdict=Verdict.MISLEADING,
+        reasoning="r",
+        strength="s",
+        premises=[],
+        sources=[
+            Source(
+                title="t",
+                publisher="p",
+                published_at=None,
+                fetched_at=datetime.now(UTC),
+                url="https://example.com",
+                source_type="article",
+            )
+        ],
+        limitations=[],
+    )
+    data = CheckResult(status=Status.OK, claims=[claim]).model_dump(mode="json")
+    assert data["claims"][0]["verdict_label"] == "wprowadzające w błąd"
+
+
+def test_non_ok_status_needs_a_message():
+    with pytest.raises(ValueError):
+        CheckResult(status=Status.CANNOT_CHECK)

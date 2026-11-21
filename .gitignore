@@ -151,6 +151,7 @@ activemq-data/
 
 # Environments
 .env
+.env.*
 .envrc
 .venv
 env/
@@ -227,5 +228,3 @@ __marimo__/
 CLAUDE.local.md
 !.claude/skills/build/
 
-# PRAWDOWID check log
-/data/
