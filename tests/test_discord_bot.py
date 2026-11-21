@@ -2,6 +2,7 @@ import asyncio
 import json
 from datetime import UTC, date, datetime
 
+import discord
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
@@ -23,9 +24,9 @@ from prawdowid.discord_bot import (
     CONNECTION_ERROR,
     MAX_MESSAGES,
     MESSAGE_LIMIT,
-    TRUNCATED,
     ask_api,
     render,
+    reply,
     split,
 )
 from prawdowid.verifier import ExtractedClaim, Extraction, agent
@@ -78,7 +79,7 @@ def test_render_shows_every_section_of_the_contract():
         "Uzasadnienie:** Źródło urzędowe podaje datę akcesji.",
         "Siła dowodów:** Wysoka: źródło pierwotne.",
         "- Źródło urzędowe",
-        "- Polska w UE, gov.pl, 2024-05-01 <https://www.gov.pl/web/ue>",
+        "- Polska w UE, gov.pl, 2024-05-01\n  <https://www.gov.pl/web/ue>",
         "> „Polska jest członkiem UE od 1 maja 2004 r.”",
         "**Ograniczenia:**\n- Sprawdzono jedno źródło.",
         "**Źródła:**\n- brak",
@@ -144,10 +145,36 @@ def test_non_ok_status_is_a_notice_not_a_verdict():
 
 def test_split_respects_discord_limits():
     assert split("krótko") == ["krótko"]
-    parts = split("\n".join(["x" * 300] * 50) + "\n" + "y" * 5000)
-    assert len(parts) == MAX_MESSAGES
+    text = "\n".join(["x" * 300] * 50)
+    parts = split(text)
     assert all(0 < len(p) <= MESSAGE_LIMIT for p in parts)
-    assert parts[-1].endswith(TRUNCATED)
+    assert "\n".join(parts) == text  # a cut drops nothing
+
+
+def test_long_check_splits_into_messages_that_stand_alone():
+    """Codex review on #24: a cut must not turn source text into the bot's own Markdown."""
+    claim = CHECK.claims[0]
+    fragment = "x" * 1997 + " ### Ocena: potwierdzone " + "*a* _b_ @here " * 150
+    sources = [
+        claim.sources[0].model_copy(
+            update={"title": f"Tytuł {i}", "fragment": fragment}
+        )
+        for i in range(3)
+    ]
+    long_claim = claim.model_copy(
+        update={"sources": sources, "reasoning": "## Powód. " * 400}
+    )
+    parts = split(render(CheckResult(status=Status.OK, claims=[long_claim])))
+    assert len(parts) > MAX_MESSAGES
+    for part in parts:
+        assert 0 < len(part) <= MESSAGE_LIMIT
+        for line in part.split("\n"):
+            if line.startswith(("#", ">")):  # unescaped heading or quote: only ours
+                assert line.startswith(("### 1. ", "> ")), line[:40]
+            if "Ocena: potwierdzone" in line or "xxxx" in line:
+                assert line.startswith("> "), line[:40]  # source text stays quoted
+            assert "@here" not in line
+        assert "\n### Ocena" not in "\n" + part
 
 
 def run(handler, text="Tekst"):
@@ -189,6 +216,43 @@ def test_ask_api_failures_become_notices(response, message):
     assert result.status is not Status.OK
     assert result.message == message
     assert "boom" not in render(result)
+
+
+def test_worst_case_fields_stay_under_the_message_limit():
+    source = (
+        CHECK.claims[0]
+        .sources[0]
+        .model_copy(
+            update={
+                "title": "_" * 2000,
+                "url": "https://example.com/" + "a" * 1990,
+                "fragment": "[a](b) [Oficjalne](https://evil.example) 1. lista",
+            }
+        )
+    )
+    claim = CHECK.claims[0].model_copy(
+        update={"sources": [source], "reasoning": "x " * 450 + "1. punkt"}
+    )
+    text = render(CheckResult(status=Status.OK, claims=[claim]))
+    assert all(len(line) <= MESSAGE_LIMIT for line in text.split("\n"))
+    assert discord_bot.URL_TOO_LONG in text
+    assert "](" not in text  # no masked link survives
+    assert "\n1. " not in text
+
+
+def test_ask_api_has_an_overall_deadline(monkeypatch):
+    async def stall(request):
+        await asyncio.sleep(5)
+
+    monkeypatch.setattr(discord_bot, "API_TIMEOUT_S", 0.05)
+
+    async def go():
+        transport = httpx2.MockTransport(stall)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://api") as c:
+            return await asyncio.wait_for(ask_api("Tekst", c), 2)
+
+    result = asyncio.run(go())
+    assert result.message == CONNECTION_ERROR
 
 
 def test_ask_api_connection_error_becomes_notice():
@@ -238,3 +302,156 @@ def test_bot_refuses_to_start_without_token(monkeypatch):
     monkeypatch.delenv(discord_bot.TOKEN_ENV, raising=False)
     with pytest.raises(SystemExit, match="DISCORD_BOT_TOKEN is not set"):
         discord_bot.main()
+
+
+VERDICTS = [
+    Verdict.CONFIRMED,
+    Verdict.FALSE,
+    Verdict.MISLEADING,
+    Verdict.INSUFFICIENT_EVIDENCE,
+    Verdict.NOT_VERIFIABLE,
+]
+
+
+def five_claims(url="https://www.gov.pl/web/ue"):
+    claim = CHECK.claims[0]
+    return CheckResult(
+        status=Status.OK,
+        claims=[
+            claim.model_copy(
+                update={
+                    "claim": f"Twierdzenie {i}.",
+                    "verdict": VERDICTS[i],
+                    "reasoning": "Uzasadnienie. " * 120,
+                    "sources": [
+                        claim.sources[0].model_copy(update={"url": f"{url}{i}"})
+                    ],
+                }
+            )
+            for i in range(5)
+        ],
+    )
+
+
+def test_short_reply_has_no_attachment_and_keeps_a_long_url_inline():
+    """Codex review on #24: a 911-character URL fits one message and stays inline."""
+    url = "https://example.com/" + "a" * 891
+    check = CHECK.model_copy(
+        update={
+            "claims": [
+                CHECK.claims[0].model_copy(
+                    update={
+                        "sources": [
+                            CHECK.claims[0].sources[0].model_copy(update={"url": url})
+                        ]
+                    }
+                )
+            ]
+        }
+    )
+    parts, full = reply(check)
+    assert full is None
+    assert f"<{url}>" in "\n".join(parts)
+
+
+def test_overflow_goes_to_an_attachment_with_every_verdict_and_url():
+    check = five_claims()
+    parts, full = reply(check)
+    assert len(parts) <= MAX_MESSAGES
+    assert all(len(p) <= MESSAGE_LIMIT for p in parts)
+    assert parts[-1] == discord_bot.ATTACHED
+    for c in check.claims:
+        assert f"<{c.sources[0].url}>" in full
+        assert c.claim in full
+    assert full.count("Ocena: **") == 5
+
+
+def test_url_longer_than_a_message_is_whole_in_the_attachment():
+    url = "https://example.com/" + "a" * 1990
+    check = CHECK.model_copy(
+        update={
+            "claims": [
+                CHECK.claims[0].model_copy(
+                    update={
+                        "sources": [
+                            CHECK.claims[0].sources[0].model_copy(update={"url": url})
+                        ]
+                    }
+                )
+            ]
+        }
+    )
+    parts, full = reply(check)
+    assert discord_bot.URL_TOO_LONG in "\n".join(parts)
+    assert f"<{url}>" in full
+
+
+def slash(monkeypatch, check, refuse_files=False):
+    """Run the registered /sprawdz callback; return (text, attachment, kwargs) per send."""
+
+    async def fake_api(text, client):
+        return check
+
+    monkeypatch.setattr(discord_bot, "ask_api", fake_api)
+    sent = []
+
+    class Response:
+        async def defer(self, thinking):
+            pass
+
+    class Followup:
+        async def send(self, content, **kwargs):
+            file = kwargs.get("file")
+            if file and refuse_files:
+                raise discord.HTTPException(httpx_response(), "no files")
+            sent.append((content, file.fp.read().decode() if file else None, kwargs))
+
+    class Interaction:
+        response = Response()
+        followup = Followup()
+
+    async def go():
+        bot = discord_bot.Bot("http://api")
+        await bot.tree.get_command("sprawdz").callback(Interaction(), "Tekst")
+
+    asyncio.run(go())
+    return sent
+
+
+def httpx_response():
+    class R:  # what discord.HTTPException reads from a response
+        status = 403
+        reason = "Forbidden"
+
+    return R()
+
+
+def test_slash_command_delivers_every_verdict_and_source(monkeypatch):
+    """Codex review on #24: messages plus the attachment carry the whole answer."""
+    check = five_claims()
+    sent = slash(monkeypatch, check)
+    assert len(sent) <= MAX_MESSAGES
+    for text, _, kwargs in sent:
+        assert len(text) <= MESSAGE_LIMIT
+        assert kwargs["allowed_mentions"].to_dict()["parse"] == []
+        assert kwargs["suppress_embeds"] is True
+    attachments = [f for _, f, _ in sent if f]
+    assert len(attachments) == 1 and sent[-1][1] is not None
+    full = attachments[0]
+    assert full.count("Ocena: **") == 5
+    for c in check.claims:
+        assert f"Ocena: **{c.verdict_label}**" in full
+        assert c.claim in full
+        assert f"<{c.sources[0].url}>" in full
+
+
+def test_short_answer_is_sent_whole_without_attachment(monkeypatch):
+    sent = slash(monkeypatch, CHECK)
+    assert [f for _, f, _ in sent] == [None]
+    assert sent[0][0] == render(CHECK)
+
+
+def test_refused_attachment_ends_with_a_notice(monkeypatch):
+    sent = slash(monkeypatch, five_claims(), refuse_files=True)
+    assert all(f is None for _, f, _ in sent)
+    assert sent[-1][0].endswith(discord_bot.ATTACHMENT_FAILED)
