@@ -37,9 +37,18 @@ Where masking runs:
 ## What a check stores
 
 One JSON line in the check log (`PRAWDOWID_CHECK_LOG`, default `logs/checks.jsonl`, in Docker
-`/tmp/prawdowid/checks.jsonl` inside the backend container): session id, time, channel, the masked
-question, status, each claim with its verdict and source URLs, and the claims left unchecked. Page
-text from a link is not stored.
+`/tmp/prawdowid/checks.jsonl` inside the backend container), written by `POST /api/checks` for
+every check, also a failed or timed-out one (#14): session id, start and end time, total latency,
+channel, the masked question, status, `error` (`"timeout"` or the exception class when the check
+failed before an answer), the notice message, the masked page URL and content hash for a link, the
+time of each step (`fetch`, `extract`, and per claim `factcheck`, `euvsdisinfo`, `web`, `rerank`,
+`judge`, `retry_*`), every model answer (model name, input and output tokens), `cost_usd`, security
+events (kind and location, never the wording), ids of matched incidents, each claim with its
+verdict, sources (masked URL and source type) and limitations (search errors, time limit), and the
+claims left unchecked. Page text from a link is not stored. `GET /api/sessions/{id}` returns the
+records of one session as stored. A check cut by the API's 60 s limit (the pipeline's own 25 s budget
+normally ends it first) keeps only its total latency and `error: "timeout"`: the steps and model
+calls it had made are not passed out of the cancelled task.
 
 Web search in a check also adds the public pages it fetched to the source cache
 (`corpus/docs.jsonl`). Those carry no user text and no session id. A check never writes the

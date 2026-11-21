@@ -5,6 +5,7 @@ import logging
 import re
 import time
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Path, Request, Response
 from fastapi.responses import JSONResponse
@@ -90,15 +91,19 @@ async def create_check(
     request: Request, response: Response, body: CheckRequest
 ) -> CheckResult:
     started = time.perf_counter()
+    started_at = datetime.now(UTC)
     session = request.headers.get(SESSION_HEADER, "")
     if not re.fullmatch(SESSION_ID, session):
         session = str(uuid.uuid4())
     response.headers[SESSION_HEADER] = session
+    # Why a check ended in a technical error, for the check log; None when verify returned.
+    error = None
     try:
         async with asyncio.timeout(VERIFY_TIMEOUT_S):
             result = await verify(body.input)
-    except Exception:
+    except Exception as exc:
         log.exception("verify failed")
+        error = "timeout" if isinstance(exc, TimeoutError) else type(exc).__name__
         result = CheckResult(
             status=Status.TECHNICAL_ERROR, message=TECHNICAL_ERROR_MESSAGE
         )
@@ -111,16 +116,34 @@ async def create_check(
         log.exception("incident matching failed")
     channel = request.headers.get("x-channel", "web")
     channel = channel if channel in CHANNELS else "other"
+    latency_ms = round((time.perf_counter() - started) * 1000)
     log.info(
         "check session=%s channel=%s status=%s latency_ms=%d input_chars=%d",
         session,
         channel,
         result.status,
-        round((time.perf_counter() - started) * 1000),
+        latency_ms,
         len(body.input),
     )
-    checklog.record(session, channel, body.input, result)
+    checklog.record(
+        session,
+        channel,
+        body.input,
+        result,
+        started_at=started_at,
+        latency_ms=latency_ms,
+        error=error,
+    )
     return result
+
+
+@app.get("/api/sessions/{session}")
+@limiter.limit(RATE_LIMIT)
+async def read_session(
+    request: Request, session: str = Path(pattern=f"^{SESSION_ID}$")
+) -> list[dict]:
+    """Every check record of a demo session, oldest first, as stored (masked)."""
+    return checklog.read_session(session)
 
 
 @app.delete("/api/sessions/{session}")

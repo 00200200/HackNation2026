@@ -22,7 +22,7 @@ from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
 from prawdowid import euvsdisinfo, factcheck, judge, rerank, websearch
-from prawdowid.contract import SecurityEvent, Source, Verdict
+from prawdowid.contract import ModelCall, SecurityEvent, Source, Verdict
 
 log = logging.getLogger("prawdowid")
 
@@ -49,6 +49,7 @@ class ClaimCheck(BaseModel):
     # Reranker and judge calls; None when a request may be billed but its price is unknown.
     cost_usd: float | None
     steps_ms: dict[str, int]
+    model_calls: list[ModelCall] = []
 
 
 async def check_claim(
@@ -56,18 +57,19 @@ async def check_claim(
 ) -> ClaimCheck:
     """Verdict for one claim. `deadline` is `loop.time()` when the whole check must end."""
     steps: dict[str, int] = {}
-    costs: list[float | None] = []
+    # Messages of each reranker and judge run, priced and logged in `_done`.
+    runs: list[list[ModelMessage]] = []
     # Injections the judge found in retrieved pages, kept from both passes.
     events: list[SecurityEvent] = []
     try:
         async with asyncio.timeout_at(deadline):
             candidates, limits = await _retrieve(claim, queries, steps)
-            judgement = await _judge(claim, candidates, exclude_url, steps, costs)
+            judgement = await _judge(claim, candidates, exclude_url, steps, runs)
             events += judgement.security_events
     except TimeoutError:
-        # `costs` is None for a model request cut mid-flight, 0 when only search was cut.
+        # The cost is None for a model request cut mid-flight, 0 when only search was cut.
         return _done(
-            claim, _not_checked(TIME_LIMIT.format(budget=CHECK_BUDGET_S)), costs, steps
+            claim, _not_checked(TIME_LIMIT.format(budget=CHECK_BUDGET_S)), runs, steps
         )
 
     # With no queries the first pass already searched the claim itself.
@@ -84,7 +86,7 @@ async def check_claim(
                         d.to_source(fragment=d.text) for d in web.documents
                     ]
                     judgement = await _judge(
-                        claim, more, exclude_url, steps, costs, "retry_"
+                        claim, more, exclude_url, steps, runs, "retry_"
                     )
                     events += judgement.security_events
                     # Only a finished retry counts: a cut one keeps the first pass as it was.
@@ -103,7 +105,7 @@ async def check_claim(
         dict.fromkeys([*reasons, *limits.values(), *judgement.limitations])
     )
     judgement.security_events = events[:1]  # same kind and location: one is enough
-    return _done(claim, judgement, costs, steps)
+    return _done(claim, judgement, runs, steps)
 
 
 async def _retrieve(
@@ -169,12 +171,12 @@ async def _judge(
     candidates: list[Source],
     exclude_url: str | None,
     steps: dict[str, int],
-    costs: list[float | None],
+    runs: list[list[ModelMessage]],
     prefix: str = "",
 ) -> judge.Judgement:
     """Steps 3 to 5. The linked page is never evidence for its own claims."""
     ranking = await _priced(
-        costs,
+        runs,
         _timed(
             steps,
             prefix + "rerank",
@@ -182,18 +184,18 @@ async def _judge(
         ),
     )
     return await _priced(
-        costs, _timed(steps, prefix + "judge", judge.judge(claim, ranking))
+        runs, _timed(steps, prefix + "judge", judge.judge(claim, ranking))
     )
 
 
-async def _priced(costs: list[float | None], aw):
-    """Adds the price of the model run inside `aw` to `costs`, also when the time limit cuts it:
-    a request without an answer may be billed, so its price is unknown (None)."""
+async def _priced(runs: list[list[ModelMessage]], aw):
+    """Keeps the messages of the model run inside `aw` in `runs`, also when the time limit cuts
+    it: a request without an answer may be billed, so its price is unknown (None)."""
     with capture_run_messages() as messages:
         try:
             return await aw
         finally:
-            costs.append(_cost(messages))
+            runs.append(messages)
 
 
 def _needs_more(judgement: judge.Judgement) -> bool:
@@ -241,9 +243,10 @@ def _not_checked(limitation: str) -> judge.Judgement:
 def _done(
     claim: str,
     judgement: judge.Judgement,
-    costs: list[float | None],
+    runs: list[list[ModelMessage]],
     steps: dict[str, int],
 ) -> ClaimCheck:
+    costs = [_cost(m) for m in runs]
     cost = None if None in costs else sum(costs)
     log.info(
         "claim check claim=%r verdict=%s sources=%d cost_usd=%s steps_ms=%s",
@@ -253,4 +256,19 @@ def _done(
         cost,
         steps,
     )
-    return ClaimCheck(judgement=judgement, cost_usd=cost, steps_ms=steps)
+    return ClaimCheck(
+        judgement=judgement,
+        cost_usd=cost,
+        steps_ms=steps,
+        model_calls=[
+            model_call(r) for m in runs for r in m if isinstance(r, ModelResponse)
+        ],
+    )
+
+
+def model_call(response: ModelResponse) -> ModelCall:
+    return ModelCall(
+        model=response.model_name,
+        input_tokens=response.usage.input_tokens,
+        output_tokens=response.usage.output_tokens,
+    )
