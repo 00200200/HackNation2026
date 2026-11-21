@@ -159,3 +159,86 @@ def test_cached_pages_past_retention_are_dropped(tmp_path):
     assert save_document(page("https://gov.pl/x", 0), again) is True
     [d] = load_documents(again)
     assert d.fetched_at > datetime.now(UTC) - timedelta(days=1)
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        (
+            "ES91 2100 0418 4502 0005 1332 BANK NAME",
+            "[numer konta] BANK NAME",
+        ),
+        ("BE71 0961 2345 6769 BANK NAME", "[numer konta] BANK NAME"),
+        ("BE71 0961 2345 6769 AB CD EF", "[numer konta] AB CD EF"),
+    ],
+)
+def test_words_after_an_iban_do_not_hide_it(text, masked):
+    assert mask_personal_data(text) == masked
+
+
+def test_concurrent_writers_keep_every_record(check_log):
+    from concurrent.futures import ThreadPoolExecutor
+
+    result = CheckResult(status=Status.TECHNICAL_ERROR, message="x")
+    checklog.record("gone-0001", "web", "pytanie", result)
+
+    def write(i):
+        if i % 5 == 0:
+            checklog.delete_session("gone-0001")
+        checklog.record(f"s-{i:06d}", "web", "pytanie", result)
+
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(write, range(40)))  # re-raises a delete_session crash
+    sessions = [r["session"] for r in records(check_log)]
+    assert sorted(sessions) == [f"s-{i:06d}" for i in range(40)]
+
+
+def test_claims_and_sources_are_masked_in_the_check_log(check_log):
+    from prawdowid.contract import ClaimResult
+
+    claim = ClaimResult.model_construct(
+        claim=f"PESEL {PESEL} należy do posła.",
+        verdict="unverified",
+        sources=[
+            type("S", (), {"url": "https://example.org/?mail=jan.kowalski@example.com"})
+        ],
+    )
+    result = CheckResult.model_construct(
+        status=Status.OK, claims=[claim], unchecked_claims=[f"tel. {PHONE}"]
+    )
+    checklog.record("s-000001", "web", "pytanie", result)
+    text = check_log.read_text()
+    assert (
+        PESEL not in text and "jan.kowalski" not in text and "600 100 200" not in text
+    )
+
+
+def test_an_unexpected_exception_is_logged_masked(
+    client, check_log, caplog, monkeypatch
+):
+    import prawdowid.app as app_module
+
+    async def broken(text):
+        raise RuntimeError(f"fetch failed https://x.pl/?u=jan@example.com {PESEL}")
+
+    monkeypatch.setattr(app_module, "verify", broken)
+    api, _ = client
+    with caplog.at_level(logging.INFO, logger="prawdowid"):
+        api.post("/api/checks", json={"input": TEXT})
+    assert "verify failed" in caplog.text and "RuntimeError" in caplog.text
+    assert "jan@example.com" not in caplog.text and PESEL not in caplog.text
+
+
+def test_a_broken_log_call_is_not_raised_by_the_filter():
+    from prawdowid.privacy import MaskingFilter
+
+    for msg, args in [
+        ("x=%d", (PESEL,)),
+        ("x=%d", ("a\n" + PESEL,)),
+        ("x=%d", (["a\n" + PESEL],)),
+        ("%(x)s", ({"y": PESEL},)),
+        ("query=%r", ("a\n" + PESEL,)),  # a valid call: repr escapes the newline
+    ]:
+        record = logging.LogRecord("prawdowid", logging.INFO, "", 0, msg, args, None)
+        assert MaskingFilter().filter(record) is True
+        assert PESEL not in record.getMessage()

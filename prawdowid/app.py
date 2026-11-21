@@ -17,10 +17,13 @@ from slowapi.util import get_remote_address
 from prawdowid import checklog
 from prawdowid.contract import CheckResult, Status
 from prawdowid.incidents import match_incidents
+from prawdowid.privacy import MaskingFilter
 from prawdowid.verifier import is_link, verify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:  %(name)s %(message)s")
 log = logging.getLogger("prawdowid")
+# Last line of defence: an unexpected exception (logged with its traceback) can carry raw input.
+log.addFilter(MaskingFilter())
 
 MAX_INPUT_CHARS = 5000
 RATE_LIMIT = "10/minute"

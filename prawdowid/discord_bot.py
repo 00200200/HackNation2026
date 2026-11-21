@@ -29,8 +29,10 @@ from prawdowid.contract import (
     Source,
     Status,
 )
+from prawdowid.privacy import MaskingFilter
 
 log = logging.getLogger("prawdowid.discord")
+log.addFilter(MaskingFilter())  # logger filters do not apply to child loggers
 
 TOKEN_ENV = "DISCORD_BOT_TOKEN"
 API_URL_ENV = "PRAWDOWID_API_URL"

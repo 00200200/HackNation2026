@@ -5,6 +5,7 @@ dropped on every write, and `delete_session` removes every record of one session
 only place a check is kept: the source cache and the database are never written by a check.
 """
 
+import fcntl
 import json
 import logging
 import os
@@ -34,13 +35,13 @@ def record(
         "status": result.status,
         "claims": [
             {
-                "claim": c.claim,
+                "claim": mask_personal_data(c.claim),
                 "verdict": c.verdict,
-                "sources": [str(s.url) for s in c.sources],
+                "sources": [mask_personal_data(str(s.url)) for s in c.sources],
             }
             for c in result.claims
         ],
-        "unchecked_claims": result.unchecked_claims,
+        "unchecked_claims": [mask_personal_data(c) for c in result.unchecked_claims],
     }
     try:
         # ponytail: rewrites the file on every check to apply retention; fine for a demo log.
@@ -58,10 +59,18 @@ def delete_session(session: str) -> int:
 def _rewrite(keep, extra: list[dict] = ()) -> int:
     """Keep the records `keep` accepts, append `extra`. Number of records dropped."""
     path = CHECK_LOG  # looked up per call, so tests can point it elsewhere
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # One writer at a time, across threads and processes: each call opens its own descriptor, and
+    # flock locks per descriptor. Without it two writers read the same file and one record is lost.
+    with path.with_suffix(".lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return _rewrite_locked(path, keep, extra)
+
+
+def _rewrite_locked(path: Path, keep, extra: list[dict]) -> int:
     lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
     records = [r for r in map(_parse, lines) if r]
     kept = [r for r in records if keep(r)] + list(extra)
-    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in kept),

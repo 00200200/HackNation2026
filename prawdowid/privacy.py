@@ -10,7 +10,9 @@ is PESEL, which this module already covers, and it pulls in spaCy and a language
 masking is applied: docs/privacy.md.
 """
 
+import logging
 import re
+import traceback
 
 # One retention period for everything we keep: check log records (prawdowid/checklog.py), the source
 # cache corpus/docs.jsonl and pages in the source store (prawdowid/cache.py, `delete_after`). The web page text
@@ -24,9 +26,12 @@ IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?\b"
 CARD = re.compile(r"\b\d{4}(?:[ -]\d{4}){2,3}(?:[ -]\d{1,3})?\b|\b\d{13,19}\b")
 PHONE = re.compile(r"\+48[ -]?\d{3}[ -]?\d{3}[ -]?\d{3}\b|\b\d{3}-\d{3}-\d{3}\b")
 ELEVEN_DIGITS = re.compile(r"\b\d{11}\b")
+REPR_ESCAPE = re.compile(r"\\[nrt]")
 PESEL_WEIGHTS = (1, 3, 7, 9, 1, 3, 7, 9, 1, 3)
 
 
+# ponytail: an ordinary 11-digit number passes the PESEL checksum 1 time in 10 and is masked too;
+# such numbers are rare in claims.
 def is_pesel(digits: str) -> bool:
     total = sum(int(d) * w for d, w in zip(digits, PESEL_WEIGHTS))
     return (10 - total % 10) % 10 == int(digits[10])
@@ -42,7 +47,11 @@ def is_luhn(digits: str) -> bool:
 
 def is_iban(text: str) -> bool:
     s = text.replace(" ", "")
-    return int("".join(str(int(c, 36)) for c in s[4:] + s[:4])) % 97 == 1
+    # IBANs are 15-34 characters; the length check stops a stripped match passing by chance.
+    return (
+        15 <= len(s) <= 34
+        and int("".join(str(int(c, 36)) for c in s[4:] + s[:4])) % 97 == 1
+    )
 
 
 def _digits(text: str) -> str:
@@ -50,15 +59,18 @@ def _digits(text: str) -> str:
 
 
 def _masker(valid, placeholder: str):
-    """re.sub callback: mask a valid match. The optional last group may be a separate token
-    (a CVV, a currency), so when the whole match fails it is retried without that group."""
+    """re.sub callback: mask a valid match. Words after the number (a CVV, a currency, a bank name)
+    can match as more groups, so when the whole match fails, trailing tokens are dropped one by one
+    and the longest valid head is masked."""
 
     def sub(m: re.Match) -> str:
         s = m.group()
-        if valid(s):
-            return placeholder
-        head, sep, tail = re.fullmatch(r"(.*?)([ -]?)([^ -]*)", s).groups()
-        return placeholder + sep + tail if sep and valid(head) else s
+        head = s
+        while head:
+            if valid(head):
+                return placeholder + s[len(head) :]
+            head = head[: max(head.rfind(" "), head.rfind("-"), 0)]
+        return s
 
     return sub
 
@@ -75,4 +87,32 @@ def mask_personal_data(text: str) -> str:
     )
     # ponytail: a 13+ digit run that passes Luhn (1 in 10) is masked even if it is an amount;
     # amounts that large are rare in claims and usually written in groups of three.
-    return CARD.sub(_masker(lambda s: is_luhn(_digits(s)), "[numer karty]"), text)
+    return CARD.sub(_masker(_is_card, "[numer karty]"), text)
+
+
+def _is_card(text: str) -> bool:
+    digits = _digits(text)
+    return 13 <= len(digits) <= 19 and is_luhn(digits)
+
+
+class MaskingFilter(logging.Filter):
+    """Mask every log record, the traceback included: an unexpected exception can carry raw
+    user text (a link with an e-mail in its query string) in its message."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            message = record.getMessage()
+        except (TypeError, ValueError, KeyError):
+            # A broken log call: keep its text, masked, instead of failing the request.
+            args = record.args
+            values = args.values() if isinstance(args, dict) else args or ()
+            message = " ".join(map(str, (record.msg, *values)))
+        # A repr (%r, a list arg) writes a newline as backslash-n, and the n would hide the digits
+        # after it from the \b patterns; in a log line a space reads the same.
+        record.msg = mask_personal_data(REPR_ESCAPE.sub(" ", message))
+        record.args = None
+        if record.exc_info:
+            text = "".join(traceback.format_exception(*record.exc_info)).rstrip("\n")
+            record.exc_text = mask_personal_data(REPR_ESCAPE.sub(" ", text))
+            record.exc_info = None
+        return True
