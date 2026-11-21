@@ -1,6 +1,10 @@
 """Runs the Prawdowid eval and writes results.
 
 Usage: uv run python -m evals.run [--quick] [--cases evals/cases.jsonl] [--corpus corpus/evidence.jsonl]
+    [--concurrency 4] [--resume PARTIAL.jsonl | --retry-failed PARTIAL.jsonl] [--only ID,ID]
+
+Every finished case prints one line and is appended to evals/results/run-<timestamp>.partial.jsonl,
+so a killed run keeps what it finished and --resume reruns only the rest.
 """
 
 from __future__ import annotations
@@ -10,6 +14,8 @@ import json
 import subprocess
 import sys
 import time
+import urllib.error
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -25,6 +31,7 @@ NON_PRODUCT = (
     "evals/results/",
 )
 NON_PRODUCT_FILES = (".gitignore", "LICENSE")
+RETRY_BACKOFF_S = 20.0  # one retry per call; slowapi's 10/minute window needs a pause
 
 
 def git(*args: str) -> str:
@@ -47,22 +54,132 @@ def is_product(path: str) -> bool:
     )
 
 
+def retryable(exc: Exception) -> bool:
+    """Rate limit, server error or timeout: worth one more try."""
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code == 429 or exc.code >= 500
+    if isinstance(exc, urllib.error.URLError):
+        return isinstance(exc.reason, TimeoutError)
+    return isinstance(exc, TimeoutError)
+
+
 def call(case: dict, channel: str) -> dict:
-    adapter.wait_turn()  # rate limit; not counted as latency
-    start = time.monotonic()
-    try:
-        response, error = adapter.ask(case["input"], channel), None
-    except (
-        OSError,
-        ValueError,
-        RuntimeError,
-    ) as exc:  # network, HTTP, bad JSON, missing URL
-        response, error = {"status": "technical_error"}, f"{type(exc).__name__}: {exc}"
+    """One request; latency is the wall time of the attempt that answered."""
+    for attempt in (1, 2):
+        adapter.wait_turn()  # rate limit; not counted as latency
+        start = time.monotonic()
+        try:
+            response, error = adapter.ask(case["input"], channel), None
+        except (
+            OSError,
+            ValueError,
+            RuntimeError,
+        ) as exc:  # network, HTTP, bad JSON, missing URL
+            response, error = (
+                {"status": "technical_error"},
+                f"{type(exc).__name__}: {exc}",
+            )
+            if attempt == 1 and retryable(exc):
+                print(
+                    f"retry {case.get('id')} {channel} after {error}; "
+                    f"waiting {RETRY_BACKOFF_S:.0f}s",
+                    flush=True,
+                )
+                time.sleep(RETRY_BACKOFF_S)
+                continue
+        break
     return {
         "channel": channel,
         "response": response,
         "seconds": time.monotonic() - start,
         "error": error,
+    }
+
+
+def run_case(case: dict) -> dict:
+    channels = [
+        ch for ch in case.get("channels") or ["web"] if adapter.supports(ch)
+    ] or ["web"]
+    runs = [call(case, ch) for ch in channels]
+    repeat = call(case, runs[0]["channel"]) if case.get("repeat") else None
+    return {"case": case, "runs": runs, "repeat": repeat}
+
+
+def failed(row: dict) -> bool:
+    return any(run["error"] for run in [*row["runs"], row["repeat"] or {"error": None}])
+
+
+def progress(row: dict, done: int, total: int, elapsed: float) -> str:
+    case, runs = row["case"], row["runs"]
+    expected = (
+        case.get("expected_verdict") or f"status:{case.get('expected_status', 'ok')}"
+    )
+    predicted = [metrics.predicted_verdict(run["response"]) for run in runs]
+    ok = not failed(row) and all(p == expected for p in predicted)
+    eta = elapsed / done * (total - done)
+    return (
+        f"[{done}/{total}] {case.get('id')} {'ok' if ok else 'FAIL'} "
+        f"verdict={'/'.join(predicted)} expected={expected} "
+        f"{sum(run['seconds'] for run in runs):.1f}s ETA {eta / 60:.1f}min"
+        + "".join(f" error={run['error']}" for run in runs if run["error"])
+    )
+
+
+def run_all(
+    cases: list[dict],
+    concurrency: int,
+    reused: dict[str, dict],
+    partial: Path,
+    version: dict,
+) -> list[dict]:
+    """Runs the cases not in `reused`, appends every row to `partial`, returns rows in case order."""
+    rows = dict(reused)
+    todo = [c for c in cases if c["id"] not in rows]
+    partial.parent.mkdir(parents=True, exist_ok=True)
+    with partial.open("a", encoding="utf-8") as out:
+
+        def save(row: dict) -> None:
+            out.write(json.dumps(row, ensure_ascii=False) + "\n")
+            out.flush()
+
+        for row in reused.values():
+            save(row)
+        if reused:
+            print(
+                f"reused {len(reused)} finished cases, running {len(todo)}", flush=True
+            )
+        start = time.monotonic()
+        with ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
+            futures = [pool.submit(run_case, case) for case in todo]
+            try:
+                for done, future in enumerate(as_completed(futures), 1):
+                    row = {**future.result(), **version}
+                    rows[row["case"]["id"]] = row
+                    save(row)
+                    print(
+                        progress(row, done, len(todo), time.monotonic() - start),
+                        flush=True,
+                    )
+            except BaseException:  # Ctrl-C or a crash: start nothing new
+                pool.shutdown(cancel_futures=True)
+                raise
+    return [rows[c["id"]] for c in cases]
+
+
+def load_reusable(path: str, cases: list[dict], version: dict) -> dict[str, dict]:
+    """Error-free rows of a partial file, for the same code and an unchanged case.
+
+    Rows from a tree with uncommitted product changes are reused only by a run that is dirty too.
+    """
+    current = {c["id"]: c for c in cases}
+    rows = {row["case"].get("id"): row for row in load_jsonl(path)}  # later line wins
+    return {
+        cid: row
+        for cid, row in rows.items()
+        if current.get(cid) == row["case"]
+        and row.get("commit") == version["commit"]
+        and (not row.get("dirty") or version["dirty"])
+        and not failed(row)
     }
 
 
@@ -72,18 +189,7 @@ def signature(response: dict) -> tuple:
     return metrics.predicted_verdict(response), tuple(urls)
 
 
-def evaluate(
-    cases: list[dict], corpus: dict[str, str] | None
-) -> tuple[dict, list[dict]]:
-    rows = []
-    for case in cases:
-        channels = [
-            ch for ch in case.get("channels") or ["web"] if adapter.supports(ch)
-        ] or ["web"]
-        runs = [call(case, ch) for ch in channels]
-        repeat = call(case, runs[0]["channel"]) if case.get("repeat") else None
-        rows.append({"case": case, "runs": runs, "repeat": repeat})
-
+def score(rows: list[dict], corpus: dict[str, str] | None) -> tuple[dict, list[dict]]:
     main = [r["runs"][0]["response"] for r in rows]
     labelled = [
         (
@@ -186,6 +292,21 @@ def main() -> int:
     parser.add_argument(
         "--quick", action="store_true", help="first case of each scenario only"
     )
+    parser.add_argument(
+        "--concurrency", type=int, default=4, help="cases in flight (1: one by one)"
+    )
+    previous = parser.add_mutually_exclusive_group()
+    previous.add_argument(
+        "--resume",
+        metavar="PARTIAL",
+        help="reuse error-free cases of a .partial.jsonl, run the rest",
+    )
+    previous.add_argument(
+        "--retry-failed",
+        metavar="PARTIAL",
+        help="rerun only the cases that errored in a .partial.jsonl",
+    )
+    parser.add_argument("--only", help="comma-separated case ids to run")
     args = parser.parse_args()
 
     cases = load_jsonl(args.cases)
@@ -202,11 +323,32 @@ def main() -> int:
         cases = [
             c for c in cases if not (c["scenario"] in seen or seen.add(c["scenario"]))
         ]
+    if args.only:
+        wanted = set(args.only.split(","))
+        cases = [c for c in cases if c["id"] in wanted]
     corpus = (
         {d["url"]: d["text"] for d in load_jsonl(args.corpus)} if args.corpus else None
     )
 
-    results, per_case = evaluate(cases, corpus)
+    commit = git("rev-parse", "HEAD")
+    paths = [
+        line[3:].split(" -> ")[-1] for line in git("status", "--porcelain").splitlines()
+    ]
+    dirty = [path for path in paths if is_product(path)]
+    version = {"commit": commit, "dirty": bool(dirty)}
+    previous_file = args.resume or args.retry_failed
+    reused = load_reusable(previous_file, cases, version) if previous_file else {}
+    if args.retry_failed:
+        in_file = {row["case"].get("id") for row in load_jsonl(args.retry_failed)}
+        cases = [c for c in cases if c["id"] in in_file]
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
+    partial = Path("evals/results", f"run-{stamp}.partial.jsonl")
+    print(
+        f"{len(cases)} cases, concurrency {args.concurrency}, progress: {partial}",
+        flush=True,
+    )
+    rows = run_all(cases, args.concurrency, reused, partial, version)
+    results, per_case = score(rows, corpus)
     required = [
         results[name]["pass"]
         for name in [
@@ -235,12 +377,8 @@ def main() -> int:
     if example_file:
         warnings.append("example cases file: results do not count for submission")
 
-    paths = [
-        line[3:].split(" -> ")[-1] for line in git("status", "--porcelain").splitlines()
-    ]
-    dirty = [path for path in paths if is_product(path)]
     report = {
-        "commit": git("rev-parse", "HEAD"),
+        "commit": commit,
         "dirty": bool(dirty),
         "mode": "quick" if args.quick else "full",
         "timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -249,6 +387,8 @@ def main() -> int:
         "scenarios": scenarios,
         "metrics": results,
         "cases_file": args.cases,
+        "concurrency": args.concurrency,  # latency is measured with this many cases in flight
+        "reused_cases": sorted(reused),
         "coverage_ok": coverage_ok,
         "overall_pass": all(p is True for p in required) and coverage_ok,
         "warnings": warnings,
