@@ -149,10 +149,9 @@ body.checked .ask textarea { min-height: 3.25rem; }
 body.checked .results { flex: 1 0 auto; }
 #result:empty { display: none; }
 #result { margin: 3rem 0; scroll-margin-top: 1rem; }
-.session { margin: 2rem auto 3rem; max-width: 60rem; font-size: .92rem; color: var(--muted); }
 .link-btn { padding: 0; font: inherit; font-weight: 700; color: var(--red-deep); background: none; border: 0;
             text-decoration: underline; cursor: pointer; }
-.link-btn[disabled] { cursor: progress; }
+.link-btn[disabled], .link-btn[aria-disabled="true"] { cursor: progress; }
 .link-btn[hidden] { display: none; }
 
 .card { background: #fff; border-radius: 1.75rem; padding: 2rem 2.25rem; box-shadow: 0 1.5rem 3.75rem rgba(29, 18, 21, .09); }
