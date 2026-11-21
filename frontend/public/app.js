@@ -17,6 +17,18 @@ const NOTICE_TITLES = {
   needs_clarification: "Doprecyzuj, co chcesz sprawdzić",
 };
 const PLURAL = new Intl.PluralRules("pl-PL");
+// Values used by the corpus branch and the web-search PR; anything else is shown as sent.
+const SOURCE_TYPES = {
+  official: "źródło oficjalne",
+  fact_checker: "serwis fact-checkingowy",
+  fact_check: "serwis fact-checkingowy",
+  incident_base: "baza incydentów dezinformacji",
+  news: "serwis informacyjny",
+};
+// Enter sends only with a hardware keyboard; on touch keyboards it adds a new line.
+const ENTER_SENDS = window.matchMedia("(hover: hover) and (pointer: fine)");
+let busy = false;
+let errorFrame = 0;
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -46,8 +58,9 @@ function safeUrl(url) {
 }
 
 // Anything that is not a verdict: neutral look, never the colours of a verdict.
+// No role here: the #result region is already aria-live, a second live role would announce it twice.
 function notice(title, text, note) {
-  return el("div", { className: "notice", role: "status" },
+  return el("div", { className: "notice" },
     el("strong", { textContent: title }),
     text ? el("span", { textContent: text }) : null,
     note ? el("p", { className: "note", textContent: note }) : null);
@@ -63,7 +76,7 @@ function sourceItem(s, i) {
     host,
     s.published_at ? `opublikowano ${plDate(s.published_at)}` : "bez daty publikacji",
     s.fetched_at ? `pobrano ${plDate(s.fetched_at)}` : null,
-    s.source_type,
+    SOURCE_TYPES[s.source_type] ?? s.source_type,
   ].filter(Boolean).join(", ");
   return el("li", { className: "source" },
     s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null,
@@ -120,7 +133,10 @@ function render(check, seconds) {
   if (check.status !== "ok") {
     return notice(NOTICE_TITLES[check.status] ?? "Brak oceny", check.message, NOT_A_VERDICT);
   }
-  if (!check.claims.length) return notice("Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia.");
+  if (!check.claims.length) {
+    return notice("Nie znaleźliśmy zdania do sprawdzenia",
+      "Wklej fragment z konkretnym faktem, na przykład datą, liczbą albo nazwą instytucji.");
+  }
   return el("article", { className: "card" },
     el("div", { className: "card-head" },
       el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
@@ -164,21 +180,29 @@ async function errorMessage(resp) {
   return GENERIC_ERROR;
 }
 
-function setBusy(busy) {
-  submit.disabled = busy;
-  chips.forEach((chip) => { chip.disabled = busy; });
-  if (busy) result.setAttribute("aria-busy", "true");
-  else result.removeAttribute("aria-busy");
+// aria-disabled, not disabled: a disabled button drops keyboard focus. No aria-busy on #result:
+// screen readers may skip updates made while it is set, and the waiting notice should be heard.
+function setBusy(value) {
+  busy = value;
+  [submit, ...chips].forEach((control) => control.setAttribute("aria-disabled", String(value)));
 }
 
+// Cleared first so the same message is announced again on a repeated attempt.
 function fieldError(message) {
-  formError.textContent = message;
+  cancelAnimationFrame(errorFrame);
+  formError.textContent = "";
   formError.hidden = !message;
+  if (message) {
+    input.setAttribute("aria-invalid", "true");
+    errorFrame = requestAnimationFrame(() => { formError.textContent = message; });
+  } else {
+    input.removeAttribute("aria-invalid");
+  }
 }
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (submit.disabled) return;
+  if (busy) return;
   const text = input.value.trim();
   if (!text || chars(text) > MAX_CHARS) {
     fieldError(text ? `Treść jest za długa. Limit to ${MAX_CHARS} znaków.` : "Wpisz tekst do sprawdzenia.");
@@ -200,7 +224,7 @@ form.addEventListener("submit", async (event) => {
     const resp = await fetch("/api/checks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input: input.value }),
+      body: JSON.stringify({ input: text }),
       signal: AbortSignal.timeout(75000),
     });
     if (resp.ok) show(render(await resp.json(), elapsed()));
@@ -222,13 +246,14 @@ function updateCount() {
 updateCount();
 input.addEventListener("input", () => { updateCount(); fieldError(""); });
 input.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && ENTER_SENDS.matches) {
     event.preventDefault();
     form.requestSubmit();
   }
 });
 
 chips.forEach((chip) => chip.addEventListener("click", () => {
+  if (busy) return;
   input.value = chip.dataset.example;
   updateCount();
   form.requestSubmit();

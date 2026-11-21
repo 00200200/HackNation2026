@@ -11,7 +11,7 @@
   <script src="/app.js" defer></script>
 </head>
 <body>
-  <a class="skip" href="#tresc">Przejdź do treści</a>
+  <a class="skip" href="#input">Przejdź do pola wiadomości</a>
 
   <section class="hero" aria-labelledby="tytul">
     <div class="wrap">
@@ -28,7 +28,7 @@
               <path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#0B1F3A"/>
             </g>
           </svg>
-          <span class="brand-name" aria-hidden="true">faktczyfejk</span>
+          <span class="brand-name" aria-hidden="true" translate="no">faktczyfejk</span>
         </a>
         <nav aria-label="Menu">
           <a href="#oceny">Jak czytać wynik</a>
@@ -36,8 +36,8 @@
       </header>
 
       <div class="hero-body">
-        <h1 id="tytul"><span class="nowrap">fakt<sup><a href="#przypis-1" id="odnosnik-1" aria-label="przypis: co znaczy fakt"><svg class="title-mark" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="44" fill="#FFFFFF"/><path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#D4213D" stroke-width="27" stroke-linejoin="round"/><rect x="86.5" y="154" width="27" height="28" fill="#D4213D"/><g transform="translate(98 60) rotate(-12) scale(0.95)"><path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#0B1F3A"/><path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#0B1F3A"/><path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#0B1F3A"/><path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#0B1F3A"/></g></svg></a></sup></span> <span class="nowrap">czy fejk?</span></h1>
-        <p class="lead">Wklej wiadomość, którą dostałeś. Wskażemy zdania, które da się sprawdzić, i pokażemy przypisy
+        <h1 id="tytul" aria-label="fakt czy fejk?"><span class="nowrap">fakt<sup><a href="#przypis-1" id="odnosnik-1" aria-label="przypis: co znaczy fakt"><svg class="title-mark" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="44" fill="#FFFFFF"/><path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#D4213D" stroke-width="27" stroke-linejoin="round"/><rect x="86.5" y="154" width="27" height="28" fill="#D4213D"/><g transform="translate(98 60) rotate(-12) scale(0.95)"><path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#0B1F3A"/><path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#0B1F3A"/><path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#0B1F3A"/><path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#0B1F3A"/></g></svg></a></sup></span> <span class="nowrap">czy fejk?</span></h1>
+        <p class="lead">Wklej wiadomość, którą ktoś ci przesłał. Wskażemy zdania, które da się sprawdzić, i pokażemy przypisy
           ze źródeł albo powiemy, czego nie wiemy.</p>
         <p class="status-pill">Wersja testowa: źródła w budowie</p>
 
@@ -49,6 +49,7 @@
         </form>
         <p class="form-error" id="form-error" role="alert" hidden></p>
         <p class="hint" id="input-hint">Bezpłatnie i bez konta. Do 5000 znaków, bez danych osobowych.
+          <span class="enter-hint">Enter wysyła, Shift+Enter dodaje nowy wiersz.</span>
           <span class="count" aria-live="off"><span id="count">0</span>/5000</span></p>
 
         <div class="examples">
@@ -94,7 +95,7 @@
             </ol>
             <h4 class="part">Nasza ocena</h4>
             <div class="assessment">
-              <p class="explain"><b>Wyjaśnienie: </b>oba źródła podają tę samą datę przystąpienia, 12 marca 1999 r.</p>
+              <p class="explain"><b>Wyjaśnienie modelu: </b>oba źródła podają tę samą datę przystąpienia, 12 marca 1999 r.</p>
               <p class="strength"><b>Siła dowodów: </b>wysoka, dwa niezależne źródła, w tym urzędowe.</p>
             </div>
           </div>
