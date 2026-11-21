@@ -392,3 +392,22 @@ def test_retry_judge_failure_after_an_empty_first_pass_is_not_checked(monkeypatc
     assert "retry_judge" in result.steps_ms
     assert result.judgement.verdict is Verdict.NOT_CHECKED
     assert result.judgement.limitations[0] == judge.JUDGE_UNAVAILABLE
+
+
+def test_retry_judge_failure_after_an_excluded_first_pass_is_not_checked(monkeypatch):
+    # The first search finds only the linked page: rerank drops it, nothing was judged.
+    claim = "Polska wstąpiła do UE w 2004 roku."
+    fake_search(monkeypatch)
+
+    def failing(messages, info):
+        raise ModelHTTPError(529, "claude", "overloaded")
+
+    with (
+        rerank.agent.override(model=model(every_fragment)),
+        judge.agent.override(model=FunctionModel(failing)),
+    ):
+        result = check(claim, ["model 1"], 30, exclude_url="https://www.gov.pl/model-1")
+    assert "retry_judge" in result.steps_ms
+    assert result.judgement.verdict is Verdict.NOT_CHECKED
+    assert result.judgement.limitations[0] == judge.JUDGE_UNAVAILABLE
+    assert pipeline.RETRY_UNJUDGED not in result.judgement.limitations
