@@ -2,8 +2,9 @@
 
 The page is untrusted data. It is fetched only over http(s), never from a private, loopback or
 link-local address (checked on every connection, so redirects and DNS rebinding are covered),
-with at most MAX_REDIRECTS redirects, a DEADLINE_S wall clock and a MAX_BYTES cap. Only HTML
-(trafilatura) and PDF (pypdf) are read. A blocked page, paywall, login wall or social media post
+with at most MAX_REDIRECTS redirects (bodies never read), a DEADLINE_S wall clock and a MAX_BYTES
+cap. Only HTML (trafilatura) and PDF (pypdf) are read, in a child process (extract_worker.py)
+killed at the deadline, at most MAX_EXTRACTIONS at once; the worker documents its own ceilings. A blocked page, paywall, login wall or social media post
 is never worked around: the user is asked to paste the text.
 """
 
@@ -14,16 +15,15 @@ import json
 import logging
 import re
 import socket
+import sys
 from datetime import date
-from io import BytesIO
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import anyio
 import httpcore2
 import httpx2
-import trafilatura
 from pydantic import BaseModel
-from pypdf import PdfReader
 
 log = logging.getLogger("prawdowid")
 
@@ -34,6 +34,10 @@ MAX_BYTES = 2 * 1024 * 1024
 MIN_TEXT_CHARS = 200
 HTML_TYPES = {"text/html", "application/xhtml+xml"}
 PDF_TYPE = "application/pdf"
+WORKER = str(Path(__file__).with_name("extract_worker.py"))
+# ponytail: one process-wide cap on parser processes; per-worker pools if the API scales out.
+MAX_EXTRACTIONS = 2
+_extractions = asyncio.Semaphore(MAX_EXTRACTIONS)
 USER_AGENT = "Prawdowid/0.1 (fact-checking; fetches one page on a user's request)"
 # ponytail: a fixed list of hosts that need a login or app to show a post; extend as needed.
 SOCIAL_HOSTS = {
@@ -158,48 +162,61 @@ def guarded_client(
     transport._pool = httpcore2.AsyncConnectionPool(
         network_backend=GuardedBackend(backend), max_connections=4
     )
+    # Redirects are followed by hand in fetch_page: httpx2 would read every redirect body whole.
     return httpx2.AsyncClient(
         transport=transport,
         trust_env=False,
-        follow_redirects=True,
-        max_redirects=MAX_REDIRECTS,
+        follow_redirects=False,
         headers={"User-Agent": USER_AGENT},
         timeout=DEADLINE_S,
     )
 
 
 def is_social(url: str) -> bool:
-    host = (urlsplit(url).hostname or "").lower()
+    # "www.facebook.com." is the same host as "www.facebook.com".
+    host = (urlsplit(url).hostname or "").lower().rstrip(".")
     return any(host == h or host.endswith("." + h) for h in SOCIAL_HOSTS)
+
+
+def check_url(url: str) -> None:
+    """Policy for every URL we are about to request: the link itself and each redirect."""
+    if urlsplit(url).scheme not in ("http", "https"):
+        raise Refusal(BAD_URL)
+    if is_social(url):
+        raise Refusal(SOCIAL_MEDIA)
+    if LOGIN_PATH.search(urlsplit(url).path):
+        raise Refusal(PAYWALL)
 
 
 async def fetch_page(
     url: str, backend: httpcore2.AsyncNetworkBackend | None = None
 ) -> Page:
     """Fetch and extract one page, or raise Refusal with the message for the user."""
-    if urlsplit(url).scheme not in ("http", "https"):
-        raise Refusal(BAD_URL)
-    if is_social(url):
-        raise Refusal(SOCIAL_MEDIA)
+    check_url(url)
     try:
-        async with (
-            asyncio.timeout(DEADLINE_S),
-            guarded_client(backend) as client,
-            client.stream("GET", url) as resp,
-        ):
+        async with asyncio.timeout(DEADLINE_S), guarded_client(backend) as client:
+            request = client.build_request("GET", url)
+            for _ in range(MAX_REDIRECTS + 1):
+                check_url(str(request.url))
+                resp = await client.send(request, stream=True)
+                try:
+                    if not resp.has_redirect_location:
+                        check_response(resp)
+                        body = await read_capped(resp)
+                        break
+                    if not resp.next_request:  # Location that is not a valid URL
+                        raise Refusal(BAD_URL)
+                    # A redirect body is never read: closing drops it unread.
+                    request = resp.next_request
+                finally:
+                    await resp.aclose()
+            else:
+                raise Refusal(TOO_MANY_REDIRECTS)
             final_url = str(resp.url)
-            if is_social(final_url):
-                raise Refusal(SOCIAL_MEDIA)
-            check_response(resp, final_url)
-            body = await read_capped(resp)
-            # Off the event loop, inside the fetch deadline.
-            # ponytail: a timed-out extraction thread still runs to the end; a process pool if abused.
-            page = await asyncio.to_thread(extract, body, content_type(resp), final_url)
+            page = await extract(body, content_type(resp), final_url)
     except _PrivateAddress:
         raise Refusal(PRIVATE_ADDRESS) from None
-    except httpx2.TooManyRedirects:
-        raise Refusal(TOO_MANY_REDIRECTS) from None
-    except httpx2.UnsupportedProtocol:  # a redirect to ftp:, file: and the like
+    except httpx2.UnsupportedProtocol:
         raise Refusal(BAD_URL) from None
     except (TimeoutError, httpx2.HTTPError) as exc:
         log.warning("link fetch failed url=%s error=%r", url, exc)
@@ -218,7 +235,7 @@ def content_type(resp: httpx2.Response) -> str:
     return resp.headers.get("content-type", "").split(";")[0].strip().lower()
 
 
-def check_response(resp: httpx2.Response, final_url: str) -> None:
+def check_response(resp: httpx2.Response) -> None:
     code = resp.status_code
     if code in (401, 402, 403, 407, 429, 451):
         raise Refusal(BLOCKED)
@@ -226,8 +243,6 @@ def check_response(resp: httpx2.Response, final_url: str) -> None:
         raise Refusal(UNREACHABLE, technical=True)
     if code >= 400:
         raise Refusal(NOT_FOUND.format(code=code))
-    if LOGIN_PATH.search(urlsplit(final_url).path):
-        raise Refusal(PAYWALL)
     if content_type(resp) not in HTML_TYPES | {PDF_TYPE}:
         raise Refusal(UNSUPPORTED_TYPE)
     if int(resp.headers.get("content-length") or 0) > MAX_BYTES:
@@ -243,61 +258,46 @@ async def read_capped(resp: httpx2.Response) -> bytes:
     return bytes(body)
 
 
-def extract(body: bytes, ctype: str, url: str) -> Page:
-    sha256 = hashlib.sha256(body).hexdigest()
-    if ctype == PDF_TYPE:
-        try:
-            reader = PdfReader(BytesIO(body))
-            text = "\n".join(p.extract_text() or "" for p in reader.pages)
-            title = reader.metadata.title if reader.metadata else None
-        # pypdf raises many types on a malformed file; any of them means no text.
-        except Exception:  # noqa: BLE001
-            raise Refusal(NO_TEXT) from None
-        publisher, published = None, None
-    else:
-        if is_paywalled(body):
-            raise Refusal(PAYWALL)
-        doc = trafilatura.bare_extraction(
-            body, url=url, with_metadata=True, include_comments=False
+async def extract(body: bytes, ctype: str, url: str) -> Page:
+    """Run the parser in a child process, killed if the caller's deadline ends first.
+
+    At most MAX_EXTRACTIONS run at once; a request waits for a slot within its own deadline.
+    """
+    async with _extractions:
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-I",
+            WORKER,
+            ctype,
+            url,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
         )
-        text = doc.text if doc else ""
-        title = doc.title if doc else None
-        publisher = doc.sitename if doc else None
-        published = parse_date(doc.date if doc else None)
-    text = (text or "").strip()
-    if len(text) < MIN_TEXT_CHARS:
+        try:
+            out, _ = await proc.communicate(body)
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+                await proc.wait()
+    try:
+        result = json.loads(out)
+    except ValueError:  # killed by its own limits, or crashed
+        log.warning("link extraction failed url=%s returncode=%s", url, proc.returncode)
+        raise Refusal(NO_TEXT) from None
+    if result["kind"] == "paywall":
+        raise Refusal(PAYWALL)
+    text = result.get("text") or ""
+    if result["kind"] != "ok" or len(text) < MIN_TEXT_CHARS:
         raise Refusal(NO_TEXT)
     return Page(
         url=url,
-        sha256=sha256,
-        title=str(title) if title else None,
-        publisher=publisher,
-        published_at=published,
+        sha256=hashlib.sha256(body).hexdigest(),
+        title=result["title"],
+        publisher=result["publisher"],
+        published_at=parse_date(result["date"]),
         text=text,
     )
-
-
-def is_paywalled(html: bytes) -> bool:
-    """schema.org marks paywalled articles with isAccessibleForFree: false in JSON-LD."""
-    for raw in re.findall(
-        rb"<script[^>]+application/ld\+json[^>]*>(.*?)</script>",
-        html,
-        re.DOTALL | re.IGNORECASE,
-    ):
-        try:
-            data = json.loads(raw)
-        except ValueError:
-            continue
-        stack = [data]
-        while stack:
-            item = stack.pop()
-            if isinstance(item, list):
-                stack.extend(item)
-            elif isinstance(item, dict):
-                if str(item.get("isAccessibleForFree", "")).lower() == "false":
-                    return True
-                stack.extend(item.values())
-    return False
 
 
 def parse_date(value: str | None) -> date | None:

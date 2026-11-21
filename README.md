@@ -93,8 +93,13 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 Input is trimmed and must be 1 to 5000 characters. A single token containing `://` counts as a
 link and must be a valid `http` or `https` URL. The page is fetched only from public addresses
 (checked on every connection, so redirects and DNS cannot reach private, loopback or link-local
-hosts), with at most 3 redirects, a 10 s deadline and a 2 MB cap; HTML goes through trafilatura,
-PDF through pypdf, and the first 5000 characters go to the verifier. `CheckResult.page` carries the
+hosts), with at most 3 redirects (their bodies are never read), a 10 s deadline and a 2 MB cap.
+The URL policy (scheme, social media hosts, login pages) is applied before every hop. HTML goes
+through trafilatura and PDF through pypdf in a child process (`prawdowid/extract_worker.py`) that
+is killed at the deadline; at most 2 run at once per API process. The parsers stop after 50 PDF
+pages, 20,000 characters and 20 MB decompressed per stream; on Linux the child is also capped at
+1 GB of memory and 15 s of CPU. Title, publisher, date and text together are cut to 5000
+characters for the verifier. `CheckResult.page` carries the
 page URL, content hash, title, publisher and date, never the page text. Validation errors come
 back as 422 with a Polish message in `detail[0].msg`.
 

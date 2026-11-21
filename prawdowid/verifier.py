@@ -35,8 +35,10 @@ MODEL_MAX_RETRIES = 1
 
 # ponytail: page text is cut to the size of a pasted text, so one link costs what one text does.
 MAX_PAGE_CHARS = 5000
+# Title and publisher each; two of them still leave over 4500 characters for the text.
+MAX_META_CHARS = 200
 PAGE_CUT = (
-    f"Strona jest długa: sprawdziliśmy tylko jej początek ({MAX_PAGE_CHARS} znaków). "
+    f"Strona jest długa: sprawdziliśmy tylko jej początek (razem z tytułem do {MAX_PAGE_CHARS} znaków). "
     "Resztę tekstu możesz wkleić osobno."
 )
 NEEDS_CLARIFICATION = (
@@ -197,14 +199,20 @@ def claim_result(
     )
 
 
-def page_text(page: Page) -> str:
-    """Page metadata first, so the model can resolve relative dates from the publication date."""
-    header = [
-        f"Tytuł: {page.title}" if page.title else None,
-        f"Wydawca: {page.publisher}" if page.publisher else None,
-        f"Data publikacji: {page.published_at}" if page.published_at else None,
-    ]
-    return "\n".join([h for h in header if h] + ["", page.text[:MAX_PAGE_CHARS]])
+def page_text(page: Page) -> tuple[str, bool]:
+    """Model input for a page, at most MAX_PAGE_CHARS in all, and whether its text was cut.
+
+    Metadata comes first, so the model can resolve relative dates from the publication date. It
+    is page content too, so it shares the budget and each field is capped, leaving room for text.
+    """
+    fields = [("Tytuł", page.title), ("Wydawca", page.publisher)]
+    # A trimmed title loses no claims to check, so only a cut in the text counts as cut.
+    header = [f"{name}: {value[:MAX_META_CHARS]}" for name, value in fields if value]
+    if page.published_at:
+        header.append(f"Data publikacji: {page.published_at}")
+    head = "\n".join(header + ["", ""])
+    room = MAX_PAGE_CHARS - len(head)
+    return head + page.text[:room], len(page.text) > room
 
 
 async def verify(text: str) -> CheckResult:
@@ -217,8 +225,9 @@ async def verify(text: str) -> CheckResult:
         status = Status.TECHNICAL_ERROR if refusal.technical else Status.CANNOT_CHECK
         # No model request was sent.
         return CheckResult(status=status, message=refusal.message, cost_usd=0.0)
-    result = await verify_text(page_text(page), location="page")
-    if len(page.text) > MAX_PAGE_CHARS:
+    text, cut = page_text(page)
+    result = await verify_text(text, location="page")
+    if cut:
         for c in result.claims:
             c.limitations.append(PAGE_CUT)
     result.page = CheckedPage(**page.model_dump(exclude={"text"}))
