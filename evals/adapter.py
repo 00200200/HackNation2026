@@ -32,7 +32,13 @@ VERDICT_LABELS = {
     "insufficient_evidence": "brak wystarczających dowodów",
     "not_verifiable": "nie podlega weryfikacji",
 }
-PASSTHROUGH = ("security_events", "cost_usd", "moderator_case_id", "incident_matches")
+PASSTHROUGH = (
+    "security_events",
+    "limitations",
+    "cost_usd",
+    "moderator_case_id",
+    "incident_matches",
+)
 
 _last_call = 0.0
 

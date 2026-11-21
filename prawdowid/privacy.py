@@ -25,7 +25,8 @@ IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?\b"
 # Groups of four ("4111 1111 1111 1111") or one run; amounts are grouped in threes and never match.
 CARD = re.compile(r"\b\d{4}(?:[ -]\d{4}){2,3}(?:[ -]\d{1,3})?\b|\b\d{13,19}\b")
 PHONE = re.compile(r"\+48[ -]?\d{3}[ -]?\d{3}[ -]?\d{3}\b|\b\d{3}-\d{3}-\d{3}\b")
-ELEVEN_DIGITS = re.compile(r"\b\d{11}\b")
+# Digit boundaries, not \b: "PESEL44051401359" has no word boundary before the digits.
+ELEVEN_DIGITS = re.compile(r"(?<!\d)\d{11}(?!\d)")
 REPR_ESCAPE = re.compile(r"\\[nrt]")
 PESEL_WEIGHTS = (1, 3, 7, 9, 1, 3, 7, 9, 1, 3)
 

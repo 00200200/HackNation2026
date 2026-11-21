@@ -3,12 +3,14 @@
 Step 2 runs three lookups at once: 2a Google Fact Check (`factcheck.search_claims`), EUvsDisinfo
 known narratives (`euvsdisinfo.search_cases`, context that never decides alone) and 2b web search
 and fetch (`websearch.search_web`, one search per query of the claim). Step 2c (our own database,
-#19) is out of the pipeline for now (team decision). The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
+#19) is out of the pipeline for now (team decision). Any EUvsDisinfo source, whichever lookup
+found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
 steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
 remains, the web is searched once more with a rewritten query and the claim is judged again.
 
-A source that fails adds a limitation; when every source failed, the claim is not checked, never
-"brak wystarczających dowodów". A claim that runs out of time is not checked either. Every step's
+A source that fails adds a limitation; when every source failed, or the judge did not answer, the
+claim is not checked, never "brak wystarczających dowodów". A claim that runs out of time is not
+checked either, and keeps the limitations of the sources that had already failed. Every step's
 time goes to the log; the reranker and judge calls are priced like the extraction call.
 """
 
@@ -22,7 +24,7 @@ from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
 from prawdowid import euvsdisinfo, factcheck, judge, rerank, websearch
-from prawdowid.contract import SecurityEvent, Source, Verdict
+from prawdowid.contract import Source, Verdict
 
 log = logging.getLogger("prawdowid")
 
@@ -37,6 +39,15 @@ EUVSDISINFO_BUDGET_S = float(os.getenv("PRAWDOWID_EUVSDISINFO_BUDGET_S") or 5)
 TIME_LIMIT = (
     "Nie sprawdzono: skończył się czas przeznaczony na sprawdzenie ({budget:g} s). "
     "Spróbuj sprawdzić to twierdzenie osobno."
+)
+WEB_PARTIAL = (
+    "Część wyszukiwań w sieci ({failed} z {total}) nie zwróciła wyników albo się nie powiodła, "
+    "więc źródła mogą być niepełne."
+)
+DISINFO_DATABASE = websearch.ALLOWLIST["euvsdisinfo.eu"].source_type
+RETRY_UNJUDGED = (
+    "Dodatkowe wyszukiwanie znalazło strony, ale model nie zdążył ich ocenić, "
+    "więc ocena opiera się tylko na pierwszym wyszukiwaniu."
 )
 SOURCES_FAILED = (
     "Nie sprawdzono: żadne źródło nie zwróciło wyników ani nie odpowiedziało, "
@@ -57,43 +68,54 @@ async def check_claim(
     """Verdict for one claim. `deadline` is `loop.time()` when the whole check must end."""
     steps: dict[str, int] = {}
     costs: list[float | None] = []
-    # Injections the judge found in retrieved pages, kept from both passes.
-    events: list[SecurityEvent] = []
+    # Each lookup's answer as soon as it arrives, so a time limit keeps what already failed.
+    found: dict = {"web": []}
+    searched = queries or [claim]
+    if _now() >= deadline:  # nothing is started after the budget ran out
+        return _done(claim, _time_limit(found), costs, steps)
     try:
         async with asyncio.timeout_at(deadline):
-            candidates, limits = await _retrieve(claim, queries, steps)
+            await _retrieve(claim, searched, steps, found)
+            candidates = _candidates(found)
             judgement = await _judge(claim, candidates, exclude_url, steps, costs)
-            events += judgement.security_events
     except TimeoutError:
         # `costs` is None for a model request cut mid-flight, 0 when only search was cut.
-        return _done(
-            claim, _not_checked(TIME_LIMIT.format(budget=CHECK_BUDGET_S)), costs, steps
-        )
+        return _done(claim, _time_limit(found), costs, steps)
+    # Injections the judge found in retrieved pages, kept from both passes.
+    events = list(judgement.security_events)
 
-    # With no queries the first pass already searched the claim itself.
-    retry = queries and claim not in queries
     cut = False
+    # The claim itself is the rewritten query, so no retry when it was searched already.
+    retry = claim not in searched
     if retry and _needs_more(judgement) and deadline - _now() >= RETRY_MIN_S:
         try:
             async with asyncio.timeout_at(deadline):
                 # ponytail: the claim itself is the rewritten query (the first pass used the
                 # model's queries); a HyDE-FC rewrite costs one more model call per claim.
-                web = await _timed(steps, "retry_web", _search_web(claim))
+                web = await _timed(steps, "retry_web", _search_web, claim)
                 if web.documents:
-                    more = candidates + [
-                        d.to_source(fragment=d.text) for d in web.documents
-                    ]
-                    judgement = await _judge(
+                    more = candidates + _candidates({"web": [web]})
+                    second = await _judge(
                         claim, more, exclude_url, steps, costs, "retry_"
                     )
-                    events += judgement.security_events
-                    # Only a finished retry counts: a cut one keeps the first pass as it was.
-                    candidates = more
-                    limits.pop("web", None)
+                    # The first pass assessed evidence only when it had fragments left after
+                    # rerank (the linked page excluded): otherwise there is no verdict to keep.
+                    assessed = judge.NO_FRAGMENTS not in judgement.limitations
+                    if second.verdict is Verdict.NOT_CHECKED and assessed:
+                        # The retry judge failed: the verdict from the first pass's evidence
+                        # stands, judged without the extra pages.
+                        judgement.limitations.append(RETRY_UNJUDGED)
+                    else:
+                        judgement = second
+                        events += judgement.security_events
+                        candidates = more
+                # Only a finished retry counts: a cut one keeps the first pass as it was.
+                found["web"].append(web)
         except TimeoutError:
             log.info("retry cut by the time limit claim=%r", claim)
             cut = True
 
+    limits = _limits(found)
     if len(limits) == 3 and not candidates:  # every source failed
         reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
         judgement = _not_checked(reason)
@@ -107,33 +129,82 @@ async def check_claim(
 
 
 async def _retrieve(
-    claim: str, queries: list[str], steps: dict[str, int]
-) -> tuple[list[Source], dict[str, str]]:
-    """Steps 2a, EUvsDisinfo and 2b at once: candidates and the limitation of each failed
-    source."""
-    lookup, cases, webs = await asyncio.gather(
-        _timed(steps, "factcheck", _search_claims(claim)),
-        _timed(steps, "euvsdisinfo", _search_cases(claim)),
-        _timed(
-            steps,
-            "web",
-            asyncio.gather(*(_search_web(q) for q in queries or [claim])),
-        ),
+    claim: str, queries: list[str], steps: dict[str, int], found: dict
+) -> None:
+    """Steps 2a, EUvsDisinfo and 2b at once, each answer stored in `found` as it arrives.
+
+    TaskGroup: when the time limit cuts the claim, every lookup task still running is cancelled
+    and awaited before this returns. Provider threads (`asyncio.to_thread`) cannot be cancelled:
+    they finish in the background, bounded by their own timeouts.
+    """
+
+    async def keep(name, fn):
+        found[name] = await _timed(steps, name, fn, claim)
+
+    async def web(query):
+        found["web"].append(await _search_web(query))
+
+    async def all_web():
+        async with asyncio.TaskGroup() as tg:
+            for query in queries:
+                tg.create_task(web(query))
+
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(keep("factcheck", _search_claims))
+        tg.create_task(keep("euvsdisinfo", _search_cases))
+        tg.create_task(_timed(steps, "web", all_web))
         # Step 2c (`cache.search_documents`, #19) plugs in here when it is back in the pipeline.
-    )
-    documents = [d for w in webs for d in w.documents]
-    candidates = (
-        [h.source for h in lookup.hits]
-        + [h.source for h in cases.hits]
-        + [d.to_source(fragment=d.text) for d in documents]
-    )
-    web_limit = None if documents else next((w.limitation for w in webs), None)
+
+
+def _candidates(found: dict) -> list[Source]:
+    sources = [
+        h.source
+        for name in ("factcheck", "euvsdisinfo")
+        if name in found
+        for h in found[name].hits
+    ]
+    sources += [d.to_source(fragment=d.text) for w in found["web"] for d in w.documents]
+    return [_context_only(s) for s in sources]
+
+
+def _context_only(source: Source) -> Source:
+    """Any EUvsDisinfo source is a known-narrative match, whichever lookup found it (a Google
+    ClaimReview from euvsdisinfo.eu comes typed `fact_check`): context, never reliable alone."""
+    entry = websearch.allowed(str(source.url))
+    if (entry and entry.source_type == DISINFO_DATABASE) or (
+        "euvsdisinfo" in source.publisher.casefold()
+    ):
+        return source.model_copy(update={"source_type": DISINFO_DATABASE})
+    return source
+
+
+def _limits(found: dict) -> dict[str, str]:
+    """The limitation of each source that failed; a web query that failed is kept even when
+    another one found pages."""
+    # ponytail: counts finished queries only; on a time limit the cut ones are not counted, and
+    # TIME_LIMIT comes first anyway.
+    webs = found["web"]
+    failed = [w.limitation for w in webs if w.limitation]
+    if failed and len(failed) == len(webs):
+        web = failed[0]
+    elif failed:
+        web = WEB_PARTIAL.format(failed=len(failed), total=len(webs))
+    else:
+        web = None
     limits = {
-        "factcheck": lookup.limitation,
-        "euvsdisinfo": cases.limitation,
-        "web": web_limit,
+        "factcheck": found["factcheck"].limitation if "factcheck" in found else None,
+        "euvsdisinfo": found["euvsdisinfo"].limitation
+        if "euvsdisinfo" in found
+        else None,
+        "web": web,
     }
-    return candidates, {k: v for k, v in limits.items() if v}
+    return {k: v for k, v in limits.items() if v}
+
+
+def _time_limit(found: dict) -> judge.Judgement:
+    judgement = _not_checked(TIME_LIMIT.format(budget=CHECK_BUDGET_S))
+    judgement.limitations += _limits(found).values()
+    return judgement
 
 
 async def _search_web(query: str) -> websearch.WebSearch:
@@ -178,12 +249,25 @@ async def _judge(
         _timed(
             steps,
             prefix + "rerank",
-            rerank.rerank(claim, candidates, exclude_url=exclude_url),
+            rerank.rerank,
+            claim,
+            candidates,
+            exclude_url=exclude_url,
         ),
     )
-    return await _priced(
-        costs, _timed(steps, prefix + "judge", judge.judge(claim, ranking))
+    judgement = await _priced(
+        costs, _timed(steps, prefix + "judge", judge.judge, claim, ranking)
     )
+    if judge.JUDGE_UNAVAILABLE in judgement.limitations:
+        # The judge did not answer: a technical limit, never "brak wystarczających dowodów".
+        return _not_checked(judge.JUDGE_UNAVAILABLE).model_copy(
+            update={
+                "limitations": list(
+                    dict.fromkeys([judge.JUDGE_UNAVAILABLE, *judgement.limitations])
+                )
+            }
+        )
+    return judgement
 
 
 async def _priced(costs: list[float | None], aw):
@@ -197,9 +281,10 @@ async def _priced(costs: list[float | None], aw):
 
 
 def _needs_more(judgement: judge.Judgement) -> bool:
-    """Not enough evidence, and not because sources disagree or the judge failed."""
-    return judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE and not (
-        {judge.CONFLICT, judge.JUDGE_UNAVAILABLE} & set(judgement.limitations)
+    """Not enough evidence, and not because sources disagree."""
+    return (
+        judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
+        and judge.CONFLICT not in judgement.limitations
     )
 
 
@@ -216,10 +301,12 @@ def _cost(messages: list[ModelMessage]) -> float | None:
         return None
 
 
-async def _timed(steps: dict[str, int], name: str, aw):
+async def _timed(steps: dict[str, int], name: str, fn, *args, **kwargs):
+    """Runs `fn(*args, **kwargs)` and records its time. The coroutine is made here, so a task
+    cancelled before it starts leaves no coroutine behind that was never awaited."""
     started = time.perf_counter()
     try:
-        return await aw
+        return await fn(*args, **kwargs)
     finally:
         steps[name] = round((time.perf_counter() - started) * 1000)
 
