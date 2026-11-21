@@ -15,13 +15,15 @@ web search, Fact Check and EUvsDisinfo all fail, comes back `not_checked` with t
 opinion, forecast or question is `not_verifiable`. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
-paste the text. There is no check database: stdout is the only record. Each check logs its status,
-latency and input length, plus a line for the model call (model, input and output tokens, latency).
-A link check also logs the final URL with secret query values removed, the page's SHA-256, and the
-text and verdict of every claim. The page text itself is never logged. Successful web evidence
-fetches are cached in `corpus/docs.jsonl` as metadata only (full text only once a domain's licence
-is confirmed, none today), one record per URL, dropped after 30 days; see
-[submission risks](docs/submission/risks.md).
+paste the text. Personal data (PESEL, phone, e-mail, account and card numbers) is masked before
+the text goes to the model. Each check is logged to stdout (session, status, latency, input length)
+with a second line for the model call (model, input and output tokens, latency), and kept for 30
+days as one masked record in the check log, which the user can delete per session. A link check
+also logs the final URL with secret query values removed and personal data masked, the page's
+SHA-256, and the text and verdict of every claim. The page text itself is never logged. Successful
+web evidence fetches are cached in `corpus/docs.jsonl` as metadata only (full text only once a
+domain's licence is confirmed, none today), one record per URL, dropped after 30 days. Details:
+[docs/privacy.md](docs/privacy.md), [submission risks](docs/submission/risks.md).
 
 ## Configuration
 
@@ -42,10 +44,13 @@ variables need an explicit Compose environment override too.
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
+| `TAVILY_API_KEY` | no | none | Tavily API key (`tavily-python`) for web search on allowlisted domains (step 2b). Without it the web search is skipped and reported as unavailable. |
 | `DOMAIN` | with `compose.prod.yaml` | none | Public domain Caddy gets the HTTPS certificate for (`compose.prod.yaml`, see `docs/deploy.md`). |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | with `compose.prod.yaml` | none | Database, user and password of the `db` service. `compose.prod.yaml` passes them to the backend as `DATABASE_URL`. `POSTGRES_PASSWORD` is also the password of the local `sourcedb` service (default `prawdowid`, port bound to 127.0.0.1 only), applied only when its `sourcedb_data` volume is created; see [deletion instructions](docs/sources.md). `make db-seed` refuses until the team approves sources for full-text storage; see [the prerequisite](docs/sources.md#full-text-seed-approval). |
 | `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database. The backend never needs it; `compose.prod.yaml` sets it for production's separate `db`, which has no source-store schema, so enabling step 2c in production needs this migration applied there first. Start the database with `make db` (127.0.0.1:5433). |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
+| `PRAWDOWID_CHECK_LOG` | no | `logs/checks.jsonl` | Check log file (masked question, result, session id). Docker sets `/tmp/prawdowid/checks.jsonl`. See [docs/privacy.md](docs/privacy.md). |
+| `PRAWDOWID_INCIDENTS_PATH` | no | `prawdowid/data/incidents.json` (empty) | Scenario I incident base, a `.json` or `.csv` file; format in `prawdowid/incidents.py`. Put the file in `incidents/` (git-ignored) and set a path relative to the repository root, e.g. `incidents/base.csv`: `make dev` reads it from the repository, Docker from `/app/incidents/base.csv`, where `compose.yaml` mounts `incidents/` read-only. The file must be readable by every user (the container runs as `nobody`). Read on the first check and kept: restart the backend after changing it. A match is shown next to the claims and never changes a verdict. |
 
 The extraction call has a 45 s provider request timeout and at most one SDK retry, but shares
 the 25 s whole-check deadline with URL fetching and per-claim checks, inside the API's 60 s
@@ -126,6 +131,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   `prod` branch within about a minute and then builds and starts it; setup in `docs/deploy.md`.
 - `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult` (with `page`,
   `security_events`, `cost_usd`).
+- `prawdowid/privacy.py`: `mask_personal_data` and `RETENTION_DAYS`; `prawdowid/checklog.py`: the check log
+  per demo session (`DELETE /api/sessions/{id}` removes a session).
 - `prawdowid/link.py`: `fetch_page(url)`, the guarded fetch and text extraction for link input.
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
   channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function

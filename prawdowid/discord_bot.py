@@ -28,11 +28,15 @@ from prawdowid.contract import (
     CheckResult,
     ClaimKind,
     ClaimResult,
+    IncidentMatch,
+    MatchKind,
     Source,
     Status,
 )
+from prawdowid.privacy import MaskingFilter
 
 log = logging.getLogger("prawdowid.discord")
+log.addFilter(MaskingFilter())  # logger filters do not apply to child loggers
 
 TOKEN_ENV = "DISCORD_BOT_TOKEN"
 API_URL_ENV = "PRAWDOWID_API_URL"
@@ -150,11 +154,46 @@ def _claim(n: int, c: ClaimResult, url_limit: int | None) -> str:
     return "\n".join(lines)
 
 
+# Scenario I: a known incident the input looks like. Context only, never a verdict.
+MATCH_LABELS = {
+    MatchKind.URL: "ten sam adres",
+    MatchKind.DOMAIN: "domena z bazy",
+    MatchKind.TEXT: "podobny tekst",
+}
+PLAIN_URL = re.compile(r"https?://[^\s<>]+")
+INCIDENT_NOTE = (
+    "Ta treść przypomina incydenty z bazy organizatora. "
+    "To tylko kontekst: nie zmienia oceny twierdzeń."
+)
+
+
+def _incident(m: IncidentMatch, url_limit: int | None) -> list[str]:
+    how = MATCH_LABELS[m.matched_on]
+    if m.similarity is not None:
+        how += f" {round(m.similarity * 100)}%"
+    lines = _field("- ", f"{m.incident_text} ({m.incident_id}, {how})", "  ")
+    # The base is outside data: only a plain http(s) URL, so it cannot break out of <...>.
+    if m.url and PLAIN_URL.fullmatch(m.url):
+        fits = url_limit is None or len(m.url) <= url_limit
+        lines.append(f"  <{m.url}>" if fits else URL_TOO_LONG)
+    return lines
+
+
+def _incidents(matches: list[IncidentMatch], url_limit: int | None) -> str:
+    lines = [line for m in matches for line in _incident(m, url_limit)]
+    return "\n".join(["### Podobne znane incydenty", INCIDENT_NOTE, *lines])
+
+
 def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
     """CheckResult as Discord Markdown, with the same sections as the web form.
 
     `url_limit=None` keeps every URL whole, for the attachment.
     """
+    warning = (
+        [_incidents(check.incident_matches, url_limit)]
+        if check.incident_matches
+        else []
+    )
     # Statuses other than "ok" are notices, never verdicts.
     if check.status is not Status.OK:
         notice = "\n".join(_field("**Brak oceny.** ", check.message or ""))
@@ -162,9 +201,10 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
             notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
         if check.limitations:
             notice += "\n**Ograniczenia:**\n" + "\n".join(_bullets(check.limitations))
-        return notice
+        return "\n\n".join([notice, *warning])
     if not check.claims and not check.unchecked_claims:
-        return "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
+        notice = "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
+        return "\n\n".join([notice, *warning])
     locations = {e.location for e in check.security_events}
     sections = [
         f"**Polecenia dla modelu.** {note}"
@@ -176,7 +216,9 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
     ]
     if check.page:
         sections.insert(0, "\n".join(_page(check.page, url_limit)))
-    sections += [_claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)]
+    sections += warning + [
+        _claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)
+    ]
     if check.unchecked_claims:
         sections.append(
             "\n".join(

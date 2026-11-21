@@ -32,7 +32,7 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 5. Wyszukiwanie i ocena
 
-- Równolegle: Google Fact Check Tools, DuckDuckGo i EUvsDisinfo MCP.
+- Równolegle: Google Fact Check Tools, Tavily i EUvsDisinfo MCP.
 - Fragmenty są porządkowane, a cytaty sprawdzane z pobranym tekstem. Reguły w kodzie ustalają ocenę.
 - EUvsDisinfo daje kontekst; własna baza PostgreSQL jest wyłączona.
   [Architektura](architecture.md), [źródła i prawa do wykorzystania](sources.md).
@@ -72,16 +72,20 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 ## Slajd 10. Bezpieczeństwo i prywatność
 
 - Kod oddziela dane od instrukcji, sprawdza obecność cytatów i ogranicza pobieranie podanych URL.
-- Maskowanie obejmuje zapytania web; surowy tekst nadal trafia do modelu, a twierdzenia do logów.
+- Maskowanie danych osobowych (e-mail, IBAN/NRB, karta, PESEL, telefon) działa przed modelem i w
+  każdym logu; dziennik sprawdzeń trzyma maskowany zapis 30 dni, sesję można usunąć (`DELETE
+  /api/sessions/{id}`, przycisk na stronie). Imiona i adresy nie są wykrywane.
+  [Prywatność](../privacy.md).
 - Najnowszy zapisany test `injection_resistance: 0.0` (nie spełnia progu); wcześniejszy test na
   innym commicie przechodził. Oba obejmują jeden przypadek, to nie dowód odporności
-  ([latest.json](../../evals/results/latest.json)). Retencja logów i usuwanie sesji są otwarte.
+  ([latest.json](../../evals/results/latest.json)). Discord nie ma jeszcze komendy usuwania.
   [Ryzyka z odwołaniami do kodu](risks.md).
 
 ## Slajd 11. Ograniczenia
 
-- Zespół odnotował problemy z DuckDuckGo; korpus demonstracyjny nie jest zbudowany.
-- Prawa do przechowywania wybranych treści i pełna ochrona danych wymagają rozstrzygnięcia.
+- DuckDuckGo zastąpiono Tavily po problemach z wynikami; korpus demonstracyjny nadal nie jest zbudowany.
+- Baza incydentów organizatora jest wpięta, ale pusta (plik od organizatora jeszcze nie dotarł).
+- Prawa do przechowywania wybranych treści wymagają rozstrzygnięcia; w Discordzie brak komendy usuwania sesji.
 - Nie pokazujemy rozpoznawania obrazów ani kolejki moderatora jako gotowych funkcji.
   [Stan projektu](../../WORKLOG.md), [źródła](sources.md), [architektura](architecture.md).
 

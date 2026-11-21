@@ -29,6 +29,7 @@ import hashlib
 import logging
 import os
 import re
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
@@ -39,14 +40,14 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel
 
 from prawdowid.contract import Source
-from prawdowid.privacy import mask_personal_data
+from prawdowid.privacy import RETENTION_DAYS, mask_personal_data
 from prawdowid.rerank import Fragment, canonical_url, split_text
 
 log = logging.getLogger("prawdowid")
 
 CACHE_PATH = Path(os.getenv("PRAWDOWID_CACHE") or "corpus/docs.jsonl")
-RETENTION_DAYS = 30
 DATABASE_ENV = "DATABASE_URL"
+_WRITE_LOCK = threading.Lock()
 
 CONNECT_TIMEOUT_S = 4
 STATEMENT_TIMEOUT_MS = 4000
@@ -145,22 +146,24 @@ def load_documents(path: Path = CACHE_PATH) -> list[Document]:
 
 def save_document(doc: Document, path: Path = CACHE_PATH) -> None:
     """Store the latest fetch of this URL (text only if licensed) and drop expired records."""
-    kept = [d for d in load_documents(path) if d.url != doc.url]
-    _write(path, [*kept, doc])
+    with _WRITE_LOCK:
+        kept = [d for d in load_documents(path) if d.url != doc.url]
+        _write(path, [*kept, doc])
 
 
 def delete_document(url: str, path: Path = CACHE_PATH) -> bool:
     """Remove the record of this URL. True when there was one."""
-    docs = load_documents(path)
-    kept = [d for d in docs if d.url != url]
-    _write(path, kept)
+    with _WRITE_LOCK:
+        docs = load_documents(path)
+        kept = [d for d in docs if d.url != url]
+        _write(path, kept)
     return len(kept) < len(docs)
 
 
 def _write(path: Path, docs: list[Document]) -> None:
     """Rewrite the file. Text of unlicensed records is dropped here, old records included."""
-    # ponytail: whole-file rewrite, one writer process at a time (two concurrent savers can
-    # lose a record). Fine for the demo corpus; the Supabase store (#19) replaces it.
+    # ponytail: whole-file rewrite under a process-wide lock (searches save from worker threads);
+    # a second writer process could still lose a record. The Supabase store (#19) replaces it.
     docs = [d if d.licence else d.model_copy(update={"text": ""}) for d in docs]
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -306,8 +309,9 @@ def _insert(doc: Document) -> bool:
     with _db() as conn:
         row = conn.execute(
             """insert into documents (doc_id, url, title, publisher, domain, source_type,
-                   licence, published_at, fetched_at, content_hash, text)
-               values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   licence, published_at, fetched_at, content_hash, text, delete_after)
+               values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                       now() + make_interval(days => %s))
                on conflict (doc_id) do nothing returning id""",
             (
                 canonical_url(doc.url),
@@ -321,6 +325,7 @@ def _insert(doc: Document) -> bool:
                 doc.fetched_at,
                 hashlib.sha256(doc.text.encode()).hexdigest(),
                 doc.text,
+                RETENTION_DAYS,
             ),
         ).fetchone()
         if row is None:

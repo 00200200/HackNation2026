@@ -7,7 +7,15 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       PRAWDOWID_MODEL: ${PRAWDOWID_MODEL:-}
       GOOGLE_FACTCHECK_API_KEY: ${GOOGLE_FACTCHECK_API_KEY:-}
+      # Scenario I base, a path relative to the repository root (e.g. incidents/base.csv). The
+      # same relative path resolves under /app in the container, where ./incidents is mounted.
+      PRAWDOWID_INCIDENTS_PATH: ${PRAWDOWID_INCIDENTS_PATH:-}
       PYDANTIC_AI_NO_BANNER: "1"
+      # The image runs as nobody and /app is read-only to it; the check log and source cache live in /tmp.
+      PRAWDOWID_CHECK_LOG: /tmp/prawdowid/checks.jsonl
+      PRAWDOWID_CACHE: /tmp/prawdowid/docs.jsonl
+    volumes:
+      - ./incidents:/app/incidents:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
       interval: 10s

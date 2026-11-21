@@ -16,7 +16,7 @@ Discord /sprawdz -> HTTP, X-Channel: discord +
     -> text, or guarded URL fetch and extraction
     -> claim extraction and search queries (PydanticAI / Anthropic)
     -> each checkable claim in parallel:
-         Google Fact Check + EUvsDisinfo MCP + DuckDuckGo / allowlisted pages
+         Google Fact Check + EUvsDisinfo MCP + Tavily / allowlisted pages
          -> deduplicate and rerank fragments -> label and validate quotes
          -> judge.decide() -> shared CheckResult -> channel rendering
 
@@ -62,10 +62,12 @@ review metadata with no full review passage; the title may be the only quoted te
 Sources: [rerank.py](../../prawdowid/rerank.py), [judge.py](../../prawdowid/judge.py),
 [factcheck.py](../../prawdowid/factcheck.py), [EUvsDisinfo](../../prawdowid/euvsdisinfo.py).
 
-Incident matching against the organiser's incident base and a separate incident warning are
-pending in [PR #38](https://github.com/00200200/HackNation2026/pull/38) (its own title: "shipped
-empty"), open and not merged into `main`. The EUvsDisinfo retrieval described here does not
-establish that feature as delivered.
+Incident matching against the organiser's incident base ([PR #38](https://github.com/00200200/HackNation2026/pull/38),
+`prawdowid/incidents.py`) is merged into `main`: a match on URL, flagged domain or text similarity
+is shown as neutral context next to the claims and never touches the verdict. It is, per the PR's
+own title, **shipped empty**: the organiser's incident file has not been shared yet, so the shipped
+base has no entries and nothing matches today. The EUvsDisinfo retrieval described above is a
+separate, already-populated source and does not substitute for the incident base.
 
 ## Models and providers
 
@@ -79,9 +81,10 @@ These are literal code defaults, not a statement about currently available publi
 Availability and the model overrides used in the saved eval are UNCONFIRMED: its JSON does not
 record them. All model calls use PydanticAI native structured output through the installed
 Anthropic provider. Alternative provider dependencies and credentials are not demonstrated.
-Web search (step 2b) is still **DuckDuckGo** through `ddgs` on `main`; **Tavily** (#7) is a
-documented, team-approved-pending replacement (merged into `main` as #20, doc only) with no code
-wired to it yet. Retrieval providers and their terms are listed in [sources.md](sources.md).
+Web search (step 2b) is now **Tavily** (`tavily_search` in `prawdowid/websearch.py`), which
+replaced DuckDuckGo (#7, proposed as #20; wired as #45) because DuckDuckGo via `ddgs` returned no
+results from our machines and left retrieval empty. Retrieval providers and their terms are listed
+in [sources.md](sources.md).
 
 ## Deployment, storage and data processing
 
@@ -105,15 +108,18 @@ runs when seeding, not on a schedule. Sources: [cache.py](../../prawdowid/cache.
 
 Direct user-linked page bodies are not persisted by the link path. Successful web evidence fetches
 are saved to local JSONL as metadata only (full text only once a domain's licence is confirmed,
-none today), one record per URL, dropped after 30 days (`RETENTION_DAYS`, `prawdowid/cache.py`).
-Stdout logs include claim text and results, and link URLs/hashes, without a deletion policy. Raw
-input goes to Anthropic; claim text goes to Google and EUvsDisinfo when configured. Only web
-search queries and the dormant own-store query terms are masked by `privacy.mask_personal_data`
-(`prawdowid/privacy.py`: e-mail, account number, PESEL, phone, regex only; it does not mask names
-or addresses). Retention, a deletable demo session and the rest of masking are tracked in PR #39
-(#17), open and not merged into `main`. Browser traffic, fetched evidence, the host and Discord
-also process data. Exact provider processing locations and retention agreements are UNCONFIRMED.
-See [risks.md](risks.md) for code references and [sources.md](sources.md) for storage limits.
+none today), one record per URL, dropped after 30 days (`RETENTION_DAYS`, `prawdowid/privacy.py`).
+Personal data (e-mail, IBAN/NRB, card number, PESEL, phone; regex and checksums, not names or
+addresses) is masked by `privacy.mask_personal_data` before the text reaches the extraction model
+and again in every log line, web search and own-store query (#17, #39, merged into `main`).
+Each check is kept 30 days as one masked record in the check log (`prawdowid/checklog.py`), which
+the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Input goes to
+Anthropic masked (a placeholder keeps the sentence shape so claims still split); masked claim text
+and queries go to Google, Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
+has no delete command, Docker stdout logs sit outside retention): [docs/privacy.md](../privacy.md).
+Browser traffic, fetched evidence, the host and Discord also process data. Exact provider
+processing locations and retention agreements are UNCONFIRMED. See [risks.md](risks.md) for code
+references and [sources.md](sources.md) for storage limits.
 
 ## Default limits, not performance measurements
 

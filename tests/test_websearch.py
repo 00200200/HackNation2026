@@ -7,7 +7,10 @@ from pathlib import Path
 import httpcore2
 import httpx2
 import pytest
-from ddgs.exceptions import DDGSException
+import requests
+from tavily import BadRequestError, InvalidAPIKeyError, UsageLimitExceededError
+from tavily.errors import ForbiddenError
+from tavily.errors import TimeoutError as TavilyTimeoutError
 
 from prawdowid import cache, safefetch, websearch
 from prawdowid.privacy import mask_personal_data
@@ -49,6 +52,16 @@ def provider_returning(*urls, calls=None):
         if calls is not None:
             calls.append(query)
         return [SearchHit(url=u, title="t", snippet="s") for u in urls]
+
+    return provider
+
+
+def provider_returning_with_dates(*url_dates):
+    def provider(query, *, domains, limit):
+        return [
+            SearchHit(url=u, title="t", snippet="s", published_date=d)
+            for u, d in url_dates
+        ]
 
     return provider
 
@@ -257,17 +270,81 @@ def test_cache_keeps_text_only_with_a_licence_and_drops_expired(tmp_path):
     assert [d.url for d in cache.load_documents(path)] == [licensed.url]
 
 
-def test_ddg_errors_become_search_unavailable(monkeypatch):
+@pytest.mark.parametrize(
+    "exc",
+    [
+        InvalidAPIKeyError("Unauthorized"),
+        BadRequestError("Bad request"),
+        ForbiddenError("Forbidden"),
+        UsageLimitExceededError("Usage limit exceeded"),
+        TavilyTimeoutError(timeout=10),
+        requests.ConnectionError("down"),
+        requests.HTTPError("502"),
+    ],
+    ids=[
+        "invalid-key",
+        "bad-request",
+        "forbidden",
+        "usage-limit",
+        "tavily-timeout",
+        "connection-error",
+        "http-error",
+    ],
+)
+def test_tavily_errors_become_search_unavailable(monkeypatch, exc):
     class Broken:
-        def __init__(self, **kwargs):
-            pass
+        def search(self, *args, **kwargs):
+            raise exc
 
-        def text(self, *args, **kwargs):
-            raise DDGSException("No results found.")
-
-    monkeypatch.setattr(websearch, "DDGS", Broken)
+    monkeypatch.setattr(websearch, "_client", Broken())
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
     with pytest.raises(SearchUnavailable):
-        websearch.ddg_search("x", domains=["gov.pl"], limit=5)
+        websearch.tavily_search("x", domains=["gov.pl"], limit=5)
+
+
+def test_tavily_without_a_key_is_search_unavailable(monkeypatch):
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    with pytest.raises(SearchUnavailable):
+        websearch.tavily_search("x", domains=["gov.pl"], limit=5)
+
+
+def test_tavily_hit_is_mapped_to_a_search_hit(monkeypatch):
+    class Fake:
+        def search(self, query, **kwargs):
+            assert kwargs["include_domains"] == ["gov.pl"]
+            assert kwargs["include_domains_mode"] == "restrict"
+            return {
+                "results": [
+                    {
+                        "url": "https://www.gov.pl/p",
+                        "title": "t",
+                        "content": "c",
+                        "published_date": "Tue, 11 Mar 2025 17:00:00 GMT",
+                    },
+                    {"url": "", "title": "no url, skipped"},
+                ]
+            }
+
+    monkeypatch.setattr(websearch, "_client", Fake())
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    hits = websearch.tavily_search("x", domains=["gov.pl"], limit=5)
+    assert [h.url for h in hits] == ["https://www.gov.pl/p"]
+    assert hits[0].published_date == date(2025, 3, 11)
+
+
+def test_tavily_date_accepts_iso_and_rfc2822():
+    assert websearch._tavily_date("2025-02-09") == date(2025, 2, 9)
+    assert websearch._tavily_date("Tue, 11 Mar 2025 17:00:00 GMT") == date(2025, 3, 11)
+    assert websearch._tavily_date(None) is None
+    assert websearch._tavily_date("garbage") is None
+
+
+def test_search_hit_date_fills_in_a_page_without_one(isolated):
+    provider = provider_returning_with_dates(("https://www.gov.pl/p", date(2025, 1, 1)))
+    result = run(provider, {"www.gov.pl/p": html(UNDATED)})
+    assert result.limitation is None
+    [doc] = result.documents
+    assert doc.published_at == date(2025, 1, 1)
 
 
 def test_source_list_documents_every_allowlisted_domain():
