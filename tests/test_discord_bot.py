@@ -2,6 +2,7 @@ import asyncio
 import json
 from datetime import UTC, date, datetime
 
+import discord
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
@@ -283,6 +284,15 @@ def test_bot_refuses_to_start_without_token(monkeypatch):
         discord_bot.main()
 
 
+VERDICTS = [
+    Verdict.CONFIRMED,
+    Verdict.FALSE,
+    Verdict.MISLEADING,
+    Verdict.INSUFFICIENT_EVIDENCE,
+    Verdict.NOT_VERIFIABLE,
+]
+
+
 def five_claims(url="https://www.gov.pl/web/ue"):
     claim = CHECK.claims[0]
     return CheckResult(
@@ -291,6 +301,7 @@ def five_claims(url="https://www.gov.pl/web/ue"):
             claim.model_copy(
                 update={
                     "claim": f"Twierdzenie {i}.",
+                    "verdict": VERDICTS[i],
                     "reasoning": "Uzasadnienie. " * 120,
                     "sources": [
                         claim.sources[0].model_copy(update={"url": f"{url}{i}"})
@@ -355,9 +366,8 @@ def test_url_longer_than_a_message_is_whole_in_the_attachment():
     assert f"<{url}>" in full
 
 
-def test_slash_command_delivers_every_verdict_and_source(monkeypatch):
-    """The registered /sprawdz callback: messages plus attachment carry the whole answer."""
-    check = five_claims()
+def slash(monkeypatch, check, refuse_files=False):
+    """Run the registered /sprawdz callback; return (text, attachment, kwargs) per send."""
 
     async def fake_api(text, client):
         return check
@@ -372,7 +382,9 @@ def test_slash_command_delivers_every_verdict_and_source(monkeypatch):
     class Followup:
         async def send(self, content, **kwargs):
             file = kwargs.get("file")
-            sent.append((content, file.fp.read().decode() if file else None))
+            if file and refuse_files:
+                raise discord.HTTPException(httpx_response(), "no files")
+            sent.append((content, file.fp.read().decode() if file else None, kwargs))
 
     class Interaction:
         response = Response()
@@ -383,9 +395,43 @@ def test_slash_command_delivers_every_verdict_and_source(monkeypatch):
         await bot.tree.get_command("sprawdz").callback(Interaction(), "Tekst")
 
     asyncio.run(go())
+    return sent
+
+
+def httpx_response():
+    class R:  # what discord.HTTPException reads from a response
+        status = 403
+        reason = "Forbidden"
+
+    return R()
+
+
+def test_slash_command_delivers_every_verdict_and_source(monkeypatch):
+    """Codex review on #24: messages plus the attachment carry the whole answer."""
+    check = five_claims()
+    sent = slash(monkeypatch, check)
     assert len(sent) <= MAX_MESSAGES
-    attachments = [f for _, f in sent if f]
+    for text, _, kwargs in sent:
+        assert len(text) <= MESSAGE_LIMIT
+        assert kwargs["allowed_mentions"].to_dict()["parse"] == []
+        assert kwargs["suppress_embeds"] is True
+    attachments = [f for _, f, _ in sent if f]
     assert len(attachments) == 1 and sent[-1][1] is not None
+    full = attachments[0]
+    assert full.count("Ocena: **") == 5
     for c in check.claims:
-        assert c.verdict_label in attachments[0]
-        assert f"<{c.sources[0].url}>" in attachments[0]
+        assert f"Ocena: **{c.verdict_label}**" in full
+        assert c.claim in full
+        assert f"<{c.sources[0].url}>" in full
+
+
+def test_short_answer_is_sent_whole_without_attachment(monkeypatch):
+    sent = slash(monkeypatch, CHECK)
+    assert [f for _, f, _ in sent] == [None]
+    assert sent[0][0] == render(CHECK)
+
+
+def test_refused_attachment_ends_with_a_notice(monkeypatch):
+    sent = slash(monkeypatch, five_claims(), refuse_files=True)
+    assert all(f is None for _, f, _ in sent)
+    assert sent[-1][0].endswith(discord_bot.ATTACHMENT_FAILED)

@@ -39,6 +39,7 @@ ATTACHED = (
     "Pełna odpowiedź, ze wszystkimi ocenami i linkami, jest w załączniku."
 )
 ATTACHMENT_NAME = "odpowiedz.md"
+ATTACHMENT_FAILED = "Nie udało się dołączyć pliku z pełną odpowiedzią. Sprawdź ten tekst w formularzu WWW."
 # Raw characters per line before escaping; escaping at most doubles them, so a line stays
 # under MESSAGE_LIMIT with its prefix.
 WRAP_WIDTH = 900
@@ -165,9 +166,10 @@ def reply(check: CheckResult) -> tuple[list[str], str | None]:
     """
     text, full = render(check), render(check, url_limit=None)
     parts = split(text)
-    if len(parts) <= MAX_MESSAGES and text == full:
-        return parts, None
-    return [*parts[: MAX_MESSAGES - 1], ATTACHED], full
+    if len(parts) > MAX_MESSAGES:
+        return [*parts[: MAX_MESSAGES - 1], ATTACHED], full
+    # Fits, but a URL longer than a message was replaced: its line points to the file.
+    return parts, None if text == full else full
 
 
 def _notice(message: str) -> CheckResult:
@@ -201,6 +203,15 @@ async def ask_api(text: str, client: httpx2.AsyncClient) -> CheckResult:
         return _notice(TECHNICAL_ERROR_MESSAGE)
 
 
+async def send(interaction: discord.Interaction, text: str, **kwargs) -> None:
+    await interaction.followup.send(
+        text,
+        allowed_mentions=discord.AllowedMentions.none(),
+        suppress_embeds=True,
+        **kwargs,
+    )
+
+
 class Bot(discord.Client):
     def __init__(self, base_url: str) -> None:
         # Slash commands need no privileged intent (no message content).
@@ -220,17 +231,18 @@ class Bot(discord.Client):
             check = await ask_api(tekst, self.api)
             log.info("check status=%s input_chars=%d", check.status, len(tekst))
             parts, full = reply(check)
-            for i, part in enumerate(parts, 1):
-                extra = {}
-                if full is not None and i == len(parts):
-                    data = io.BytesIO(full.encode())
-                    extra["file"] = discord.File(data, filename=ATTACHMENT_NAME)
-                await interaction.followup.send(
-                    part,
-                    allowed_mentions=discord.AllowedMentions.none(),
-                    suppress_embeds=True,
-                    **extra,
-                )
+            last = parts.pop()
+            for part in parts:
+                await send(interaction, part)
+            if full is None:
+                await send(interaction, last)
+                return
+            try:
+                file = discord.File(io.BytesIO(full.encode()), filename=ATTACHMENT_NAME)
+                await send(interaction, last, file=file)
+            except discord.HTTPException:
+                log.exception("attachment refused")
+                await send(interaction, f"{last}\n\n{ATTACHMENT_FAILED}")
 
     async def setup_hook(self) -> None:
         # Created here so the client lives in the bot's event loop.
