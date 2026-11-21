@@ -60,7 +60,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Decisions
 
-- 2026-11-21: Verdict rules (#10, `judge.decide`). A side counts when one `official`/`primary`/`fact_check` source or two independent publishers back it with a verified quote. Both sides count: `brak wystarczających dowodów`, conflict shown (scenario C). Named missing context counts: `wprowadzające w błąd` (B). Else refute: `fałszywe`, support: `potwierdzone`, nothing: `brak wystarczających dowodów`. Sources older than `PRAWDOWID_ARCHIVE_DAYS` (730) get an archival warning. Thresholds are UNCONFIRMED guesses; corpus source-type labels are not fixed yet.
+- 2026-11-21: Verdict rules (#10, `judge.decide`). A side counts when one `official`/`primary`/`fact_check` source or two independent origins back it with a verified quote. Origins: evidence sharing a publisher, the same quote or a named news agency (PAP, Reuters, ...) counts once. A publisher on both sides keeps the side the model marks as its own conclusion, else neither. Missing context counts only on a context/refute label whose verified quote shares a number or word with it. Quotes match with typography, case and spacing folded; digits, signs and separators exact. Both sides count: `brak wystarczających dowodów`, conflict shown (scenario C). Named missing context counts: `wprowadzające w błąd` (B). Else refute: `fałszywe`, support: `potwierdzone`, nothing: `brak wystarczających dowodów`. Sources older than `PRAWDOWID_ARCHIVE_DAYS` (730) get an archival warning. Thresholds are UNCONFIRMED guesses; corpus source-type labels are not fixed yet.
 - 2026-11-21: Web search starts with **DuckDuckGo** through `ddgs` (backend `duckduckgo` only, no `auto` fallback to
   other engines), user decision; the Tavily proposal (#7) stays as the later replacement. DuckDuckGo has no official
   web search API (`ddgs` scrapes), which conflicts with the brief's rule on official APIs: needs a team OK before
@@ -107,6 +107,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #10 PR #30 review fixes: fact-check debunk keeps its own conclusion, grounded missing context, syndicated copies one origin, exact numbers in quotes, `security_events` (location `source`) for injection in retrieved fragments.
 - 2026-11-21 Łukasz (Claude worker): #10 `prawdowid/judge.py` steps 4 and 5, model labels with quotes, verdict rules in code, offline FunctionModel tests per rule. Branch `LukiLenkiewicz/issue10-judge`.
 - 2026-11-21 Łukasz (Claude worker): #4 link input: `prawdowid/link.py`, `CheckResult.page`, offline tests `tests/test_link.py`.
 - 2026-11-21 Łukasz (Claude worker): #15 `security_events` and `cost_usd` in `CheckResult`, offline FunctionModel tests; quick eval without an API key now reports injection_resistance and cost_per_100_usd instead of unknown. Branch `LukiLenkiewicz/issue15-contract-metrics`.
