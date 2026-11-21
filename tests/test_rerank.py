@@ -173,6 +173,12 @@ def test_canonical_url():
     assert canonical_url("HTTPS://WWW.Gov.pl/a/?utm_medium=x&id=3#top") == (
         "https://gov.pl/a?id=3"
     )
+    assert canonical_url("https://x.pl/caf%E9") != canonical_url("https://x.pl/caf%E8")
+    assert canonical_url("portal.pl/artykul") == "portal.pl/artykul"
+    assert canonical_url("https://x.pl/a%2Fb") != canonical_url("https://x.pl/a/b")
+    assert canonical_url("https://x.pl/?q=c%2B%2B") != canonical_url(
+        "https://x.pl/?q=c++"
+    )
     assert canonical_url("http://x.pl/index.php?art1") != canonical_url(
         "http://x.pl/index.php?art2"
     )
@@ -193,3 +199,69 @@ def test_fallback_keeps_search_order_across_documents(monkeypatch):
         "https://a.pl/",
         "https://gov.pl/ue",
     ]
+
+
+@pytest.mark.parametrize(
+    "page_url, exclude_url",
+    [
+        ("https://example.org/zażółć", "https://example.org/zażółć"),
+        (
+            "https://example.org/za%C5%BC%C3%B3%C5%82%C4%87",
+            "http://example.org/zażółć/",
+        ),
+        ("https://żółw.pl/artykuł", "https://www.ŻÓŁW.pl/artyku%C5%82"),
+        # Decomposed "ó" (o + combining acute) is the same letter after NFC.
+        ("https://example.org/zażółć", "https://example.org/zażółć"),
+        # UTS 46 keeps "ß" (pydantic's parser), IDNA 2003 would turn it into "ss".
+        ("https://stra\u00dfe.de/x", "https://STRA\u00dfE.de/x"),
+    ],
+)
+def test_linked_page_with_unicode_url_is_excluded(page_url, exclude_url):
+    def model(messages, info):
+        pytest.fail("only the linked page: nothing to rank")
+
+    linked = source(page_url, "Tekst strony.")
+    ranking = run([linked], FunctionModel(model), exclude_url=exclude_url)
+    assert ranking.fragments == []
+
+
+@pytest.mark.parametrize("title_first", [True, False])
+def test_fetched_text_wins_over_a_title_only_hit_for_the_same_page(title_first):
+    hit = source("https://demagog.org.pl/x/", title="Polska w UE od 2004? Prawda")
+    hit = hit.model_copy(update={"source_type": "fact_check"})
+    page = source(
+        "https://demagog.org.pl/x", "Pełny tekst z cytatem: Polska jest w UE."
+    )
+    candidates = [hit, page] if title_first else [page, hit]
+    ranking = run(candidates, answering([0]))
+    [fragment] = ranking.fragments
+    assert fragment.source.fragment == page.fragment
+    # The first candidate keeps its metadata, the fact-check provenance included.
+    assert fragment.source.source_type == candidates[0].source_type
+
+
+@pytest.mark.parametrize(
+    "other",
+    [
+        "Według GUS w 2023 roku do Polski przyjechało 2100 lekarzy z zagranicy.",
+        "Według GUS w 2024 roku do Polski przyjechało 1200 lekarzy z zagranicy.",
+        "Według GUS w 2023 roku do Polski nie przyjechało 1200 lekarzy z zagranicy.",
+    ],
+)
+def test_passages_with_a_changed_fact_are_both_kept(other):
+    first = source(
+        "https://a.pl",
+        "Według GUS w 2023 roku do Polski przyjechało 1200 lekarzy z zagranicy.",
+    )
+    ranking = run([first, source("https://b.pl", other)], answering([0, 1]))
+    assert len(ranking.fragments) == 2
+
+
+def test_input_budget_applies_before_splitting(monkeypatch):
+    monkeypatch.setattr(rr, "MAX_DOCUMENTS", 2)
+    monkeypatch.setattr(rr, "MAX_DOC_CHARS", 100)
+    monkeypatch.setattr(rr, "FRAGMENT_CHARS", 60)
+    pages = [source(f"https://p{i}.pl", f"strona {i} " * 500) for i in range(5)]
+    fragments = rr.split_all(pages, exclude_url=None)
+    assert {f.doc_id for f in fragments} == {"https://p0.pl/", "https://p1.pl/"}
+    assert sum(len(f.source.fragment) for f in fragments) <= 2 * 100
