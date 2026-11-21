@@ -113,6 +113,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #19 merged `origin/LukiLenkiewicz/issue31-euvsdisinfo` (#33) to keep the stack linear; kept the newer quick eval (8 cases, 17:23 UTC) over the older full run from #31's base; quick eval rerun on the merge: macro_f1 0.111, injection 0.0, end_to_end 0.875, latency 3.4 s, $1.50 per 100.
 - 2026-11-21 Łukasz (Claude worker): #19 step 2c taken out of the pipeline (user decision): only the seed script writes to the database, web search saves to JSONL only, compose `db` is opt-in (profile `db`), backend has no `DATABASE_URL`. Branch `LukiLenkiewicz/issue19-supabase`.
 - 2026-11-21 Łukasz (Claude worker): #19 source store on local PostgreSQL (user decision, replaces Supabase): compose `db`, migration, psycopg store behind `cache.py`, per-claim FTS, seed queries file, retention, offline tests, checked on Postgres 17. Not seeded. Branch `LukiLenkiewicz/issue19-supabase`.
 - 2026-11-21 Łukasz (Claude worker): #31 `prawdowid/euvsdisinfo.py` EUvsDisinfo MCP `search` lookup (pydantic-ai MCP client), offline tests against an in-process FastMCP server. Branch `LukiLenkiewicz/issue31-euvsdisinfo`.
