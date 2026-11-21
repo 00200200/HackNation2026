@@ -52,12 +52,21 @@ NO_EVIDENCE_PREMISES = ["Nie zbadaliśmy żadnych źródeł ani dowodów."]
 
 USER_TEXT = register_tag("user_text")
 
+
+def positive_int_env(name: str, default: int) -> int:
+    """Read a count from the environment; fail at startup on anything below 1."""
+    value = int(os.getenv(name) or default)
+    if value < 1:
+        raise ValueError(f"{name} must be at least 1, got {value}")
+    return value
+
+
 # Hyperparameters. Defaults are a first guess for the 30 s median, not tuned yet.
 # Most central claims checked in full; the rest are listed as not checked. Only these carry a
-# source sentence, reason and queries: writing all that for 50 claims took 83 s in one test.
-MAX_CHECKED_CLAIMS = int(os.getenv("PRAWDOWID_MAX_CHECKED_CLAIMS") or 5)
+# source sentence, reason and queries, to keep the output short on long texts.
+MAX_CHECKED_CLAIMS = positive_int_env("PRAWDOWID_MAX_CHECKED_CLAIMS", 5)
 # Search queries the model writes per checked claim, for retrieval.
-QUERIES_PER_CLAIM = int(os.getenv("PRAWDOWID_QUERIES_PER_CLAIM") or 3)
+QUERIES_PER_CLAIM = positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 3)
 
 INSTRUCTIONS = f"""\
 You split a text written in Polish into claims for a fact-checking service. You have no sources,

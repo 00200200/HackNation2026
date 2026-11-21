@@ -208,7 +208,7 @@ def test_quote_gives_attribution_and_quoted_claim():
     sentence = "Minister Sikorski powiedział, że Polska wyśle do Ukrainy 100 czołgów."
     split = [
         claim(
-            "Radosław Sikorski powiedział, że Polska wyśle do Ukrainy 100 czołgów.",
+            "Minister Sikorski powiedział, że Polska wyśle do Ukrainy 100 czołgów.",
             kind=ClaimKind.ATTRIBUTION,
             sentence=sentence,
         ),
@@ -253,3 +253,19 @@ def test_claims_only_in_other_claims_are_listed_not_dropped():
     assert result.status is Status.OK
     assert result.claims == []
     assert result.unchecked_claims == ["Fakt."]
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_non_positive_hyperparameter_fails_at_startup(monkeypatch, value):
+    monkeypatch.setenv("PRAWDOWID_MAX_CHECKED_CLAIMS", value)
+    with pytest.raises(
+        ValueError, match="PRAWDOWID_MAX_CHECKED_CLAIMS must be at least 1"
+    ):
+        verifier.positive_int_env("PRAWDOWID_MAX_CHECKED_CLAIMS", 5)
+
+
+def test_hyperparameter_default_and_override(monkeypatch):
+    monkeypatch.delenv("PRAWDOWID_QUERIES_PER_CLAIM", raising=False)
+    assert verifier.positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 3) == 3
+    monkeypatch.setenv("PRAWDOWID_QUERIES_PER_CLAIM", "2")
+    assert verifier.positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 3) == 2
