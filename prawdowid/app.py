@@ -21,6 +21,8 @@ log = logging.getLogger("prawdowid")
 MAX_INPUT_CHARS = 5000
 RATE_LIMIT = "10/minute"
 VERIFY_TIMEOUT_S = 60
+# Channels send X-Channel; logged so checks can be compared across channels.
+CHANNELS = {"web", "discord"}
 TECHNICAL_ERROR_MESSAGE = (
     "Wystąpił błąd techniczny i nie udało się sprawdzić tej treści. "
     "Spróbuj ponownie za chwilę."
@@ -85,8 +87,10 @@ async def create_check(request: Request, body: CheckRequest) -> CheckResult:
             status=Status.TECHNICAL_ERROR, message=TECHNICAL_ERROR_MESSAGE
         )
     # ponytail: stdout log instead of a check store until the team picks storage.
+    channel = request.headers.get("x-channel", "web")
     log.info(
-        "check status=%s latency_ms=%d input_chars=%d",
+        "check channel=%s status=%s latency_ms=%d input_chars=%d",
+        channel if channel in CHANNELS else "other",
         result.status,
         round((time.perf_counter() - started) * 1000),
         len(body.input),

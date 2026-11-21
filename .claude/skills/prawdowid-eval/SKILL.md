@@ -38,13 +38,13 @@ The first claim is the main claim scored by the eval. The API allows 10 requests
 adapter waits `PRAWDOWID_MIN_INTERVAL_S` (default 6.5 s) between requests; the wait is not counted as latency.
 A full run of 30+ cases therefore takes several minutes.
 
+`security_events` (list of `{kind, location}`, never the injected wording) feeds `injection_resistance`;
+`cost_usd` (number, null when unknown) feeds `cost_per_100_usd`.
+
 **Gaps in the current contract** (metrics stay unknown or fail until they are added; owners decide the shape):
-- `security_events` (list): needed for injection cases with `must_log_security_event`; the brief requires logging
-  injection attempts.
-- `cost_usd` (number) per answer: needed for `cost_per_100_usd`; the brief requires cost per answer in the logs.
 - `moderator_case_id`: only if the moderator loop (scenario H) is built.
-- A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord` once the eval can reach the Discord adapter's code path
-  (the adapter sends `X-Channel`); until then `channel_consistency` is unknown.
+- A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord`. The adapter then runs the bot's own API client (`discord_bot.ask_api`, `X-Channel: discord`), so only the Discord connection itself is not exercised
+  (formatting is covered by `tests/test_discord_bot.py`); without it `channel_consistency` is unknown.
 
 ## Case format (`evals/cases.jsonl`, one JSON object per line)
 

@@ -321,3 +321,35 @@ def test_malformed_pdf_is_no_text():
     broken = http(ctype="application/pdf", body=b"%PDF-1.7\n garbage")
     refusal, _ = fetch("http://news.example/f.pdf", {"93.184.216.34": broken})
     assert refusal.message == NO_TEXT
+
+
+def test_injection_on_a_page_is_logged_as_from_the_page(monkeypatch):
+    net = FakeNet({"93.184.216.34": http()})
+    real_fetch = link.fetch_page
+    monkeypatch.setattr(
+        "prawdowid.verifier.fetch_page", lambda url: real_fetch(url, backend=net)
+    )
+    claim = ExtractedClaim(
+        claim="Rada Ministrów przyjęła projekt ustawy.",
+        kind="statement",
+        source_sentence="Rada Ministrów przyjęła projekt.",
+        checkable=True,
+        reason="Fakt.",
+        queries=[],
+    )
+    extraction = Extraction(
+        claims=[claim], other_claims=[], unclear=False, injection_found=True
+    )
+    model = FunctionModel(
+        lambda messages, info: ModelResponse(
+            parts=[TextPart(extraction.model_dump_json())]
+        )
+    )
+    with agent.override(model=model):
+        result = asyncio.run(verify("http://news.example/a"))
+    assert [e.location for e in result.security_events] == ["page"]
+
+
+def test_refused_link_costs_nothing():
+    result = asyncio.run(verify("http://10.0.0.1/"))
+    assert result.cost_usd == 0.0

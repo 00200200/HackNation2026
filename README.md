@@ -8,8 +8,10 @@ the shared contract, the HTTP API and the web frontend.
 claims, each marked checkable or not. The model never decides whether a claim is true. There are
 no sources yet, so the verdict is set in code: a checkable claim is always `insufficient_evidence`
 with a note that the source base is not connected, and an opinion, forecast or question is
-`not_verifiable`. `sources` is always empty. Links are not supported yet and come back as
-`cannot_check`. Nothing is stored; each check is logged to stdout (status, latency, input length)
+`not_verifiable`. `sources` is always empty. A link is fetched (`prawdowid/link.py`) and the page's
+main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
+private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
+paste the text. Nothing is stored; each check is logged to stdout (status, latency, input length)
 with a second line for the model call (model, input and output tokens, latency).
 
 ## Configuration
@@ -21,6 +23,8 @@ image; `docker compose` and `make dev` read it at start-up.
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
 | `PRAWDOWID_MODEL` | no | `anthropic:claude-opus-5-5` | PydanticAI model id (`provider:model`). |
+| `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
+| `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
 
 The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
@@ -45,6 +49,7 @@ Run `make help` to list every target. The ones used most:
 |---|---|
 | `make up` / `make down` / `make logs` | Docker stack: frontend on `PORT` (default 8080), backend internal only |
 | `make dev` | API alone on http://127.0.0.1:8000 with reload (docs at `/docs`) |
+| `make discord` | Discord bot against `make dev`; `make up DISCORD=1` runs it in Docker |
 | `make check` | `ruff format --check`, `ruff check`, `pytest` |
 | `make format` | Format and autofix |
 
@@ -59,7 +64,9 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   a strict Content-Security-Policy.
 - `Dockerfile`: the backend image (Python 3.13, uv, runs as `nobody`).
 - `compose.yaml`: both services. Only the frontend port is published.
-- `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult`.
+- `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult` (with `page`,
+  `security_events`, `cost_usd`).
+- `prawdowid/link.py`: `fetch_page(url)`, the guarded fetch and text extraction for link input.
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
   channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function
   that turns the model's claims into verdicts.
@@ -69,6 +76,12 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
   message and no hits. Not wired into `verify()` yet (issue #11).
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
+- `prawdowid/discord_bot.py`: the second channel, a `/sprawdz tekst:` slash command (discord.py).
+  It sends the same `POST /api/checks` as the web form, with `X-Channel: discord`, and renders the
+  `CheckResult` with the same sections (verdict, reasoning, strength, premises, sources with
+  quotes, limitations). User and source text is escaped and messages never ping anyone. Long
+  answers are split into at most 5 messages of 2000 characters; API errors are shown as notices.
+  The bot shares one API rate limit (10 per minute) for all its users.
 
 ## API
 
@@ -78,8 +91,11 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 | `GET /health` | Liveness. |
 
 Input is trimmed and must be 1 to 5000 characters. A single token containing `://` counts as a
-link and must be a valid `http` or `https` URL. Links are not fetched yet: a valid link returns
-`cannot_check`. Validation errors come
+link and must be a valid `http` or `https` URL. The page is fetched only from public addresses
+(checked on every connection, so redirects and DNS cannot reach private, loopback or link-local
+hosts), with at most 3 redirects, a 10 s deadline and a 2 MB cap; HTML goes through trafilatura,
+PDF through pypdf, and the first 5000 characters go to the verifier. `CheckResult.page` carries the
+page URL, content hash, title, publisher and date, never the page text. Validation errors come
 back as 422 with a Polish message in `detail[0].msg`.
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
