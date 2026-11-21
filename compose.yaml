@@ -6,9 +6,16 @@ services:
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       PRAWDOWID_MODEL: ${PRAWDOWID_MODEL:-}
+      GOOGLE_FACTCHECK_API_KEY: ${GOOGLE_FACTCHECK_API_KEY:-}
+      # Scenario I base, a path relative to the repository root (e.g. incidents/base.csv). The
+      # same relative path resolves under /app in the container, where ./incidents is mounted.
+      PRAWDOWID_INCIDENTS_PATH: ${PRAWDOWID_INCIDENTS_PATH:-}
       PYDANTIC_AI_NO_BANNER: "1"
-      # The image runs as nobody and /app is read-only to it; the check log lives in /tmp.
+      # The image runs as nobody and /app is read-only to it; the check log and source cache live in /tmp.
       PRAWDOWID_CHECK_LOG: /tmp/prawdowid/checks.jsonl
+      PRAWDOWID_CACHE: /tmp/prawdowid/docs.jsonl
+    volumes:
+      - ./incidents:/app/incidents:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
       interval: 10s
@@ -17,13 +24,12 @@ services:
       start_period: 5s
 
   # Step 2c source store, opt-in (`make db`). Step 2c is disabled in the pipeline until licensed
-  # sources are chosen (user decision), so the backend gets no DATABASE_URL and never needs it.
+  # sources are chosen (user decision), so no check reads it and the backend never connects to it.
   # Starts empty: the team seeds it with `make db-seed`. Schema from db/migrations/ on first start
   # of the volume. Port bound to 127.0.0.1 only. The default password is for this local-only
-  # database; POSTGRES_PASSWORD applies only when the volume is created (`docker compose
-  # --profile db down -v` to recreate).
-  db:
-    profiles: [db]
+  # database; POSTGRES_PASSWORD applies only when the volume is created (see docs/sources.md).
+  sourcedb:
+    profiles: [sourcedb]
     image: postgres:17
     restart: unless-stopped
     environment:
@@ -31,7 +37,7 @@ services:
       POSTGRES_DB: prawdowid
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prawdowid}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - sourcedb_data:/var/lib/postgresql/data
       - ./db/migrations:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:${DB_PORT:-5433}:5432"
@@ -61,4 +67,4 @@ services:
         restart: true
 
 volumes:
-  pgdata:
+  sourcedb_data:

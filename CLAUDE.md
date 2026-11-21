@@ -19,6 +19,7 @@ nobody owns it. Parallel branches: on merge conflicts in `WORKLOG.md`, keep both
 | Writing or changing code | `/build` (SDK-first) |
 | Before every commit, or "does it actually work?" | `/verify` + `reviewer` agent |
 | Any user-facing text: UI copy, pitch, docs, submission form | `/humanizer` |
+| Changing the web UI (`frontend/`) | `frontend-design` for direction; before commit `/web-design-guidelines` + `a11y-reviewer` agent |
 | "Is there a library/SDK for X?", current API of a library | `researcher` agent |
 | Before every push, before submitting, "would the jury accept this?" | `/hacknation-judging` + `judge` agent |
 | Test cases, metrics, "do we meet the jury's thresholds?" | `/prawdowid-eval` (`uv run python -m evals.run`) |
@@ -26,6 +27,8 @@ nobody owns it. Parallel branches: on merge conflicts in `WORKLOG.md`, keep both
 Agents: `builder` (implements an assigned slice), `reviewer` (read-only, before every commit),
 `researcher` (read-only, finds the SDK/library and its current API).
 `judge` (read-only, plays the Prawdowid jury before every push and returns PASS or BLOCK).
+`a11y-reviewer` (read-only, WCAG 2.2 AA review of the web channel). The brand in `docs/brand/` is fixed: design
+skills may refine layout and UX, not replace the logo, colours or tagline. Third-party skill licenses: `.claude/third-party/`.
 
 Pre-push hook: `.githooks/pre-push` (setup once per clone: `git config core.hooksPath .githooks`). It refuses a push
 without a judge PASS for the pushed commit, product code without a clean eval run on that commit (once an eval

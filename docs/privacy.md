@@ -39,16 +39,18 @@ Where masking runs:
 One JSON line in the check log (`PRAWDOWID_CHECK_LOG`, default `logs/checks.jsonl`, in Docker
 `/tmp/prawdowid/checks.jsonl` inside the backend container), written by `POST /api/checks` for
 every check, also a failed or timed-out one (#14): session id, start and end time, total latency,
-channel, the masked question, status, `error` (`"timeout"` or the exception class when the check
-failed before an answer), the notice message, the masked page URL and content hash for a link, the
+channel, the masked question, status, `error` (`"timeout"` when the API's 60 s limit fired, or the exception class when verify raised;
+`null` when the pipeline returned a notice, also its own 25 s budget cut), the notice message, the masked page URL and content hash for a link, the
 time of each step (`fetch`, `extract`, and per claim `factcheck`, `euvsdisinfo`, `web`, `rerank`,
 `judge`, `retry_*`), every model answer (model name, input and output tokens), `cost_usd`, security
-events (kind and location, never the wording), ids of matched incidents, each claim with its
+events (kind, location and detector, never the wording), ids of matched incidents, check-level
+limitations, each claim with its
 verdict, sources (masked URL and source type) and limitations (search errors, time limit), and the
 claims left unchecked. Page text from a link is not stored. `GET /api/sessions/{id}` returns the
 records of one session as stored. A check cut by the API's 60 s limit (the pipeline's own 25 s budget
-normally ends it first) keeps only its total latency and `error: "timeout"`: the steps and model
-calls it had made are not passed out of the cancelled task.
+normally ends it first), or one where verify raised, keeps its total latency, `error`, the notice
+and the pattern-only screening: the steps and model calls it had made are lost with the cancelled
+task.
 
 Web search in a check also adds the public pages it fetched to the source cache
 (`corpus/docs.jsonl`). Those carry no user text and no session id. A check never writes the
@@ -76,6 +78,8 @@ The API gives every check a session id in the `X-Session-Id` response header. A 
 the header back keeps the same session. The web page keeps it in `sessionStorage` (until the tab
 closes) and shows "Usuń moje sprawdzenia", which calls `DELETE /api/sessions/{id}` and removes every
 check log record of that session. The answer is `{"deleted": <number of records>}`.
+The session id is a bearer token: anyone who has it can read (`GET /api/sessions/{id}`) and
+delete that session's records; there is no other login.
 
 Discord sends no session id, so each Discord check gets its own session; deleting it takes an API
 call with the id from the log.

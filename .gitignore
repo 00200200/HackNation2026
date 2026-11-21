@@ -234,3 +234,7 @@ corpus/docs.jsonl
 
 # Check log: masked questions per demo session, local only (see prawdowid/checklog.py)
 logs/
+
+# Scenario I incident base from the organiser: local only, mounted into the backend (compose.yaml)
+incidents/*
+!incidents/README.md

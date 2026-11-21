@@ -19,7 +19,7 @@ from prawdowid import checklog
 from prawdowid.contract import CheckResult, Status
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
-from prawdowid.verifier import is_link, verify
+from prawdowid.verifier import failed, is_link, verify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:  %(name)s %(message)s")
 log = logging.getLogger("prawdowid")
@@ -104,9 +104,13 @@ async def create_check(
     except Exception as exc:
         log.exception("verify failed")
         error = "timeout" if isinstance(exc, TimeoutError) else type(exc).__name__
-        result = CheckResult(
-            status=Status.TECHNICAL_ERROR, message=TECHNICAL_ERROR_MESSAGE
+        # Cost unknown: a model request may have been sent before the failure.
+        result = failed(
+            body.input, Status.TECHNICAL_ERROR, TECHNICAL_ERROR_MESSAGE, cost=None
         )
+        if is_link(body.input):
+            # Only the URL was screened, not the page, so the "patterns only" note would mislead.
+            result.limitations = []
     # Scenario I context, added after the verdicts so it cannot change them.
     try:
         # The final address after redirects counts too (a short link to a known page).
@@ -118,10 +122,12 @@ async def create_check(
     channel = channel if channel in CHANNELS else "other"
     latency_ms = round((time.perf_counter() - started) * 1000)
     log.info(
-        "check session=%s channel=%s status=%s latency_ms=%d input_chars=%d",
+        "check session=%s channel=%s status=%s security_events=%d cost_usd=%s latency_ms=%d input_chars=%d",
         session,
         channel,
         result.status,
+        len(result.security_events),
+        result.cost_usd,
         latency_ms,
         len(body.input),
     )

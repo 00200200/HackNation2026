@@ -18,7 +18,9 @@ private address or file that is not HTML or PDF comes back as `cannot_check` wit
 paste the text. Personal data (PESEL, phone, e-mail, account and card numbers) is masked before
 the text goes to the model. Each check is logged to stdout (session, status, latency, input length)
 with a second line for the model call (model, input and output tokens, latency), and kept for 30
-days as one masked record in the check log, which the user can delete per session. Details:
+days as one masked record in the check log, which the user can delete per session. A link check
+also logs the final URL with secret query values removed and personal data masked, the page's
+SHA-256, and the text and verdict of every claim. The page text itself is never logged. Details:
 [docs/privacy.md](docs/privacy.md).
 
 ## Configuration
@@ -37,12 +39,15 @@ image; `docker compose` and `make dev` read it at start-up.
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
-| `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database and the backend runs without it. Start the database with `make db` (127.0.0.1:5433). |
-| `POSTGRES_PASSWORD` | no | `prawdowid` | Password of the local `db` service (port bound to 127.0.0.1 only). Applies only when the volume is created (`docker compose --profile db down -v` to recreate). The database starts empty: seed it with `make db-seed`. |
+| `TAVILY_API_KEY` | no | none | Tavily API key (`tavily-python`) for web search on allowlisted domains (step 2b). Without it the web search is skipped and reported as unavailable. |
+| `DOMAIN` | with `compose.prod.yaml` | none | Public domain Caddy gets the HTTPS certificate for (`compose.prod.yaml`, see `docs/deploy.md`). |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | with `compose.prod.yaml` | none | Database, user and password of the `db` service. `compose.prod.yaml` passes them to the backend as `DATABASE_URL`. `POSTGRES_PASSWORD` is also the password of the local `sourcedb` service (default `prawdowid`, port bound to 127.0.0.1 only), applied only when its `sourcedb_data` volume is created; see [deletion instructions](docs/sources.md). `make db-seed` refuses until the team approves sources for full-text storage; see [the prerequisite](docs/sources.md#full-text-seed-approval). |
+| `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database. The backend never needs it; `compose.prod.yaml` sets it for production's separate `db`, which has no source-store schema, so enabling step 2c in production needs this migration applied there first. Start the database with `make db` (127.0.0.1:5433). |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 | `PRAWDOWID_CHECK_LOG` | no | `logs/checks.jsonl` | Check log file (masked question, result, session id). Docker sets `/tmp/prawdowid/checks.jsonl`. See [docs/privacy.md](docs/privacy.md). |
+| `PRAWDOWID_INCIDENTS_PATH` | no | `prawdowid/data/incidents.json` (empty) | Scenario I incident base, a `.json` or `.csv` file; format in `prawdowid/incidents.py`. Put the file in `incidents/` (git-ignored) and set a path relative to the repository root, e.g. `incidents/base.csv`: `make dev` reads it from the repository, Docker from `/app/incidents/base.csv`, where `compose.yaml` mounts `incidents/` read-only. The file must be readable by every user (the container runs as `nobody`). Read on the first check and kept: restart the backend after changing it. A match is shown next to the claims and never changes a verdict. |
 
-The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
+The model call has at most one retry and shares the check's time budget (`PRAWDOWID_CHECK_BUDGET_S`, 25 s), inside the API's 60 s limit. Provider
 errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns
 `cannot_check`. Both carry a Polish message and no claims.
 
@@ -57,6 +62,8 @@ make up
 Open http://localhost:8080. Stop with `make down`. Use another port with `make up PORT=9000`.
 
 Without `make`: `docker compose up --build -d`.
+
+Public deployment with HTTPS on a server: [docs/deploy.md](docs/deploy.md).
 
 Run `make help` to list every target. The ones used most:
 
@@ -79,6 +86,10 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   a strict Content-Security-Policy.
 - `Dockerfile`: the backend image (Python 3.13, uv, runs as `nobody`).
 - `compose.yaml`: both services. Only the frontend port is published.
+- `compose.prod.yaml`, `caddy/Caddyfile`: production overlay. Caddy serves HTTPS in front of nginx
+  and is then the only service with published ports; `db` is Postgres 18 with pgvector and pg_trgm.
+- `deploy/`: the server's deploy script and systemd timer. The demo server picks up a push to the
+  `prod` branch within about a minute and then builds and starts it; setup in `docs/deploy.md`.
 - `prawdowid/contract.py`: `Verdict`, `Status`, `Source`, `ClaimResult`, `CheckResult` (with `page`,
   `security_events`, `cost_usd`).
 - `prawdowid/privacy.py`: `mask_personal_data` and `RETENTION_DAYS`; `prawdowid/checklog.py`: the check log
@@ -91,13 +102,14 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   Tools (`claims:search`). Each review becomes a `Source` (`source_type="fact_check"`) with the
   fact-checker's rating and the reviewed claim kept beside it, not in `fragment`: the rating is a
   signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
-  message and no hits. Not wired into `verify()` yet (issue #11).
+  message and no hits. Called per claim from `prawdowid/pipeline.py` (#11).
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
 - `prawdowid/discord_bot.py`: the second channel, a `/sprawdz tekst:` slash command (discord.py).
   It sends the same `POST /api/checks` as the web form, with `X-Channel: discord`, and renders the
   `CheckResult` with the same sections (verdict, reasoning, strength, premises, sources with
-  quotes, limitations). User and source text is escaped and messages never ping anyone. Long
-  answers are split into at most 5 messages of 2000 characters; API errors are shown as notices.
+  quotes, limitations). User and source text is escaped and messages never ping anyone. An answer
+  goes out in at most 5 messages of 2000 characters; whatever does not fit is in an attached
+  `odpowiedz.md` with the whole answer. API errors are shown as notices.
   The bot shares one API rate limit (10 per minute) for all its users.
 
 ## API
@@ -110,8 +122,13 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 Input is trimmed and must be 1 to 5000 characters. A single token containing `://` counts as a
 link and must be a valid `http` or `https` URL. The page is fetched only from public addresses
 (checked on every connection, so redirects and DNS cannot reach private, loopback or link-local
-hosts), with at most 3 redirects, a 10 s deadline and a 2 MB cap; HTML goes through trafilatura,
-PDF through pypdf, and the first 5000 characters go to the verifier. `CheckResult.page` carries the
+hosts), with at most 3 redirects (their bodies are never read), a 10 s deadline and a 2 MB cap.
+The URL policy (scheme, social media hosts, login pages) is applied before every hop. HTML goes
+through trafilatura and PDF through pypdf in a child process (`prawdowid/extract_worker.py`) that
+is killed at the deadline; at most 2 run at once per API process. The parsers stop after 50 PDF
+pages, 20,000 characters and 20 MB decompressed per stream; on Linux the child is also capped at
+1 GB of memory and 15 s of CPU. Title, publisher, date and text together are cut to 5000
+characters for the verifier. `CheckResult.page` carries the
 page URL, content hash, title, publisher and date, never the page text. Validation errors come
 back as 422 with a Polish message in `detail[0].msg`.
 

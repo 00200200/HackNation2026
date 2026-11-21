@@ -8,10 +8,13 @@ message can ping anyone.
 Run: `make discord` (reads DISCORD_BOT_TOKEN and PRAWDOWID_API_URL from the environment).
 """
 
+import asyncio
+import io
 import logging
 import os
 import re
 import sys
+import textwrap
 
 import discord
 import httpx2
@@ -21,6 +24,7 @@ from pydantic import ValidationError
 
 from prawdowid.app import MAX_INPUT_CHARS, TECHNICAL_ERROR_MESSAGE
 from prawdowid.contract import (
+    CheckedPage,
     CheckResult,
     ClaimKind,
     ClaimResult,
@@ -41,30 +45,72 @@ CHANNEL = "discord"
 API_TIMEOUT_S = 75
 MESSAGE_LIMIT = 2000  # Discord's limit for one message
 MAX_MESSAGES = 5
-TRUNCATED = "… Odpowiedź była za długa dla Discorda i została skrócona."
+ATTACHED = (
+    "Dalsza część odpowiedzi nie mieści się w wiadomościach Discorda. "
+    "Pełna odpowiedź, ze wszystkimi ocenami i linkami, jest w załączniku."
+)
+ATTACHMENT_NAME = "odpowiedz.md"
+ATTACHMENT_FAILED = "Nie udało się dołączyć pliku z pełną odpowiedzią. Sprawdź ten tekst w formularzu WWW."
+# Raw characters per line before escaping; escaping at most doubles them, so a line stays
+# under MESSAGE_LIMIT with its prefix.
+WRAP_WIDTH = 900
+# "  <" + url + ">" must fit one message.
+URL_LIMIT = MESSAGE_LIMIT - 4
+URL_TOO_LONG = "  (link za długi na wiadomość Discorda; jest w załączniku)"
 CONNECTION_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę."
 
 
-def _safe(text: str) -> str:
-    # One line: a line break in untrusted text must not end its quote or section.
-    return escape_mentions(escape_markdown(" ".join(text.split())))
+def _escape(text: str) -> str:
+    text = escape_markdown(text)
+    # escape_markdown escapes only the first "[x](y)" of a run; break every masked link,
+    # and a leading "1." so a wrapped line cannot become a numbered list.
+    text = re.sub(r"^(\d+)\.", r"\1\\.", text.replace("](", "]\\("))
+    return escape_mentions(text)
+
+
+def _field(prefix: str, raw: str, cont: str = "", suffix: str = "") -> list[str]:
+    """One untrusted field as Discord lines that each stand alone.
+
+    The raw text is collapsed to one line, wrapped at spaces, and only then escaped, so every
+    line start is escaped and no escape sequence is cut. Continuation lines repeat `cont`
+    (e.g. "> " for a quote), so a message cut between lines keeps its quote or section.
+    """
+    chunks = textwrap.wrap(" ".join(raw.split()), WRAP_WIDTH) or [""]
+    lines = [(cont if i else prefix) + _escape(chunk) for i, chunk in enumerate(chunks)]
+    lines[-1] += suffix
+    return lines
 
 
 def _bullets(items: list[str]) -> list[str]:
-    return [f"- {_safe(item)}" for item in items]
+    return [line for item in items for line in _field("- ", item, "  ")]
 
 
-def _source(s: Source) -> list[str]:
+def _source(s: Source, url_limit: int | None) -> list[str]:
     meta = ", ".join(
-        part
-        for part in (_safe(s.publisher), s.published_at and s.published_at.isoformat())
-        if part
+        part for part in (s.publisher, s.published_at and str(s.published_at)) if part
     )
-    # <url> stops Discord from unfurling a preview of an untrusted page.
-    lines = [f"- {_safe(s.title)}" + (f", {meta}" if meta else "") + f" <{s.url}>"]
+    lines = _field("- ", f"{s.title}, {meta}" if meta else s.title, "  ")
+    # Own line, <url> stops Discord from unfurling a preview of an untrusted page.
+    url = str(s.url)
+    fits = url_limit is None or len(url) <= url_limit
+    lines.append(f"  <{url}>" if fits else URL_TOO_LONG)
     if s.fragment:
-        lines.append(f"> „{_safe(s.fragment)}”")
+        lines += _field("> „", s.fragment, "> ", "”")
     return lines
+
+
+def _page(p: CheckedPage, url_limit: int | None) -> list[str]:
+    """The page behind a link: what was read, not evidence for its own claims."""
+    meta = ", ".join(
+        part for part in (p.publisher, p.published_at and str(p.published_at)) if part
+    )
+    title = p.title or p.url
+    lines = _field(
+        "Sprawdzony tekst pochodzi ze strony: ", f"{title}, {meta}" if meta else title
+    )
+    fits = url_limit is None or len(p.url) <= url_limit
+    lines.append(f"  <{p.url}>" if fits else URL_TOO_LONG)
+    return lines + [PAGE_NOTE]
 
 
 # Claims from a quote: who said it, and what was said. Plain statements get no tag.
@@ -73,15 +119,15 @@ KIND_LABELS = {
     ClaimKind.QUOTED: "Treść cytatu",
 }
 SECURITY_NOTE = (
-    "Treść zawierała polecenia skierowane do modelu. "
-    "Zignorowaliśmy je i sprawdziliśmy resztę."
+    "W treści są zwroty, które wyglądają na polecenia dla modelu. "
+    "Nie wykonaliśmy ich i sprawdziliśmy resztę."
 )
 SECURITY_NOTE_ONLY = (
-    "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je."
+    "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich."
 )
 SOURCE_SECURITY_NOTE = (
-    "W źródłach znaleźliśmy polecenia skierowane do modelu. "
-    "Zignorowaliśmy je i sprawdziliśmy resztę."
+    "W źródłach są zwroty, które wyglądają na polecenia dla modelu. "
+    "Nie wykonaliśmy ich i sprawdziliśmy resztę."
 )
 PAGE_NOTE = "Ta strona nie jest źródłem dowodów dla własnych twierdzeń."
 UNCHECKED_NOTE = (
@@ -90,18 +136,18 @@ UNCHECKED_NOTE = (
 )
 
 
-def _claim(n: int, c: ClaimResult) -> str:
+def _claim(n: int, c: ClaimResult, url_limit: int | None) -> str:
     kind = f"[{KIND_LABELS[c.kind]}] " if c.kind in KIND_LABELS else ""
     lines = [
-        f"### {n}. {_safe(c.claim)}",
-        f"-# {kind}W tekście: {_safe(c.source_sentence)}",
+        *_field(f"### {n}. ", c.claim, "### "),
+        *_field(f"-# {kind}W tekście: ", c.source_sentence, "-# "),
         f"Ocena: **{c.verdict_label}**",
-        f"**Uzasadnienie:** {_safe(c.reasoning)}",
-        f"**Siła dowodów:** {_safe(c.strength)}",
+        *_field("**Uzasadnienie:** ", c.reasoning),
+        *_field("**Siła dowodów:** ", c.strength),
         "**Przesłanki:**",
         *_bullets(c.premises),
         "**Źródła:**",
-        *([line for s in c.sources for line in _source(s)] or ["- brak"]),
+        *([line for s in c.sources for line in _source(s, url_limit)] or ["- brak"]),
     ]
     if c.limitations:
         lines += ["**Ograniczenia:**", *_bullets(c.limitations)]
@@ -121,29 +167,40 @@ INCIDENT_NOTE = (
 )
 
 
-def _incident(m: IncidentMatch) -> str:
+def _incident(m: IncidentMatch, url_limit: int | None) -> list[str]:
     how = MATCH_LABELS[m.matched_on]
     if m.similarity is not None:
         how += f" {round(m.similarity * 100)}%"
+    lines = _field("- ", f"{m.incident_text} ({m.incident_id}, {how})", "  ")
     # The base is outside data: only a plain http(s) URL, so it cannot break out of <...>.
-    url = f" <{m.url}>" if m.url and PLAIN_URL.fullmatch(m.url) else ""
-    return f"- {_safe(m.incident_text)} ({_safe(m.incident_id)}, {how}){url}"
+    if m.url and PLAIN_URL.fullmatch(m.url):
+        fits = url_limit is None or len(m.url) <= url_limit
+        lines.append(f"  <{m.url}>" if fits else URL_TOO_LONG)
+    return lines
 
 
-def _incidents(matches: list[IncidentMatch]) -> str:
-    return "\n".join(
-        ["### Podobne znane incydenty", INCIDENT_NOTE, *map(_incident, matches)]
+def _incidents(matches: list[IncidentMatch], url_limit: int | None) -> str:
+    lines = [line for m in matches for line in _incident(m, url_limit)]
+    return "\n".join(["### Podobne znane incydenty", INCIDENT_NOTE, *lines])
+
+
+def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
+    """CheckResult as Discord Markdown, with the same sections as the web form.
+
+    `url_limit=None` keeps every URL whole, for the attachment.
+    """
+    warning = (
+        [_incidents(check.incident_matches, url_limit)]
+        if check.incident_matches
+        else []
     )
-
-
-def render(check: CheckResult) -> str:
-    """CheckResult as Discord Markdown, with the same sections as the web form."""
-    warning = [_incidents(check.incident_matches)] if check.incident_matches else []
     # Statuses other than "ok" are notices, never verdicts.
     if check.status is not Status.OK:
-        notice = f"**Brak oceny.** {_safe(check.message or '')}"
+        notice = "\n".join(_field("**Brak oceny.** ", check.message or ""))
         if check.security_events:
             notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
+        if check.limitations:
+            notice += "\n**Ograniczenia:**\n" + "\n".join(_bullets(check.limitations))
         return "\n\n".join([notice, *warning])
     if not check.claims and not check.unchecked_claims:
         notice = "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
@@ -158,22 +215,10 @@ def render(check: CheckResult) -> str:
         if found
     ]
     if check.page:
-        p = check.page
-        meta = ", ".join(
-            part
-            for part in (
-                p.publisher and _safe(p.publisher),
-                p.published_at and p.published_at.isoformat(),
-            )
-            if part
-        )
-        sections.insert(
-            0,
-            f"Sprawdzony tekst pochodzi ze strony: {_safe(p.title or p.url)}"
-            + (f", {meta}" if meta else "")
-            + f" <{p.url}>. {PAGE_NOTE}",
-        )
-    sections += warning + [_claim(n, c) for n, c in enumerate(check.claims, 1)]
+        sections.insert(0, "\n".join(_page(check.page, url_limit)))
+    sections += warning + [
+        _claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)
+    ]
     if check.unchecked_claims:
         sections.append(
             "\n".join(
@@ -188,25 +233,34 @@ def render(check: CheckResult) -> str:
 
 
 def split(text: str) -> list[str]:
-    """Cut text into Discord messages on line breaks; at most MAX_MESSAGES, marked if cut."""
-    # Hand-rolled: commands.Paginator raises on a line longer than one message.
+    """Cut text into Discord messages between lines.
+
+    Every line is shorter than a message (`_field` wraps), so a cut never falls inside a line.
+    """
     parts, current = [], ""
     for line in text.split("\n"):
-        while len(line) > MESSAGE_LIMIT:
-            if current:
-                parts.append(current)
-            current, line = line[:MESSAGE_LIMIT], line[MESSAGE_LIMIT:]
         candidate = f"{current}\n{line}" if current else line
-        if len(candidate) > MESSAGE_LIMIT:
+        if current and len(candidate) > MESSAGE_LIMIT:
             parts.append(current)
             current = line
         else:
             current = candidate
     parts.append(current)
-    if len(parts) > MAX_MESSAGES:
-        parts = parts[:MAX_MESSAGES]
-        parts[-1] = parts[-1][: MESSAGE_LIMIT - len(TRUNCATED) - 1] + "\n" + TRUNCATED
     return parts
+
+
+def reply(check: CheckResult) -> tuple[list[str], str | None]:
+    """Messages for one check, plus the full text to attach when the messages would lose any.
+
+    At most MAX_MESSAGES messages. Nothing is dropped: whatever does not fit (more messages,
+    or a URL longer than a message) is in the attachment, which holds the whole answer.
+    """
+    text, full = render(check), render(check, url_limit=None)
+    parts = split(text)
+    if len(parts) > MAX_MESSAGES:
+        return [*parts[: MAX_MESSAGES - 1], ATTACHED], full
+    # Fits, but a URL longer than a message was replaced: its line points to the file.
+    return parts, None if text == full else full
 
 
 def _notice(message: str) -> CheckResult:
@@ -216,10 +270,12 @@ def _notice(message: str) -> CheckResult:
 async def ask_api(text: str, client: httpx2.AsyncClient) -> CheckResult:
     """The same request the web form sends. Any failure becomes a notice, never a verdict."""
     try:
-        resp = await client.post(
-            "/api/checks", json={"input": text}, headers={"X-Channel": CHANNEL}
-        )
-    except httpx2.HTTPError:
+        # httpx timeouts are per read; this caps the whole call, body included.
+        async with asyncio.timeout(API_TIMEOUT_S):
+            resp = await client.post(
+                "/api/checks", json={"input": text}, headers={"X-Channel": CHANNEL}
+            )
+    except (httpx2.HTTPError, TimeoutError):
         log.exception("API call failed")
         return _notice(CONNECTION_ERROR)
     if resp.status_code in (422, 429):
@@ -236,6 +292,15 @@ async def ask_api(text: str, client: httpx2.AsyncClient) -> CheckResult:
     except (httpx2.HTTPError, ValidationError):
         log.exception("API answered with an error or a bad body")
         return _notice(TECHNICAL_ERROR_MESSAGE)
+
+
+async def send(interaction: discord.Interaction, text: str, **kwargs) -> None:
+    await interaction.followup.send(
+        text,
+        allowed_mentions=discord.AllowedMentions.none(),
+        suppress_embeds=True,
+        **kwargs,
+    )
 
 
 class Bot(discord.Client):
@@ -256,12 +321,19 @@ class Bot(discord.Client):
             await interaction.response.defer(thinking=True)
             check = await ask_api(tekst, self.api)
             log.info("check status=%s input_chars=%d", check.status, len(tekst))
-            for part in split(render(check)):
-                await interaction.followup.send(
-                    part,
-                    allowed_mentions=discord.AllowedMentions.none(),
-                    suppress_embeds=True,
-                )
+            parts, full = reply(check)
+            last = parts.pop()
+            for part in parts:
+                await send(interaction, part)
+            if full is None:
+                await send(interaction, last)
+                return
+            try:
+                file = discord.File(io.BytesIO(full.encode()), filename=ATTACHMENT_NAME)
+                await send(interaction, last, file=file)
+            except discord.HTTPException:
+                log.exception("attachment refused")
+                await send(interaction, f"{last}\n\n{ATTACHMENT_FAILED}")
 
     async def setup_hook(self) -> None:
         # Created here so the client lives in the bot's event loop.

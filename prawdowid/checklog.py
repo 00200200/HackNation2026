@@ -55,6 +55,8 @@ def record(
         "cost_usd": result.cost_usd,
         "security_events": [e.model_dump() for e in result.security_events],
         "incidents": [m.incident_id for m in result.incident_matches],
+        # Check-level limits, e.g. "patterns only" when the model did not answer.
+        "limitations": [mask_personal_data(x) for x in result.limitations],
         "claims": [
             {
                 "claim": mask_personal_data(c.claim),

@@ -31,6 +31,7 @@ FIELDS = {
     "cost_usd",
     "security_events",
     "incidents",
+    "limitations",
     "claims",
     "unchecked_claims",
 }
@@ -79,7 +80,9 @@ def test_a_successful_check_leaves_one_complete_record(api):
     assert rec["started_at"] <= rec["time"]
     assert set(rec["steps_ms"]) == {"extract"}
     assert rec["model_calls"][0]["model"] == "fake-extract"
-    assert rec["security_events"] == [{"kind": "prompt_injection", "location": "input"}]
+    assert rec["security_events"] == [
+        {"kind": "prompt_injection", "location": "input", "detector": "model"}
+    ]
     [claim] = rec["claims"]
     # Offline every source fails: the abstention and the search errors are in the record.
     assert claim["verdict"] == "not_checked" and claim["limitations"]
@@ -97,6 +100,7 @@ def test_a_failed_check_leaves_one_record(api, monkeypatch):
     body, rec = check(api)
     assert body["status"] == rec["status"] == "technical_error"
     assert rec["error"] == "RuntimeError" and rec["claims"] == []
+    assert rec["limitations"] == body["limitations"] != []
 
 
 def test_a_timed_out_check_leaves_one_record(api, monkeypatch):
