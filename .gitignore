@@ -221,3 +221,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Claude Code (personal overrides)
+.claude/settings.local.json
+CLAUDE.local.md
+!.claude/skills/build/
