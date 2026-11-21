@@ -56,11 +56,32 @@ function claimCard(c) {
     c.limitations.length ? list(c.limitations) : null);
 }
 
+// Scenario I: a known incident the input looks like. Context only, never a verdict.
+const MATCH_LABELS = { url: "ten sam adres", domain: "domena z bazy", text: "podobny tekst" };
+
+function incidentItem(m) {
+  const safeUrl = m.url && /^https?:\/\//.test(m.url) ? m.url : null;
+  const how = MATCH_LABELS[m.matched_on] + (m.similarity != null ? ` ${Math.round(m.similarity * 100)}%` : "");
+  return el("li", {}, m.incident_text, ` (${m.incident_id}, ${how})`,
+    safeUrl ? el("span", {}, " ", el("a", { href: safeUrl, textContent: "adres", rel: "noopener noreferrer", target: "_blank" })) : null);
+}
+
+function incidentWarning(matches) {
+  return el("section", { className: "incidents", role: "note" },
+    el("h2", { textContent: "Podobne znane incydenty" }),
+    el("p", { textContent: INCIDENT_NOTE }),
+    el("ul", {}, ...matches.map(incidentItem)));
+}
+
+const INCIDENT_NOTE = "Ta treść przypomina incydenty z bazy organizatora. "
+  + "To tylko kontekst: nie zmienia oceny twierdzeń.";
+
 function render(check) {
+  const warning = check.incident_matches?.length ? [incidentWarning(check.incident_matches)] : [];
   // Statuses other than "ok" are notices, never verdicts.
-  if (check.status !== "ok") return [box("notice", "Brak oceny", check.message)];
-  if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia.")];
-  const nodes = check.claims.map(claimCard);
+  if (check.status !== "ok") return [box("notice", "Brak oceny", check.message), ...warning];
+  if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia."), ...warning];
+  const nodes = [...warning, ...check.claims.map(claimCard)];
   if (check.unchecked_claims?.length) nodes.push(uncheckedList(check.unchecked_claims));
   return nodes;
 }

@@ -73,12 +73,33 @@ class ClaimResult(BaseModel):
         return self.verdict.label
 
 
+class MatchKind(StrEnum):
+    """How the input matched a known incident, strongest first."""
+
+    URL = "url"
+    DOMAIN = "domain"
+    TEXT = "text"
+
+
+class IncidentMatch(BaseModel):
+    """A known incident the input looks like (scenario I). Context only, never a verdict."""
+
+    incident_id: str
+    incident_text: str
+    matched_on: MatchKind
+    url: str | None = None
+    # Text similarity 0..1 (difflib ratio), only for a text match.
+    similarity: float | None = None
+
+
 class CheckResult(BaseModel):
     status: Status
     message: str | None = None
     claims: list[ClaimResult] = []
     # Claims found but left out by the per-check cap. They have no verdict.
     unchecked_claims: list[str] = []
+    # Shown next to the claims, also on a notice (a link): it never sets or changes a verdict.
+    incident_matches: list[IncidentMatch] = []
 
     @model_validator(mode="after")
     def _non_ok_is_a_notice(self) -> "CheckResult":

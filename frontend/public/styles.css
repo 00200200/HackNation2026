@@ -105,3 +105,6 @@ a { color: var(--blue); }
 @media (max-width: 600px) { .legend dl > div { grid-template-columns: 1fr; } }
 
 .foot { background: var(--soft); border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; padding: 1.5rem 0 2.5rem; }
+.incidents { border-left: 4px solid var(--line); padding: .2rem 0 .2rem 1rem; margin-bottom: 1.5rem; }
+.incidents h2 { font-size: 1rem; margin: 0 0 .3rem; }
+.incidents p, .incidents ul { margin: .2rem 0; }
