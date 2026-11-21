@@ -139,9 +139,7 @@ def test_security_event_is_shown_first():
 
 def test_injection_in_a_source_says_it_came_from_a_source():
     flagged = CHECK.model_copy(
-        update={
-            "security_events": [SecurityEvent(location="source", detector="model")]
-        }
+        update={"security_events": [SecurityEvent(location="source", detector="model")]}
     )
     text = render(flagged)
     assert text.startswith("**Polecenia dla modelu.** W źródłach")
