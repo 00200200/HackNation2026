@@ -53,9 +53,22 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - 2026-11-21: No database for now; each check is logged to stdout. Storage UNDECIDED. (`96f3b46`)
 - 2026-11-21: Frontend is static HTML/CSS/JS behind nginx, no build step; backend is JSON only. (`96f3b46`)
 - 2026-11-21: Every push goes through `.githooks/pre-push` (ruff, pytest, eval, judge PASS). (`d5aa35b`)
+- 2026-11-21 (Michał): Retrieval flow. Source domains are indexed ahead of time (fetch with trafilatura, store publication and
+  retrieval dates), never scraped while a check runs. Per check, in parallel and each with its own timeout: the official
+  corpus (BM25 + embeddings), Google Fact Check Tools API, the incident base (EUvsDisinfo + the organiser's base) and live
+  official APIs (e.g. IMGW warnings). An incident match is context or secondary evidence, never a verdict. A link input is
+  fetched and its address also goes to the incident base. Fallback web search only on an allowlist of trusted domains, one
+  round, only if time is left; fetched pages are untrusted data. No evidence left: `brak wystarczających dowodów`.
+  Diagram: board "Architektura" on https://claude.ai/artifact/3f8LsRGUNnpgVAhAEsZcgu (private until shared).
+  Details and the rule for known disinformation domains (warning, never a verdict): `docs/adr/0001-evidence-retrieval-and-verdict.md`.
+- 2026-11-21 (Michał): Brand. Logo is a question mark wearing a detective's deerstalker: red rounded square, white "?",
+  navy hat. Vector files without font dependencies in `docs/brand/` (`znak.svg`, `znak-na-czerwonym.svg` for red
+  backgrounds, `awatar.svg` for the Discord bot); `frontend/public/favicon.svg` uses `znak.svg`. Tagline: "Fakt ma
+  przypis." We never claim to be "the source of truth": the brief rules out the role of an automatic judge of truth.
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał: `feat/ui-frontend` ADR 0001 (retrieval and verdict flow, mentor's answer format), brand files in `docs/brand/`.
 - 2026-11-21 Łukasz: linked the architecture board in README, committed the quick eval on `c27b642`, pushed `feat/llm-verifier`.
 - 2026-11-21 Łukasz: added this worklog and the CLAUDE.md rule to keep it current.
 - 2026-11-21 Łukasz: `c27b642` prompt keeps injected instructions out of claims, checks yes/no questions.
