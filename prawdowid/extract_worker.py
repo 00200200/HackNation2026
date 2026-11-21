@@ -2,7 +2,8 @@
 
 Usage: python -I extract_worker.py <content-type> <url>, page bytes on stdin, one JSON object on
 stdout: {"kind": "ok", "text", "title", "publisher", "date"} or {"kind": "paywall" | "no_text"}.
-"paywall" covers schema.org paywall markup and inline sign-in or subscribe walls.
+"paywall" covers schema.org paywall markup (JSON-LD or microdata) and inline sign-in or subscribe
+walls, in the article text or in a form.
 Self-contained on purpose (no prawdowid imports), so it runs with -I.
 
 Work is bounded twice: the caller kills the process at its deadline, and the parsers stop after a
@@ -107,19 +108,35 @@ def extract_pdf(body: bytes) -> dict:
     return ok("\n".join(parts), title and str(title), None, None)
 
 
+def paywalled_microdata(tree) -> bool:
+    """schema.org microdata form of the paywall marker: itemprop="isAccessibleForFree" false."""
+    return any(
+        (el.get("content") or el.text_content()).strip().lower() == "false"
+        for el in tree.xpath('//*[@itemprop="isAccessibleForFree"]')
+    )
+
+
 def extract_html(body: bytes, url: str) -> dict:
     import trafilatura
+    from trafilatura.utils import load_html
 
-    if is_paywalled(body):
+    tree = load_html(body)  # decodes like trafilatura does, so Polish notices match
+    if tree is None:
+        return {"kind": "no_text"}
+    if is_paywalled(body) or paywalled_microdata(tree):
         return {"kind": "paywall"}
+    # trafilatura drops small forms from its text, so a notice inside one is read from the HTML.
+    # Like a password form, it marks a wall only beside a preview: a newsletter box saying
+    # "subscribe to read our digest" must not refuse a full free article.
+    form_notice = any(WALL_NOTICE.search(f.text_content()) for f in tree.iter("form"))
     doc = trafilatura.bare_extraction(
-        body, url=url, with_metadata=True, include_comments=False
+        tree, url=url, with_metadata=True, include_comments=False
     )
     if not doc:
         return {"kind": "no_text"}
     text = doc.text or ""
     if WALL_NOTICE.search(text) or (
-        PASSWORD_INPUT.search(body) and len(text) < PREVIEW_CHARS
+        (PASSWORD_INPUT.search(body) or form_notice) and len(text) < PREVIEW_CHARS
     ):
         return {"kind": "paywall"}
     return ok(doc.text, doc.title, doc.sitename, doc.date)
