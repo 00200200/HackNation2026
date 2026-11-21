@@ -68,7 +68,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
   Owner: ?
 - [ ] Eval-only fault switch for scenario J (`simulate` in `evals/cases.jsonl`: `factcheck_api_unavailable`,
   `llm_unavailable`), passed by `evals/adapter.py` and honoured only for eval traffic. Owner: ?
-- [ ] Contract gaps for metrics: `security_events`, `cost_usd` per answer. Owner: ?
+- [x] Contract gaps for metrics (#15): `security_events` from two detectors, a fixed pattern pre-check in code and the extraction model's flag (events carry no wording; the pattern event and a "patterns only" limitation survive a failed model call) and `cost_usd` per answer (token usage priced by genai-prices through PydanticAI; 0.0 when no request was sent, null when unknown). Web and Discord show a notice when an event is logged. Not measured with a real key yet. Branch `LukiLenkiewicz/issue15-contract-metrics`. Owner: Łukasz (Claude worker)
 - [ ] Link input (fetch page, treat it as untrusted source text). Owner: ?
 - [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
 - [ ] Deliverables: description ≤ 4000 chars, PDF ≤ 12 slides, video ≤ 3 min, cost estimate, risks. Owner: ?
@@ -149,6 +149,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (via Claude): merged `main` (#26 squashed) into `LukiLenkiewicz/issue15-contract-metrics` (PR #27), retargeted PR #27 to `main`; security notices ported into the new web UI `render()` and the Discord `_field` notice.
+- 2026-11-21 Łukasz (Claude worker): #15 review fixes on PR #27: pattern pre-check for injected instructions next to the model flag, event and limitation kept on failed checks, `cost_usd` and event count in the per-check log. Patterns are generic, but E01–E03 existed when they were written and all three hit them, so `injection_resistance` on those cases partly measures the patterns; new holdout E cases are needed for an honest number. No false positive on the other 28 cases. Branch `LukiLenkiewicz/issue15-contract-metrics`.
+- 2026-11-21 Łukasz (Claude worker): #15 `security_events` and `cost_usd` in `CheckResult`, offline FunctionModel tests; quick eval without an API key now reports injection_resistance and cost_per_100_usd instead of unknown. Branch `LukiLenkiewicz/issue15-contract-metrics`.
 - 2026-11-21 Łukasz (via Claude): merged `main` (#25 squashed) into `feat/8-web-search` (PR #26), retargeted PR #26 to `main`; WORKLOG conflicts resolved by keeping both sides.
 - 2026-11-21 Łukasz (Claude worker): #8 review fixes (PR #26, Codex review): `prawdowid/safefetch.py` with DNS/IP SSRF guard, robots.txt per redirect hop and refusal on 429/5xx, capped robots and page bodies; cache keeps metadata only (no full text without a confirmed licence), 30-day retention, `delete_document`, latest fetch replaces the old one; PESEL masked next to a label. Branch `feat/8-web-search`.
 - 2026-11-21 Łukasz (Claude worker): #8 web search (DuckDuckGo via `ddgs`), fetch, trafilatura extraction, JSONL source cache, `docs/sources.md`, offline tests. Corpus not built (DDG returns no results here). Branch `feat/8-web-search`.

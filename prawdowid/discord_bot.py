@@ -93,6 +93,13 @@ KIND_LABELS = {
     ClaimKind.ATTRIBUTION: "Kto co powiedział",
     ClaimKind.QUOTED: "Treść cytatu",
 }
+SECURITY_NOTE = (
+    "W tekście są zwroty, które wyglądają na polecenia dla modelu. "
+    "Nie wykonaliśmy ich i sprawdziliśmy resztę."
+)
+SECURITY_NOTE_ONLY = (
+    "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich."
+)
 UNCHECKED_NOTE = (
     "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
     "Tych nie oceniliśmy. Możesz wkleić je osobno."
@@ -124,10 +131,18 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
     """
     # Statuses other than "ok" are notices, never verdicts.
     if check.status is not Status.OK:
-        return "\n".join(_field("**Brak oceny.** ", check.message or ""))
+        notice = "\n".join(_field("**Brak oceny.** ", check.message or ""))
+        if check.security_events:
+            notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
+        if check.limitations:
+            notice += "\n**Ograniczenia:**\n" + "\n".join(_bullets(check.limitations))
+        return notice
     if not check.claims and not check.unchecked_claims:
         return "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
-    sections = [_claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)]
+    sections = (
+        [f"**Polecenia dla modelu.** {SECURITY_NOTE}"] if check.security_events else []
+    )
+    sections += [_claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)]
     if check.unchecked_claims:
         sections.append(
             "\n".join(

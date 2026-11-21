@@ -8,6 +8,8 @@ const result = document.getElementById("result");
 const example = document.getElementById("przyklad");
 const chips = document.querySelectorAll("[data-example]");
 
+const SECURITY_NOTE = "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
+const SECURITY_NOTE_ONLY = "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich.";
 const MAX_CHARS = 5000;
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 const NOT_A_VERDICT = "To nie jest ocena prawdziwości tej treści.";
@@ -167,7 +169,14 @@ function copyButton(check) {
 function render(check, seconds) {
   // Statuses other than "ok" are notices, never verdicts.
   if (check.status !== "ok") {
-    return notice(NOTICE_TITLES[check.status] ?? "Brak oceny", check.message, NOT_A_VERDICT);
+    const main = notice(NOTICE_TITLES[check.status] ?? "Brak oceny", check.message, NOT_A_VERDICT);
+    const limits = check.limitations?.length
+      ? el("ul", {}, ...check.limitations.map((l) => el("li", { textContent: l })))
+      : null;
+    if (!check.security_events?.length && !limits) return main;
+    return el("div", {},
+      check.security_events?.length ? notice("Polecenia dla modelu", SECURITY_NOTE_ONLY) : null,
+      main, limits);
   }
   const unchecked = check.unchecked_claims ?? [];
   if (!check.claims.length && !unchecked.length) {
@@ -175,6 +184,7 @@ function render(check, seconds) {
       "Wklej fragment z konkretnym faktem, na przykład datą, liczbą albo nazwą instytucji.");
   }
   return el("article", { className: "card" },
+    check.security_events?.length ? notice("Polecenia dla modelu", SECURITY_NOTE) : null,
     el("div", { className: "card-head" },
       el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
         el("span", { className: "took", textContent: `w ${seconds} s` })),
