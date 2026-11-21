@@ -69,7 +69,7 @@ def test_misleading_states_the_missing_context_and_its_source():
     assert verdict is Verdict.MISLEADING
     assert (
         text
-        == "Twierdzenie pomija ważny kontekst: dotyczy tylko 2024 roku (MON, 3.07.2026)."
+        == "Twierdzenie pomija ważny kontekst: dotyczy tylko 2024 roku (MON, 3.07.2026: „Polska jest członkiem”)."
     )
 
 
@@ -98,7 +98,9 @@ def test_insufficient_without_sources_says_none_were_found():
 def test_data_gap_is_named():
     verdict, text = decided(evidence(MON, Stance.GAP, own_conclusion=True))
     assert verdict is Verdict.INSUFFICIENT_EVIDENCE
-    assert text.startswith("MON, 3.07.2026 wskazuje, że dostępne dane")
+    assert text == (
+        "Źródła mówią, że dostępne dane nie pozwalają tego sprawdzić: MON, 3.07.2026."
+    )
 
 
 def test_not_checked_is_an_outage_not_a_verdict():
@@ -154,3 +156,36 @@ def test_extraction_note_never_reaches_a_checked_claim():
     assert verifier.claim_result(claim, out).reasoning == justification.NOT_CHECKED
     # A claim that was never checked keeps the model's note: it says why.
     assert verifier.claim_result(claim, None).reasoning == CLAIM_NOTE
+
+
+def test_publisher_whose_own_conclusion_is_a_gap_is_not_cited_as_confirming():
+    # Its quote of the claim confirms nothing (decide drops it); Portal A is the real support.
+    quoter = source("Fact-checker", "Twierdzenie: Polska wyszła z NATO.", slug="q")
+    support = source("Portal A", "Polska jest w NATO.", source_type="article", slug="c")
+    support2 = source("Portal B", "NATO liczy Polskę.", source_type="article", slug="d")
+    verdict, text = decided(
+        evidence(quoter, Stance.SUPPORTS),
+        evidence(quoter, Stance.GAP, own_conclusion=True),
+        evidence(support, Stance.SUPPORTS),
+        evidence(support2, Stance.SUPPORTS),
+    )
+    assert verdict is Verdict.CONFIRMED
+    assert "Fact-checker" not in text and "Portal A" in text
+
+
+def test_two_weak_sources_on_opposite_sides_are_not_called_a_conflict():
+    a = source("Portal A", "Tak.", source_type="article", slug="c")
+    b = source("Portal B", "Nie.", source_type="article", slug="d")
+    verdict, text = decided(evidence(a, Stance.SUPPORTS), evidence(b, Stance.REFUTES))
+    assert verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert text.startswith("Znaleźliśmy za mało")
+    assert "sprzeczne" not in text and "Wiarygodne" not in text
+
+
+def test_self_contradicting_publisher_dropped_by_decide_is_not_cited():
+    both = source("Portal A", "Raz tak, raz nie.", source_type="article", slug="c")
+    verdict, text = decided(
+        evidence(both, Stance.SUPPORTS), evidence(both, Stance.REFUTES)
+    )
+    assert verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert "potwierdza Portal A, przeczy Portal A" not in text

@@ -358,6 +358,8 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
             premises,
             evidence,
             limitations + [CONFLICT],
+            cited=_cited(supports, "supports") + _cited(refutes, "refutes"),
+            conflict=True,
         )
     for verdict, side, other in (
         (Verdict.MISLEADING, context, []),
@@ -368,13 +370,21 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
             if other:
                 publishers = ", ".join(sorted(_publishers(other)))
                 limitations.append(COUNTER_EVIDENCE.format(publishers=publishers))
-            return _judgement(verdict, _strength(side), premises, evidence, limitations)
+            return _judgement(
+                verdict,
+                _strength(side),
+                premises,
+                evidence,
+                limitations,
+                cited=_cited_for(verdict, side),
+            )
     return _judgement(
         Verdict.INSUFFICIENT_EVIDENCE,
         "słaba" if evidence else "brak",
         premises,
         evidence,
         limitations + ([] if gaps else [NOT_ENOUGH]),
+        cited=_cited(gaps, "gap") + _cited(supports + refutes, "weak"),
     )
 
 
@@ -484,22 +494,37 @@ def _date_limits(evidence: list[Evidence], today: date) -> list[str]:
     return limits
 
 
-def _judgement(verdict, strength, premises, evidence, limitations) -> Judgement:
+def _judgement(
+    verdict, strength, premises, evidence, limitations, cited=(), conflict=False
+) -> Judgement:
+    """`cited` is the evidence the verdict rests on, after the filters in `decide`."""
     return Judgement(
         verdict=verdict,
         strength=strength,
         premises=premises,
         sources=[e.source for e in evidence],
         limitations=limitations,
-        justification=justification.explain(
-            verdict,
-            [(e.source, e.label.stance.value, _missing(e)) for e in evidence],
-        ),
+        justification=justification.explain(verdict, cited, conflict=conflict),
     )
 
 
-def _missing(e: Evidence) -> str | None:
-    return e.label.missing_context if _grounded(e) else None
+def _cited(evidence: list[Evidence], stance: str):
+    return [(e.source, stance, None) for e in evidence]
+
+
+def _cited_for(verdict: Verdict, side: list[Evidence]):
+    if verdict is not Verdict.MISLEADING:
+        stance = "supports" if verdict is Verdict.CONFIRMED else "refutes"
+        return _cited(side, stance)
+    # The verified words that name the missing context, not the model's paraphrase alone.
+    return [
+        (
+            e.source.model_copy(update={"fragment": e.context_span}),
+            "context",
+            e.label.missing_context,
+        )
+        for e in side
+    ]
 
 
 def _insufficient(strength: str, limitations: list[str]) -> Judgement:

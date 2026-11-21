@@ -25,7 +25,7 @@ CONFLICT = (
     "Wiarygodne źródła mówią co innego: potwierdza {supports}, przeczy {refutes}. "
     "Nie rozstrzygamy, które ma rację."
 )
-DATA_GAP = "{cited} wskazuje, że dostępne dane nie pozwalają tego sprawdzić."
+DATA_GAP = "Źródła mówią, że dostępne dane nie pozwalają tego sprawdzić: {cited}."
 TOO_FEW = "Znaleźliśmy za mało, żeby to rozstrzygnąć: {cited}."
 CONTEXT = "Twierdzenie pomija ważny kontekst: {context} ({cited})."
 SEE_SOURCES = "Ocena wynika ze źródeł wymienionych poniżej."
@@ -36,17 +36,18 @@ REFUTED = "Przeczy temu: {cited}."
 def explain(
     verdict: Verdict,
     stances: Iterable[tuple[Source, str, str | None]],
+    conflict: bool = False,
 ) -> str:
     """One or two sentences for the verdict.
 
-    `stances` is every verified piece of evidence as (source, stance, missing context), the stance
-    being "supports", "refutes", "context" or "gap". Evidence the verdict does not rest on is
-    left out of the sentence.
+    `stances` is the verified evidence the verdict rests on, as (source, stance, missing context),
+    the stance being "supports", "refutes", "context", "gap" or "weak" (too little to decide).
+    The caller filters it with the verdict rules; `conflict` says they found two sides.
     """
     items = list(stances)
     by = {
         stance: [s for s, st, _ in items if st == stance]
-        for stance in ("supports", "refutes", "context", "gap")
+        for stance in ("supports", "refutes", "context", "gap", "weak")
     }
     match verdict:
         case Verdict.NOT_CHECKED:
@@ -61,7 +62,7 @@ def explain(
             return SEE_SOURCES
         case Verdict.MISLEADING:
             return _misleading(items)
-    if by["supports"] and by["refutes"]:
+    if conflict and by["supports"] and by["refutes"]:
         return CONFLICT.format(
             supports=_cite(by["supports"]), refutes=_cite(by["refutes"])
         )
@@ -73,12 +74,12 @@ def explain(
 
 
 def _misleading(items: list[tuple[Source, str, str | None]]) -> str:
-    # The rules need a missing context found in a source; without one, cite what refutes.
+    # The rules need a missing context found in a source, so `grounded` is never empty there.
     grounded = [(s, ctx) for s, _, ctx in items if ctx]
     if not grounded:
-        return REFUTED.format(cited=_cite([s for s, _, _ in items]))
+        return SEE_SOURCES
     source, context = grounded[0]
-    return CONTEXT.format(context=context.rstrip(". "), cited=_cite([source], False))
+    return CONTEXT.format(context=context.rstrip(". "), cited=_cite([source]))
 
 
 def _cite(sources: list[Source], quote: bool = True) -> str:
