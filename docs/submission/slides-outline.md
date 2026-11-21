@@ -46,15 +46,16 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 7. Zapisany test
 
-- Szybki test regresji, nie pełny test: `n_cases: 8`, `dirty: false`, `coverage_ok: true`, `overall_pass: false`.
-- Commit produktu: `aa9fb7edceddbc577ca0922c1873ca325129a0bb`.
-- Znacznik czasu: `2026-11-21T18:19:08+00:00`.
+- Szybki test regresji, nie pełny test: `n_cases: 9`, `dirty: false`, `coverage_ok: true`, `overall_pass: false`.
+- Commit produktu: `95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, sprzed scalenia #40 z `main`; świeży test po
+  scaleniu jeszcze nie uruchomiony (decyzja: `HN_SKIP_EVAL=1`).
+- Znacznik czasu: `2026-11-21T19:10:57+00:00`.
 - Źródło wszystkich wartości: [latest.json](../../evals/results/latest.json).
 
 ## Slajd 8. Wyniki jakości
 
-- `macro_f1: 0.25`; `citation_coverage: 1.0`; `abstention: 1.0`.
-- `injection_resistance: 1.0`; `end_to_end: 0.875`.
+- `macro_f1: 0.1`; `citation_coverage: null`; `abstention: 1.0`.
+- `injection_resistance: 0.0`; `end_to_end: 0.8888888888888888`.
 - `citation_correctness: null`; `channel_consistency: null`: niezmierzone.
 - Wynik całości nie spełnia wymagań. Pokrycie cytatami nie dowodzi poprawności interpretacji.
   [Dokładne wyniki i definicje](architecture.md#saved-test-results-and-reproduction),
@@ -62,9 +63,9 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 9. Czas i koszt
 
-- `median_latency_s: 17.00699254195206`; `cost_per_100_usd: 1.7199700000000002`.
-- Ekstrapolacja: `1.7199700000000002 / 100 * 1000 = 17.199700000000002 USD`, czyli około
-  `17.20 USD` za 1000 sprawdzeń przy tej samej mieszance zapytań.
+- `median_latency_s: 3.8964525419287384`; `cost_per_100_usd: 1.8220444444444441`.
+- Ekstrapolacja: `1.8220444444444441 / 100 * 1000 = 18.220444444444441 USD`, czyli około
+  `18.22 USD` za 1000 sprawdzeń przy tej samej mieszance zapytań.
 - Źródło: [latest.json](../../evals/results/latest.json). Hosting, opłaty kanału i zachowanie pod
   obciążeniem: UNCONFIRMED. [Założenia i rachunek](cost.md).
 
@@ -72,7 +73,9 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 - Kod oddziela dane od instrukcji, sprawdza obecność cytatów i ogranicza pobieranie podanych URL.
 - Maskowanie obejmuje zapytania web; surowy tekst nadal trafia do modelu, a twierdzenia do logów.
-- Szybki test injection przeszedł; obejmuje jeden przypadek ([latest.json](../../evals/results/latest.json)). Retencja logów i usuwanie sesji są otwarte.
+- Najnowszy zapisany test `injection_resistance: 0.0` (nie spełnia progu); wcześniejszy test na
+  innym commicie przechodził. Oba obejmują jeden przypadek, to nie dowód odporności
+  ([latest.json](../../evals/results/latest.json)). Retencja logów i usuwanie sesji są otwarte.
   [Ryzyka z odwołaniami do kodu](risks.md).
 
 ## Slajd 11. Ograniczenia

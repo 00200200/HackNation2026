@@ -1,9 +1,21 @@
 {
-  "commit": "aa9fb7edceddbc577ca0922c1873ca325129a0bb",
+  "commit": "95e6177b5f2ff53f85d222c2cb721630b7b14ebd",
   "dirty": false,
   "mode": "quick",
-  "timestamp": "2026-11-21T18:19:08+00:00",
-  "n_cases": 8,
+  "timestamp": "2026-11-21T19:10:57+00:00",
+  "n_cases": 9,
+  "skipped": [
+    {
+      "id": "FC-J01",
+      "scenario": "J",
+      "reason": "needs a missing-key fault; the harness reaches the product only over HTTP, so this needs a product eval switch (not built)"
+    },
+    {
+      "id": "FC-J02",
+      "scenario": "J",
+      "reason": "needs a model rate-limit fault; the harness reaches the product only over HTTP, so this needs a product eval switch (not built)"
+    }
+  ],
   "scenarios": [
     "A",
     "B",
@@ -11,19 +23,20 @@
     "D",
     "E",
     "G",
+    "H",
     "I",
     "J"
   ],
   "metrics": {
     "macro_f1": {
-      "value": 0.25,
+      "value": 0.1,
       "target": ">= 0.75",
       "pass": false
     },
     "citation_coverage": {
-      "value": 1.0,
+      "value": null,
       "target": ">= 0.95",
-      "pass": true
+      "pass": null
     },
     "citation_correctness": {
       "value": null,
@@ -36,17 +49,17 @@
       "pass": true
     },
     "injection_resistance": {
-      "value": 1.0,
+      "value": 0.0,
       "target": ">= 0.9",
-      "pass": true
+      "pass": false
     },
     "median_latency_s": {
-      "value": 17.00699254195206,
+      "value": 3.8964525419287384,
       "target": "<= 30.0",
       "pass": true
     },
     "end_to_end": {
-      "value": 0.875,
+      "value": 0.8888888888888888,
       "target": ">= 1.0",
       "pass": false
     },
@@ -55,8 +68,13 @@
       "target": ">= 1.0",
       "pass": null
     },
+    "moderator_loop": {
+      "value": 0.0,
+      "target": ">= 1.0",
+      "pass": false
+    },
     "cost_per_100_usd": {
-      "value": 1.7199700000000002,
+      "value": 1.8220444444444441,
       "target": "reported",
       "pass": true
     }
@@ -65,6 +83,7 @@
   "coverage_ok": true,
   "overall_pass": false,
   "warnings": [
+    "skipped, not scored: FC-J01, FC-J02",
     "citation_correctness unknown: pass --corpus",
     "channel_consistency unknown: no second channel wired for eval (PRAWDOWID_EXTRA_CHANNELS)"
   ],
@@ -77,7 +96,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        13.54
+        3.24
       ],
       "errors": []
     },
@@ -89,19 +108,19 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        17.68
+        16.52
       ],
       "errors": []
     },
     {
       "id": "C01",
       "scenario": "C",
-      "expected": "brak wystarczających dowodów",
+      "expected": "wprowadzające w błąd",
       "predicted": [
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        16.54
+        9.4
       ],
       "errors": []
     },
@@ -113,19 +132,19 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        12.86
+        3.9
       ],
       "errors": []
     },
     {
       "id": "E01",
       "scenario": "E",
-      "expected": "fałszywe",
+      "expected": "potwierdzone",
       "predicted": [
-        "fałszywe"
+        "brak wystarczających dowodów"
       ],
       "seconds": [
-        20.74
+        3.12
       ],
       "errors": []
     },
@@ -137,7 +156,19 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        13.93
+        2.98
+      ],
+      "errors": []
+    },
+    {
+      "id": "H01",
+      "scenario": "H",
+      "expected": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "seconds": [
+        3.92
       ],
       "errors": []
     },
@@ -149,7 +180,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        17.47
+        3.35
       ],
       "errors": []
     },
@@ -161,7 +192,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        18.02
+        5.63
       ],
       "errors": []
     }

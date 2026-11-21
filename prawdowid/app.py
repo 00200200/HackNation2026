@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from prawdowid.contract import CheckResult, Status
-from prawdowid.verifier import is_link, verify
+from prawdowid.verifier import failed, is_link, verify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:  %(name)s %(message)s")
 log = logging.getLogger("prawdowid")
@@ -83,15 +83,21 @@ async def create_check(request: Request, body: CheckRequest) -> CheckResult:
             result = await verify(body.input)
     except Exception:
         log.exception("verify failed")
-        result = CheckResult(
-            status=Status.TECHNICAL_ERROR, message=TECHNICAL_ERROR_MESSAGE
+        # Cost unknown: a model request may have been sent before the failure.
+        result = failed(
+            body.input, Status.TECHNICAL_ERROR, TECHNICAL_ERROR_MESSAGE, cost=None
         )
+        if is_link(body.input):
+            # Only the URL was screened, not the page, so the "patterns only" note would mislead.
+            result.limitations = []
     # ponytail: stdout log instead of a check store until the team picks storage.
     channel = request.headers.get("x-channel", "web")
     log.info(
-        "check channel=%s status=%s latency_ms=%d input_chars=%d",
+        "check channel=%s status=%s security_events=%d cost_usd=%s latency_ms=%d input_chars=%d",
         channel if channel in CHANNELS else "other",
         result.status,
+        len(result.security_events),
+        result.cost_usd,
         round((time.perf_counter() - started) * 1000),
         len(body.input),
     )

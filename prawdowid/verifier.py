@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 
 from pydantic import BaseModel
@@ -39,8 +40,10 @@ MODEL_MAX_RETRIES = 1
 
 # ponytail: page text is cut to the size of a pasted text, so one link costs what one text does.
 MAX_PAGE_CHARS = 5000
+# Title and publisher each; two of them still leave over 4500 characters for the text.
+MAX_META_CHARS = 200
 PAGE_CUT = (
-    f"Strona jest długa: sprawdziliśmy tylko jej początek ({MAX_PAGE_CHARS} znaków). "
+    f"Strona jest długa: sprawdziliśmy tylko jej początek (razem z tytułem do {MAX_PAGE_CHARS} znaków). "
     "Resztę tekstu możesz wkleić osobno."
 )
 NEEDS_CLARIFICATION = (
@@ -68,14 +71,92 @@ NOT_CHECKABLE = Judgement(
     limitations=[],
 )
 
+PATTERNS_ONLY = (
+    "Sprawdzenie nie zostało dokończone, więc polecenia skierowane do modelu "
+    "wykrywaliśmy tylko listą typowych zwrotów."
+)
+
 USER_TEXT = register_tag("user_text")
+
+# Deterministic pre-check, independent of the model it protects. No maintained offline detector
+# covers Polish (llm-guard's DeBERTa is English-only; Prompt Guard 2 was not evaluated on Polish).
+# Singular imperatives only: "zignorował", "ignorujemy" or a plural "zignorujcie" in reported
+# speech are about people, not the model.
+# ponytail: a fixed phrase list misses paraphrases and other languages and flags a quoted
+# singular command; the model flag covers part of that. Add a screening model if the eval
+# shows misses.
+INJECTION_PATTERNS = re.compile(
+    r"""
+    # Override of earlier rules: singular imperative or "proszę" + infinitive, with or without
+    # Polish letters.
+    (\b(zignoruj|ignoruj|pomi[nń])|\bprosz[eę]\s+(zignorowa[cć]|pomin[aą][cć]))\s+
+        ((wszystk|wszelk|każd|kazd|moj|swoj|twoj|t[eąa]\b|dotychczasow|poprzedn|wcze[sś]niejsz
+          |powy[zż]sz|systemow|otrzyman)\w*\s+)*
+        (instrukcj|polece|zasad|reguł|regul|wytyczn|prompt)
+    | \b(zignoruj|ignoruj|pomi[nń])\s+(wszystko\s+)?powy[zż]sz\w*
+    | \bzapomnij\s+o\s+(\w+\s+){0,2}(instrukcj|polece|prompt)
+    | \b(ignore|disregard|forget)\s+(all\s+|any\s+)?(of\s+)?(the\s+)?
+        ((previous|prior|earlier|your|my|system)\s+)+(instructions?|rules|prompts?|directions|commands)\b
+    | \b(ignore|disregard)\s+(all\s+|everything\s+)?(of\s+)?(the\s+)?above\b
+    # A new role or a fake system turn.
+    | \bod\s+teraz\s+jeste[sś]\b | \[\s*system\s*\]
+    | \byou\s+are\s+now\s+(an?\s+)?(ai|assistant|bot|model|unrestricted|dan)\b
+    # Text addressed to the model itself.
+    | \b(note|message)\s+to\s+the\s+(ai|model|assistant)\b
+    | \b(notatka|wiadomo[sś][cć]|polecenie)\s+dla\s+(ai|modelu|asystenta)\s*:
+    # Asking for a verdict, a fixed answer or the prompt.
+    | \b(oceń|oznacz)\s+(to|je|go|ją|wszystko)\s+jako\s+(prawd|potwierdz)
+    | \b(mark|rate)\s+(this|it|everything)\s+as\s+(true|confirmed)
+    | \bodpowiedz\s+(tylko|wyłącznie|jedynie)\b | \boutput\s+only\s+(the|one|a)\b
+    | \b(ujawnij|pokaż|wypisz)\s+(mi\s+)?(swój\s+|swoje\s+|twój\s+|twoje\s+)?(prompt|instrukcj)
+    | \b(reveal|print|show)\s+(me\s+)?(your|the)\s+(system\s+)?(prompt|instructions)\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def screen(text: str, location: str = "input") -> list[SecurityEvent]:
+    """Pattern pre-check for instructions aimed at the model, in user input or a fetched page."""
+    if not INJECTION_PATTERNS.search(text):
+        return []
+    log.warning(
+        "security_event kind=prompt_injection location=%s detector=patterns", location
+    )
+    return [SecurityEvent(location=location, detector="patterns")]
+
+
+def failed(
+    text: str,
+    status: Status,
+    message: str,
+    cost: float | None,
+    location: str = "input",
+) -> CheckResult:
+    """A check the model did not complete: the pattern events still go out, with that limit."""
+    events = screen(text, location)
+    return CheckResult(
+        status=status,
+        message=message,
+        security_events=events,
+        limitations=[PATTERNS_ONLY],
+        cost_usd=cost,
+    )
+
+
+def positive_int_env(name: str, default: int) -> int:
+    """Read a count from the environment; fail at startup on anything below 1."""
+    value = int(os.getenv(name) or default)
+    if value < 1:
+        raise ValueError(f"{name} must be at least 1, got {value}")
+    return value
+
 
 # Hyperparameters. Defaults are a first guess for the 30 s median, not tuned yet.
 # Most central claims checked in full; the rest are listed as not checked. Only these carry a
-# source sentence, reason and queries: writing all that for 50 claims took 83 s in one test.
-MAX_CHECKED_CLAIMS = int(os.getenv("PRAWDOWID_MAX_CHECKED_CLAIMS") or 5)
+# source sentence, reason and queries, to keep the output short on long texts.
+MAX_CHECKED_CLAIMS = positive_int_env("PRAWDOWID_MAX_CHECKED_CLAIMS", 5)
 # Search queries the model writes per checked claim, for retrieval.
-QUERIES_PER_CLAIM = int(os.getenv("PRAWDOWID_QUERIES_PER_CLAIM") or 3)
+QUERIES_PER_CLAIM = positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 3)
 
 INSTRUCTIONS = f"""\
 You split a text written in Polish into claims for a fact-checking service. You have no sources,
@@ -141,9 +222,8 @@ class Extraction(BaseModel):
     claims: list[ExtractedClaim]
     other_claims: list[str]
     unclear: bool
-    # The same call reports injected instructions: no Polish offline detector exists, and the
-    # brief only asks to log them. ponytail: an attacked model can hide the flag; add a separate
-    # screening call when fetched pages come in.
+    # Second detector next to the pattern pre-check (screen): catches paraphrases the patterns
+    # miss, but an attacked model can hide it, so it never stands alone.
     injection_found: bool = False
 
 
@@ -208,14 +288,20 @@ def claim_result(c: ExtractedClaim, check: pipeline.ClaimCheck | None) -> ClaimR
     )
 
 
-def page_text(page: Page) -> str:
-    """Page metadata first, so the model can resolve relative dates from the publication date."""
-    header = [
-        f"Tytuł: {page.title}" if page.title else None,
-        f"Wydawca: {page.publisher}" if page.publisher else None,
-        f"Data publikacji: {page.published_at}" if page.published_at else None,
-    ]
-    return "\n".join([h for h in header if h] + ["", page.text[:MAX_PAGE_CHARS]])
+def page_text(page: Page) -> tuple[str, bool]:
+    """Model input for a page, at most MAX_PAGE_CHARS in all, and whether its text was cut.
+
+    Metadata comes first, so the model can resolve relative dates from the publication date. It
+    is page content too, so it shares the budget and each field is capped, leaving room for text.
+    """
+    fields = [("Tytuł", page.title), ("Wydawca", page.publisher)]
+    # A trimmed title loses no claims to check, so only a cut in the text counts as cut.
+    header = [f"{name}: {value[:MAX_META_CHARS]}" for name, value in fields if value]
+    if page.published_at:
+        header.append(f"Data publikacji: {page.published_at}")
+    head = "\n".join(header + ["", ""])
+    room = MAX_PAGE_CHARS - len(head)
+    return head + page.text[:room], len(page.text) > room
 
 
 async def verify(text: str) -> CheckResult:
@@ -237,10 +323,11 @@ async def verify(text: str) -> CheckResult:
         status = Status.TECHNICAL_ERROR if refusal.technical else Status.CANNOT_CHECK
         # No model request was sent.
         return CheckResult(status=status, message=refusal.message, cost_usd=0.0)
+    text, cut = page_text(page)
     result = await verify_text(
-        page_text(page), location="page", deadline=deadline, exclude_url=page.url
+        text, location="page", deadline=deadline, exclude_url=page.url
     )
-    if len(page.text) > MAX_PAGE_CHARS:
+    if cut:
         for c in result.claims:
             c.limitations.append(PAGE_CUT)
     result.page = CheckedPage(**page.model_dump(exclude={"text"}))
@@ -277,20 +364,26 @@ async def verify_text(
             raise  # not our budget: the API answers with a technical error
         # The cut request may still be billed: cost unknown.
         log.warning("extraction cut by the check budget model=%s", MODEL)
-        return CheckResult(status=Status.TECHNICAL_ERROR, message=TIMED_OUT)
+        return failed(
+            text, Status.TECHNICAL_ERROR, TIMED_OUT, cost=None, location=location
+        )
     # A failed or refused request may still be billed and reports no usage: cost unknown.
     except ContentFilterError:
         log.warning("model refused model=%s", MODEL)
-        return CheckResult(status=Status.CANNOT_CHECK, message=MODEL_REFUSED)
+        return failed(
+            text, Status.CANNOT_CHECK, MODEL_REFUSED, cost=None, location=location
+        )
     except UserError as exc:
         # A missing API key, raised on first use of the provider: no request was sent.
         log.warning("model not configured model=%s error=%r", MODEL, exc)
-        return CheckResult(
-            status=Status.TECHNICAL_ERROR, message=MODEL_FAILED, cost_usd=0.0
+        return failed(
+            text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=0.0, location=location
         )
     except AgentRunError as exc:
         log.warning("model failed model=%s error=%r", MODEL, exc)
-        return CheckResult(status=Status.TECHNICAL_ERROR, message=MODEL_FAILED)
+        return failed(
+            text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=None, location=location
+        )
     usage = result.usage
     # Best-effort price of every request in the run from PydanticAI's genai-prices tables; None
     # for an unpriced model. genai-prices 0.2.5 (2026-11-19) lists claude-opus-5-5 at $4 input and
@@ -316,9 +409,12 @@ async def verify_text(
     check = to_check_result(result.output, checks)
     claim_costs = [c.cost_usd for c in checks if c]
     check.cost_usd = None if None in [cost, *claim_costs] else cost + sum(claim_costs)
+    check.security_events = screen(text, location)
     if result.output.injection_found:
-        check.security_events = [SecurityEvent(location=location)]
-        log.warning("security_event kind=prompt_injection location=%s", location)
+        check.security_events.append(SecurityEvent(location=location, detector="model"))
+        log.warning(
+            "security_event kind=prompt_injection location=%s detector=model", location
+        )
     # The judge logs its own events (location "source"); one per check is enough.
     check.security_events += [
         e for c in checks if c for e in c.judgement.security_events

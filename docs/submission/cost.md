@@ -3,21 +3,23 @@
 This is an extrapolation from a saved test run, not an invoice or a hosting quote.
 The only monetary and measured latency inputs below come from
 [evals/results/latest.json](../../evals/results/latest.json), timestamp
-`2026-11-21T18:19:08+00:00`, product commit
-`aa9fb7edceddbc577ca0922c1873ca325129a0bb`, `mode: "quick"`, `n_cases: 8`, `dirty: false`.
-The run has `overall_pass: false`; it is not evidence of production quality or capacity.
+`2026-11-21T19:10:57+00:00`, product commit
+`95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `mode: "quick"`, `n_cases: 9`, `dirty: false`.
+The run has `overall_pass: false`; it is not evidence of production quality or capacity. It also
+predates PR #40 (this docs change) landing on `main`: no eval has run on the merged commit, by
+user decision (`HN_SKIP_EVAL=1`) — a fresh eval on the merged commit is pending.
 
 ## Estimate for 1,000 checks
 
-The recorded `metrics.cost_per_100_usd.value` is exactly `1.7199700000000002` USD.
+The recorded `metrics.cost_per_100_usd.value` is exactly `1.8220444444444441` USD.
 The eval computes a mean of per-answer `cost_usd` and multiplies it by the reporting unit
-([evals/run.py:156](../../evals/run.py#L156)). Applying that measured rate:
+([evals/run.py:157-158](../../evals/run.py#L157-L158)). Applying that measured rate:
 
 ```text
-Estimated USD/check = 1.7199700000000002 / 100 = 0.017199700000000002
-Estimated USD for 1,000 checks = 0.017199700000000002 * 1000
-                              = 17.199700000000002
-Rounded display estimate = USD 17.20 for 1,000 checks
+Estimated USD/check = 1.8220444444444441 / 100 = 0.018220444444444441
+Estimated USD for 1,000 checks = 0.018220444444444441 * 1000
+                              = 18.220444444444441
+Rounded display estimate = USD 18.22 for 1,000 checks
 ```
 
 This assumes the same request mix and retrieval conditions as the saved run. It prices model
@@ -50,7 +52,7 @@ or an ongoing operator subsidy. A free-to-user deployment budget remains UNCONFI
 
 ## Latency and load
 
-Saved `metrics.median_latency_s.value`: exactly `17.00699254195206` seconds
+Saved `metrics.median_latency_s.value`: exactly `3.8964525419287384` seconds
 ([latest.json](../../evals/results/latest.json)). The eval spaces requests and excludes that wait
 from latency ([adapter.py](../../evals/adapter.py)); this is not a concurrency benchmark.
 No simultaneous-user capacity, tail latency, saturation point or cost under load is measured:
