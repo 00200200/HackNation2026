@@ -205,7 +205,7 @@ def test_user_submitted_link_page_is_never_saved(monkeypatch):
                 html() if r.url.path == "/web/kas/sankcje" else httpx2.Response(404)
             )
         )
-        async with websearch._client(transport) as client:
+        async with websearch._http_client(transport) as client:
             return await websearch.fetch_document(
                 "https://www.gov.pl/web/kas/sankcje", client
             )

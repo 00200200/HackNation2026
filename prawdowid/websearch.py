@@ -1,8 +1,9 @@
 """Step 2b: web search on allowlisted domains, page fetch, text extraction and the source cache.
 
-The search provider is one function with the `SearchProvider` signature. Today it is DuckDuckGo
-through the `ddgs` library (no key needed; it scrapes, there is no official DuckDuckGo web search
-API). A Tavily, Brave or Exa wrapper with the same signature replaces it in one place.
+The search provider is one function with the `SearchProvider` signature. It is Tavily's official
+`/search` endpoint through `tavily-python` (https://docs.tavily.com/documentation/api-reference/endpoint/search),
+restricted server-side to `ALLOWLIST` via `include_domains`. A Brave or Exa wrapper with the same
+signature replaces it in one place.
 
 A failed or empty search is a technical limit returned in `WebSearch.limitation`, never a verdict.
 """
@@ -12,15 +13,23 @@ import logging
 import os
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
+from email.utils import parsedate_to_datetime
 from typing import NamedTuple, Protocol
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
 import httpx2
+import requests
 import trafilatura
-from ddgs import DDGS
-from ddgs.exceptions import DDGSException
 from pydantic import BaseModel
+from tavily import (
+    BadRequestError,
+    InvalidAPIKeyError,
+    TavilyClient,
+    UsageLimitExceededError,
+)
+from tavily.errors import ForbiddenError
+from tavily.errors import TimeoutError as TavilyTimeoutError
 
 from prawdowid.cache import Document, save_document
 from prawdowid.privacy import mask_personal_data
@@ -73,10 +82,6 @@ PAGE_BUDGET_S = float(
     os.getenv("PRAWDOWID_PAGE_BUDGET_S") or 8
 )  # robots.txt and page; reads time out at 10 s, so no retry after a stall
 SAVE_BUDGET_S = 10  # saving every fetched page to the source store
-# Region "pl-pl" is passed to ddgs unchecked; UNCONFIRMED that every backend honours it.
-REGION = "pl-pl"
-# DuckDuckGo only (team decision). Not "auto": that falls back to scraping other engines.
-DDGS_BACKEND = "duckduckgo"
 USER_AGENT = "PrawdowidBot/0.1 (fact-checking demo, HackNation 2026)"
 
 SEARCH_UNAVAILABLE = (
@@ -93,6 +98,7 @@ class SearchHit(BaseModel):
     url: str
     title: str
     snippet: str
+    published_date: date | None = None
 
 
 class SearchUnavailable(Exception):
@@ -105,23 +111,59 @@ class SearchProvider(Protocol):
     ) -> list[SearchHit]: ...
 
 
-def ddg_search(query: str, *, domains: Sequence[str], limit: int) -> list[SearchHit]:
-    """DuckDuckGo via ddgs. Domains go into the query as `site:` operators."""
-    sites = " OR ".join(f"site:{d}" for d in domains)
+_TAVILY_ERRORS = (
+    BadRequestError,
+    ForbiddenError,
+    InvalidAPIKeyError,
+    UsageLimitExceededError,
+    TavilyTimeoutError,
+    requests.RequestException,  # network errors and non-2xx the SDK doesn't map itself
+)
+_client: TavilyClient | None = None
+
+
+def tavily_search(query: str, *, domains: Sequence[str], limit: int) -> list[SearchHit]:
+    """Tavily /search, restricted server-side to `domains`.
+    https://docs.tavily.com/documentation/api-reference/endpoint/search
+    """
+    global _client
+    api_key = os.getenv("TAVILY_API_KEY")
+    if not api_key:
+        raise SearchUnavailable("TAVILY_API_KEY not set")
+    if _client is None:
+        _client = TavilyClient(api_key=api_key)
     try:
-        results = DDGS(timeout=SEARCH_TIMEOUT_S).text(
-            f"{query} ({sites})",
-            region=REGION,
+        response = _client.search(
+            query,
             max_results=limit,
-            backend=DDGS_BACKEND,
+            include_domains=list(domains),
+            include_domains_mode="restrict",
+            language="pl",
+            include_published_date=True,
+            timeout=SEARCH_TIMEOUT_S,
         )
-    except DDGSException as exc:  # ddgs raises it for "no results" too: they look alike
+    except _TAVILY_ERRORS as exc:
         raise SearchUnavailable(str(exc)) from exc
     return [
-        SearchHit(url=r["href"], title=r.get("title", ""), snippet=r.get("body", ""))
-        for r in results
-        if r.get("href")
+        SearchHit(
+            url=r["url"],
+            title=r.get("title") or "",
+            snippet=r.get("content") or "",
+            published_date=_tavily_date(r.get("published_date")),
+        )
+        for r in response["results"]
+        if r.get("url")
     ]
+
+
+def _tavily_date(value: str | None) -> date | None:
+    """Tavily sends either an RFC 2822 string or a plain ISO date, undocumented which."""
+    if parsed := _date(value):
+        return parsed
+    try:
+        return parsedate_to_datetime(value).date()
+    except (TypeError, ValueError):
+        return None
 
 
 class WebSearch(BaseModel):
@@ -150,7 +192,7 @@ async def search_web(
     *,
     limit: int = 5,
     domains: Sequence[str] = tuple(ALLOWLIST),
-    provider: SearchProvider = ddg_search,
+    provider: SearchProvider = tavily_search,
     transport: httpx2.AsyncBaseTransport | None = None,  # tests only
     save: bool = True,
 ) -> WebSearch:
@@ -158,12 +200,14 @@ async def search_web(
     hits = await _search(mask_personal_data(query), domains, limit, provider)
     if hits is None:
         return WebSearch(limitation=SEARCH_UNAVAILABLE)
-    urls = list(dict.fromkeys(h.url for h in hits if allowed(h.url)))
-    if not urls:
+    by_url = {h.url: h for h in hits if allowed(h.url)}
+    if not by_url:
         return WebSearch(limitation=SEARCH_UNAVAILABLE)
 
-    async with _client(transport) as http:
-        docs = await asyncio.gather(*(_fetch_bounded(u, http) for u in urls))
+    async with _http_client(transport) as http:
+        docs = await asyncio.gather(
+            *(_fetch_bounded(u, http, h.published_date) for u, h in by_url.items())
+        )
     # Two hits may redirect to the same page.
     docs = list({d.url: d for d in docs if d}.values())
     if save:
@@ -213,7 +257,7 @@ async def _only_allowlisted(request: httpx2.Request) -> None:
         raise OffAllowlist(f"{request.url} is not allowlisted", request=request)
 
 
-def _client(transport: httpx2.AsyncBaseTransport | None) -> httpx2.AsyncClient:
+def _http_client(transport: httpx2.AsyncBaseTransport | None) -> httpx2.AsyncClient:
     return httpx2.AsyncClient(
         headers={"User-Agent": USER_AGENT},
         timeout=FETCH_TIMEOUT_S,
@@ -224,18 +268,26 @@ def _client(transport: httpx2.AsyncBaseTransport | None) -> httpx2.AsyncClient:
     )
 
 
-async def _fetch_bounded(url: str, client: httpx2.AsyncClient) -> Document | None:
+async def _fetch_bounded(
+    url: str, client: httpx2.AsyncClient, fallback_published: date | None = None
+) -> Document | None:
     """The client timeout bounds each read, not a page trickled in slowly: cap the whole page."""
     try:
         async with asyncio.timeout(PAGE_BUDGET_S):
-            return await fetch_document(url, client)
+            return await fetch_document(url, client, fallback_published)
     except TimeoutError:
         log.warning("fetch skipped %s: over %g s", url, PAGE_BUDGET_S)
         return None
 
 
-async def fetch_document(url: str, client: httpx2.AsyncClient) -> Document | None:
-    """Fetch an allowlisted HTML page and extract it. None when it cannot be used."""
+async def fetch_document(
+    url: str, client: httpx2.AsyncClient, fallback_published: date | None = None
+) -> Document | None:
+    """Fetch an allowlisted HTML page and extract it. None when it cannot be used.
+
+    `fallback_published`: the search provider's own publication date, used only when the page
+    itself carries none (common on Polish gov/news pages without date metadata).
+    """
     entry = allowed(url)
     if not entry or not await _robots_allow(url, client):
         return None
@@ -255,7 +307,7 @@ async def fetch_document(url: str, client: httpx2.AsyncClient) -> Document | Non
         # page without metadata. ponytail: accepted; a stricter metadata-only check if it misleads.
         date_extraction_params={"original_date": True, "extensive_search": False},
     )
-    published = _date(page.date) if page else None
+    published = (_date(page.date) if page else None) or fallback_published
     if not page or not page.text or not page.title or not published:
         # No publication date: the brief requires one on every source.
         log.info("fetch skipped %s: no text, title or publication date", url)
