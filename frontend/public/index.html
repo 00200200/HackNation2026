@@ -41,19 +41,15 @@
         <h1 id="tytul" aria-label="fakt czy fejk?"><span class="nowrap">fakt<sup><a href="#przypis-1" id="odnosnik-1" aria-label="przypis: co znaczy fakt"><svg class="title-mark" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="44" fill="#FFFFFF"/><path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#D4213D" stroke-width="27" stroke-linejoin="round"/><rect x="86.5" y="154" width="27" height="28" fill="#D4213D"/><g transform="translate(98 60) rotate(-12) scale(0.95)"><path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#0B1F3A"/><path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#0B1F3A"/><path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#0B1F3A"/><path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#0B1F3A"/></g></svg></a></sup></span> <span class="nowrap">czy fejk?</span></h1>
         <div class="hero-main">
           <p class="lead">Wklej wiadomość, którą ktoś ci przesłał. Wskażemy zdania, które da się sprawdzić, i pokażemy
-            przypisy ze źródeł albo powiemy, czego nie wiemy. Bezpłatnie i bez konta.</p>
-          <p class="status-pill">Wersja testowa: źródła w budowie</p>
+            przypisy ze źródeł albo powiemy, czego nie wiemy. Bezpłatnie i bez konta. Nie wklejaj danych osobowych.</p>
 
           <form id="check-form" class="ask" novalidate>
             <label for="input" class="sr-only">Wiadomość do sprawdzenia</label>
             <textarea id="input" name="input" rows="2" required
-                      placeholder="Wklej wiadomość…" aria-describedby="input-hint form-error"></textarea>
+                      placeholder="Wklej wiadomość…" aria-describedby="form-error"></textarea>
             <button type="submit" class="ask-btn" id="submit">Sprawdź</button>
           </form>
           <p class="form-error" id="form-error" role="alert" hidden></p>
-          <p class="hint" id="input-hint">Do 5000 znaków, bez danych osobowych.
-            <span class="enter-hint">Enter wysyła, Shift+Enter dodaje nowy wiersz.</span>
-            <span class="count" aria-live="off"><span id="count">0</span>/5000</span></p>
 
           <div class="examples">
             <span>Spróbuj:</span>
@@ -135,13 +131,13 @@
 
       <section id="oceny" class="legend" aria-labelledby="oceny-tytul">
         <h2 id="oceny-tytul">Jak czytać wynik</h2>
-        <dl>
-          <div><dt><span class="verdict verdict-confirmed">potwierdzone</span></dt><dd>Wiarygodne źródła mówią to samo.</dd></div>
-          <div><dt><span class="verdict verdict-false">fałszywe</span></dt><dd>Wiarygodne źródła mówią coś przeciwnego.</dd></div>
-          <div><dt><span class="verdict verdict-misleading">wprowadzające w błąd</span></dt><dd>Fakty się zgadzają, ale pokazane w złym czasie, miejscu albo bez kontekstu.</dd></div>
-          <div><dt><span class="verdict verdict-insufficient_evidence">brak wystarczających dowodów</span></dt><dd>Za mało źródeł, żeby rozstrzygnąć. Wtedy nie zgadujemy.</dd></div>
-          <div><dt><span class="verdict verdict-not_verifiable">nie podlega weryfikacji</span></dt><dd>Opinia, prognoza albo pytanie bez faktu do sprawdzenia.</dd></div>
-          <div><dt><span class="verdict verdict-not_checked">nie sprawdzono</span></dt><dd>Zabrakło czasu, źródła nic nie zwróciły albo model nie odpowiedział. To nie jest ocena. Powód podajemy przy twierdzeniu.</dd></div>
+        <dl class="legend-grid">
+          <div class="legend-item legend-confirmed"><dt><span class="verdict verdict-confirmed">potwierdzone</span></dt><dd>Wiarygodne źródła mówią to samo.</dd><dd class="legend-answer">Odpowiedź zaczyna się od: <q>Tak.</q></dd></div>
+          <div class="legend-item legend-false"><dt><span class="verdict verdict-false">fałszywe</span></dt><dd>Wiarygodne źródła mówią coś przeciwnego.</dd><dd class="legend-answer">Odpowiedź zaczyna się od: <q>Nie.</q></dd></div>
+          <div class="legend-item legend-misleading"><dt><span class="verdict verdict-misleading">wprowadzające w błąd</span></dt><dd>Fakty się zgadzają, ale pokazane w złym czasie, miejscu albo bez kontekstu.</dd><dd class="legend-answer">Odpowiedź zaczyna się od: <q>To wprowadza w błąd.</q></dd></div>
+          <div class="legend-item legend-insufficient_evidence"><dt><span class="verdict verdict-insufficient_evidence">brak wystarczających dowodów</span></dt><dd>Za mało źródeł, żeby rozstrzygnąć. Wtedy nie zgadujemy.</dd><dd class="legend-answer">Odpowiedź zaczyna się od: <q>Nie udało mi się potwierdzić tej informacji.</q></dd></div>
+          <div class="legend-item legend-not_verifiable"><dt><span class="verdict verdict-not_verifiable">nie podlega weryfikacji</span></dt><dd>Opinia, prognoza albo pytanie bez faktu do sprawdzenia.</dd><dd class="legend-answer">Odpowiedź zaczyna się od: <q>Tego nie da się sprawdzić:</q></dd></div>
+          <div class="legend-item legend-not_checked"><dt><span class="verdict verdict-not_checked">nie sprawdzono</span></dt><dd>Zabrakło czasu, źródła nic nie zwróciły albo model nie odpowiedział. To nie jest ocena. Powód podajemy przy twierdzeniu.</dd><dd class="legend-answer">Odpowiedź zaczyna się od: <q>Nie sprawdziliśmy tego twierdzenia.</q></dd></div>
         </dl>
         <p class="legend-note">Błąd techniczny i prośba o doprecyzowanie pytania to nie ocena. Pokazujemy je osobno, w szarym kolorze.</p>
       </section>
@@ -153,8 +149,7 @@
       <p class="foot-slogan">Fakt ma przypis.</p>
       <p id="przypis-1" class="footnote"><a href="#odnosnik-1" aria-label="Wróć do tytułu"><svg class="foot-mark" viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" rx="44" fill="#FFFFFF"/><path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#D4213D" stroke-width="27" stroke-linejoin="round"/><rect x="86.5" y="154" width="27" height="28" fill="#D4213D"/><g transform="translate(98 60) rotate(-12) scale(0.95)"><path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#0B1F3A"/><path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#0B1F3A"/><path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#0B1F3A"/><path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#0B1F3A"/></g></svg></a>
         <span>Fakt to informacja potwierdzona w źródle, które pokazujemy przy odpowiedzi.</span></p>
-      <p>Prototyp z HackNation 2026, wyzwanie Prawdowid. To nie jest serwis MSZ ani żadnego innego urzędu.
-        Pomagamy ocenić informację, ale nie zastępujemy lektury źródeł.</p>
+      <p>Prototyp z HackNation 2026, wyzwanie Prawdowid.</p>
       <p><a href="https://github.com/00200200/HackNation2026" rel="noopener noreferrer" target="_blank">Kod źródłowy</a></p>
     </div>
   </footer>
