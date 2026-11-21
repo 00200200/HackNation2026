@@ -1,12 +1,9 @@
 // Web channel: send the input to the API and render CheckResult. No verification logic here.
 const form = document.getElementById("check-form");
 const input = document.getElementById("input");
-const count = document.getElementById("count");
 const submit = document.getElementById("submit");
 const formError = document.getElementById("form-error");
 const result = document.getElementById("result");
-const example = document.getElementById("przyklad");
-const chips = document.querySelectorAll("[data-example]");
 
 const SECURITY_NOTE = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
 const SOURCE_SECURITY_NOTE = "W źródłach są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
@@ -239,7 +236,6 @@ function calm() {
 // Resolves once the new content is in the DOM, so callers can scroll to it.
 function show(node) {
   const swap = () => {
-    example.hidden = true;
     document.body.classList.add("checked");
     result.replaceChildren(node);
   };
@@ -271,7 +267,7 @@ async function errorMessage(resp) {
 // screen readers may skip updates made while it is set, and the waiting notice should be heard.
 function setBusy(value) {
   busy = value;
-  [submit, ...chips].forEach((control) => control.setAttribute("aria-disabled", String(value)));
+  submit.setAttribute("aria-disabled", String(value));
 }
 
 // Cleared first so the same message is announced again on a repeated attempt.
@@ -305,11 +301,11 @@ form.addEventListener("submit", async (event) => {
   seconds.setAttribute("aria-hidden", "true");
   waiting.append(seconds);
   const timer = setInterval(() => { seconds.textContent = `${elapsed()} s`; }, 1000);
-  submit.textContent = "Sprawdzamy…";
+  submit.setAttribute("aria-label", "Sprawdzamy…");
   show(waiting).then(reveal);
   try {
     const headers = { "Content-Type": "application/json" };
-    const known = sessionStorage.getItem(SESSION_KEY);
+    const known = storedSession();
     if (known) headers["X-Session-Id"] = known;
     const resp = await fetch("/api/checks", {
       method: "POST",
@@ -325,17 +321,12 @@ form.addEventListener("submit", async (event) => {
     show(notice("Błąd połączenia", GENERIC_ERROR, NOT_A_VERDICT));
   } finally {
     clearInterval(timer);
-    submit.textContent = "Sprawdź";
+    submit.setAttribute("aria-label", "Sprawdź");
     setBusy(false);
   }
 });
 
-function updateCount() {
-  count.textContent = chars(input.value);
-}
-
-updateCount();
-input.addEventListener("input", () => { updateCount(); fieldError(""); });
+input.addEventListener("input", () => fieldError(""));
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing && ENTER_SENDS.matches) {
     event.preventDefault();
@@ -343,12 +334,6 @@ input.addEventListener("keydown", (event) => {
   }
 });
 
-chips.forEach((chip) => chip.addEventListener("click", () => {
-  if (busy) return;
-  input.value = chip.dataset.example;
-  updateCount();
-  form.requestSubmit();
-}));
 
 // Demo session: the API issues an id on the first check; this tab sends it back and can delete it.
 const SESSION_KEY = "prawdowid-session";
@@ -356,16 +341,30 @@ const sessionNote = document.getElementById("session");
 const sessionStatus = document.getElementById("session-status");
 const deleteSession = document.getElementById("delete-session");
 
+// Browsers may deny storage (SecurityError); then the id lives in memory for this page only.
+let sessionId = null;
+try { sessionId = sessionStorage.getItem(SESSION_KEY); } catch { /* storage denied */ }
+function storedSession() {
+  return sessionId;
+}
+function storeSession(id) {
+  sessionId = id;
+  try {
+    if (id) sessionStorage.setItem(SESSION_KEY, id);
+    else sessionStorage.removeItem(SESSION_KEY);
+  } catch { /* kept in memory */ }
+}
+
 function rememberSession(id) {
   if (!id) return;
-  sessionStorage.setItem(SESSION_KEY, id);
+  storeSession(id);
   sessionNote.hidden = false;
   deleteSession.hidden = false;
   sessionStatus.textContent = "";
 }
 
 deleteSession.addEventListener("click", async () => {
-  const id = sessionStorage.getItem(SESSION_KEY);
+  const id = storedSession();
   if (!id) return;
   deleteSession.disabled = true;
   try {
@@ -374,7 +373,7 @@ deleteSession.addEventListener("click", async () => {
       signal: AbortSignal.timeout(10000),
     });
     if (!resp.ok) throw new Error(String(resp.status));
-    sessionStorage.removeItem(SESSION_KEY);
+    storeSession(null);
     deleteSession.hidden = true;
     sessionStatus.textContent = "Usunęliśmy sprawdzenia z tej sesji.";
   } catch {
@@ -384,4 +383,4 @@ deleteSession.addEventListener("click", async () => {
   }
 });
 
-if (sessionStorage.getItem(SESSION_KEY)) sessionNote.hidden = false;
+if (storedSession()) sessionNote.hidden = false;

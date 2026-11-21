@@ -1,8 +1,10 @@
 # Deploy
 
-The public demo runs on one Linux server in the EU with Docker Compose. Caddy gets and renews
-the HTTPS certificate and proxies every request to the nginx frontend, which serves the static UI
-and forwards `/api/` and `/health` to the backend. Only Caddy publishes ports (80 and 443).
+The public demo runs on one Linux server in the EU with Docker Compose. Caddy is the server's only
+reverse proxy: it gets and renews the HTTPS certificates and proxies faktczyfejk.pl to the nginx
+frontend, which serves the static UI and forwards `/api/` and `/health` to the backend. It also
+serves other projects on the server (see "Other projects on this server"). Only Caddy publishes
+ports (80 and 443).
 
 ```
 browser --HTTPS--> caddy :443 --> frontend (nginx) :80 --> backend (FastAPI) :8000 --> db (Postgres + pgvector) :5432
@@ -16,7 +18,7 @@ there. No CI service is involved, and a failed deploy is retried on the next run
 |---|---|
 | `compose.yaml` | backend and frontend, also used for local runs |
 | `compose.prod.yaml` | production overlay: Caddy, Postgres with pgvector, no host port on nginx, real client IP for the rate limit |
-| `caddy/Caddyfile` | HTTPS site for `DOMAIN` |
+| `caddy/Caddyfile` | HTTPS sites: `DOMAIN` and `www`, doc2json.pl and `www` |
 | `deploy/pull-deploy.sh` | deploys `origin/prod` when it moves |
 | `deploy/faktczyfejk-deploy.service`, `.timer` | run the script every minute as `ubuntu` |
 | `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*` (never committed; deploys leave it alone) |
@@ -48,6 +50,7 @@ On the server, install Docker and give the server a read-only key for the reposi
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker ubuntu
+sudo docker network create edge     # shared with other projects Caddy serves, see "Other projects"
 ssh-keygen -t ed25519 -N "" -C faktczyfejk-vps -f ~/.ssh/github_deploy
 printf 'Host github.com\n  IdentityFile ~/.ssh/github_deploy\n  IdentitiesOnly yes\n' >> ~/.ssh/config
 ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
@@ -69,10 +72,15 @@ Back on the server, clone `prod` and write the configuration:
 sudo install -d -o ubuntu -g ubuntu /opt/faktczyfejk
 git clone --branch prod git@github.com:00200200/HackNation2026.git /opt/faktczyfejk
 cd /opt/faktczyfejk
-printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
+printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nTAVILY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
 chmod 600 .env
-nano .env      # paste the Anthropic key after ANTHROPIC_API_KEY=
+nano .env      # paste the keys after ANTHROPIC_API_KEY=, TAVILY_API_KEY= and the others you have
 ```
+
+The evidence keys matter as much as the model key: without `TAVILY_API_KEY` (web search, the only
+search provider), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` every source lookup fails,
+`/health` still answers, and every checkable claim ends as "nie sprawdzono". `compose.yaml`
+forwards all three to the backend.
 
 The database password is generated on the server and never leaves it; hex keeps it safe inside
 the `DATABASE_URL` that Compose builds for the backend. `COMPOSE_FILE` makes every
@@ -185,8 +193,24 @@ journalctl -u faktczyfejk-deploy -n 50 --no-pager
 `db` runs Postgres 18 with pgvector (`pgvector/pgvector:0.8.7-pg18`). Its data lives in the Docker
 volume `db_data`, its port is not published, and the backend gets
 `DATABASE_URL=postgresql://USER:PASSWORD@db:5432/DB` from `compose.prod.yaml`. On the first start
-with an empty volume Postgres creates the `vector` and `pg_trgm` extensions. The application does
-not use the database yet: tables and loading the corpus come with the search work.
+with an empty volume Postgres creates the `vector` and `pg_trgm` extensions.
+
+### Search index
+
+The corpus search (`prawdowid/corpus_search.py`) reads the tables `corpus_documents` and `corpus_chunks` (an
+embedding per chunk with an HNSW index, a full-text vector with a GIN index). They are built from
+`corpus/evidence.jsonl`, which is part of the backend image. After a deploy that changes the corpus,
+load it once:
+
+```bash
+docker compose exec backend python -m prawdowid.index corpus/evidence.jsonl
+```
+
+The first run downloads the embedding model (`intfloat/multilingual-e5-large`, about 2.2 GB) into
+the `models` volume and embeds every chunk; later runs embed only documents that changed and
+delete the ones that left the corpus. The model needs about 3 GB of memory while it runs, in the
+indexer, and in the backend once the first corpus search has loaded it (the backend loads it
+only when corpus search is first called, not at startup).
 
 On the server, in `/opt/faktczyfejk`. Backups go to `~/backups`, outside the checkout:
 
@@ -199,6 +223,25 @@ docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 # restore a backup into the running database
 docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < ~/backups/prawdowid-YYYY-MM-DD.dump
 ```
+
+## Other projects on this server
+
+Caddy here is the server's only reverse proxy, so it also serves doc2json.pl (repository
+HackNation2026-2). That project runs from `/opt/doc2json` with its own Compose file; its web
+container `doc2json-web` joins the external Docker network `edge` and publishes no ports, and Caddy
+reaches it as `doc2json-web:80`. Its site blocks live in `caddy/Caddyfile` in this repository, so
+changing them is a PR here and a push to `prod`, like any other change. DNS: `A` records for
+`doc2json.pl` and `www.doc2json.pl` pointing at the server, and no other `A` or `AAAA` records for
+those names. Caddy gets each domain's certificate on its own; until doc2json.pl resolves to the
+server, its certificate requests fail without affecting faktczyfejk.pl.
+
+Caddy reaches this stack's nginx as `faktczyfejk-frontend`, an alias on this project's own network,
+so a container called `frontend` on `edge` cannot take its traffic. Still, give containers on `edge`
+unique names and never `frontend` or `caddy`. Caddy's admin API listens only on its own loopback
+(127.0.0.1:2019), so other containers on `edge` cannot reconfigure it.
+
+To add another project the same way: put its web container on `edge` under a unique name, add a
+site block to `caddy/Caddyfile`, and point the domain's `A` records at the server.
 
 ## Known limits
 
@@ -217,6 +260,7 @@ docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB
 ## Where data is processed
 
 - Web server, API, database and logs: OVHcloud VPS in Limburg, Germany.
+- Corpus search embeddings: computed on the same server with a local model; no external service.
 - The text of each check goes to the Anthropic API for claim extraction.
 
 ## Try the production setup locally
@@ -224,16 +268,19 @@ docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB
 With Docker Desktop and ports 80 and 443 free on your machine:
 
 ```bash
+docker network create edge      # once; the overlay expects it
 DOMAIN=localhost POSTGRES_DB=prawdowid POSTGRES_USER=prawdowid POSTGRES_PASSWORD=local \
   docker compose -f compose.yaml -f compose.prod.yaml up --build
 curl -k https://localhost/health
 ```
 
-For `localhost` Caddy uses its own local certificate authority, hence `-k`.
+For `localhost` Caddy uses its own local certificate authority, hence `-k`. It also tries to get
+public certificates for doc2json.pl from your laptop; those requests fail, which is harmless.
 
 ## After the event
 
-On the server, take a final `pg_dump` if the data should be kept (see "Database"), then:
+This also takes doc2json.pl offline: its proxy and certificate live in this stack. On the server,
+take a final `pg_dump` if the data should be kept (see "Database"), then:
 
 ```bash
 sudo systemctl disable --now faktczyfejk-deploy.timer

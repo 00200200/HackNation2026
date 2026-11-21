@@ -18,6 +18,10 @@ services:
       # requests new certificates and can run into Let's Encrypt rate limits.
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - default
+      # Shared with other projects on this server that Caddy also serves (doc2json.pl, docs/deploy.md).
+      - edge
     depends_on:
       frontend:
         condition: service_healthy
@@ -25,6 +29,11 @@ services:
   frontend:
     # Only Caddy reaches nginx in production, so the host port from compose.yaml is dropped.
     ports: !reset []
+    networks:
+      default:
+        # Caddy also sits on the shared `edge` network, where another project could have its own
+        # `frontend`; this stack-specific name cannot collide with it.
+        aliases: [faktczyfejk-frontend]
     configs:
       - source: nginx_real_ip
         target: /etc/nginx/conf.d/00-real-ip.conf
@@ -39,6 +48,9 @@ services:
   backend:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      # Embedding model files (about 2.2 GB), kept between deploys. See "Search index" in docs/deploy.md.
+      - models:/models
     depends_on:
       db:
         condition: service_healthy
@@ -86,3 +98,9 @@ volumes:
   caddy_data:
   caddy_config:
   db_data:
+  models:
+
+networks:
+  edge:
+    # Created once on the server with `docker network create edge` (docs/deploy.md).
+    external: true

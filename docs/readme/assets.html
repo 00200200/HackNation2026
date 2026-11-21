@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8">
+<style>
+@font-face { font-family: "Figtree"; src: url("../../frontend/public/fonts/Figtree.woff2") format("woff2"); font-weight: 300 900; }
+:root { --red:#8a1c2f; --ink:#1d1215; --muted:#5a4a4d; --line:#e7e5e5; --soft:#f6f5f5;
+  --weave: repeating-linear-gradient(0deg, rgba(0,0,0,.06) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px); }
+* { box-sizing: border-box; } html, body { margin: 0; }
+body { font-family: "Figtree", sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; }
+.a { display: none; position: relative; overflow: hidden; }
+body.s-banner #banner, body.s-flow #flow, body.s-verdicts #verdicts { display: block; }
+.red { background-color: var(--red); background-image: var(--weave); color: #fff; }
+
+/* banner 1600×560 */
+#banner { width: 1600px; height: 560px; padding: 44px 80px; }
+.hd { display: flex; justify-content: space-between; align-items: center; font-size: 22px; font-weight: 700; }
+.hd .brand { display: flex; align-items: center; gap: 12px; } .hd svg { width: 42px; height: 42px; }
+.hd .ev { text-align: right; line-height: 1.25; } .hd .ev span { display: block; font-weight: 500; opacity: .8; font-size: 18px; }
+.giant { font-weight: 900; letter-spacing: -.05em; line-height: .84; white-space: nowrap; }
+.giant .o { color: transparent; -webkit-text-stroke: 2.5px rgba(255,255,255,.55); }
+.glass { position: absolute; border-radius: 50%; overflow: hidden; background-color: #9a2236; background-image: var(--weave);
+  box-shadow: inset 0 0 0 8px rgba(255,255,255,.96), inset 0 0 0 10px rgba(0,0,0,.12), inset 0 16px 36px rgba(0,0,0,.28), 0 26px 60px rgba(0,0,0,.38); }
+.glass .inner { position: absolute; color: #fff; }
+.glass::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(120% 80% at 30% 18%, rgba(255,255,255,.32), rgba(255,255,255,.06) 38%, transparent 55%); }
+.handle { position: absolute; width: 46px; height: 200px; border-radius: 23px; transform-origin: top center;
+  background: linear-gradient(90deg, #e9e2e2, #fff 45%, #d8cfd0); box-shadow: 0 20px 40px rgba(0,0,0,.35); }
+.pill { display: inline-block; font-size: 30px; font-weight: 800; background: #fff; color: var(--red); border-radius: 999px; padding: 8px 28px; }
+
+/* flow 1600×620 */
+#flow { width: 1600px; height: 500px; padding: 56px 70px; background: #fff; }
+#flow h2 { margin: 0 0 40px; font-size: 56px; font-weight: 900; letter-spacing: -.035em; }
+.flow { display: grid; grid-template-columns: 1fr 1.25fr 1fr 1fr 1fr; gap: 18px; }
+.step { border: 2px solid var(--line); border-radius: 22px; padding: 24px 22px; }
+.step .k { font-size: 18px; font-weight: 800; color: var(--red); }
+.step h3 { margin: 8px 0 8px; font-size: 27px; line-height: 1.1; letter-spacing: -.02em; }
+.step p { margin: 0; font-size: 18px; line-height: 1.38; color: var(--muted); }
+.step ul { margin: 6px 0 0; padding-left: 18px; font-size: 18px; line-height: 1.45; color: var(--muted); }
+.step code { font-size: 15px; background: var(--soft); padding: 1px 6px; border-radius: 6px; color: var(--ink); }
+.step.code { background-color: var(--red); background-image: var(--weave); border-color: var(--red); color: #fff; }
+.step.code .k, .step.code p { color: rgba(255,255,255,.88); } .step.code code { background: rgba(255,255,255,.15); color: #fff; }
+.foot { position: absolute; left: 70px; right: 70px; bottom: 34px; font-size: 18px; color: var(--muted); display: flex; justify-content: space-between; }
+
+/* verdicts 1600×600 */
+#verdicts { width: 1600px; height: 600px; padding: 56px 70px; }
+#verdicts h2 { margin: 0 0 34px; font-size: 56px; font-weight: 900; letter-spacing: -.035em; }
+.rows { display: grid; grid-template-columns: 470px 1fr 1fr; row-gap: 20px; align-items: center; font-size: 26px; }
+.rows .ans { font-weight: 700; }
+.chip { display: inline-block; padding: 8px 22px; border-radius: 999px; font-weight: 800; font-size: 25px; }
+.c-ok { background: #127a4b; color: #fff; } .c-false { background: #b0162f; color: #fff; } .c-mis { background: #fdf0dc; color: #8a4106; }
+.c-nei { background: #e3e6eb; color: #2e3848; } .c-nv { background: #fff; color: #2e3848; box-shadow: inset 0 0 0 3px #8a93a3; }
+.c-nc { background: transparent; color: #fff; box-shadow: inset 0 0 0 3px rgba(255,255,255,.7); }
+.hdr { font-size: 18px; font-weight: 700; opacity: .75; }
+</style></head>
+<body>
+
+<section class="a red" id="banner">
+  <div class="hd"><div class="brand"><svg viewBox="0 0 200 200"><rect width="200" height="200" rx="44" fill="#fff"/><path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#8A1C2F" stroke-width="27" stroke-linejoin="round"/><rect x="86.5" y="154" width="27" height="28" fill="#8A1C2F"/><g transform="translate(98 60) rotate(-12) scale(0.95)"><path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#1D1215"/><path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#1D1215"/><path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#1D1215"/><path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#1D1215"/></g></svg>faktczyfejk.pl</div>
+    <div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <div class="giant" style="position:absolute; left:74px; top:130px; font-size:230px"><div>faktczyfejk</div><div class="o">faktczyfejk</div></div>
+  <div class="handle" style="left:1180px; top:330px; transform: rotate(-45deg)"></div>
+  <div class="glass" style="left:925px; top:110px; width:280px; height:280px"><div class="inner giant" style="left:-851px; top:20px; font-size:230px; transform: scale(1.4); transform-origin:991px 120px">faktczyfejk</div></div>
+  <div style="position:absolute; left:80px; bottom:52px; display:flex; align-items:center; gap:24px">
+    <span style="font-size:34px; font-weight:700; background-color:var(--red); background-image:var(--weave); padding-right:6px">Sprawdź, zanim podasz dalej.</span><span class="pill">faktczyfejk.pl</span></div>
+</section>
+
+<section class="a" id="flow">
+  <h2>Model czyta. Werdykt ustala kod.</h2>
+  <div class="flow">
+    <div class="step"><div class="k">1 · wejście</div><h3>Tekst albo link</h3><p>Link pobieramy bezpiecznie (<code>link.py</code>): tylko adresy publiczne, limit czasu i rozmiaru.</p></div>
+    <div class="step"><div class="k">2 · źródła równolegle</div><h3>Każde twierdzenie osobno</h3><ul><li>Google Fact Check Tools</li><li>EUvsDisinfo: tylko kontekst</li><li>wyszukiwarka www.gov.pl</li><li>Tavily, tylko zaufane domeny</li></ul></div>
+    <div class="step"><div class="k">3 · porządek</div><h3>Rerank i cytaty</h3><p>Najlepsze fragmenty dla każdego twierdzenia, bez duplikatów.</p></div>
+    <div class="step"><div class="k">4 · sędzia</div><h3>Model ocenia fragmenty</h3><p>Oznacza, czy cytat wspiera twierdzenie, przeczy mu, czy go nie dotyczy.</p></div>
+    <div class="step code"><div class="k">5 · werdykt</div><h3>Reguły w kodzie</h3><p><code>judge.decide()</code> wyznacza ocenę z dowodów. Brak dowodów to „nie wiem”, awaria to „nie sprawdzono”.</p></div>
+  </div>
+  <div class="foot"><span>Jeden limit czasu na całe sprawdzenie (25 s) · dane osobowe maskowane przed modelem</span><span>prawdowid/pipeline.py</span></div>
+</section>
+
+<section class="a red" id="verdicts">
+  <h2>Pięć ocen. I „nie wiem”, gdy brak dowodów.</h2>
+  <div class="rows">
+    <span class="hdr">ocena</span><span class="hdr">kiedy</span><span class="hdr">odpowiedź zaczyna się od</span>
+    <span><span class="chip c-ok">potwierdzone</span></span><span>źródła mówią to samo</span><span class="ans">„Tak.”</span>
+    <span><span class="chip c-false">fałszywe</span></span><span>źródła mówią coś przeciwnego</span><span class="ans">„Nie.”</span>
+    <span><span class="chip c-mis">wprowadzające w błąd</span></span><span>fakty bez kontekstu</span><span class="ans">„To wprowadza w błąd.”</span>
+    <span><span class="chip c-nei">brak wystarczających dowodów</span></span><span>za mało źródeł</span><span class="ans">„Nie udało mi się potwierdzić…”</span>
+    <span><span class="chip c-nv">nie podlega weryfikacji</span></span><span>opinia, prognoza</span><span class="ans">„Tego nie da się sprawdzić…”</span>
+  </div>
+</section>
+
+<script>const p = new URLSearchParams(location.search).get("s"); if (p) document.body.classList.add("s-" + p);</script>
+</body></html>

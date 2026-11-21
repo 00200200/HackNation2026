@@ -1,0 +1,513 @@
+{
+ "built_at": "2026-11-21T21:41:28+00:00",
+ "command": "uv run python -m corpus.build",
+ "size_bytes": 5334594,
+ "summary": {
+  "documents": 1158,
+  "registered_domains": {
+   "www.gov.pl": 396,
+   "cert.pl": 284,
+   "odyseusz.gov.pl": 251,
+   "policja.pl": 45,
+   "policja.gov.pl": 38,
+   "imgw.pl": 36,
+   "stat.gov.pl": 36,
+   "kgsok.pl": 30,
+   "sejm.gov.pl": 20,
+   "pravda.org.pl": 15,
+   "europa.eu": 7
+  },
+  "strict_domains": {
+   "gov.pl": 741,
+   "cert.pl": 284,
+   "policja.pl": 45,
+   "imgw.pl": 36,
+   "kgsok.pl": 30,
+   "pravda.org.pl": 15,
+   "europa.eu": 7
+  },
+  "source_types": {
+   "official": 1143,
+   "fact_checker": 15
+  },
+  "storage": {
+   "full_text": 1113,
+   "excerpt": 45
+  },
+  "sources": {
+   "cert-komunikaty": 284,
+   "odyseusz": 251,
+   "govpl-rcb": 60,
+   "govpl-kgpsp": 54,
+   "govpl-msz": 50,
+   "govpl-gis": 50,
+   "policja-kgp": 45,
+   "policja-mazowiecka": 38,
+   "imgw-warnings": 36,
+   "gus": 36,
+   "govpl-kprm": 30,
+   "govpl-mc": 30,
+   "kgsok": 30,
+   "govpl-mswia": 28,
+   "govpl-mon": 28,
+   "govpl-mi": 20,
+   "govpl-paa": 20,
+   "govpl-mz": 20,
+   "sejm-eli": 20,
+   "pravda": 15,
+   "eurlex": 7,
+   "govpl-mi-pages": 2,
+   "govpl-rcb-pages": 1,
+   "govpl-mswia-pages": 1,
+   "govpl-gddkia-pages": 1,
+   "govpl-wody-pages": 1
+  },
+  "without_published_at": 259
+ },
+ "problems": [],
+ "sources": [
+  {
+   "id": "govpl-rcb",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 60,
+   "note": ""
+  },
+  {
+   "id": "govpl-msz",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 50,
+   "note": ""
+  },
+  {
+   "id": "govpl-mswia",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 28,
+   "note": ""
+  },
+  {
+   "id": "govpl-kgpsp",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 54,
+   "note": "",
+   "warnings": 6,
+   "first_warnings": [
+    "nothing kept from https://www.gov.pl/web/kgpsp/komendant-glowny-psp-oglasza-nabor-do-korpusu-sluzby-cywilnej2 (no text, or a job advert)",
+    "nothing kept from https://www.gov.pl/web/kgpsp/nabor-w-ramach-przeniesienia-sluzbowego-do-biura-logistyki (no text, or a job advert)",
+    "nothing kept from https://www.gov.pl/web/kgpsp/nabor-finanse-st-specjalista (no text, or a job advert)"
+   ]
+  },
+  {
+   "id": "govpl-mon",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 28,
+   "note": ""
+  },
+  {
+   "id": "govpl-gis",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 50,
+   "note": ""
+  },
+  {
+   "id": "govpl-mi",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 20,
+   "note": ""
+  },
+  {
+   "id": "govpl-kprm",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 30,
+   "note": ""
+  },
+  {
+   "id": "govpl-paa",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 20,
+   "note": ""
+  },
+  {
+   "id": "govpl-mz",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 20,
+   "note": ""
+  },
+  {
+   "id": "govpl-mc",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 30,
+   "note": ""
+  },
+  {
+   "id": "govpl-rcb-pages",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 1,
+   "note": ""
+  },
+  {
+   "id": "govpl-mswia-pages",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 1,
+   "note": ""
+  },
+  {
+   "id": "govpl-mi-pages",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 2,
+   "note": ""
+  },
+  {
+   "id": "govpl-gddkia-pages",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 1,
+   "note": ""
+  },
+  {
+   "id": "govpl-wody-pages",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 1,
+   "note": ""
+  },
+  {
+   "id": "cert-komunikaty",
+   "domain": "moje.cert.pl",
+   "registered_domain": "cert.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 284,
+   "note": ""
+  },
+  {
+   "id": "policja-kgp",
+   "domain": "policja.pl",
+   "registered_domain": "policja.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 45,
+   "note": ""
+  },
+  {
+   "id": "policja-mazowiecka",
+   "domain": "mazowiecka.policja.gov.pl",
+   "registered_domain": "policja.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 38,
+   "note": ""
+  },
+  {
+   "id": "sejm-eli",
+   "domain": "api.sejm.gov.pl",
+   "registered_domain": "sejm.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 20,
+   "note": ""
+  },
+  {
+   "id": "imgw-warnings",
+   "domain": "danepubliczne.imgw.pl",
+   "registered_domain": "imgw.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 36,
+   "note": ""
+  },
+  {
+   "id": "eurlex",
+   "domain": "publications.europa.eu",
+   "registered_domain": "europa.eu",
+   "source_type": "official",
+   "status": "active",
+   "documents": 7,
+   "note": ""
+  },
+  {
+   "id": "odyseusz",
+   "domain": "odyseusz.gov.pl",
+   "registered_domain": "odyseusz.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 251,
+   "note": ""
+  },
+  {
+   "id": "gus",
+   "domain": "new.stat.gov.pl",
+   "registered_domain": "stat.gov.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 36,
+   "note": "",
+   "warnings": 2,
+   "first_warnings": [
+    "skipped https://new.stat.gov.pl/aktualnosci/wspolny-raport-mrit-i-gus-monitorowanie-realizacji-celow-zrownowazonego-rozwoju-w-polsce (redirects to https://www.gov.pl/attachment/362f4889-de8c-4af3-96fb-2c5eaa5f8e92)",
+    "skipped https://new.stat.gov.pl/aktualnosci/wskazniki-sdg-dla-priorytetow-regionalnych-juz-dostepne (redirects to https://sdg.gov.pl/statistics_reg/)"
+   ]
+  },
+  {
+   "id": "kgsok",
+   "domain": "kgsok.pl",
+   "registered_domain": "kgsok.pl",
+   "source_type": "official",
+   "status": "active",
+   "documents": 30,
+   "note": ""
+  },
+  {
+   "id": "demagog",
+   "domain": "demagog.org.pl",
+   "registered_domain": "demagog.org.pl",
+   "source_type": "fact_checker",
+   "status": "excluded",
+   "documents": 0,
+   "note": "Team decision; no direct integration. Demagog's ratings reach us only as ClaimReview records through the Google Fact Check Tools API (entry google-factcheck), with the claim, the verbatim rating and the link."
+  },
+  {
+   "id": "pravda",
+   "domain": "pravda.org.pl",
+   "registered_domain": "pravda.org.pl",
+   "source_type": "fact_checker",
+   "status": "active",
+   "documents": 15,
+   "note": ""
+  },
+  {
+   "id": "google-factcheck",
+   "domain": "factchecktools.googleapis.com",
+   "registered_domain": "factchecktools.googleapis.com",
+   "source_type": "fact_checker",
+   "status": "active",
+   "documents": 0,
+   "note": "skipped: GOOGLE_FACTCHECK_API_KEY is not set"
+  },
+  {
+   "id": "euvsdisinfo",
+   "domain": "euvsdisinfo.eu",
+   "registered_domain": "euvsdisinfo.eu",
+   "source_type": "incident_base",
+   "status": "active",
+   "documents": 0,
+   "note": "skipped: EUVSDISINFO_TOKEN is not set"
+  },
+  {
+   "id": "gios-air",
+   "domain": "api.gios.gov.pl",
+   "registered_domain": "gios.gov.pl",
+   "source_type": "official",
+   "status": "live_only",
+   "documents": 0,
+   "note": "Air quality changes hourly, so a stored copy would mislead. Planned as a live lookup (ADR 0001, step 4); not wired into the verifier yet."
+  },
+  {
+   "id": "nask",
+   "domain": "www.nask.pl",
+   "registered_domain": "nask.pl",
+   "source_type": "official",
+   "status": "candidate",
+   "documents": 0,
+   "note": "Needs its own list parser. The brief names NASK's materials on disinformation as a reference point."
+  },
+  {
+   "id": "ums",
+   "domain": "www.ums.gov.pl",
+   "registered_domain": "ums.gov.pl",
+   "source_type": "official",
+   "status": "candidate",
+   "documents": 0,
+   "note": "On the organiser's list. Reachable; needs its own parser."
+  },
+  {
+   "id": "umgdy",
+   "domain": "www.umgdy.gov.pl",
+   "registered_domain": "umgdy.gov.pl",
+   "source_type": "official",
+   "status": "candidate",
+   "documents": 0,
+   "note": "On the organiser's list. The feed had no entries when checked."
+  },
+  {
+   "id": "oko-press",
+   "domain": "oko.press",
+   "registered_domain": "oko.press",
+   "source_type": "fact_checker",
+   "status": "candidate",
+   "documents": 0,
+   "note": "IFCN or EFCSN status not confirmed on 2026-11-21, so it is not admitted."
+  },
+  {
+   "id": "govpl-ostrzezenia",
+   "domain": "www.gov.pl",
+   "registered_domain": "www.gov.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "www.gov.pl/web/gov/ostrzezenia fills its list with a script; the HTML has no warnings and there is no documented API. On the organiser's list."
+  },
+  {
+   "id": "utk",
+   "domain": "utk.gov.pl",
+   "registered_domain": "utk.gov.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "robots.txt: Disallow: / for every client except Googlebot. On the organiser's list."
+  },
+  {
+   "id": "ulc",
+   "domain": "ulc.gov.pl",
+   "registered_domain": "ulc.gov.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "Bot challenge (Imperva Incapsula) on every page; not bypassed. On the organiser's list."
+  },
+  {
+   "id": "gddkia-drogi",
+   "domain": "drogi.gddkia.gov.pl",
+   "registered_domain": "gddkia.gov.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "Bot challenge (Imperva Incapsula) on every page; not bypassed. The 19 111 information page on www.gov.pl is collected instead. On the organiser's list."
+  },
+  {
+   "id": "sar",
+   "domain": "www.sar.gov.pl",
+   "registered_domain": "sar.gov.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "Bot challenge (Imperva Incapsula) on every page, robots.txt included; not bypassed. On the organiser's list."
+  },
+  {
+   "id": "straz-graniczna",
+   "domain": "www.strazgraniczna.pl",
+   "registered_domain": "strazgraniczna.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "Bot challenge on the news list; not bypassed."
+  },
+  {
+   "id": "wojsko-polskie",
+   "domain": "www.wojsko-polskie.pl",
+   "registered_domain": "wojsko-polskie.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "The server closed the connection on robots.txt three times; without robots.txt we do not crawl (RFC 9309)."
+  },
+  {
+   "id": "paa-monitoring",
+   "domain": "monitoring.paa.gov.pl",
+   "registered_domain": "paa.gov.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "Map application rendered by a script, no text. PAA news is collected from www.gov.pl/web/paa. On the organiser's list."
+  },
+  {
+   "id": "imgw-apps",
+   "domain": "meteo.imgw.pl",
+   "registered_domain": "imgw.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "meteo.imgw.pl, hydro.imgw.pl and baltyk.imgw.pl are script-rendered apps; the same warnings come from the documented API (imgw-warnings). On the organiser's list."
+  },
+  {
+   "id": "portal-pasazera",
+   "domain": "portalpasazera.pl",
+   "registered_domain": "portalpasazera.pl",
+   "source_type": "official",
+   "status": "excluded",
+   "documents": 0,
+   "note": "Timetable search application with all rights reserved; no document-like pages found on 2026-11-21. On the organiser's list."
+  },
+  {
+   "id": "fakehunter-pap",
+   "domain": "fakehunter.pap.pl",
+   "registered_domain": "pap.pl",
+   "source_type": "fact_checker",
+   "status": "excluded",
+   "documents": 0,
+   "note": "Bot challenge (Imperva Incapsula) on every page, robots.txt included; not bypassed."
+  },
+  {
+   "id": "afp-sprawdzam",
+   "domain": "factcheck.afp.com",
+   "registered_domain": "afp.com",
+   "source_type": "fact_checker",
+   "status": "excluded",
+   "documents": 0,
+   "note": "HTTP 403 for automated clients, robots.txt included."
+  },
+  {
+   "id": "edmo",
+   "domain": "edmo.eu",
+   "registered_domain": "edmo.eu",
+   "source_type": "fact_checker",
+   "status": "excluded",
+   "documents": 0,
+   "note": "HTTP 403 for automated clients, robots.txt included."
+  },
+  {
+   "id": "konkret24",
+   "domain": "konkret24.tvn24.pl",
+   "registered_domain": "tvn24.pl",
+   "source_type": "fact_checker",
+   "status": "excluded",
+   "documents": 0,
+   "note": "The page footer reserves further distribution and requires a licence agreement; IFCN or EFCSN status was not confirmed on 2026-11-21."
+  }
+ ]
+}

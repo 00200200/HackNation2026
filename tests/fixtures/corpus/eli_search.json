@@ -1,0 +1,74 @@
+{
+ "count": 3,
+ "items": [
+  {
+   "ELI": "DU/2026/646",
+   "address": "WDU20260000646",
+   "displayAddress": "Dz.U. 2026 poz. 646",
+   "pos": 646,
+   "publisher": "DU",
+   "year": 2026,
+   "title": "Ustawa z dnia 17 kwietnia 2026 r. o zmianie ustawy o ochronie ludności i obronie cywilnej oraz niektórych innych ustaw",
+   "type": "Ustawa",
+   "status": "obowiązujący",
+   "inForce": "IN_FORCE",
+   "promulgation": "2026-05-14",
+   "announcementDate": "2026-04-17",
+   "textHTML": false,
+   "textPDF": true
+  },
+  {
+   "ELI": "DU/2025/1705",
+   "address": "WDU20250001705",
+   "displayAddress": "Dz.U. 2025 poz. 1705",
+   "pos": 1705,
+   "publisher": "DU",
+   "year": 2025,
+   "title": "Ustawa z dnia 7 listopada 2025 r. o zmianie ustawy o systemie informacji w ochronie zdrowia oraz ustawy o ochronie ludności i obronie cywilnej",
+   "type": "Ustawa",
+   "status": "obowiązujący",
+   "inForce": "IN_FORCE",
+   "promulgation": "2025-12-04",
+   "announcementDate": "2025-11-07",
+   "textHTML": false,
+   "textPDF": true
+  },
+  {
+   "ELI": "DU/2024/1907",
+   "address": "WDU20240001907",
+   "displayAddress": "Dz.U. 2024 poz. 1907",
+   "pos": 1907,
+   "publisher": "DU",
+   "year": 2024,
+   "title": "Ustawa z dnia 5 grudnia 2024 r. o ochronie ludności i obronie cywilnej",
+   "type": "Ustawa",
+   "status": "obowiązujący",
+   "inForce": "IN_FORCE",
+   "promulgation": "2024-12-23",
+   "announcementDate": "2024-12-05",
+   "textHTML": true,
+   "textPDF": true
+  }
+ ],
+ "offset": 0,
+ "totalCount": 3,
+ "searchQuery": {
+  "comparator": {
+   "column": "publisher",
+   "dir": "desc"
+  },
+  "dateEffectType": "NONE",
+  "dateType": "NONE",
+  "exile": false,
+  "keyword": [],
+  "position": -1,
+  "pubDateType": "NONE",
+  "publisher": "DU",
+  "publisherName": "Dziennik Ustaw",
+  "statusInForce": true,
+  "title": "ochronie ludności i obronie cywilnej",
+  "type": [],
+  "volume": -1,
+  "year": -1
+ }
+}

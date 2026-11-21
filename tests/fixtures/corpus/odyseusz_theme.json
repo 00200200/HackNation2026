@@ -1,0 +1,58 @@
+{
+ "kod": "przed-podroza",
+ "nazwa": "Przed podróżą",
+ "podstrony": [
+  {
+   "kod": "czym-sa-ostrzezenia-dla-podrozujacych",
+   "nazwa": "Czym są ostrzeżenia dla podróżujących",
+   "podstrony": [],
+   "sekcje": [
+    {
+     "tytul": "Poziomy ostrzeżeń",
+     "tresc": "W każdym z profili krajów znajdziesz informację o ogólnym poziomie ostrzeżenia dla kraju. W niektórych profilach znajdują się też ostrzeżenia regionalne.\nJeżeli miejsce, do którego planujesz się wybrać, jest objęte ostrzeżeniem wysokiego poziomu - zastanów, czy podróż jest konieczna. Jeśli boisz się o swoje zdrowie lub bezpieczeństwo, rozważ rezygnację z wycieczki lub wybierz inny kierunek wyjazdu.",
+     "uporzadkowanie": 1,
+     "podsekcje": [
+      {
+       "tytul": "Poziom 1 - Zwykła ostrożność",
+       "tresc": "Oznacza poziom zagrożenia zbliżony do Polski.",
+       "uporzadkowanie": 1
+      },
+      {
+       "tytul": "Poziom 2 - Szczególna ostrożność",
+       "tresc": "Oznacza poziom zagrożenia wyższy niż w Polsce.",
+       "uporzadkowanie": 2
+      },
+      {
+       "tytul": "Poziom 3 - Unikaj podróży",
+       "tresc": "Oznacza poziom zagrożenia znacznie wyższy niż w Polsce.\nDo miejsc objętych poziomem 3 ostrzeżenia MSZ odradza podróże, które nie są konieczne. W naszej ocenie podróże konieczne to wyjazdy w celach zawodowych, pilnych sprawach rodzinnych itd. – wyłączamy z tej kategorii cele turystyczne. Ostateczna decyzja, czy podróż jest konieczna, należy do obywatela.",
+       "uporzadkowanie": 3
+      },
+      {
+       "tytul": "Poziom 4 - Nie jedź",
+       "tresc": "Oznacza najwyższy poziom zagrożenia.\nDo miejsc objętych poziomem 4 ostrzeżenia MSZ odradza wszelkie podróże, w tym w celach zawodowych i pilnych sprawach rodzinnych.",
+       "uporzadkowanie": 4
+      }
+     ]
+    },
+    {
+     "tytul": "Skutki prawne ostrzeżeń dla podróżujących",
+     "tresc": "Publikowane przez MSZ ostrzeżenia dla podróżujących to wyłącznie rekomendacje, które nie mogą stanowić podstawy do jakichkolwiek roszczeń. Pamiętaj, że MSZ nie ma prawnych możliwości zakazania wyjazdu do\njakiegokolwiek państwa.\nTreść ostrzeżeń może jednak pośrednio wpływać na:\n- ważność ubezpieczenia podróżnego\n- umowę z biurem podróży",
+     "uporzadkowanie": 2,
+     "podsekcje": [
+      {
+       "tytul": "Ubezpieczenia podróżne",
+       "tresc": "- Niektóre polisy ubezpieczeniowe mogą zawierać klauzule wyłączające odpowiedzialność ubezpieczyciela w przypadku, gdy podróżny zdecyduje się na wyjazd do kraju objętego wysokim poziomem (zazwyczaj poziom 3 lub 4) ostrzeżenia MSZ.\n- Sprawdź dokładnie warunki swojej polisy ubezpieczeniowej, zwłaszcza jeżeli podróżujesz do miejsc objętych wysokimi poziomami ostrzeżeń.\n- Pamiętaj też, że w przypadku nagłego pogorszenia się sytuacji bezpieczeństwa, niezależnie od poziomu ostrzeżenia MSZ, ubezpieczyciel może nie być w stanie udzielić ci pomocy, do której jest zobowiązany zgodnie z polisą.",
+       "uporzadkowanie": 1
+      },
+      {
+       "tytul": "Umowy o imprezę turystyczną",
+       "tresc": "- Ustawa z dnia 24 listopada 2017 r. o imprezach turystycznych i powiązanych usługach turystycznych nie odnosi się wprost do ostrzeżeń dla podróżujących MSZ.\n- Zasady rezygnacji lub odwołania imprezy turystycznej są w ustawie powiązane z wystąpieniem \"nieuniknionych i nadzwyczajnych okoliczności występujących w miejscu docelowym lub jego najbliższym sąsiedztwie, które mają znaczący wpływ na realizację imprezy turystycznej lub przewóz podróżnych do miejsca docelowego\". Wystąpienie takich okoliczności nie jest jednoznaczne z wprowadzeniem przez MSZ ostrzeżenia dla podróżujących.\n- Istnieje jednak praktyka orzecznicza sądów, która niekiedy uznaje, że ww. okoliczności występują, gdy MSZ wprowadza wysokie poziomy ostrzeżeń dla podróżujących (zazwyczaj poziom 3 lub 4).\n- W przypadku wątpliwości co do przysługujących ci praw wobec biura podróży, skonsultuj się z prawnikiem lub rzecznikiem praw konsumenta",
+       "uporzadkowanie": 2
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "sekcje": []
+}

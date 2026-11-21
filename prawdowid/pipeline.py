@@ -1,8 +1,10 @@
 """Steps 2 to 5 for one claim, under the time budget of the whole check.
 
-Step 2 runs three lookups at once: 2a Google Fact Check (`factcheck.search_claims`), EUvsDisinfo
-known narratives (`euvsdisinfo.search_cases`, context that never decides alone) and 2b web search
-and fetch (`websearch.search_web`, one search per query of the claim). Step 2c (our own database,
+Step 2 runs four lookups at once: 2a Google Fact Check (`factcheck.search_claims`), EUvsDisinfo
+known narratives (`euvsdisinfo.search_cases`, context that never decides alone), the www.gov.pl
+site search (`govpl.search_govpl`, the claim's gov.pl queries, else its first web query; off with
+PRAWDOWID_GOVPL=0) and 2b web search and fetch (`websearch.search_web`, one search per web query of
+the claim, www.gov.pl pages left to the gov.pl lookup). Step 2c (our own database,
 #19) is out of the pipeline for now (team decision). Any EUvsDisinfo source, whichever lookup
 found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
 steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
@@ -23,7 +25,7 @@ from pydantic import BaseModel
 from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
-from prawdowid import euvsdisinfo, factcheck, judge, rerank, websearch
+from prawdowid import euvsdisinfo, factcheck, govpl, judge, rerank, websearch
 from prawdowid.contract import ModelCall, Source, Verdict
 
 log = logging.getLogger("prawdowid")
@@ -64,20 +66,34 @@ class ClaimCheck(BaseModel):
 
 
 async def check_claim(
-    claim: str, queries: list[str], deadline: float, exclude_url: str | None = None
+    claim: str,
+    queries: list[str],
+    deadline: float,
+    exclude_url: str | None = None,
+    govpl_queries: list[str] = (),
 ) -> ClaimCheck:
-    """Verdict for one claim. `deadline` is `loop.time()` when the whole check must end."""
+    """Verdict for one claim. `deadline` is `loop.time()` when the whole check must end.
+
+    `queries` go to web search, `govpl_queries` to the gov.pl site search (to the web when it is
+    switched off).
+    """
     steps: dict[str, int] = {}
     # Messages of each reranker and judge run, priced and logged in `_done`.
     runs: list[list[ModelMessage]] = []
     # Each lookup's answer as soon as it arrives, so a time limit keeps what already failed.
     found: dict = {"web": []}
+    if govpl.ENABLED:
+        # Keywords suit the gov.pl search box better than the claim sentence.
+        gov = [q for q in govpl_queries if q.strip()]
+        gov = gov or [q for q in queries if q.strip()][:1] or [claim]
+    else:
+        gov, queries = None, [*queries, *govpl_queries]
     searched = queries or [claim]
     if _now() >= deadline:  # nothing is started after the budget ran out
         return _done(claim, _time_limit(found), runs, steps)
     try:
         async with asyncio.timeout_at(deadline):
-            await _retrieve(claim, searched, steps, found)
+            await _retrieve(claim, searched, gov, steps, found)
             candidates = _candidates(found)
             judgement = await _judge(claim, candidates, exclude_url, steps, runs)
     except TimeoutError:
@@ -118,7 +134,7 @@ async def check_claim(
             cut = True
 
     limits = _limits(found)
-    if len(limits) == 3 and not candidates:  # every source failed
+    if len(limits) == len(found) and not candidates:  # every source failed
         reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
         judgement = _not_checked(reason)
     # The main reason first, then what each source said.
@@ -131,9 +147,13 @@ async def check_claim(
 
 
 async def _retrieve(
-    claim: str, queries: list[str], steps: dict[str, int], found: dict
+    claim: str,
+    queries: list[str],
+    gov: list[str] | None,
+    steps: dict[str, int],
+    found: dict,
 ) -> None:
-    """Steps 2a, EUvsDisinfo and 2b at once, each answer stored in `found` as it arrives.
+    """Steps 2a, EUvsDisinfo, gov.pl (when `gov` is set) and 2b at once, each answer stored in `found` as it arrives.
 
     TaskGroup: when the time limit cuts the claim, every lookup task still running is cancelled
     and awaited before this returns. Provider threads (`asyncio.to_thread`) cannot be cancelled:
@@ -155,6 +175,8 @@ async def _retrieve(
         tg.create_task(keep("factcheck", _search_claims))
         tg.create_task(keep("euvsdisinfo", _search_cases))
         tg.create_task(_timed(steps, "web", all_web))
+        if gov is not None:
+            tg.create_task(keep("govpl", lambda _: _search_govpl(gov)))
         # Step 2c (`cache.search_documents`, #19) plugs in here when it is back in the pipeline.
 
 
@@ -165,7 +187,8 @@ def _candidates(found: dict) -> list[Source]:
         if name in found
         for h in found[name].hits
     ]
-    sources += [d.to_source(fragment=d.text) for w in found["web"] for d in w.documents]
+    webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
+    sources += [d.to_source(fragment=d.text) for w in webs for d in w.documents]
     return [_context_only(s) for s in sources]
 
 
@@ -198,6 +221,7 @@ def _limits(found: dict) -> dict[str, str]:
         "euvsdisinfo": found["euvsdisinfo"].limitation
         if "euvsdisinfo" in found
         else None,
+        "govpl": found["govpl"].limitation if "govpl" in found else None,
         "web": web,
     }
     return {k: v for k, v in limits.items() if v}
@@ -213,10 +237,20 @@ async def _search_web(query: str) -> websearch.WebSearch:
     """An unexpected error (cache write, extraction) is a limitation of this source only."""
     try:
         # Bounded inside: search by SEARCH_BUDGET_S, each page by PAGE_BUDGET_S.
-        return await websearch.search_web(query)
+        return await websearch.search_web(
+            query, skip_hosts=govpl.HOSTS if govpl.ENABLED else frozenset()
+        )
     except Exception:
         log.exception("web search failed query=%r", query)
         return websearch.WebSearch(limitation=websearch.SEARCH_UNAVAILABLE)
+
+
+async def _search_govpl(queries: list[str]) -> websearch.WebSearch:
+    try:
+        return await govpl.search_govpl(queries)
+    except Exception:
+        log.exception("gov.pl search failed")
+        return websearch.WebSearch(limitation=govpl.LOOKUP_UNAVAILABLE)
 
 
 async def _search_claims(claim: str) -> factcheck.FactCheckLookup:

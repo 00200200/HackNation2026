@@ -460,6 +460,25 @@ def test_publisher_on_both_sides_without_one_conclusion_counts_for_neither(
     assert SELF_CONTRADICTION.format(publishers="demagog") in j.limitations
 
 
+def test_a_self_contradicting_publisher_cannot_decide_misleading_either():
+    j = run(
+        [REVIEW],
+        answering(
+            label(REVIEW, "supports", "UE wprowadza podatek od wypieków"),
+            label(REVIEW, "refutes", "Sprawdziliśmy: to fałsz"),
+            label(
+                REVIEW,
+                "context",
+                "W sieci krąży wpis",
+                missing_context="To wpis z sieci, nie decyzja UE.",
+                context_quote="W sieci krąży wpis",
+            ),
+        ),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert SELF_CONTRADICTION.format(publishers="demagog") in j.limitations
+
+
 @pytest.mark.parametrize(
     "stance, missing_context",
     [

@@ -246,6 +246,9 @@ def test_fetched_text_wins_over_a_title_only_hit_for_the_same_page(title_first):
         "Według GUS w 2023 roku do Polski przyjechało 2100 lekarzy z zagranicy.",
         "Według GUS w 2024 roku do Polski przyjechało 1200 lekarzy z zagranicy.",
         "Według GUS w 2023 roku do Polski nie przyjechało 1200 lekarzy z zagranicy.",
+        "Według GUS w 2023 roku do Polski przyjechało -1200 lekarzy z zagranicy.",
+        "Według GUS w 2023 roku do Polski przyjechało 1,200 lekarzy z zagranicy.",
+        "Według GUS w 2023 roku do Polski przyjechało 1.200 lekarzy z zagranicy.",
     ],
 )
 def test_passages_with_a_changed_fact_are_both_kept(other):
@@ -255,6 +258,36 @@ def test_passages_with_a_changed_fact_are_both_kept(other):
     )
     ranking = run([first, source("https://b.pl", other)], answering([0, 1]))
     assert len(ranking.fragments) == 2
+
+
+def test_a_changed_separator_keeps_both():
+    # Polish: "1.500" is fifteen hundred, "1,500" is one and a half.
+    copies = [
+        source("https://a.pl", "Dług wzrósł o 1.500 mld zł w roku 2023."),
+        source("https://b.pl", "Dług wzrósł o 1,500 mld zł w roku 2023."),
+    ]
+    assert len(run(copies, answering([0, 1])).fragments) == 2
+
+
+def test_copies_differing_in_format_only_are_one():
+    text = "Saldo wynosi -10,5 mln zł."
+    copies = [
+        source("https://a.pl", text),
+        source("https://b.pl", "SALDO wynosi  -10,5 mln zł!"),
+    ]
+    assert len(run(copies, answering([0, 1])).fragments) == 1
+
+
+@pytest.mark.parametrize("official_first", [True, False])
+def test_a_copy_never_hides_an_official_source(official_first):
+    article = source(
+        "https://portal.pl/x", "Polska jest członkiem UE od 1 maja 2004 roku."
+    )
+    candidates = [EU.model_copy(update={"source_type": "official"}), article]
+    if not official_first:
+        candidates.reverse()
+    [fragment] = run(candidates, answering([0])).fragments
+    assert fragment.source.source_type == "official"
 
 
 def test_input_budget_applies_before_splitting(monkeypatch):

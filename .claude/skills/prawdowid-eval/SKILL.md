@@ -13,15 +13,45 @@ this so the numbers in the PDF and README come from a run anyone can repeat (`ev
 
 ```bash
 PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick          # one case per scenario, before a push
-PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --corpus corpus/docs.jsonl   # full set, before submitting
+PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --corpus corpus/evidence.jsonl   # full set, before submitting
 uv run pytest -q tests/test_eval_metrics.py                                      # metric code only
 ```
 
 Options: `--cases` (default `evals/cases.jsonl`), `--corpus` (JSONL `{"url", "text"}` of the demo corpus; needed for
 citation correctness). Exit code 1 when a required metric fails or is unknown.
 
+Running, resuming, rerunning:
+
+```bash
+uv run python -m evals.run --concurrency 4                     # cases in flight (default 4; 1 = one by one)
+tail -f evals/results/run-*.partial.jsonl                      # one JSON line per finished case
+uv run python -m evals.run --resume evals/results/run-<ts>.partial.jsonl        # keep finished cases, run the rest
+uv run python -m evals.run --retry-failed evals/results/run-<ts>.partial.jsonl  # rerun only the cases that errored
+uv run python -m evals.run --only FC-C02,A01                   # just these case ids
+```
+
+- Each finished case prints `[23/71] FC-C02 ok verdict=fałszywe expected=fałszywe 14.2s ETA 3.1min` (`FAIL` when
+  the verdict or status misses or a call errored) and is appended to a new `evals/results/run-<timestamp>.partial.jsonl`
+  (git-ignored). A killed run keeps the cases it finished.
+- `--resume` and `--retry-failed` reuse only rows with no error, for the same commit and an unchanged case (rows from a dirty tree only by a dirty run); reused rows
+  are copied into the new partial file and listed in the report as `reused_cases`. Metrics are computed after all cases,
+  over reused and new rows alike; the final report keeps the order of the cases file.
+- Requests still start at least `PRAWDOWID_MIN_INTERVAL_S` (6.5 s) apart, because the API allows 10 requests per minute
+  per client; concurrency overlaps the waiting for answers, it does not lift that ceiling.
+- HTTP 429, 5xx and timeouts get one retry after 20 s, logged as `retry <id> <channel> after ...`. Latency is the wall
+  time of the attempt that answered.
+- Latency is measured with `concurrency` checks in flight on the backend (recorded in the report). If
+  `median_latency_s` is close to its target, confirm it with `--concurrency 1`.
+- Ctrl-C stops new cases from starting; the ones in flight finish and the partial file keeps every finished case.
+
 Each run writes `evals/results/latest.json` (commit this one: it is the "test results with data to reproduce"
-deliverable) and `.git/eval-latest.json`, which the pre-push hook reads.
+deliverable) and `.git/eval-latest.json`, which the pre-push hook reads. It also writes a full report to
+`evals/results/history/<timestamp>-<sha>-<mode>.json` and appends one row to `evals/results/HISTORY.md` (both
+tracked; only the `run-*.partial.jsonl` progress file is git-ignored), so every session can see every past run, not
+only the latest one. `--note "<text>"` fills that row's notes column. **Read `evals/results/HISTORY.md`, not only
+`latest.json`; check the commit and notes before concluding anything** — see `docs/eval-notes.md` for why some past
+runs are distorted (timeouts, missing keys, a too-tight time budget). On a merge conflict in `HISTORY.md` from
+parallel branches each appending a run, keep both rows (same rule as `WORKLOG.md`).
 
 ## Product contract and how the eval maps it
 

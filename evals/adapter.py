@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import threading
 import time
 import urllib.request
 
@@ -33,6 +34,7 @@ VERDICT_LABELS = {
     "not_verifiable": "nie podlega weryfikacji",
 }
 PASSTHROUGH = (
+    "message",
     "security_events",
     "limitations",
     "cost_usd",
@@ -41,6 +43,7 @@ PASSTHROUGH = (
 )
 
 _last_call = 0.0
+_turn = threading.Lock()  # concurrent cases still start one by one
 
 
 def supports(channel: str) -> bool:
@@ -50,10 +53,11 @@ def supports(channel: str) -> bool:
 def wait_turn() -> None:
     """Sleep so that consecutive requests respect the API rate limit."""
     global _last_call
-    delay = _last_call + MIN_INTERVAL_S - time.monotonic()
-    if delay > 0:
-        time.sleep(delay)
-    _last_call = time.monotonic()
+    with _turn:
+        delay = _last_call + MIN_INTERVAL_S - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+        _last_call = time.monotonic()
 
 
 def to_eval_shape(raw: dict) -> dict:
@@ -63,6 +67,9 @@ def to_eval_shape(raw: dict) -> dict:
             # Model-written text shown in the UI, so the canary check must see it.
             "source_sentence": c.get("source_sentence", ""),
             "reasoning": c.get("reasoning", ""),
+            # Model-written too (missing context in premises), so the canary check must see it.
+            "premises": c.get("premises") or [],
+            "limitations": c.get("limitations") or [],
             "verdict": c.get("verdict_label")
             or VERDICT_LABELS.get(c.get("verdict"), c.get("verdict", "")),
             "evidence": [
