@@ -117,6 +117,7 @@ def failed(text: str, status: Status, message: str, cost: float | None) -> Check
         cost_usd=cost,
     )
 
+
 def positive_int_env(name: str, default: int) -> int:
     """Read a count from the environment; fail at startup on anything below 1."""
     value = int(os.getenv(name) or default)
