@@ -14,7 +14,7 @@ Updated: 2026-11-21 20:35, by Michał (via Claude).
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
 not → verdict set in code. No sources yet, so every checkable claim is `brak wystarczających dowodów` and the rest
-`nie podlega weryfikacji`. Links (#4, branch `LukiLenkiewicz/issue4-link-input`): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls (incl. inline sign-in or subscribe walls), social media, URLs with a login or password, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Nothing is stored; each link check logs URL (secret query values, userinfo and fragment redacted, also in the answer), content hash, claims and result to stdout.
+`nie podlega weryfikacji`. Links (#4, on `main` as #28): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls (incl. inline sign-in or subscribe walls), social media, URLs with a login or password, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Nothing is stored; each link check logs URL (secret query values, userinfo and fragment redacted, also in the answer), content hash, claims and result to stdout.
 
 **Branches**
 
@@ -26,7 +26,7 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `LukiLenkiewicz/issue9-rerank` | #9 step 3 rerank and dedupe, PR #25 against `main` (#24 merged). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `feat/8-web-search` | #8 web search (DuckDuckGo via `ddgs`), page fetch, source cache, `docs/sources.md`. PR #26 against `main` (#25 merged), PR open, not merged. Corpus not built. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue31-euvsdisinfo` | #31 EUvsDisinfo MCP lookup, PR #33 rebased onto `main` (independent of #28 and #30). PR open, not merged. Owner: Łukasz (Claude worker). |
-| `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, stacked on `LukiLenkiewicz/issue4-link-input` (PR #28, restacked on `main` `ebfcf76`). PR open, not merged. Owner: Łukasz (Claude worker). |
+| `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, based on `main` (`e9a7f86`, #28 squashed). PR #30 open. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 | `claude/deploy-config-43a484` | Deploy config, merged into `main` as #32. |
 | `claude/pull-deploy` | Deploy by pulling `prod` on the server (`deploy/`), Actions workflow removed. |
@@ -74,7 +74,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Eval-only fault switch for scenario J (`simulate` in `evals/cases.jsonl`: `factcheck_api_unavailable`,
   `llm_unavailable`), passed by `evals/adapter.py` and honoured only for eval traffic. Owner: ?
 - [x] Contract gaps for metrics (#15): `security_events` from two detectors, a fixed pattern pre-check in code and the extraction model's flag (events carry no wording; the pattern event and a "patterns only" limitation survive a failed model call) and `cost_usd` per answer (token usage priced by genai-prices through PydanticAI; 0.0 when no request was sent, null when unknown). Web and Discord show a notice when an event is logged. Not measured with a real key yet. Branch `LukiLenkiewicz/issue15-contract-metrics`. Owner: Łukasz (Claude worker)
-- [x] Link input (#4): safe fetch (http/https, SSRF guard on every connection incl. redirects and DNS, ≤ 3 redirects, 10 s, 2 MB, HTML via trafilatura, PDF via pypdf), page URL kept in `CheckResult.page` for later evidence exclusion. Branch `LukiLenkiewicz/issue4-link-input`, stacked on #15, in review. Prompt injection found in a page is logged with `location="page"`. Owner: Łukasz (Claude worker). Open: page text cut to 5000 chars (same as pasted text, UNCONFIRMED choice); no eval case uses a URL yet.
+- [x] Link input (#4): safe fetch (http/https, SSRF guard on every connection incl. redirects and DNS, ≤ 3 redirects, 10 s, 2 MB, HTML via trafilatura, PDF via pypdf), page URL kept in `CheckResult.page` for later evidence exclusion. Merged to `main` as #28 (`e9a7f86`). Prompt injection found in a page is logged with `location="page"`. Owner: Łukasz (Claude worker). Open: page text cut to 5000 chars (same as pasted text, UNCONFIRMED choice); no eval case uses a URL yet.
 - [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
 - [ ] Deliverables: description ≤ 4000 chars, PDF ≤ 12 slides, video ≤ 3 min, cost estimate, risks. Owner: ?
 - [ ] Optional after basics: moderator loop (scenario H), screenshots (F).
@@ -155,6 +155,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): merged `main` (`e9a7f86`: #28 squashed, #41, #42) into #10 `LukiLenkiewicz/issue10-judge` (PR #30), retargeted PR #30 to `main`: conflicts in `prawdowid/contract.py` (`SecurityEvent.location` keeps `source`), WORKLOG (all lines kept), `evals/results/latest.json` (main's). Judge rules untouched. Eval skipped by the user's decision.
 - 2026-11-21 Łukasz (Claude worker): merged the restacked #28 head (`4c596ff`, on `main` `ebfcf76`) into #10 `LukiLenkiewicz/issue10-judge` (PR #30): conflicts in `prawdowid/contract.py` (`SecurityEvent.location` keeps `source`, main's required `detector` kept; the judge's event now says `detector="model"`) and WORKLOG; gap stance, `context_quote` and scenario C rules untouched. Judge test now checks `detector="model"` (`d3c30d7`). Quick eval on `d3c30d7` (judge not wired into `verify()` yet): macro_f1 0.10, abstention 1.00, injection_resistance 0.00, end_to_end 0.89 (J01), median 3.4 s, cost $1.75/100.
 - 2026-11-21 Łukasz (Claude worker): #10 PR #30 round 2 fixes: data gap gives no verdict (D01), missing context needs verified `context_quote` (paraphrase B variant), official vs PAP is a conflict (C), quotes never across title/body join, decomposed text keeps its own span.
 - 2026-11-21 Łukasz (Claude worker): #10 PR #30 review fixes: fact-check debunk keeps its own conclusion, grounded missing context, syndicated copies one origin, exact numbers in quotes, `security_events` (location `source`) for injection in retrieved fragments.
