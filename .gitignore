@@ -151,6 +151,7 @@ activemq-data/
 
 # Environments
 .env
+.env.*
 .envrc
 .venv
 env/
@@ -226,3 +227,4 @@ __marimo__/
 .claude/settings.local.json
 CLAUDE.local.md
 !.claude/skills/build/
+
