@@ -1,4 +1,8 @@
-"""Check log: one JSON line per check (question, time, result, sources), per demo session.
+"""Check log: one JSON line per check, per demo session.
+
+A record holds the masked question, channel, start and end time, total and per-step latency, status
+(with why a technical error happened), claims with verdicts, sources and limitations (search errors
+and abstentions show up there), model calls with tokens, cost, security events and incident ids.
 
 The question is stored masked (prawdowid/privacy.py), records older than `RETENTION_DAYS` are
 dropped on every write, and `delete_session` removes every record of one session. This file is the
@@ -25,19 +29,47 @@ def record(
     channel: str,
     question: str,
     result: CheckResult,
+    *,
+    started_at: datetime,
+    latency_ms: int,
+    error: str | None = None,
 ) -> None:
-    """Append one check. A write failure is logged and never fails the check."""
+    """Append one check. A write failure is logged and never fails the check.
+
+    `error` says why verify did not return ("timeout" or the exception class)."""
+    page = result.page
     entry = {
         "session": session,
+        # End of the check; retention counts from it.
         "time": datetime.now(UTC).isoformat(),
+        "started_at": started_at.isoformat(),
+        "latency_ms": latency_ms,
         "channel": channel,
         "question": mask_personal_data(question),
         "status": result.status,
+        "error": error,
+        "message": result.message,
+        "page": page and {"url": mask_personal_data(page.url), "sha256": page.sha256},
+        "steps_ms": result.steps_ms,
+        "model_calls": [m.model_dump() for m in result.model_calls],
+        "cost_usd": result.cost_usd,
+        "security_events": [e.model_dump() for e in result.security_events],
+        "incidents": [m.incident_id for m in result.incident_matches],
+        # Check-level limits, e.g. "patterns only" when the model did not answer.
+        "limitations": [mask_personal_data(x) for x in result.limitations],
         "claims": [
             {
                 "claim": mask_personal_data(c.claim),
                 "verdict": c.verdict,
-                "sources": [mask_personal_data(str(s.url)) for s in c.sources],
+                "sources": [
+                    {
+                        "url": mask_personal_data(str(s.url)),
+                        "source_type": s.source_type,
+                    }
+                    for s in c.sources
+                ],
+                "limitations": [mask_personal_data(x) for x in c.limitations],
+                "steps_ms": c.steps_ms,
             }
             for c in result.claims
         ],
@@ -45,15 +77,30 @@ def record(
     }
     try:
         # ponytail: rewrites the file on every check to apply retention; fine for a demo log.
-        cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)
-        _rewrite(lambda r: datetime.fromisoformat(r["time"]) > cutoff, [entry])
+        _rewrite(_fresh, [entry])
     except OSError as exc:
         log.warning("check log write failed: %r", exc)
+
+
+def read_session(session: str) -> list[dict]:
+    """Every record of the session, oldest first. Writers swap the file atomically, so no lock."""
+    path = CHECK_LOG
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    return [
+        r for r in map(_parse, lines) if r and r["session"] == session and _fresh(r)
+    ]
 
 
 def delete_session(session: str) -> int:
     """Delete every record of the session. Number of records deleted."""
     return _rewrite(lambda r: r["session"] != session)
+
+
+def _fresh(r: dict) -> bool:
+    """Within retention."""
+    return datetime.fromisoformat(r["time"]) > datetime.now(UTC) - timedelta(
+        days=RETENTION_DAYS
+    )
 
 
 def _rewrite(keep, extra: list[dict] = ()) -> int:

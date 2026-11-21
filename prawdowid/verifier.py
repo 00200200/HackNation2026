@@ -14,7 +14,13 @@ import re
 import time
 
 from pydantic import BaseModel
-from pydantic_ai import Agent, NativeOutput
+from pydantic_ai import (
+    Agent,
+    AgentRunResult,
+    ModelResponse,
+    NativeOutput,
+    capture_run_messages,
+)
 from pydantic_ai.exceptions import AgentRunError, ContentFilterError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
@@ -286,6 +292,7 @@ def claim_result(c: ExtractedClaim, check: pipeline.ClaimCheck | None) -> ClaimR
         source_sentence=c.source_sentence,
         reasoning=c.reason,
         **judgement.model_dump(exclude={"security_events"}),
+        steps_ms=check.steps_ms if check else {},
     )
 
 
@@ -310,6 +317,7 @@ async def verify(text: str) -> CheckResult:
     deadline = asyncio.get_running_loop().time() + pipeline.CHECK_BUDGET_S
     if not is_link(text):
         return await verify_text(text, deadline=deadline)
+    started = time.perf_counter()
     try:
         async with asyncio.timeout_at(deadline) as budget:
             page = await fetch_page(text)
@@ -318,12 +326,21 @@ async def verify(text: str) -> CheckResult:
             raise
         log.warning("link fetch cut by the check budget")
         return CheckResult(
-            status=Status.TECHNICAL_ERROR, message=TIMED_OUT, cost_usd=0.0
+            status=Status.TECHNICAL_ERROR,
+            message=TIMED_OUT,
+            cost_usd=0.0,
+            steps_ms={"fetch": round((time.perf_counter() - started) * 1000)},
         )
     except Refusal as refusal:
         status = Status.TECHNICAL_ERROR if refusal.technical else Status.CANNOT_CHECK
         # No model request was sent.
-        return CheckResult(status=status, message=refusal.message, cost_usd=0.0)
+        return CheckResult(
+            status=status,
+            message=refusal.message,
+            cost_usd=0.0,
+            steps_ms={"fetch": round((time.perf_counter() - started) * 1000)},
+        )
+    fetch_ms = round((time.perf_counter() - started) * 1000)
     text, cut = page_text(page)
     result = await verify_text(
         text, location="page", deadline=deadline, exclude_url=page.url
@@ -332,6 +349,7 @@ async def verify(text: str) -> CheckResult:
         for c in result.claims:
             c.limitations.append(PAGE_CUT)
     result.page = CheckedPage(**page.model_dump(exclude={"text"}))
+    result.steps_ms = {"fetch": fetch_ms, **result.steps_ms}
     # The page text is not kept; the URL is masked (an e-mail in a query string).
     log.info(
         "link check url=%s sha256=%s status=%s claims=%s",
@@ -356,11 +374,66 @@ async def verify_text(
 ) -> CheckResult:
     """`deadline` is `loop.time()` when the whole check must end; `exclude_url` the linked page."""
     started = time.perf_counter()
+    with capture_run_messages() as messages:
+        result = await _extract(text, location, deadline)
+    extract_ms = round((time.perf_counter() - started) * 1000)
+    calls = [pipeline.model_call(m) for m in messages if isinstance(m, ModelResponse)]
+    if isinstance(
+        result, CheckResult
+    ):  # the model failed: a notice, kept in the check log
+        result.steps_ms = {"extract": extract_ms}
+        result.model_calls = calls
+        return result
+    usage = result.usage
+    # Best-effort price of every request in the run from PydanticAI's genai-prices tables; None
+    # for an unpriced model. genai-prices 0.2.5 (2026-11-19) lists claude-opus-5-5 at $4 input and
+    # $20 output per million tokens, from https://platform.claude.com/docs/en/about-claude/pricing.
+    # Rerank and judge calls are added per claim; Fact Check is free. Tavily web search costs API
+    # credits but is not priced into cost_usd (#7/#8: not measured yet, no key in this clone).
+    cost = None if usage.cost is None else float(usage.cost)
+    log.info(
+        "model name=%s input_tokens=%d output_tokens=%d cost_usd=%s latency_ms=%d",
+        result.response.model_name,
+        usage.input_tokens,
+        usage.output_tokens,
+        cost,
+        extract_ms,
+    )
+    checks = await asyncio.gather(
+        *(
+            pipeline.check_claim(c.claim, c.queries, deadline, exclude_url)
+            if c.checkable
+            else asyncio.sleep(0)
+            for c in checked_claims(result.output)
+        )
+    )
+    check = to_check_result(result.output, checks)
+    claim_costs = [c.cost_usd for c in checks if c]
+    check.cost_usd = None if None in [cost, *claim_costs] else cost + sum(claim_costs)
+    check.steps_ms = {"extract": extract_ms}
+    check.model_calls = calls + [call for c in checks if c for call in c.model_calls]
+    check.security_events = screen(text, location)
+    if result.output.injection_found:
+        check.security_events.append(SecurityEvent(location=location, detector="model"))
+        log.warning(
+            "security_event kind=prompt_injection location=%s detector=model", location
+        )
+    # The judge logs its own events (location "source"); one per check is enough.
+    check.security_events += [
+        e for c in checks if c for e in c.judgement.security_events
+    ][:1]
+    return check
+
+
+async def _extract(
+    text: str, location: str, deadline: float
+) -> AgentRunResult[Extraction] | CheckResult:
+    """Step 1, or the notice to show when the model fails."""
     try:
         # Masked before the model: placeholders keep the sentence, so claims still split (docs/privacy.md).
         # The extraction shares the check's budget: its own 45 s would overrun it.
         async with asyncio.timeout_at(deadline) as budget:
-            result = await agent.run(wrap(USER_TEXT, mask_personal_data(text)))
+            return await agent.run(wrap(USER_TEXT, mask_personal_data(text)))
     except TimeoutError:
         if not budget.expired():
             raise  # not our budget: the API answers with a technical error
@@ -386,40 +459,3 @@ async def verify_text(
         return failed(
             text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=None, location=location
         )
-    usage = result.usage
-    # Best-effort price of every request in the run from PydanticAI's genai-prices tables; None
-    # for an unpriced model. genai-prices 0.2.5 (2026-11-19) lists claude-opus-5-5 at $4 input and
-    # $20 output per million tokens, from https://platform.claude.com/docs/en/about-claude/pricing.
-    # Rerank and judge calls are added per claim; Fact Check is free. Tavily web search costs API
-    # credits but is not priced into cost_usd (#7/#8: not measured yet, no key in this clone).
-    cost = None if usage.cost is None else float(usage.cost)
-    log.info(
-        "model name=%s input_tokens=%d output_tokens=%d cost_usd=%s latency_ms=%d",
-        result.response.model_name,
-        usage.input_tokens,
-        usage.output_tokens,
-        cost,
-        round((time.perf_counter() - started) * 1000),
-    )
-    checks = await asyncio.gather(
-        *(
-            pipeline.check_claim(c.claim, c.queries, deadline, exclude_url)
-            if c.checkable
-            else asyncio.sleep(0)
-            for c in checked_claims(result.output)
-        )
-    )
-    check = to_check_result(result.output, checks)
-    claim_costs = [c.cost_usd for c in checks if c]
-    check.cost_usd = None if None in [cost, *claim_costs] else cost + sum(claim_costs)
-    check.security_events = screen(text, location)
-    if result.output.injection_found:
-        check.security_events.append(SecurityEvent(location=location, detector="model"))
-        log.warning(
-            "security_event kind=prompt_injection location=%s detector=model", location
-        )
-    # The judge logs its own events (location "source"); one per check is enough.
-    check.security_events += [
-        e for c in checks if c for e in c.judgement.security_events
-    ][:1]
-    return check

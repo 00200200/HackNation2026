@@ -117,6 +117,10 @@ def test_five_claims_with_fast_sources_finish_under_budget(monkeypatch, models):
     assert {s.fragment for c in result.claims for s in c.sources} == {QUOTE}
     # Extraction (opus) plus rerank (haiku) and judge (sonnet) for each claim.
     assert result.cost_usd == pytest.approx(OPUS + 5 * (HAIKU + SONNET))
+    # The check log gets every model answer with its tokens, and the time of each step.
+    assert [m.model for m in result.model_calls].count("claude-sonnet-5-5") == 5
+    assert len(result.model_calls) == 11 and result.model_calls[0].input_tokens == 1000
+    assert {"rerank", "judge"} <= set(result.claims[0].steps_ms)
 
 
 def test_slow_search_leaves_the_late_claim_not_checked(monkeypatch, models):
