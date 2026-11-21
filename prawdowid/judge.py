@@ -44,7 +44,7 @@ MIN_QUOTE_WORDS = 3
 # ponytail: fixed list with common Polish endings, and any mention merges (errs to insufficient);
 # a provenance field from retrieval if this over- or under-merges.
 AGENCY = re.compile(
-    r"\b(PAP|IAR|Reuters|AFP|dpa|ISBnews|Bloomberg)(?:a|em|ie|u|owi|-u|-owi)?\b"
+    r"\b(PAP|IAR|Reuters?|AFP|dpa|ISBnews|Bloomberg)(?:a|em|ie|u|owi|-u|-owi)?\b"
 )
 # Folded away when matching quotes: typography only, never digits, signs or separators.
 TYPOGRAPHY = str.maketrans(
@@ -228,9 +228,12 @@ def find_quote(quote: str, text: str) -> str | None:
         if re.search(r"\w$", head) or re.match(r"\w", tail):
             continue
         # A quoted number may not be cut from a longer one: "-10", "10,5", "10 000", "10 %".
-        if q[lead].isdigit() and re.search(r"([-+]|\d[ .,])$", head):
+        # Only text outside the match counts: the quote's own "-" or "%" is part of the copy.
+        before = re.search(r"([-+]|\d[ .,])$", head)
+        if q[lead].isdigit() and before and before.start() < m.start():
             continue
-        if q[trail - 1].isdigit() and re.match(r"([.,]\d| ?%| \d)", tail):
+        after = re.match(r"([.,]\d| ?%| \d)", tail)
+        if q[trail - 1].isdigit() and after and after.end() > len(q) - trail:
             continue
         return text[index[m.start()] : index[m.end() - 1] + 1]
     return None
