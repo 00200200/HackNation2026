@@ -51,12 +51,14 @@ Basic requirements first: the jury gives no points for extras if one of these is
 ## Decisions
 
 - 2026-11-21: **PROPOSED, needs team OK** (#7). Web search for step 2b: **Tavily** `/search` as the provider, called
-  with `include_domains` (allowlist, `include_domains_mode=restrict`) and `language="pl"`, through the official
+  with `include_domains` (allowlist, `include_domains_mode=restrict`) and `language="pl"` (a ranking boost, not a
+  filter; `filter_by_language=True` makes it strict), through the official
   `tavily-python` SDK. Fallback on the same contract: **Exa** (`exa-py`, `includeDomains`, `userLocation="PL"`).
   Sources checked 2026-11-21. Reasons:
   - Official API, signup open, free tier of 1,000 credits a month without a card, which covers the demo and evals
     ([credits](https://docs.tavily.com/documentation/api-credits)).
-  - Native domain allowlist, up to 300 domains, plus an ISO language filter
+  - Native domain allowlist, up to 300 domains, plus an ISO 639-1 `language` boost that becomes a strict filter
+    with `filter_by_language=True`
     ([search API](https://docs.tavily.com/documentation/api-reference/endpoint/search)). Brave has only `site:` and
     Goggles ([docs](https://api-dashboard.search.brave.com/app/documentation/web-search/query)).
   - Exa is cheaper ($4 per 1k Lite, $10 free a month) and allows 1,200 domains, but has no language parameter
