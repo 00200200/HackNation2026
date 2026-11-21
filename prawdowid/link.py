@@ -26,6 +26,8 @@ import httpx2
 from pydantic import BaseModel
 
 log = logging.getLogger("prawdowid")
+# httpx2 logs every request URL at INFO, before redact() can run; fetch_page logs the redacted one.
+logging.getLogger("httpx2").setLevel(logging.WARNING)
 
 MAX_REDIRECTS = 3
 DEADLINE_S = 10
@@ -184,7 +186,7 @@ def is_social(url: str) -> bool:
 # "author" or "zipcode" stay readable for evidence exclusion.
 SECRET_PARAM = re.compile(
     r"(.*[_-])?(token|key|apikey|sig|signature|secret|auth|password|passwd|pwd|pass"
-    r"|session|sessionid|sid|code|credential|credentials|jwt)",
+    r"|session|session[_-]?id|sid|code|credential|credentials|jwt)",
     re.IGNORECASE,
 )
 
