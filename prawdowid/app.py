@@ -15,7 +15,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from prawdowid import checklog
+from prawdowid import checklog, faults
 from prawdowid.contract import CheckResult, Status
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
@@ -99,8 +99,10 @@ async def create_check(
     # Why a check ended in a technical error, for the check log; None when verify returned.
     error = None
     try:
-        async with asyncio.timeout(VERIFY_TIMEOUT_S):
-            result = await verify(body.input)
+        # Eval traffic only: honoured with the secret eval token, ignored for everyone else.
+        with faults.simulate(faults.requested(request.headers)):
+            async with asyncio.timeout(VERIFY_TIMEOUT_S):
+                result = await verify(body.input)
     except Exception as exc:
         log.exception("verify failed")
         error = "timeout" if isinstance(exc, TimeoutError) else type(exc).__name__

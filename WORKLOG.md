@@ -61,7 +61,7 @@ read `evals/results/HISTORY.md`, not only `latest.json`; check the commit and no
 
 Basic requirements first: the jury gives no points for extras if one of these is missing.
 
-- [ ] Eval fault switch for J01/J02 (`simulate` in `evals/cases.jsonl` is never applied; CodeRabbit PR #46). Owner: coordinator schedules.
+- [x] Eval fault switch for J01/J02 (#60): see the item below. Owner: Claude worker, branch `claude/60-63-outage-budget-2d8e30`.
 - [x] Merge `feat/llm-verifier` into `main`: done as #2 (`390d483`). Owner: Łukasz
 - [x] Step 1 (#5): self-contained claims, quote split, search queries per claim, top N checked, rest listed as not checked. Owner: Łukasz (Claude worker), branch `feat/5-self-contained-claims`, PR #22, merged into `main`.
 - [ ] Deployment: public demo on https://faktczyfejk.pl. Server (OVHcloud VPS-2, Limburg) and domain (OVHcloud)
@@ -94,8 +94,22 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Eval gaps to close once retrieval exists: C cases carry one Demagog rating each, not two credible sources
   disagreeing on the same measure; E cases put the injection in the submitted text, none in a fetched source page.
   Owner: ?
-- [ ] Eval-only fault switch for scenario J (`simulate` in `evals/cases.jsonl`: `factcheck_api_unavailable`,
-  `llm_unavailable`), passed by `evals/adapter.py` and honoured only for eval traffic. Owner: ?
+- [x] Eval-only fault switch for scenario J (#60): `simulate` in `evals/cases.jsonl` (`factcheck_api_unavailable`,
+  `llm_unavailable`) goes through `evals/adapter.py` as `X-Eval-Fault` plus `X-Eval-Token`;
+  `prawdowid/faults.py` honours it only when the server has `PRAWDOWID_EVAL_TOKEN` and it matches (unset on the
+  public demo: the headers do nothing). FC-J01/FC-J02 are no longer skipped. Owner: Claude worker. Open: not run
+  against a live product (no keys in the clone, #58); J01 passes live only if web search finds no usable evidence.
+- [x] Outage is not a verdict (#60): `websearch.WebSearch.failed` (provider failure only; zero hits and unreadable
+  pages are answers), `pipeline`: Fact Check down, or every web query failed, with not enough evidence gives
+  `nie sprawdzono` with the outage as the reason (`ClaimCheck.outage`); when every checkable claim hit an outage the
+  answer is `technical_error` with "Nie mogę teraz sprawdzić ...". Scenario D (all sources answered, nothing found)
+  stays `brak wystarczających dowodów`. Discord prints "Bez oceny: nie sprawdzono". Owner: Claude worker.
+- [x] URL input budget (#63): `PRAWDOWID_CHECK_BUDGET_S` 25 → 40 s (API limit 60 s) and
+  `PRAWDOWID_MAX_CHECKED_CLAIMS` 5 → 3, so they deploy with `prod`; eval cases U01/U02 take a URL. Owner: Claude worker.
+  Open: step times not measured live (no keys here); live check of the issue's gov.pl URL (≤ 30 s, one judged claim)
+  is still to do on the demo.
+- [x] Check log on a named volume `checklog` at `/var/lib/prawdowid` (#70). Owner: Claude worker. Open: not run
+  with `docker compose up` here.
 - [x] Scenario I (#12): `prawdowid/incidents.py` matches the input against the incident base on URL (canonical), flagged domain and text similarity (difflib, per sentence, ≥ `PRAWDOWID_INCIDENT_MIN_SIMILARITY` 0.7, a guess), result in `CheckResult.incident_matches`, added in `app.py` after `verify()` so it never touches a verdict; web form and Discord show it as a neutral note. Base path `PRAWDOWID_INCIDENTS_PATH`, default `prawdowid/data/incidents.json`, shipped **empty**: the organiser's file is not here yet, so nothing matches and the I eval cases show no warning. File format (JSON list or CSV: `id`, `text`, optional `url`, `domain`) is UNCONFIRMED. Owner: Łukasz (Claude worker), branch `LukiLenkiewicz/issue12-incidents`. Text match also needs word agreement (incident ≥ 3 content words, sentence holds ≥ 60% of their stems), URL parentheses kept; Docker: `PRAWDOWID_INCIDENTS_PATH=incidents/<file>` with `./incidents` (git-ignored) mounted read-only at `/app/incidents`. Open: load the organiser's file when it arrives, check its fields (a `url` without a scheme never matches), tune the threshold and measure difflib latency on it; a fetched page's text is not matched yet (only the typed URL and the final URL after redirects).
 - [x] Contract gaps for metrics (#15): `security_events` from two detectors, a fixed pattern pre-check in code and the extraction model's flag (events carry no wording; the pattern event and a "patterns only" limitation survive a failed model call) and `cost_usd` per answer (token usage priced by genai-prices through PydanticAI; 0.0 when no request was sent, null when unknown). Web and Discord show a notice when an event is logged. Not measured with a real key yet. Branch `LukiLenkiewicz/issue15-contract-metrics`. Owner: Łukasz (Claude worker)
 - [x] Link input (#4): safe fetch (http/https, SSRF guard on every connection incl. redirects and DNS, ≤ 3 redirects, 10 s, 2 MB, HTML via trafilatura, PDF via pypdf), page URL kept in `CheckResult.page` for later evidence exclusion. Merged to `main` as #28 (`e9a7f86`). Prompt injection found in a page is logged with `location="page"`. Owner: Łukasz (Claude worker). Open: page text cut to 5000 chars (same as pasted text, UNCONFIRMED choice); no eval case uses a URL yet.
@@ -198,6 +212,8 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - 2026-11-21: Corpus: `corpus/evidence.jsonl` in git is the auditable source of truth, rebuilt by `make corpus`; any search index is built from it. Full text only under a licence or terms that allow it, otherwise a fragment of at most 500 characters and the link. robots.txt and bot protection are always respected. Domains are counted with the Public Suffix List (all of www.gov.pl is one domain). (branch `claude/corpus-455bc1`)
 
 ## Log (newest first, append only)
+
+- 2026-11-22 Claude worker: #60 + #63 + #70 on `claude/60-63-outage-budget-2d8e30`: outage rule and technical error, `faults.py` eval switch, FC-J01/FC-J02 unskipped, Discord "Bez oceny", budget 40 s and 3 claims, URL eval cases U01/U02, `checklog` volume. ruff and pytest green offline; no live eval, no live timing.
 
 - 2026-11-21 Michał: web hero in the layout of doc2json.pl: centred name with the lens and a tagline over a white two-pane panel (check box with examples on the left, "Jak odpowiadamy" guide with verdict chips and the first words of each answer on the right); outlined echo removed; after a check the panel collapses to the box; field and chip borders at 3.9:1. Reviewer and a11y-reviewer findings fixed.
 - 2026-11-21 Michał: web UX pass against the brief: example questions back under the box, "bezpłatnie i bez konta", the waiting notice names the sources searched, a verdict summary and one-line meaning per verdict (the page has no legend), an archival flag on sources 5+ years old, time and model cost per answer when the API reports it.

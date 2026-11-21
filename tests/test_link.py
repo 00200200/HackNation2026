@@ -224,6 +224,7 @@ def test_unreachable_host_is_a_technical_error():
     assert refusal.technical
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_link_goes_through_the_same_verify_as_text(monkeypatch):
     net = FakeNet({"93.184.216.34": http()})
     real_fetch = link.fetch_page
@@ -304,6 +305,7 @@ def test_article_about_logging_in_is_not_a_paywall():
     assert page.title == "Rząd przyjął projekt"
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_long_page_is_cut_and_says_so(monkeypatch):
     long_page = link.Page(
         url="http://news.example/a",

@@ -73,6 +73,7 @@ def check(api, session="session-0001", channel="web"):
     return resp.json(), rec
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_a_successful_check_leaves_one_complete_record(api):
     body, rec = check(api, channel="discord")
     assert rec["channel"] == "discord" and rec["status"] == "ok"
@@ -84,8 +85,8 @@ def test_a_successful_check_leaves_one_complete_record(api):
         {"kind": "prompt_injection", "location": "input", "detector": "model"}
     ]
     [claim] = rec["claims"]
-    # Offline every source fails: the abstention and the search errors are in the record.
-    assert claim["verdict"] == "not_checked" and claim["limitations"]
+    # Every source answers with nothing: an abstention with its reason is in the record.
+    assert claim["verdict"] == "insufficient_evidence" and claim["limitations"]
     assert {"factcheck", "web"} <= set(claim["steps_ms"])
     # The log-only fields never reach a channel.
     assert "steps_ms" not in body and "model_calls" not in body

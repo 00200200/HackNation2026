@@ -77,6 +77,7 @@ def test_a_trailing_token_does_not_hide_a_number(text, masked):
     assert mask_personal_data(text) == masked
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_pesel_and_phone_masked_in_log_and_before_the_model(client, check_log, caplog):
     api, sent = client
     with caplog.at_level(logging.INFO, logger="prawdowid"):

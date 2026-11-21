@@ -73,7 +73,11 @@ def call(case: dict, channel: str) -> dict:
         adapter.wait_turn()  # rate limit; not counted as latency
         start = time.monotonic()
         try:
-            response, error = adapter.ask(case["input"], channel), None
+            # A case's `simulate` fault travels with the input; the adapter turns it into headers.
+            payload = dict(case["input"])
+            if case.get("simulate"):
+                payload["simulate"] = case["simulate"]
+            response, error = adapter.ask(payload, channel), None
         except (
             OSError,
             ValueError,
@@ -296,6 +300,10 @@ def summarize(per_case: list[dict]) -> dict:
     """Pass/fail counts per scenario and per case-set (FC-* vs A-J ids)."""
 
     def correct(row: dict) -> bool:
+        if (
+            row["expected_label"] == "status:ok"
+        ):  # unlabelled (URL cases): answered, no label
+            return not row["errors"] and row["status"][:1] == ["ok"]
         return (
             not row["errors"]
             and bool(row["predicted"])

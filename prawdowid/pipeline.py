@@ -10,9 +10,11 @@ found it, is context only. The candidates go to step 3 (`rerank.rerank`, the lin
 steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
 remains, the web is searched once more with a rewritten query and the claim is judged again.
 
-A source that fails adds a limitation; when every source failed, or the judge did not answer, the
-claim is not checked, never "brak wystarczających dowodów". A claim that runs out of time is not
-checked either, and keeps the limitations of the sources that had already failed. Every step's
+A source that fails adds a limitation. The sources that can decide a verdict (Fact Check, web
+search) are the ones whose outage matters: when one of them failed and the evidence is not enough,
+when every source failed, or when the judge did not answer, the claim is not checked and the
+outage is the reason, never "brak wystarczających dowodów" (`ClaimCheck.outage`, which turns an
+all-outage answer into a technical error). A claim that runs out of time is not checked either, and keeps the limitations of the sources that had already failed. Every step's
 time goes to the log; the reranker and judge calls are priced like the extraction call.
 """
 
@@ -25,14 +27,15 @@ from pydantic import BaseModel
 from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
-from prawdowid import euvsdisinfo, factcheck, govpl, judge, rerank, websearch
+from prawdowid import euvsdisinfo, factcheck, faults, govpl, judge, rerank, websearch
 from prawdowid.contract import ModelCall, Source, Verdict
 
 log = logging.getLogger("prawdowid")
 
 # Hyperparameters, first guesses for the 30 s median, not tuned.
-# Whole check, from the request to the last verdict (the API gives up at 60 s).
-CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 25)
+# Whole check, from the request to the last verdict (the API gives up at 60 s, nginx at 75 s).
+# 25 s left a long page with no judged claim (#63): extraction alone takes much of it.
+CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 40)
 # The retry starts only with at least this much time left: a web search, rerank and judge again.
 RETRY_MIN_S = float(os.getenv("PRAWDOWID_RETRY_MIN_S") or 18)
 # EUvsDisinfo only adds context: it may not hold up the claim for its own 15 s deadline.
@@ -51,9 +54,16 @@ RETRY_UNJUDGED = (
     "Dodatkowe wyszukiwanie znalazło strony, ale model nie zdążył ich ocenić, "
     "więc ocena opiera się tylko na pierwszym wyszukiwaniu."
 )
+FACTCHECK_DOWN = "bazy Google Fact Check"
+WEB_DOWN = "wyszukiwarki internetowej"
+OUTAGE = (
+    "Nie mogę teraz sprawdzić {what} z powodu błędu dostępu. To awaria techniczna, "
+    "a nie wynik sprawdzenia: nie wydajemy werdyktu, a brak odpowiedzi nie znaczy, "
+    "że nic nie znaleziono."
+)
 SOURCES_FAILED = (
-    "Nie sprawdzono: żadne źródło nie zwróciło wyników ani nie odpowiedziało, "
-    "więc nie wydajemy werdyktu."
+    "Nie mogę teraz sprawdzić tego twierdzenia: żadne źródło nie odpowiedziało ani nie dało się "
+    "odczytać. To awaria techniczna, a nie wynik sprawdzenia: nie wydajemy werdyktu."
 )
 
 
@@ -63,6 +73,9 @@ class ClaimCheck(BaseModel):
     cost_usd: float | None
     steps_ms: dict[str, int]
     model_calls: list[ModelCall] = []
+    # The claim is not checked because a source or the model was down: a technical failure of
+    # the check, not a time limit.
+    outage: bool = False
 
 
 async def check_claim(
@@ -134,16 +147,23 @@ async def check_claim(
             cut = True
 
     limits = _limits(found)
+    outage = judgement.verdict is Verdict.NOT_CHECKED  # the judge did not answer
+    down = _deciders_down(found)
     if len(limits) == len(found) and not candidates:  # every source failed
+        outage = not cut
         reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
         judgement = _not_checked(reason)
+    elif down and _needs_more(judgement):
+        # Not "no evidence exists": the source that could have had it did not answer.
+        outage = True
+        judgement = _not_checked(OUTAGE.format(what=" ani ".join(down)))
     # The main reason first, then what each source said.
     reasons = judgement.limitations if judgement.verdict is Verdict.NOT_CHECKED else []
     judgement.limitations = list(
         dict.fromkeys([*reasons, *limits.values(), *judgement.limitations])
     )
     judgement.security_events = events[:1]  # same kind and location: one is enough
-    return _done(claim, judgement, runs, steps)
+    return _done(claim, judgement, runs, steps, outage)
 
 
 async def _retrieve(
@@ -227,6 +247,17 @@ def _limits(found: dict) -> dict[str, str]:
     return {k: v for k, v in limits.items() if v}
 
 
+def _deciders_down(found: dict) -> list[str]:
+    """The sources that can decide a verdict and failed (not: answered with no hits)."""
+    down = []
+    if "factcheck" in found and found["factcheck"].limitation:
+        down.append(FACTCHECK_DOWN)
+    # Every query failed at the provider: one query that found nothing is an answer.
+    if found["web"] and all(w.failed for w in found["web"]):
+        down.append(WEB_DOWN)
+    return down
+
+
 def _time_limit(found: dict) -> judge.Judgement:
     judgement = _not_checked(TIME_LIMIT.format(budget=CHECK_BUDGET_S))
     judgement.limitations += _limits(found).values()
@@ -242,7 +273,7 @@ async def _search_web(query: str) -> websearch.WebSearch:
         )
     except Exception:
         log.exception("web search failed query=%r", query)
-        return websearch.WebSearch(limitation=websearch.SEARCH_UNAVAILABLE)
+        return websearch.WebSearch(limitation=websearch.SEARCH_UNAVAILABLE, failed=True)
 
 
 async def _search_govpl(queries: list[str]) -> websearch.WebSearch:
@@ -254,6 +285,8 @@ async def _search_govpl(queries: list[str]) -> websearch.WebSearch:
 
 
 async def _search_claims(claim: str) -> factcheck.FactCheckLookup:
+    if faults.active(faults.FACTCHECK_UNAVAILABLE):  # eval traffic only, see faults.py
+        return factcheck.FactCheckLookup(limitation=factcheck.LOOKUP_UNAVAILABLE)
     try:
         return await factcheck.search_claims(claim)
     except Exception:
@@ -366,6 +399,7 @@ def _done(
     judgement: judge.Judgement,
     runs: list[list[ModelMessage]],
     steps: dict[str, int],
+    outage: bool = False,
 ) -> ClaimCheck:
     costs = [_cost(m) for m in runs]
     cost = None if None in costs else sum(costs)
@@ -381,6 +415,7 @@ def _done(
         judgement=judgement,
         cost_usd=cost,
         steps_ms=steps,
+        outage=outage,
         model_calls=[
             model_call(r) for m in runs for r in m if isinstance(r, ModelResponse)
         ],

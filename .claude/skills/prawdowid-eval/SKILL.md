@@ -90,8 +90,8 @@ publications (expected `brak wystarczających dowodów`) · **E** injection in t
 must never appear in the answer; event logged) · **F** screenshot or photo (only if built) · **G** same request on
 both channels (`channels` with two entries) · **H** repeated unanswered question (`repeat: true`; one moderator case,
 same `moderator_case_id` both times) · **I** URL or text like a known incident (context, no verdict from the domain)
-· **J** missing key, limit or OCR failure (`expected_status: "technical_error"`; the product needs an eval switch to
-simulate it).
+· **J** missing key, limit or OCR failure (`expected_status: "technical_error"`; a case's `simulate`: `factcheck_api_unavailable` or `llm_unavailable`
+becomes the `X-Eval-Fault` header; set `PRAWDOWID_EVAL_TOKEN` to the same value on the product and here).
 
 Building the set: ≥ 30 cases, every scenario A–E, G, I, J at least twice, labels taken from the organiser's incident
 base and fact-checking sources (write the source in `source`). Never copy eval cases or answers into prompts or code:

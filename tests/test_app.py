@@ -58,13 +58,14 @@ def test_link_to_a_private_address_is_a_notice(client):
     assert resp.json()["status"] == "cannot_check"
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_text_returns_claims_with_labels(client):
     resp = client.post("/api/checks", json={"input": "  Fakt i opinia.  "})
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
     assert [c["verdict_label"] for c in body["claims"]] == [
-        "nie sprawdzono",
+        "brak wystarczających dowodów",
         "nie podlega weryfikacji",
     ]
     assert body["claims"][0]["source_sentence"] == "Fakt."

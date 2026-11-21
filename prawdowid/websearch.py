@@ -84,8 +84,7 @@ PAGE_BUDGET_S = float(
 SAVE_BUDGET_S = 10  # saving every fetched page to the source store
 
 SEARCH_UNAVAILABLE = (
-    "Wyszukiwarka internetowa nie odpowiedziała albo nie zwróciła wyników, "
-    "więc nie szukaliśmy źródeł w sieci."
+    "Wyszukiwarka internetowa nie odpowiedziała, więc nie szukaliśmy źródeł w sieci."
 )
 NOTHING_FETCHED = (
     "Wyszukiwarka znalazła strony, ale żadnej nie udało się pobrać i odczytać, "
@@ -169,6 +168,9 @@ class WebSearch(BaseModel):
     documents: list[Document] = []
     # Set when search or every fetch failed; goes to ClaimResult.limitations.
     limitation: str | None = None
+    # True only when the provider failed (bad or missing key, HTTP error, quota, timeout). A search
+    # that found nothing, or pages that could not be read, is an answer: "no evidence", not an outage.
+    failed: bool = False
 
 
 def allowed(url: str) -> Domain | None:
@@ -208,10 +210,12 @@ async def search_web(
         mask_personal_data(query), domains, limit * 2 if skip_hosts else limit, provider
     )
     if hits is None:
-        return WebSearch(limitation=SEARCH_UNAVAILABLE)
+        return WebSearch(limitation=SEARCH_UNAVAILABLE, failed=True)
     by_url = {h.url: h for h in hits if allowed(h.url)}
-    if not by_url:
-        return WebSearch(limitation=SEARCH_UNAVAILABLE)
+    if (
+        not by_url
+    ):  # the provider answered, with nothing on the allowlist: found nothing
+        return WebSearch()
     by_url = {
         u: h
         for u, h in by_url.items()

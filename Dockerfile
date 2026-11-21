@@ -20,7 +20,7 @@ COPY prawdowid ./prawdowid
 COPY corpus/evidence.jsonl ./corpus/evidence.jsonl
 ENV FASTEMBED_CACHE_PATH=/models \
     HF_HOME=/models/hf
-RUN mkdir -p /models && chown nobody /models
+RUN mkdir -p /models /var/lib/prawdowid && chown nobody /models /var/lib/prawdowid
 
 USER nobody
 EXPOSE 8000
