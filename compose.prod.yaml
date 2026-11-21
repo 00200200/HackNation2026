@@ -1,6 +1,6 @@
 # Production overlay for the public demo: Caddy terminates HTTPS in front of the nginx frontend,
 # Postgres with pgvector holds the data. On the server, .env sets COMPOSE_FILE=compose.yaml:compose.prod.yaml,
-# so plain `docker compose up -d --build` loads both files. Deploys: .github/workflows/deploy.yml, docs/deploy.md.
+# so plain `docker compose up -d --build` loads both files. Deploys: deploy/pull-deploy.sh, docs/deploy.md.
 services:
   caddy:
     image: caddy:2.11-alpine

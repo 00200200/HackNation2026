@@ -9,7 +9,7 @@ Rules and jury criteria: `.claude/skills/hacknation-judging/SKILL.md`. Metrics: 
 
 ## Now (snapshot, edit in place)
 
-Updated: 2026-11-21 19:40, by Michał (via Claude).
+Updated: 2026-11-21 20:35, by Michał (via Claude).
 
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
@@ -20,11 +20,13 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 
 | Branch | State |
 |---|---|
-| `main` / `origin/main` | at `189f443`: skeleton (#1), verifier (#2), worklog (#3), web UI and eval set (#29), Tavily proposal (#20), Fact Check lookup (#21). |
+| `main` / `origin/main` | at `75c1583`: skeleton (#1), verifier (#2), worklog (#3), web UI and eval set (#29), Tavily proposal (#20), Fact Check lookup (#21), deploy config (#32), self-contained claims (#22), FC eval cases (#23), pitch-deck web UI (#35). |
 | `feat/ui-frontend` | merged into `main` as #29. |
 | `feat/7-search-provider` | #7 search provider research, WORKLOG only. Merged into `main` as #20. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
-| `claude/deploy-config-43a484` | Deploy config: `compose.prod.yaml` (Caddy, HTTPS, Postgres with pgvector), `caddy/Caddyfile`, `.github/workflows/deploy.yml`, `docs/deploy.md`. Goes to `main` through a PR. |
+| `claude/deploy-config-43a484` | Deploy config, merged into `main` as #32. |
+| `claude/pull-deploy` | Deploy by pulling `prod` on the server (`deploy/`), Actions workflow removed. |
+| `prod` | What runs on https://faktczyfejk.pl. Only takes commits already on `main` (`docs/deploy.md`). |
 
 **Last eval** (`evals/results/latest.json`, **full, no corpus**, 30 scored cases from `evals/cases.jsonl`, J01–J02 skipped,
 commit `3ce9bae`). Does **not** count for submission: the cache-corpus run is blocked (no corpus yet) and `coverage_ok` is false
@@ -43,9 +45,10 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [x] Step 1 (#5): self-contained claims, quote split, search queries per claim, top N checked, rest listed as not checked. Owner: Łukasz (Claude worker), branch `feat/5-self-contained-claims`, PR #22, merged into `main`.
 - [ ] Deployment: public demo on https://faktczyfejk.pl. Server (OVHcloud VPS-2, Limburg) and domain (OVHcloud)
   bought; DNS A records for the domain and `www` point at the server. The stack (Caddy, nginx, API, Postgres) runs
-  there from `claude/deploy-config-43a484`, HTTPS checked from outside; GitHub variables and the `DEPLOY_SSH_KEY`
-  secret are set. Open: Anthropic key in the server's `.env`, PR into `main`, `prod` branch and the first Actions
-  deploy (`docs/deploy.md`). Owner: Michał
+  there from `prod` (#32), HTTPS checked from outside. Deploys: the server pulls `prod` every minute
+  (`claude/pull-deploy`, replaces the Actions workflow); its read-only deploy key `faktczyfejk-vps` is in GitHub.
+  Open: Anthropic key in the server's `.env`, the timer on the server once this is on `prod` (`docs/deploy.md`).
+  Owner: Michał
 - [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: ?
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
@@ -124,14 +127,21 @@ Basic requirements first: the jury gives no points for extras if one of these is
   Typeface: Figtree (SIL OFL), self-hosted in `frontend/public/fonts/` because the CSP allows no font hosts; the web
   hero and the pitch deck share the same look (giant title with an outlined echo, chat preview, verdict card).
 - 2026-11-21: Public demo on one EU VPS (OVHcloud VPS-2, Limburg, Germany) with `docker compose` and Caddy
-  (automatic HTTPS) in front of nginx. No Vercel. A push to `prod` deploys through GitHub Actions; `prod` only
-  takes commits already on `main`. DNS has only an A record: behind Docker's userland proxy all IPv6 visitors
-  would share one rate-limit bucket. (`claude/deploy-config-43a484`)
+  (automatic HTTPS) in front of nginx. No Vercel. A push to `prod` deploys (GitHub Actions at first, replaced
+  below); `prod` only takes commits already on `main`. DNS has only an A record: behind Docker's userland proxy all
+  IPv6 visitors would share one rate-limit bucket. (`claude/deploy-config-43a484`)
+- 2026-11-21 (Michał): no GitHub Actions, the account's Actions jobs are blocked by billing. The server fetches
+  `prod` every minute (systemd timer, `deploy/pull-deploy.sh`) with a read-only deploy key and runs
+  `docker compose up --build --wait`. (`claude/pull-deploy`)
 - 2026-11-21: Database: Postgres 18 with pgvector 0.8.7 and pg_trgm as the `db` service next to the app on the VPS,
   no Supabase. Tables and corpus loading belong to the search work. (`claude/deploy-config-43a484`)
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał (via Claude): merged #29, #20, #21 (WORKLOG conflicts resolved, judge PASS each) and #32 (deploy
+  config); `prod` created at `8ff84db`. The Actions deploy job was not started (account billing), so `prod` was
+  deployed by hand; new UI live on https://faktczyfejk.pl. `claude/pull-deploy`: deploy by pulling `prod` on the server.
+  Actions leftovers removed: the `DEPLOY_*` variables, the `DEPLOY_SSH_KEY` secret and the CI key on the server.
 - 2026-11-21 Michał: web answer in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić tej informacji." plus sources), the same text in copy-to-chat; example chips use the organiser's questions.
 - 2026-11-21 Michał: web UI matched to the pitch deck: Figtree, flat red hero with the outlined title echo, labelled chat preview, verdict card with sources one per row and quotes on a red rule.
 - 2026-11-21 Łukasz (Claude worker): merged `main` into `feat/16-eval-set` (PR #23); both eval sets kept, #16 cases renamed `FC-*` (73 cases). Quick eval on `69f1f82`: abstention 1.00, median 4.1 s, macro_f1 0.10, end_to_end 0.89.
