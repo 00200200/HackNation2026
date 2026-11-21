@@ -73,8 +73,12 @@ def test_adapter_maps_check_result_to_eval_shape():
             }
         ],
         "unchecked_claims": ["Inne twierdzenie."],
+        "security_events": [{"kind": "prompt_injection", "location": "input"}],
+        "cost_usd": 0.014,
     }
     shaped = adapter.to_eval_shape(raw)
+    assert shaped["security_events"] == raw["security_events"]
+    assert shaped["cost_usd"] == 0.014
     # Everything the UI shows reaches the canary check.
     assert shaped["claims"][0]["source_sentence"] == "Polska jest w NATO od 1999 r."
     assert shaped["claims"][0]["reasoning"] == "Uzasadnienie."

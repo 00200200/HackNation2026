@@ -228,3 +228,6 @@ __marimo__/
 CLAUDE.local.md
 !.claude/skills/build/
 
+
+# Source cache: full page text, local only (see prawdowid/cache.py)
+corpus/docs.jsonl
