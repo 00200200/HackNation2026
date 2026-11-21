@@ -125,7 +125,6 @@ narrative. It is context: the verdict rules never count it as a reliable source 
 
 | Domain | Publisher | Type | Why it qualifies | Licence (check) |
 |---|---|---|---|---|
-| `demagog.org.pl` | Demagog | `fact_check` | Polish fact-checker; IFCN or EFCSN membership UNCONFIRMED | UNCONFIRMED |
 | `konkret24.tvn24.pl` | Konkret24 | `fact_check` | fact-checking desk of TVN24; membership UNCONFIRMED | UNCONFIRMED |
 | `fakenews.pl` | FakeNews.pl | `fact_check` | Polish fact-checker; membership UNCONFIRMED | UNCONFIRMED |
 | `sprawdzam.afp.com` | AFP Sprawdzam | `fact_check` | AFP's Polish fact-checking service; membership UNCONFIRMED | UNCONFIRMED |

@@ -17,7 +17,7 @@ rules:
     - Full text only under a licence or terms that allow it (CC BY-SA 4.0, reuse with attribution, legal acts outside copyright). Each document carries its licence.
     - Otherwise metadata, a fragment of at most 500 characters and the link.
     - No images, audio or video. E-mail addresses are masked. Job adverts are skipped (they list contact persons and are not evidence).
-    - Who made a claim, and where, is stored only for public statements of public figures (Demagog's statements section), never for posts of private people.
+    - "Who made a reviewed claim, and where, is never stored: it is often a private person."
   update:
     - Each entry has an update interval. `make corpus` fetches again every list, feed and API answer older than that interval; article pages stay cached until `make corpus ARGS=--refresh`. At most about one request per second per registered domain, with a generic User-Agent.
     - A source that fails or is blocked keeps its records from the previous build, and the manifest says so. A build that misses a threshold writes nothing.
@@ -26,6 +26,7 @@ rules:
   exclude:
     - "robots.txt disallows the path, the site answers with a bot challenge or refuses automated clients, or the content exists only in a script-rendered app. Exception, recorded in the entry: an official portal whose own pages load the content from a public JSON endpoint without a login; then we read that JSON."
     - The source is dead or blocked for longer than one update interval, loses its IFCN or EFCSN status, or changes its terms so that a fragment may no longer be stored.
+    - A team decision can also exclude a source (for example to take it only through an aggregator).
     - Excluded entries stay in this file with the reason and the date. A single document is removed by adding it to `removed_urls` and rebuilding.
 
 # Documents removed on request or after a correction: {url, reason, removed_on}.
@@ -289,37 +290,21 @@ sources:
     params: {feeds: ["https://kgsok.pl/feed/", "https://kgsok.pl/feed/?paged=2", "https://kgsok.pl/feed/?paged=3"]}
 
   # ---- Reliable secondary sources: fact-checkers -----------------------------------------
-  - &demagog
-    id: demagog-fake-news
+  - id: demagog
     domain: demagog.org.pl
     publisher: Stowarzyszenie Demagog
     source_type: fact_checker
-    licence: "Brak licencji; robots.txt: search=yes, use=reference. Metadane, ocena, fragment do 500 znaków, link"
+    licence: "Brak licencji; robots.txt: search=yes, use=reference"
     licence_url: https://demagog.org.pl/robots.txt
     licence_checked: 2026-11-21
-    storage: excerpt
-    access: RSS feed pages (?paged=N) for discovery, then the ClaimReview markup, the summary and the cited links of each page
-    update_interval: 24h
+    storage: none
+    access: none (its ClaimReview records come through google-factcheck below)
+    update_interval: "-"
     added: 2026-11-21
-    status: active
-    note: EFCSN verified member, valid until 2027-05-25 (members.efcsn.com/organization/demagog, read 2026-11-21). IFCN signatory according to Demagog; IFCN's own list could not be read automatically (UNCONFIRMED).
-    collector: claim_reviews
-    params:
-      feeds: ["https://demagog.org.pl/fake_news/feed/"]
-      pages: 15
-      summary_xpath: '//div[contains(@class, "summary-text")]'
-  - <<: *demagog
-    id: demagog-wypowiedzi
-    params:
-      feeds: ["https://demagog.org.pl/wypowiedzi/feed/"]
-      pages: 15
-      summary_xpath: '//div[contains(@class, "summary-text")]'
-      public_claimants: true
-  - <<: *demagog
-    id: demagog-analizy
-    access: RSS feed (title, date and summary)
-    collector: feed
-    params: {feeds: ["https://demagog.org.pl/feed/"], drop: "Artykuł .{0,300}? pochodzi z serwisu Demagog\\s*\\."}
+    status: excluded
+    excluded_on: 2026-11-21
+    excluded_reason: Team decision; no direct integration. Demagog's ratings reach us only as ClaimReview records through the Google Fact Check Tools API (entry google-factcheck), with the claim, the verbatim rating and the link.
+    note: EFCSN verified member, valid until 2027-05-25 (members.efcsn.com/organization/demagog, read 2026-11-21).
   - id: pravda
     domain: pravda.org.pl
     publisher: Stowarzyszenie Pravda
@@ -346,7 +331,7 @@ sources:
     update_interval: 24h
     added: 2026-11-21
     status: active
-    note: Named by the organiser. Needs a key from a Google Cloud project; not run yet, so the response shape is UNVERIFIED against the live API. Only publishers admitted above are queried.
+    note: Named by the organiser. Needs a key from a Google Cloud project; not run yet, so the response shape is UNVERIFIED against the live API. Only fact-checkers with an EFCSN or IFCN status recorded in this file are queried (Demagog, Pravda).
     collector: google_factcheck
     requires_env: GOOGLE_FACTCHECK_API_KEY
     params: {publisher_sites: [demagog.org.pl, pravda.org.pl], max_pages: 3}

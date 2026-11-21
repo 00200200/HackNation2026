@@ -63,7 +63,6 @@ ALLOWLIST = {
     "euvsdisinfo.eu": Domain("disinfo_database", "EUvsDisinfo (ESDZ)"),
     "nato.int": Domain("official", "NATO"),
     "who.int": Domain("official", "Światowa Organizacja Zdrowia"),
-    "demagog.org.pl": Domain("fact_check", "Demagog"),
     "konkret24.tvn24.pl": Domain("fact_check", "Konkret24"),
     "fakenews.pl": Domain("fact_check", "FakeNews.pl"),
     "sprawdzam.afp.com": Domain("fact_check", "AFP Sprawdzam"),
