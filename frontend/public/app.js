@@ -1,7 +1,6 @@
 // Web channel: send the input to the API and render CheckResult. No verification logic here.
 const form = document.getElementById("check-form");
 const input = document.getElementById("input");
-const count = document.getElementById("count");
 const submit = document.getElementById("submit");
 const formError = document.getElementById("form-error");
 const result = document.getElementById("result");
@@ -330,12 +329,7 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-function updateCount() {
-  count.textContent = chars(input.value);
-}
-
-updateCount();
-input.addEventListener("input", () => { updateCount(); fieldError(""); });
+input.addEventListener("input", () => fieldError(""));
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing && ENTER_SENDS.matches) {
     event.preventDefault();
@@ -346,7 +340,6 @@ input.addEventListener("keydown", (event) => {
 chips.forEach((chip) => chip.addEventListener("click", () => {
   if (busy) return;
   input.value = chip.dataset.example;
-  updateCount();
   form.requestSubmit();
 }));
 
