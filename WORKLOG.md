@@ -61,6 +61,7 @@ read `evals/results/HISTORY.md`, not only `latest.json`; check the commit and no
 
 Basic requirements first: the jury gives no points for extras if one of these is missing.
 
+- [ ] After the next full eval, run `uv run python -m evals.split_report` and put the FC-* row next to the overall numbers in README (#91). Owner: unassigned.
 - [ ] Eval fault switch for J01/J02 (`simulate` in `evals/cases.jsonl` is never applied; CodeRabbit PR #46). Owner: coordinator schedules.
 - [x] Merge `feat/llm-verifier` into `main`: done as #2 (`390d483`). Owner: Łukasz
 - [x] Step 1 (#5): self-contained claims, quote split, search queries per claim, top N checked, rest listed as not checked. Owner: Łukasz (Claude worker), branch `feat/5-self-contained-claims`, PR #22, merged into `main`.
@@ -199,6 +200,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-22 Claude workflow: eval leakage test (`tests/test_eval_leakage.py`, in `make check`), `evals/split_report.py` for the FC-* held-out split, provenance and leakage notes in `docs/eval-notes.md` and the eval skill; no product code (#91, branch `claude/91-eval-leakage-wf`).
 - 2026-11-21 Michał: web: the session paragraph under the answer is gone (user request); "Usuń moje sprawdzenia" now sits at the end of the note under the box and appears once a session exists, so deletion (brief §5) stays.
 - 2026-11-21 Michał: web hero in the layout of doc2json.pl: centred name with the lens and a tagline over a white two-pane panel (check box with examples on the left, "Jak odpowiadamy" guide with verdict chips and the first words of each answer on the right); outlined echo removed; after a check the panel collapses to the box; field and chip borders at 3.9:1. Reviewer and a11y-reviewer findings fixed.
 - 2026-11-21 Michał: web UX pass against the brief: example questions back under the box, "bezpłatnie i bez konta", the waiting notice names the sources searched, a verdict summary and one-line meaning per verdict (the page has no legend), an archival flag on sources 5+ years old, time and model cost per answer when the API reports it.

@@ -70,3 +70,17 @@ smoke test against plain DuckDuckGo got 0/8.
 - Add gov.pl search as a source.
 - `injection_resistance` (0.571 in Run 2) was identical with and without search in that run: it is
   not a retrieval problem, so look at the judge/decide logic instead.
+
+## How the cases were made, and the leakage check (#91)
+
+Cases in `evals/cases.jsonl` were written and labelled from sources, never from our system's answers: each
+case's `source` field names the fact-check rating, official page or quote the label comes from, with the date it was
+checked. The `FC-*` cases were written by a different person and never used while tuning prompts or rules, so
+they are the closest stand-in for the jury's hidden comparison set; read their numbers apart from the A-J cases.
+`tests/test_eval_leakage.py` runs in `make check` and fails when a case input, a quote cited in a `source` field
+(both compared as word 8-grams after folding case, whitespace and quotes), a case id or a canary string appears in
+any file under `prawdowid/`; it prints the file and the offending n-gram. It checks product files only, so a test
+fixture may still copy a case. `uv run python -m evals.split_report [results.json]` reads a results file
+(default `evals/results/latest.json`) and prints cases, errored cases, accuracy, macro_f1, abstention and median
+latency for the FC-* group and for the rest. Per-case rows carry no cost, citations or canary flags, so the
+split shows only those metrics; an `FC-*` row of 0 cases means the run did not include them (quick mode).
