@@ -9,7 +9,7 @@ Rules and jury criteria: `.claude/skills/hacknation-judging/SKILL.md`. Metrics: 
 
 ## Now (snapshot, edit in place)
 
-Updated: 2026-11-21 17:15, by Michał (via Claude).
+Updated: 2026-11-21 19:40, by Michał (via Claude).
 
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
@@ -20,10 +20,11 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 
 | Branch | State |
 |---|---|
-| `main` / `origin/main` | at `7ee1410`: skeleton (#1), PydanticAI verifier (#2), worklog and eval results (#3). |
-| `feat/ui-frontend` | ADR 0001, brand files, new web UI (`04d27db`), merged `feat/eval-cases` (`80a3ee0`). Pushed to `origin/feat/ui-frontend`, not merged into `main`. Backend unchanged. |
+| `main` / `origin/main` | at `189f443`: skeleton (#1), verifier (#2), worklog (#3), web UI and eval set (#29), Tavily proposal (#20), Fact Check lookup (#21). |
+| `feat/ui-frontend` | merged into `main` as #29. |
 | `feat/7-search-provider` | #7 search provider research, WORKLOG only. Merged into `main` as #20. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
+| `claude/deploy-config-43a484` | Deploy config: `compose.prod.yaml` (Caddy, HTTPS, Postgres with pgvector), `caddy/Caddyfile`, `.github/workflows/deploy.yml`, `docs/deploy.md`. Goes to `main` through a PR. |
 
 **Last eval** (`evals/results/latest.json`, quick, 4 example cases, commit `c27b642`, does not count for submission):
 macro_f1 0.33 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail), median latency 2.6 s,
@@ -38,6 +39,11 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 - [x] Merge `feat/llm-verifier` into `main`: done as #2 (`390d483`). Owner: Łukasz
 - [x] Step 1 (#5): self-contained claims, quote split, search queries per claim, top N checked, rest listed as not checked. Owner: Łukasz (Claude worker), branch `feat/5-self-contained-claims`, PR #22, merged into `main`.
+- [ ] Deployment: public demo on https://faktczyfejk.pl. Server (OVHcloud VPS-2, Limburg) and domain (OVHcloud)
+  bought; DNS A records for the domain and `www` point at the server. The stack (Caddy, nginx, API, Postgres) runs
+  there from `claude/deploy-config-43a484`, HTTPS checked from outside; GitHub variables and the `DEPLOY_SSH_KEY`
+  secret are set. Open: Anthropic key in the server's `.env`, PR into `main`, `prod` branch and the first Actions
+  deploy (`docs/deploy.md`). Owner: Michał
 - [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: ?
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
@@ -96,7 +102,8 @@ Basic requirements first: the jury gives no points for extras if one of these is
     Tavily figure. LLM cost is not included.
 - 2026-11-21: The model never decides truth. It extracts claims; verdicts are set in code from evidence. (`b52c248`)
 - 2026-11-21: Model through PydanticAI, default `anthropic:claude-opus-5-5`, swappable with `PRAWDOWID_MODEL`. (`b52c248`)
-- 2026-11-21: No database for now; each check is logged to stdout. Storage UNDECIDED. (`96f3b46`)
+- 2026-11-21: No database for now; each check is logged to stdout. Storage UNDECIDED. (`96f3b46`) Superseded by the
+  Postgres decision below; the application still stores nothing.
 - 2026-11-21: Frontend is static HTML/CSS/JS behind nginx, no build step; backend is JSON only. (`96f3b46`)
 - 2026-11-21: Every push goes through `.githooks/pre-push` (ruff, pytest, eval, judge PASS). (`d5aa35b`)
 - 2026-11-21 (Michał): Retrieval flow. Source domains are indexed ahead of time (fetch with trafilatura, store publication and
@@ -111,13 +118,24 @@ Basic requirements first: the jury gives no points for extras if one of these is
   navy hat. Vector files without font dependencies in `docs/brand/` (`znak.svg`, `znak-na-czerwonym.svg` for red
   backgrounds, `awatar.svg` for the Discord bot); `frontend/public/favicon.svg` uses `znak.svg`. Tagline: "Fakt ma
   przypis." We never claim to be "the source of truth": the brief rules out the role of an automatic judge of truth.
+- 2026-11-21: Public demo on one EU VPS (OVHcloud VPS-2, Limburg, Germany) with `docker compose` and Caddy
+  (automatic HTTPS) in front of nginx. No Vercel. A push to `prod` deploys through GitHub Actions; `prod` only
+  takes commits already on `main`. DNS has only an A record: behind Docker's userland proxy all IPv6 visitors
+  would share one rate-limit bucket. (`claude/deploy-config-43a484`)
+- 2026-11-21: Database: Postgres 18 with pgvector 0.8.7 and pg_trgm as the `db` service next to the app on the VPS,
+  no Supabase. Tables and corpus loading belong to the search work. (`claude/deploy-config-43a484`)
 
 ## Log (newest first, append only)
 
 - 2026-11-21 Łukasz (Claude worker): merged `main` (#29 web UI) into `feat/5-self-contained-claims`; claim origin line and unchecked-claims list ported into the new UI. Quick eval on `6689ad6`: abstention 1.00, median 3.87 s, macro_f1 0.10, end_to_end 0.89 (no sources yet).
-
 - 2026-11-21 Łukasz (Claude worker): #5 review fixes on PR #22: reject hyperparameters below 1, latency numbers marked UNCONFIRMED, quote test fixture uses only names from its input.
 - 2026-11-21 Łukasz (Claude worker): #5 claims stand alone (pronouns, relative dates from the text), quotes split into attribution + quoted, queries per claim, top-N cap with `unchecked_claims`, source sentence shown in the UI. Branch `feat/5-self-contained-claims`.
+- 2026-11-21 Michał (via Claude): deploy config on `claude/deploy-config-43a484` (`compose.prod.yaml`,
+  `caddy/Caddyfile`, deploy workflow for `prod`, `docs/deploy.md`, README pointers). Compose files and the workflow
+  pass their JSON schemas; reviewed. Bought OVHcloud VPS-2 and faktczyfejk.pl; DNS A records point at the server.
+  Server: Docker 29.10, Compose 5.8, stack up with `--wait`; Let's Encrypt certificate, www redirect, 429 on the 11th
+  check and a spoofed X-Forwarded-For ignored (checked over HTTPS); Postgres with vector 0.8.7 and pg_trgm 1.6,
+  `pg_dump`/`pg_restore` tested.
 - 2026-11-21 Michał: web UI accessibility pass from the `a11y-reviewer` and `web-design-guidelines` audits: focus kept during a check, no aria-busy, aria-invalid on errors, Enter sends only with a hardware keyboard, long URLs wrap, Polish source-type labels, chip hover contrast.
 - 2026-11-21 Michał: UI tooling in `.claude/`: `web-design-guidelines` skill (Vercel Web Interface Guidelines, MIT, pinned copy) and `a11y-reviewer` agent (WCAG 2.2 AA, read-only); CLAUDE.md workflow row.
 - 2026-11-21 Michał: pushed `feat/ui-frontend` (UI, ADR, brand, eval set) after a judge check; no eval rerun, the API code is unchanged and this clone has no model key.
