@@ -91,8 +91,9 @@ class SecurityEvent(BaseModel):
     """Instructions aimed at the model were found and ignored. Never carries their wording."""
 
     kind: Literal["prompt_injection"] = "prompt_injection"
-    # Where they were found: "input" (the user's text) or "page" (the page a link points to).
-    location: Literal["input", "page"]
+    # Where they were found: "input" (the user's text), "page" (the page a link points to) or
+    # "source" (a retrieved evidence page).
+    location: Literal["input", "page", "source"]
 
 
 class CheckResult(BaseModel):

@@ -21,7 +21,7 @@ from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
 from prawdowid import factcheck, judge, rerank, websearch
-from prawdowid.contract import Source, Verdict
+from prawdowid.contract import SecurityEvent, Source, Verdict
 
 log = logging.getLogger("prawdowid")
 
@@ -64,10 +64,13 @@ async def check_claim(
     """Verdict for one claim. `deadline` is `loop.time()` when the whole check must end."""
     steps: dict[str, int] = {}
     costs: list[float | None] = []
+    # Injections the judge found in retrieved pages, kept from both passes.
+    events: list[SecurityEvent] = []
     try:
         async with asyncio.timeout_at(deadline):
             candidates, limits = await _retrieve(claim, queries, steps)
-            judgement = await _judge(claim, candidates, exclude_url, steps, costs, "")
+            judgement = await _judge(claim, candidates, exclude_url, steps, costs)
+            events += judgement.security_events
     except TimeoutError:
         # A request cut off mid-flight may still be billed.
         return _done(
@@ -90,6 +93,7 @@ async def check_claim(
                     judgement = await _judge(
                         claim, more, exclude_url, steps, costs, "retry_"
                     )
+                    events += judgement.security_events
                     # Only a finished retry counts: a cut one keeps the first pass as it was.
                     candidates = more
                     limits.pop("web", None)
@@ -106,6 +110,7 @@ async def check_claim(
     judgement.limitations = list(
         dict.fromkeys([*reasons, *limits.values(), *judgement.limitations])
     )
+    judgement.security_events = events[:1]  # same kind and location: one is enough
     return _done(claim, judgement, costs, steps)
 
 
@@ -156,7 +161,7 @@ async def _judge(
     exclude_url: str | None,
     steps: dict[str, int],
     costs: list[float | None],
-    prefix: str,
+    prefix: str = "",
 ) -> judge.Judgement:
     """Steps 3 to 5. The linked page is never evidence for its own claims."""
     with capture_run_messages() as messages:

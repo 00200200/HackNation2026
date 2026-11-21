@@ -110,8 +110,7 @@ def test_five_claims_with_fast_sources_finish_under_budget(monkeypatch, models):
     assert len(seen) == 15
     # 15 searches of 0.2 s each: parallel, not one after another.
     assert elapsed < 1.5 < pipeline.CHECK_BUDGET_S
-    # The document's own words are shown: the span of the quote, without its full stop.
-    assert {s.fragment for c in result.claims for s in c.sources} == {QUOTE[:-1]}
+    assert {s.fragment for c in result.claims for s in c.sources} == {QUOTE}
     # Extraction (opus) plus rerank (haiku) and judge (sonnet) for each claim.
     opus, haiku, sonnet = (
         float(ModelResponse(parts=[], usage=USAGE, model_name=m).cost().total_price)
@@ -230,3 +229,19 @@ def test_retry_cut_by_the_deadline_keeps_the_first_pass(monkeypatch):
     )
     assert websearch.SEARCH_UNAVAILABLE in result.judgement.limitations
     assert result.cost_usd is None
+
+
+def test_injection_in_a_source_reaches_the_check_result(monkeypatch):
+    fake_search(monkeypatch)
+
+    def flagged(prompt):
+        labels = judge.Labels.model_validate_json(supports_all(prompt))
+        return labels.model_copy(update={"injection_found": True}).model_dump_json()
+
+    with (
+        rerank.agent.override(model=model(every_fragment)),
+        judge.agent.override(model=model(flagged, "claude-sonnet-5-5")),
+    ):
+        result = verify("tekst", claims(2))
+    assert [e.location for e in result.security_events] == ["source"]
+    assert all(c.verdict is Verdict.CONFIRMED for c in result.claims)

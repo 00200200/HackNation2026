@@ -200,7 +200,7 @@ def claim_result(c: ExtractedClaim, check: pipeline.ClaimCheck | None) -> ClaimR
         kind=c.kind,
         source_sentence=c.source_sentence,
         reasoning=c.reason,
-        **judgement.model_dump(),
+        **judgement.model_dump(exclude={"security_events"}),
     )
 
 
@@ -299,4 +299,8 @@ async def verify_text(
     if result.output.injection_found:
         check.security_events = [SecurityEvent(location=location)]
         log.warning("security_event kind=prompt_injection location=%s", location)
+    # The judge logs its own events (location "source"); one per check is enough.
+    check.security_events += [
+        e for c in checks if c for e in c.judgement.security_events
+    ][:1]
     return check
