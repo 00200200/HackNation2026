@@ -545,3 +545,45 @@ def test_a_hanging_provider_is_cut_by_the_search_budget(monkeypatch):
     result, elapsed = asyncio.run(go())
     assert elapsed < 0.8
     assert result.limitation == websearch.SEARCH_UNAVAILABLE
+
+
+def claim_review_page(ld: str) -> str:
+    return PAGE.replace(
+        "</head>", f'<script type="application/ld+json">{ld}</script></head>'
+    )
+
+
+CLAIM_REVIEW = """{"@context": "https://schema.org", "@graph": [{"@type": "WebPage"},
+{"@type": "ClaimReview", "claimReviewed": "  Polska   wyda 10 mld na X ",
+ "reviewRating": {"@type": "Rating", "ratingValue": 1, "alternateName": "Fałsz"}}]}"""
+
+
+def test_fact_check_page_carries_the_fact_checkers_rating():
+    result = run(
+        provider_returning("https://demagog.org.pl/w/1"),
+        {"demagog.org.pl/w/1": html(claim_review_page(CLAIM_REVIEW))},
+    )
+    [doc] = result.documents
+    source = doc.to_source()
+    assert (source.rating, source.reviewed_claim) == (
+        "Fałsz",
+        "Polska wyda 10 mld na X",
+    )
+
+
+def test_claim_review_outside_a_fact_check_domain_is_ignored():
+    result = run(
+        provider_returning("https://www.gov.pl/p"),
+        {"www.gov.pl/p": html(claim_review_page(CLAIM_REVIEW))},
+    )
+    [doc] = result.documents
+    assert doc.rating is None and doc.reviewed_claim is None
+
+
+def test_broken_claim_review_keeps_the_document():
+    result = run(
+        provider_returning("https://demagog.org.pl/w/1"),
+        {"demagog.org.pl/w/1": html(claim_review_page('{"@type": "ClaimRev'))},
+    )
+    [doc] = result.documents
+    assert doc.text and doc.rating is None and doc.reviewed_claim is None

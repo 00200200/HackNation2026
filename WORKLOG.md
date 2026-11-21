@@ -60,6 +60,19 @@ read `evals/results/HISTORY.md`, not only `latest.json`; check the commit and no
 
 Basic requirements first: the jury gives no points for extras if one of these is missing.
 
+- [ ] Agentic retrieval, branch `LukiLenkiewicz/agentic-retrieval`, **not merged, not measured**. Owner: Łukasz (via Claude).
+  `PRAWDOWID_RETRIEVAL=agent` (default `fixed`): after the fixed lookups a research agent (`prawdowid/research.py`,
+  Haiku, PydanticAI tools: web search scoped to fact-checkers or official sites in pl/en, Fact Check, gov.pl, corpus,
+  open a title-only hit) adds sources to the evidence pool before rerank and judge, and again in place of the fixed
+  retry; `decide()` still sets the verdict. Capped by `UsageLimits` (3 model turns, 8 tool calls),
+  `PRAWDOWID_RESEARCH_BUDGET_S` (10 s) and `PRAWDOWID_JUDGE_RESERVE_S` (12 s). Same branch: `PRAWDOWID_CORPUS=1` adds
+  the #49 corpus to the lookups (off by default, not run against a database); `PRAWDOWID_CHECK_BUDGET_S` default
+  25 → 45 s; fact-checker rating on `Source` (`rating`, `reviewed_claim`) from the Fact Check API and from ClaimReview
+  JSON-LD of fetched fact-check pages, shown to the judge as a signal. Open: (1) A/B against `fixed` on the eval, with
+  latency: an aborted trial on B/C cases (7–8 checks per mode, before the 10 s cap) had every agent run cut by the
+  deadline, two checks `nie sprawdzono` at 45 s, and fixed mode at 31–45 s per check with the 45 s budget; no
+  correctness numbers from it. (2) ClaimReview parse is UNCONFIRMED on real pages: Demagog and AFP answered 403 to a
+  plain fetch, Konkret24 and FakeNews.pl carry no ClaimReview markup.
 - [ ] Eval fault switch for J01/J02 (`simulate` in `evals/cases.jsonl` is never applied; CodeRabbit PR #46). Owner: coordinator schedules.
 - [x] Merge `feat/llm-verifier` into `main`: done as #2 (`390d483`). Owner: Łukasz
 - [x] Step 1 (#5): self-contained claims, quote split, search queries per claim, top N checked, rest listed as not checked. Owner: Łukasz (Claude worker), branch `feat/5-self-contained-claims`, PR #22, merged into `main`.
@@ -198,6 +211,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (via Claude): agentic retrieval behind `PRAWDOWID_RETRIEVAL=agent` (`prawdowid/research.py`), corpus lookup behind `PRAWDOWID_CORPUS=1`, check budget default 45 s, fact-checker rating on sources. Branch `LukiLenkiewicz/agentic-retrieval`; pytest and ruff clean, no eval (user decision: test later).
 - 2026-11-21 Łukasz (Claude worker): eval history on `LukiLenkiewicz/eval-history` (`cc58dac`): every `evals/run.py`
   run now writes `evals/results/history/<timestamp>-<sha>-<mode>.json` (full report) and appends one row to
   `evals/results/HISTORY.md` (both tracked), plus a per-scenario/per-case-set (FC-* vs A-J) summary in the report;

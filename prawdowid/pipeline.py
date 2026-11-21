@@ -4,11 +4,16 @@ Step 2 runs four lookups at once: 2a Google Fact Check (`factcheck.search_claims
 known narratives (`euvsdisinfo.search_cases`, context that never decides alone), the www.gov.pl
 site search (`govpl.search_govpl`, the claim's gov.pl queries, else its first web query; off with
 PRAWDOWID_GOVPL=0) and 2b web search and fetch (`websearch.search_web`, one search per web query of
-the claim, www.gov.pl pages left to the gov.pl lookup). Step 2c (our own database,
-#19) is out of the pipeline for now (team decision). Any EUvsDisinfo source, whichever lookup
+the claim, www.gov.pl pages left to the gov.pl lookup). Step 2c, the evidence corpus
+(`corpus_search.search_corpus`, #49), joins them with PRAWDOWID_CORPUS=1. Any EUvsDisinfo source, whichever lookup
 found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
 steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
 remains, the web is searched once more with a rewritten query and the claim is judged again.
+
+With PRAWDOWID_RETRIEVAL=agent the lookups above only seed the evidence: a research agent with
+search tools (`prawdowid.research`) then decides what is missing and searches for it before the
+judge, and again in place of the fixed retry, told why the judge could not decide. It stops
+`JUDGE_RESERVE_S` before the deadline so the judge still runs. It never sets a verdict.
 
 A source that fails adds a limitation; when every source failed, or the judge did not answer, the
 claim is not checked, never "brak wystarczających dowodów". A claim that runs out of time is not
@@ -25,18 +30,34 @@ from pydantic import BaseModel
 from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
-from prawdowid import euvsdisinfo, factcheck, govpl, judge, rerank, websearch
+from prawdowid import (
+    euvsdisinfo,
+    factcheck,
+    govpl,
+    judge,
+    rerank,
+    research,
+    websearch,
+)
 from prawdowid.contract import ModelCall, Source, Verdict
 
 log = logging.getLogger("prawdowid")
 
 # Hyperparameters, first guesses for the 30 s median, not tuned.
 # Whole check, from the request to the last verdict (the API gives up at 60 s).
-CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 25)
+CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 45)
 # The retry starts only with at least this much time left: a web search, rerank and judge again.
 RETRY_MIN_S = float(os.getenv("PRAWDOWID_RETRY_MIN_S") or 18)
 # EUvsDisinfo only adds context: it may not hold up the claim for its own 15 s deadline.
 EUVSDISINFO_BUDGET_S = float(os.getenv("PRAWDOWID_EUVSDISINFO_BUDGET_S") or 5)
+# "agent": after the fixed lookups, a research agent with search tools fills the gaps
+# (`prawdowid.research`), also in place of the fixed retry. "fixed": the lookups alone.
+AGENTIC = (os.getenv("PRAWDOWID_RETRIEVAL") or "fixed") == "agent"
+# The research agent stops this long before the deadline, so rerank and judge still run.
+JUDGE_RESERVE_S = float(os.getenv("PRAWDOWID_JUDGE_RESERVE_S") or 12)
+# One run of the research agent. First guess: in the first live trial (7 checks, 45 s budget)
+# every run lasted until the reserve and two checks ran out of time.
+RESEARCH_BUDGET_S = float(os.getenv("PRAWDOWID_RESEARCH_BUDGET_S") or 10)
 
 TIME_LIMIT = (
     "Nie sprawdzono: skończył się czas przeznaczony na sprawdzenie ({budget:g} s). "
@@ -89,30 +110,53 @@ async def check_claim(
     else:
         gov, queries = None, [*queries, *govpl_queries]
     searched = queries or [claim]
+    pool = research.Pool()  # used in agent mode only
     if _now() >= deadline:  # nothing is started after the budget ran out
         return _done(claim, _time_limit(found), runs, steps)
     try:
         async with asyncio.timeout_at(deadline):
             await _retrieve(claim, searched, gov, steps, found)
             candidates = _candidates(found)
+            if AGENTIC:
+                # Only lookups that answered count as run: the agent never repeats those.
+                # ponytail: web answers are not matched to their query, so one failed query
+                # among several is still listed; all failed lists none.
+                if not all(w.limitation for w in found["web"]):
+                    pool.searched += [f"search_web[all, pl]: {q}" for q in searched]
+                if not found["factcheck"].limitation:
+                    pool.searched.append(f"search_fact_checks[pl]: {claim}")
+                if gov and not found["govpl"].limitation:
+                    pool.searched += [f"search_govpl: {q}" for q in gov]
+                pool.add(candidates)
+                candidates = await _research(claim, pool, deadline, steps, runs)
             judgement = await _judge(claim, candidates, exclude_url, steps, runs)
     except TimeoutError:
         # The cost is None for a model request cut mid-flight, 0 when only search was cut.
-        return _done(claim, _time_limit(found), runs, steps)
+        judgement = _time_limit(found)
+        judgement.security_events = pool.events[:1]
+        return _done(claim, judgement, runs, steps)
     # Injections the judge found in retrieved pages, kept from both passes.
     events = list(judgement.security_events)
 
     cut = False
     # The claim itself is the rewritten query, so no retry when it was searched already.
-    retry = claim not in searched
+    retry = AGENTIC or claim not in searched
     if retry and _needs_more(judgement) and deadline - _now() >= RETRY_MIN_S:
         try:
             async with asyncio.timeout_at(deadline):
                 # ponytail: the claim itself is the rewritten query (the first pass used the
                 # model's queries); a HyDE-FC rewrite costs one more model call per claim.
-                web = await _timed(steps, "retry_web", _search_web, claim)
-                if web.documents:
+                if AGENTIC:
+                    seen = pool.changes
+                    more = await _research(
+                        claim, pool, deadline, steps, runs, _feedback(judgement)
+                    )
+                    new = pool.changes > seen
+                else:
+                    web = await _timed(steps, "retry_web", _search_web, claim)
                     more = candidates + _candidates({"web": [web]})
+                    new = bool(web.documents)
+                if new:
                     second = await _judge(
                         claim, more, exclude_url, steps, runs, "retry_"
                     )
@@ -128,7 +172,8 @@ async def check_claim(
                         events += judgement.security_events
                         candidates = more
                 # Only a finished retry counts: a cut one keeps the first pass as it was.
-                found["web"].append(web)
+                if not AGENTIC:
+                    found["web"].append(web)
         except TimeoutError:
             log.info("retry cut by the time limit claim=%r", claim)
             cut = True
@@ -142,6 +187,7 @@ async def check_claim(
     judgement.limitations = list(
         dict.fromkeys([*reasons, *limits.values(), *judgement.limitations])
     )
+    events += pool.events  # instructions withheld from the research agent
     judgement.security_events = events[:1]  # same kind and location: one is enough
     return _done(claim, judgement, runs, steps)
 
@@ -177,13 +223,16 @@ async def _retrieve(
         tg.create_task(_timed(steps, "web", all_web))
         if gov is not None:
             tg.create_task(keep("govpl", lambda _: _search_govpl(gov)))
-        # Step 2c (`cache.search_documents`, #19) plugs in here when it is back in the pipeline.
+        if (
+            research.CORPUS
+        ):  # step 2c: the evidence corpus (#49), on with PRAWDOWID_CORPUS=1
+            tg.create_task(keep("corpus", _search_corpus))
 
 
 def _candidates(found: dict) -> list[Source]:
     sources = [
         h.source
-        for name in ("factcheck", "euvsdisinfo")
+        for name in ("factcheck", "euvsdisinfo", "corpus")
         if name in found
         for h in found[name].hits
     ]
@@ -222,6 +271,7 @@ def _limits(found: dict) -> dict[str, str]:
         if "euvsdisinfo" in found
         else None,
         "govpl": found["govpl"].limitation if "govpl" in found else None,
+        "corpus": found["corpus"].limitation if "corpus" in found else None,
         "web": web,
     }
     return {k: v for k, v in limits.items() if v}
@@ -251,6 +301,50 @@ async def _search_govpl(queries: list[str]) -> websearch.WebSearch:
     except Exception:
         log.exception("gov.pl search failed")
         return websearch.WebSearch(limitation=govpl.LOOKUP_UNAVAILABLE)
+
+
+async def _search_corpus(claim: str):
+    from prawdowid import corpus_search  # on use: it loads the embedding libraries
+
+    try:
+        return await corpus_search.search_corpus(claim)
+    except Exception:
+        log.exception("corpus search failed")
+        return corpus_search.CorpusLookup(limitation=corpus_search.SEARCH_UNAVAILABLE)
+
+
+async def _research(
+    claim: str,
+    pool: research.Pool,
+    deadline: float,
+    steps: dict[str, int],
+    runs: list[list[ModelMessage]],
+    feedback: str | None = None,
+) -> list[Source]:
+    """One run of the research agent on the pool, then everything the pool holds."""
+    name = "retry_research" if feedback else "research"
+    until = min(deadline - JUDGE_RESERVE_S, _now() + RESEARCH_BUDGET_S)
+    refused = await _priced(
+        runs, _timed(steps, name, research.research, claim, pool, until, feedback)
+    )
+    if refused and isinstance(runs[-1][-1], ModelRequest):
+        # The request the usage limits refused was never sent: left in, the run would read as
+        # one that may have been billed without an answer (cost unknown).
+        runs[-1].pop()
+    return [_context_only(s) for s in pool.sources.values()]
+
+
+def _feedback(judgement: judge.Judgement) -> str:
+    """Why the judge could not decide, in our own words and host names only: no page text goes
+    back to the agent that picks the next searches."""
+    hosts = sorted({str(s.url.host) for s in judgement.sources})
+    return (
+        "The evidence step read this pool and could not reach a conclusion. It needs the own "
+        "conclusion of one fact-checker, official or primary source about this exact claim, or "
+        "of two independent publishers. "
+        f"Sources it could quote: {', '.join(hosts) or 'none'}. "
+        "Look for what is still missing."
+    )
 
 
 async def _search_claims(claim: str) -> factcheck.FactCheckLookup:

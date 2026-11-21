@@ -114,6 +114,9 @@ class Document(BaseModel):
     domain: str
     licence: str | None = None
     text: str
+    # ClaimReview of a fact-check page (websearch._claim_review); not a column of the source store.
+    rating: str | None = None
+    reviewed_claim: str | None = None
 
     def to_source(self, fragment: str | None = None) -> Source:
         return Source(
@@ -124,6 +127,8 @@ class Document(BaseModel):
             url=self.url,
             source_type=self.source_type,
             fragment=fragment,
+            rating=self.rating,
+            reviewed_claim=self.reviewed_claim,
         )
 
 

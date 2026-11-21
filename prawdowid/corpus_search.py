@@ -145,6 +145,9 @@ def to_hit(row: tuple) -> CorpusHit:
             url=url,
             source_type=kind,
             fragment=text,
+            # Also on the source, where the judge reads them.
+            rating=rating,
+            reviewed_claim=claim,
         ),
         score=float(score),
         rating=rating,

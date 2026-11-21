@@ -366,6 +366,22 @@ def test_fragments_are_framed_as_data():
     assert "doc_id: https://zla.pl\n" in prompt
 
 
+def test_fact_check_rating_is_shown_inside_its_fragment():
+    rated = fragment(
+        "https://demagog.org.pl/x", "Tekst analizy.", "Demagog", "fact_check"
+    )
+    rated.source.rating = "Manipulacja"
+    rated.source.reviewed_claim = "Zełenski nie ustąpi."
+    seen = []
+    run([rated, A], answering(seen=seen))
+    prompt = seen[0][0].parts[-1].content
+    assert (
+        "doc_id: https://demagog.org.pl/x\n"
+        "rating: Manipulacja (rated claim: Zełenski nie ustąpi.)\nTytuł"
+    ) in prompt
+    assert prompt.count("rating:") == 1  # a source without a rating gets no line
+
+
 def test_find_quote_is_normalised_but_whole_words():
     text = "„Tak” – powiedział minister… i wyszedł."
     assert (

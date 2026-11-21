@@ -11,7 +11,7 @@ Check, EUvsDisinfo known narratives (context only, never a verdict on its own), 
 search (ministry and RCB pages; web search leaves www.gov.pl to it) and web search on
 allowlisted domains (our own database, #19, is out of the pipeline for now), then
 rerank and a judge that labels quotes; the verdict is set in code (`judge.decide`). The whole check
-has one time budget (`PRAWDOWID_CHECK_BUDGET_S`, 25 s). A claim that runs out of time, or whose
+has one time budget (`PRAWDOWID_CHECK_BUDGET_S`, 45 s). A claim that runs out of time, or whose
 web search, gov.pl, Fact Check and EUvsDisinfo all fail, comes back `not_checked` with the reason, never as a verdict. An
 opinion, forecast or question is `not_verifiable`. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
@@ -39,7 +39,9 @@ path. Other tuning variables need an explicit Compose environment override.
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
 | `PRAWDOWID_MODEL` | no | `anthropic:claude-opus-5-5` | PydanticAI model id (`provider:model`). |
-| `PRAWDOWID_CHECK_BUDGET_S` | no | `25` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. |
+| `PRAWDOWID_CHECK_BUDGET_S` | no | `45` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. |
+| `PRAWDOWID_RETRIEVAL` | no | `fixed` | `agent` adds a research agent with search tools after the fixed lookups (`prawdowid/research.py`): it looks for the fact-checker's article and the original source, and never sets a verdict. Model: `PRAWDOWID_RESEARCH_MODEL` (default `anthropic:claude-haiku-5-5`). |
+| `PRAWDOWID_CORPUS` | no | off | `1` adds the evidence corpus (`prawdowid/corpus_search.py`) to the lookups; needs `DATABASE_URL` and a built index. |
 | `PRAWDOWID_WEB_SEARCH_BUDGET_S` | no | `10` | Longest one web search query may take, retry included, before it counts as unavailable. |
 | `PRAWDOWID_PAGE_BUDGET_S` | no | `8` | Longest one page fetch may take (robots.txt and page); a slower page is skipped, the others are kept. |
 | `PRAWDOWID_GOVPL` | no | `1` | `0` switches off the www.gov.pl site search (`prawdowid/govpl.py`); its queries then go to web search, which searches www.gov.pl again. See [docs/sources.md](docs/sources.md). |
@@ -58,7 +60,7 @@ path. Other tuning variables need an explicit Compose environment override.
 | `FASTEMBED_CACHE_PATH` | no | fastembed's temp dir | Where the embedding model files are kept (`/models` in the image). |
 
 The extraction call has a 45 s provider request timeout and at most one SDK retry, but shares
-the 25 s whole-check deadline with URL fetching and per-claim checks, inside the API's 60 s
+the 45 s whole-check deadline with URL fetching and per-claim checks, inside the API's 60 s
 limit. Extraction errors and a missing model key return `technical_error`; a
 model refusal returns `cannot_check`. Both carry a Polish message and no claims. Retrieval
 failures are reported per claim. A judge-model outage becomes `not_checked` with a limitation;

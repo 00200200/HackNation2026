@@ -9,6 +9,7 @@ A failed or empty search is a technical limit returned in `WebSearch.limitation`
 """
 
 import asyncio
+import json
 import logging
 import os
 from collections.abc import Sequence
@@ -18,6 +19,8 @@ from typing import NamedTuple, Protocol
 from urllib.parse import urlsplit
 
 import httpx2
+import lxml.etree
+import lxml.html
 import requests
 import trafilatura
 from pydantic import BaseModel
@@ -122,7 +125,9 @@ _TAVILY_ERRORS = (
 _client: TavilyClient | None = None
 
 
-def tavily_search(query: str, *, domains: Sequence[str], limit: int) -> list[SearchHit]:
+def tavily_search(
+    query: str, *, domains: Sequence[str], limit: int, language: str = "pl"
+) -> list[SearchHit]:
     """Tavily /search, restricted server-side to `domains`.
     https://docs.tavily.com/documentation/api-reference/endpoint/search
     """
@@ -138,7 +143,7 @@ def tavily_search(query: str, *, domains: Sequence[str], limit: int) -> list[Sea
             max_results=limit,
             include_domains=list(domains),
             include_domains_mode="restrict",
-            language="pl",
+            language=language,
             include_published_date=True,
             timeout=SEARCH_TIMEOUT_S,
         )
@@ -304,6 +309,11 @@ async def fetch_document(
         date_extraction_params={"original_date": True, "extensive_search": False},
     )
     published = (_date(extracted.date) if extracted else None) or fallback_published
+    review = (
+        await asyncio.to_thread(_claim_review, page.text())
+        if entry.source_type == "fact_check"
+        else None
+    )
     if not extracted or not extracted.text or not extracted.title or not published:
         # No publication date: the brief requires one on every source.
         log.info("fetch skipped %s: no text, title or publication date", url)
@@ -319,7 +329,59 @@ async def fetch_document(
         domain=host,
         licence=entry.licence,
         text=extracted.text,
+        rating=review[0] if review else None,
+        reviewed_claim=review[1] if review else None,
     )
+
+
+def _claim_review(html: str) -> tuple[str | None, str | None] | None:
+    """(rating, claim) from the page's schema.org ClaimReview JSON-LD, or None.
+
+    Page content is untrusted: whitespace collapsed and lengths capped. Malformed JSON-LD is
+    skipped, never an error. Custom code: trafilatura drops structured data and the JSON-LD
+    shapes (list, @graph) are a few lines of stdlib; microdata/RDFa is not handled.
+    """
+    try:
+        scripts = lxml.html.fromstring(html).xpath(
+            '//script[@type="application/ld+json"]/text()'
+        )
+    except (ValueError, lxml.etree.ParserError):
+        return None
+    pending = []
+    for script in scripts:
+        try:
+            pending.append(json.loads(script))
+        except (ValueError, RecursionError):
+            continue
+    while pending:
+        node = pending.pop(0)
+        if isinstance(node, list):
+            pending += node
+        elif isinstance(node, dict):
+            if isinstance(graph := node.get("@graph"), list):
+                pending += graph
+            kinds = node.get("@type")
+            if "ClaimReview" in (kinds if isinstance(kinds, list) else [kinds]):
+                rating, claim = _review_text(node)
+                if rating or claim:
+                    return rating, claim
+    return None
+
+
+def _review_text(node: dict) -> tuple[str | None, str | None]:
+    rating = node.get("reviewRating")
+    rating = rating[0] if isinstance(rating, list) and rating else rating
+    rating = rating if isinstance(rating, dict) else {}
+    return (
+        _clean(rating.get("alternateName") or rating.get("ratingValue"), 100),
+        _clean(node.get("claimReviewed"), 500),
+    )
+
+
+def _clean(value: object, limit: int) -> str | None:
+    if not isinstance(value, str | int | float):
+        return None
+    return " ".join(str(value).split())[:limit] or None
 
 
 async def _get_html(url: str, client: httpx2.AsyncClient) -> safefetch.Page | None:

@@ -56,6 +56,10 @@ class Source(BaseModel):
     url: HttpUrl
     source_type: str
     fragment: str | None = None
+    # Google Fact Check ClaimReview: the fact-checker's own rating ("Fałsz", "Manipulacja", ...)
+    # of `reviewed_claim`. Shown to the judge as a signal, never a verdict.
+    rating: str | None = None
+    reviewed_claim: str | None = None
 
 
 class ModelCall(BaseModel):
