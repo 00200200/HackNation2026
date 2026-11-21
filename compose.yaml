@@ -7,6 +7,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       PRAWDOWID_MODEL: ${PRAWDOWID_MODEL:-}
       GOOGLE_FACTCHECK_API_KEY: ${GOOGLE_FACTCHECK_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      EUVSDISINFO_API_KEY: ${EUVSDISINFO_API_KEY:-}
       # Scenario I base, a path relative to the repository root (e.g. incidents/base.csv). The
       # same relative path resolves under /app in the container, where ./incidents is mounted.
       PRAWDOWID_INCIDENTS_PATH: ${PRAWDOWID_INCIDENTS_PATH:-}
