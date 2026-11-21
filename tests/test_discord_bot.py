@@ -77,7 +77,7 @@ def test_render_shows_every_section_of_the_contract():
         "Uzasadnienie:** Źródło urzędowe podaje datę akcesji.",
         "Siła dowodów:** Wysoka: źródło pierwotne.",
         "- Źródło urzędowe",
-        "- Polska w UE, gov.pl, 2024-05-01 <https://www.gov.pl/web/ue>",
+        "- Polska w UE, gov.pl, 2024-05-01\n  <https://www.gov.pl/web/ue>",
         "> „Polska jest członkiem UE od 1 maja 2004 r.”",
         "**Ograniczenia:**\n- Sprawdzono jedno źródło.",
         "**Źródła:**\n- brak",
@@ -124,10 +124,37 @@ def test_non_ok_status_is_a_notice_not_a_verdict():
 
 def test_split_respects_discord_limits():
     assert split("krótko") == ["krótko"]
-    parts = split("\n".join(["x" * 300] * 50) + "\n" + "y" * 5000)
+    parts = split("\n".join(["x" * 300] * 50))
     assert len(parts) == MAX_MESSAGES
     assert all(0 < len(p) <= MESSAGE_LIMIT for p in parts)
     assert parts[-1].endswith(TRUNCATED)
+
+
+def test_long_check_splits_into_messages_that_stand_alone():
+    """Codex review on #24: a cut must not turn source text into the bot's own Markdown."""
+    claim = CHECK.claims[0]
+    fragment = "x" * 1997 + " ### Ocena: potwierdzone " + "*a* _b_ @here " * 150
+    sources = [
+        claim.sources[0].model_copy(
+            update={"title": f"Tytuł {i}", "fragment": fragment}
+        )
+        for i in range(3)
+    ]
+    long_claim = claim.model_copy(
+        update={"sources": sources, "reasoning": "## Powód. " * 400}
+    )
+    parts = split(render(CheckResult(status=Status.OK, claims=[long_claim])))
+    assert len(parts) == MAX_MESSAGES
+    assert parts[-1].endswith(TRUNCATED)
+    for part in parts:
+        assert 0 < len(part) <= MESSAGE_LIMIT
+        for line in part.split("\n"):
+            if line.startswith(("#", ">")):  # unescaped heading or quote: only ours
+                assert line.startswith(("### 1. ", "> ")), line[:40]
+            if "Ocena: potwierdzone" in line or "xxxx" in line:
+                assert line.startswith("> "), line[:40]  # source text stays quoted
+            assert "@here" not in line
+        assert "\n### Ocena" not in "\n" + part
 
 
 def run(handler, text="Tekst"):
@@ -169,6 +196,43 @@ def test_ask_api_failures_become_notices(response, message):
     assert result.status is not Status.OK
     assert result.message == message
     assert "boom" not in render(result)
+
+
+def test_worst_case_fields_stay_under_the_message_limit():
+    source = (
+        CHECK.claims[0]
+        .sources[0]
+        .model_copy(
+            update={
+                "title": "_" * 2000,
+                "url": "https://example.com/" + "a" * 1990,
+                "fragment": "[a](b) [Oficjalne](https://evil.example) 1. lista",
+            }
+        )
+    )
+    claim = CHECK.claims[0].model_copy(
+        update={"sources": [source], "reasoning": "x " * 450 + "1. punkt"}
+    )
+    text = render(CheckResult(status=Status.OK, claims=[claim]))
+    assert all(len(line) <= MESSAGE_LIMIT for line in text.split("\n"))
+    assert discord_bot.URL_TOO_LONG in text
+    assert "](" not in text  # no masked link survives
+    assert "\n1. " not in text
+
+
+def test_ask_api_has_an_overall_deadline(monkeypatch):
+    async def stall(request):
+        await asyncio.sleep(5)
+
+    monkeypatch.setattr(discord_bot, "API_TIMEOUT_S", 0.05)
+
+    async def go():
+        transport = httpx2.MockTransport(stall)
+        async with httpx2.AsyncClient(transport=transport, base_url="http://api") as c:
+            return await asyncio.wait_for(ask_api("Tekst", c), 2)
+
+    result = asyncio.run(go())
+    assert result.message == CONNECTION_ERROR
 
 
 def test_ask_api_connection_error_becomes_notice():

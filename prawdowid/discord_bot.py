@@ -8,9 +8,12 @@ message can ping anyone.
 Run: `make discord` (reads DISCORD_BOT_TOKEN and PRAWDOWID_API_URL from the environment).
 """
 
+import asyncio
 import logging
 import os
+import re
 import sys
+import textwrap
 
 import discord
 import httpx2
@@ -31,28 +34,48 @@ API_TIMEOUT_S = 75
 MESSAGE_LIMIT = 2000  # Discord's limit for one message
 MAX_MESSAGES = 5
 TRUNCATED = "… Odpowiedź była za długa dla Discorda i została skrócona."
+# Raw characters per line before escaping; escaping at most doubles them, so a line stays
+# under MESSAGE_LIMIT with its prefix.
+WRAP_WIDTH = 900
+URL_TOO_LONG = "  (link za długi, by pokazać go na Discordzie; jest w formularzu WWW)"
 CONNECTION_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę."
 
 
-def _safe(text: str) -> str:
-    # One line: a line break in untrusted text must not end its quote or section.
-    return escape_mentions(escape_markdown(" ".join(text.split())))
+def _escape(text: str) -> str:
+    text = escape_markdown(text)
+    # escape_markdown escapes only the first "[x](y)" of a run; break every masked link,
+    # and a leading "1." so a wrapped line cannot become a numbered list.
+    text = re.sub(r"^(\d+)\.", r"\1\\.", text.replace("](", "]\\("))
+    return escape_mentions(text)
+
+
+def _field(prefix: str, raw: str, cont: str = "", suffix: str = "") -> list[str]:
+    """One untrusted field as Discord lines that each stand alone.
+
+    The raw text is collapsed to one line, wrapped at spaces, and only then escaped, so every
+    line start is escaped and no escape sequence is cut. Continuation lines repeat `cont`
+    (e.g. "> " for a quote), so a message cut between lines keeps its quote or section.
+    """
+    chunks = textwrap.wrap(" ".join(raw.split()), WRAP_WIDTH) or [""]
+    lines = [(cont if i else prefix) + _escape(chunk) for i, chunk in enumerate(chunks)]
+    lines[-1] += suffix
+    return lines
 
 
 def _bullets(items: list[str]) -> list[str]:
-    return [f"- {_safe(item)}" for item in items]
+    return [line for item in items for line in _field("- ", item, "  ")]
 
 
 def _source(s: Source) -> list[str]:
     meta = ", ".join(
-        part
-        for part in (_safe(s.publisher), s.published_at and s.published_at.isoformat())
-        if part
+        part for part in (s.publisher, s.published_at and str(s.published_at)) if part
     )
-    # <url> stops Discord from unfurling a preview of an untrusted page.
-    lines = [f"- {_safe(s.title)}" + (f", {meta}" if meta else "") + f" <{s.url}>"]
+    lines = _field("- ", f"{s.title}, {meta}" if meta else s.title, "  ")
+    # Own line, <url> stops Discord from unfurling a preview of an untrusted page.
+    url = str(s.url)
+    lines.append(f"  <{url}>" if len(url) <= WRAP_WIDTH else URL_TOO_LONG)
     if s.fragment:
-        lines.append(f"> „{_safe(s.fragment)}”")
+        lines += _field("> „", s.fragment, "> ", "”")
     return lines
 
 
@@ -70,11 +93,11 @@ UNCHECKED_NOTE = (
 def _claim(n: int, c: ClaimResult) -> str:
     kind = f"[{KIND_LABELS[c.kind]}] " if c.kind in KIND_LABELS else ""
     lines = [
-        f"### {n}. {_safe(c.claim)}",
-        f"-# {kind}W tekście: {_safe(c.source_sentence)}",
+        *_field(f"### {n}. ", c.claim, "### "),
+        *_field(f"-# {kind}W tekście: ", c.source_sentence, "-# "),
         f"Ocena: **{c.verdict_label}**",
-        f"**Uzasadnienie:** {_safe(c.reasoning)}",
-        f"**Siła dowodów:** {_safe(c.strength)}",
+        *_field("**Uzasadnienie:** ", c.reasoning),
+        *_field("**Siła dowodów:** ", c.strength),
         "**Przesłanki:**",
         *_bullets(c.premises),
         "**Źródła:**",
@@ -89,7 +112,7 @@ def render(check: CheckResult) -> str:
     """CheckResult as Discord Markdown, with the same sections as the web form."""
     # Statuses other than "ok" are notices, never verdicts.
     if check.status is not Status.OK:
-        return f"**Brak oceny.** {_safe(check.message or '')}"
+        return "\n".join(_field("**Brak oceny.** ", check.message or ""))
     if not check.claims and not check.unchecked_claims:
         return "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
     sections = [_claim(n, c) for n, c in enumerate(check.claims, 1)]
@@ -107,24 +130,24 @@ def render(check: CheckResult) -> str:
 
 
 def split(text: str) -> list[str]:
-    """Cut text into Discord messages on line breaks; at most MAX_MESSAGES, marked if cut."""
-    # Hand-rolled: commands.Paginator raises on a line longer than one message.
+    """Cut text into Discord messages between lines; at most MAX_MESSAGES, marked if cut.
+
+    Every line is shorter than a message (`_field` wraps), so a cut never falls inside a line.
+    """
     parts, current = [], ""
     for line in text.split("\n"):
-        while len(line) > MESSAGE_LIMIT:
-            if current:
-                parts.append(current)
-            current, line = line[:MESSAGE_LIMIT], line[MESSAGE_LIMIT:]
         candidate = f"{current}\n{line}" if current else line
-        if len(candidate) > MESSAGE_LIMIT:
+        if current and len(candidate) > MESSAGE_LIMIT:
             parts.append(current)
             current = line
         else:
             current = candidate
     parts.append(current)
     if len(parts) > MAX_MESSAGES:
-        parts = parts[:MAX_MESSAGES]
-        parts[-1] = parts[-1][: MESSAGE_LIMIT - len(TRUNCATED) - 1] + "\n" + TRUNCATED
+        lines = parts[MAX_MESSAGES - 1].split("\n")
+        while len("\n".join([*lines, TRUNCATED])) > MESSAGE_LIMIT:
+            lines.pop()
+        parts = [*parts[: MAX_MESSAGES - 1], "\n".join([*lines, TRUNCATED])]
     return parts
 
 
@@ -135,10 +158,12 @@ def _notice(message: str) -> CheckResult:
 async def ask_api(text: str, client: httpx2.AsyncClient) -> CheckResult:
     """The same request the web form sends. Any failure becomes a notice, never a verdict."""
     try:
-        resp = await client.post(
-            "/api/checks", json={"input": text}, headers={"X-Channel": CHANNEL}
-        )
-    except httpx2.HTTPError:
+        # httpx timeouts are per read; this caps the whole call, body included.
+        async with asyncio.timeout(API_TIMEOUT_S):
+            resp = await client.post(
+                "/api/checks", json={"input": text}, headers={"X-Channel": CHANNEL}
+            )
+    except (httpx2.HTTPError, TimeoutError):
         log.exception("API call failed")
         return _notice(CONNECTION_ERROR)
     if resp.status_code in (422, 429):
