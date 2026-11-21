@@ -9,8 +9,10 @@ Docs: EUvsDisinfo MCP docs, Fibery, 2025/2026 (Streamable HTTP, JSON-RPC 2.0, AP
 """
 
 import asyncio
+import html
 import logging
 import os
+import re
 from datetime import UTC, datetime
 from typing import Any, Literal
 from urllib.parse import urlsplit
@@ -75,6 +77,10 @@ async def search_cases(query: str, *, server: Any = None) -> EuvsdisinfoLookup:
         return EuvsdisinfoLookup(limitation=LOOKUP_UNAVAILABLE)
     if items is None:
         return EuvsdisinfoLookup(limitation=LOOKUP_UNAVAILABLE)
+    if (
+        isinstance(items, dict) and "results" in items
+    ):  # live server: one page plus paging
+        items = items["results"]
     if isinstance(items, dict) and "type" in items:  # one hit comes back unwrapped
         items = [items]
     if not isinstance(items, list):
@@ -147,9 +153,16 @@ def _to_hit(item: Any, fetched_at: datetime) -> EuvsdisinfoHit | None:
             url=item["link"],
             source_type=_DOMAIN.source_type,
             # Retrieved text is untrusted data: shown and quoted, never followed.
-            fragment=content[:MAX_FRAGMENT_CHARS] if isinstance(content, str) else None,
+            fragment=_text(content)[:MAX_FRAGMENT_CHARS] or None
+            if isinstance(content, str)
+            else None,
         )
     except (KeyError, TypeError, ValidationError):
         log.warning("euvsdisinfo hit skipped: no usable link")
         return None
     return EuvsdisinfoHit(source=source, kind=item["type"])
+
+
+def _text(content: str) -> str:
+    """`content` is HTML (`<p>`, `<a>`, entities); the fragment is plain text."""
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", content)).split())
