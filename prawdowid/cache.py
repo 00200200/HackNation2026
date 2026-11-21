@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
@@ -138,22 +139,35 @@ def save_document(doc: Document, path: Path = CACHE_PATH) -> bool:
 
     Retention: pages fetched more than RETENTION_DAYS ago are dropped on the same write.
     """
-    # ponytail: rereads the file on every save; fine for a local demo cache.
-    docs = load_documents(path)
-    if any(d.url == doc.url for d in docs):
-        return False
-    cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)
-    fresh = [
-        d
-        for d in docs
-        if d.fetched_at.replace(tzinfo=d.fetched_at.tzinfo or UTC) > cutoff
-    ]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    mode = "a" if len(fresh) == len(docs) else "w"
-    with path.open(mode, encoding="utf-8") as f:
-        for d in ([] if mode == "a" else fresh) + [doc]:
-            f.write(json.dumps(d.model_dump(mode="json"), ensure_ascii=False) + "\n")
-    return True
+    # ponytail: rereads the file on every save under one process-wide lock; fine for a local
+    # demo cache, a real store (step 2c) if saves contend.
+    with _SAVE_LOCK:
+        docs = load_documents(path)
+        cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)
+        fresh = [
+            d
+            for d in docs
+            if d.fetched_at.replace(tzinfo=d.fetched_at.tzinfo or UTC) > cutoff
+        ]
+        if any(d.url == doc.url for d in fresh):
+            return False
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if len(fresh) == len(docs):
+            with path.open("a", encoding="utf-8") as f:
+                f.write(_line(doc))
+            return True
+        # Expired pages to drop: write a new file and swap it in, so a reader never sees half.
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text("".join(map(_line, fresh + [doc])), encoding="utf-8")
+        tmp.replace(path)
+        return True
+
+
+_SAVE_LOCK = threading.Lock()
+
+
+def _line(doc: Document) -> str:
+    return json.dumps(doc.model_dump(mode="json"), ensure_ascii=False) + "\n"
 
 
 def stored_documents() -> list[Document]:

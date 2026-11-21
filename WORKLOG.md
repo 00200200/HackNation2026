@@ -26,6 +26,7 @@ not → on branch `LukiLenkiewicz/issue11-fanout` each checkable claim runs Fact
 | `LukiLenkiewicz/issue19-supabase` | #19 step 2c: local PostgreSQL source store (compose `db`) and per-claim full-text search, stacked on `LukiLenkiewicz/issue10-judge` (#30; the #11 and #12 branches were not on origin after 45 min). PR open, not merged. **Disabled in the pipeline** (user decision). Database empty, not seeded. Owner: Łukasz (Claude worker). |
 | `feat/16-eval-set` | #16 eval set (31 cases) and full eval, stacked on `feat/5-self-contained-claims`. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue12-incidents` | #12 scenario I incident matcher, empty base. Stacked on `LukiLenkiewicz/issue11-fanout` (#37, merged in), PR open, not merged. Owner: Łukasz (Claude worker). |
+| `LukiLenkiewicz/issue17-privacy` | #17 masking, check log per demo session with delete, `RETENTION_DAYS`, `docs/privacy.md`. Stacked on `LukiLenkiewicz/issue12-incidents`, PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue9-rerank` | #9 step 3 rerank and dedupe, stacked on `LukiLenkiewicz/issue13-discord` (PR #24). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue11-fanout` | #11 orchestration: `verify()` runs steps 2 to 5 per claim (`prawdowid/pipeline.py`), stacked on `LukiLenkiewicz/issue19-supabase` (PR #34). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue31-euvsdisinfo` | #31 EUvsDisinfo MCP lookup, stacked on the stack tip. PR open, not merged. Owner: Łukasz (Claude worker). |
@@ -122,6 +123,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #17 merged `origin/LukiLenkiewicz/issue12-incidents` (stack tip) into `LukiLenkiewicz/issue17-privacy`; masking checked on the wired #11 pipeline; retention (atomic rewrite, lock) for `corpus/docs.jsonl`. Quick eval on the merge: macro_f1 0.125, abstention 1.00, injection 0.0, end_to_end 0.875, median 16.9 s.
 - 2026-11-21 Łukasz (Claude worker): #17 masking before the model and in logs (cards, IBAN added), check log per demo session with delete endpoint and web button, `RETENTION_DAYS` = 30, `docs/privacy.md`. Branch `LukiLenkiewicz/issue17-privacy`.
 - 2026-11-21 Łukasz (Claude worker): #12 merged `origin/LukiLenkiewicz/issue11-fanout` (stack tip, PR #37) into `LukiLenkiewicz/issue12-incidents`, full eval on `729b220` committed: macro_f1 0.24, abstention 1.00, injection_resistance 0.33, median latency 14.3 s.
 - 2026-11-21 Łukasz (Claude worker): #12 full eval on `4bd8471` committed: macro_f1 0.09, abstention 1.00, injection_resistance 0.00, median latency 4.6 s, cost $1.61 per 100.

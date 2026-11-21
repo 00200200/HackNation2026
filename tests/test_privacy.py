@@ -153,3 +153,9 @@ def test_cached_pages_past_retention_are_dropped(tmp_path):
         "https://gov.pl/kept",
         "https://gov.pl/new",
     ]
+    # A page past retention fetched again replaces the old copy.
+    again = tmp_path / "again.jsonl"
+    save_document(page("https://gov.pl/x", RETENTION_DAYS + 1), again)
+    assert save_document(page("https://gov.pl/x", 0), again) is True
+    [d] = load_documents(again)
+    assert d.fetched_at > datetime.now(UTC) - timedelta(days=1)

@@ -30,7 +30,7 @@ Where masking runs:
 | Text sent to Claude for claim extraction (`verifier.verify_text`), pasted text and the text of a linked page | yes | A placeholder keeps the sentence, so claims still split. A claim about the personal data itself (for example "this account belongs to the charity") can no longer be checked from the number, which is the point. The claim and source sentence shown to the user carry the placeholder. |
 | Everything after extraction (`prawdowid/pipeline.py`, #11): web search, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`) and database queries (`cache.build_tsquery`) are masked again. |
 | Check log record (`checklog.record`) | yes | The question is stored masked. |
-| stdout log lines | yes | They carry no user text: session id, channel, status, lengths, token counts. Link URLs are masked (an e-mail in a query string), fetch errors are logged by type only. |
+| stdout log lines | yes | No raw user text: session id, channel, status, lengths, token counts, and the claims and search queries of each check (written by the model from the masked text, so a name or a phone written as `600 100 200` can still appear). Link URLs are masked (an e-mail in a query string), fetch errors are logged by type only. |
 | The link itself, when it is fetched | no | We need the real address to fetch the page. |
 | Evidence fragments from source pages | no | They are public pages, and the quote must match the page word for word. |
 
@@ -56,7 +56,7 @@ One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:
   `delete_expired_documents()` removes expired pages and the seed script runs it first.
 
 Not covered: Docker's own stdout logs (rotation is set by the Docker host). They carry no raw user
-text: link checks log the masked URL and the claims, which come from the masked text.
+text: claims, queries and link URLs, all from masked text.
 
 ## Demo session and deletion
 
