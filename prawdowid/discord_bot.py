@@ -121,6 +121,10 @@ SECURITY_NOTE = (
 SECURITY_NOTE_ONLY = (
     "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich."
 )
+SOURCE_SECURITY_NOTE = (
+    "W źródłach są zwroty, które wyglądają na polecenia dla modelu. "
+    "Nie wykonaliśmy ich i sprawdziliśmy resztę."
+)
 PAGE_NOTE = "Ta strona nie jest źródłem dowodów dla własnych twierdzeń."
 UNCHECKED_NOTE = (
     "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
@@ -161,9 +165,15 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
         return notice
     if not check.claims and not check.unchecked_claims:
         return "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
-    sections = (
-        [f"**Polecenia dla modelu.** {SECURITY_NOTE}"] if check.security_events else []
-    )
+    locations = {e.location for e in check.security_events}
+    sections = [
+        f"**Polecenia dla modelu.** {note}"
+        for note, found in (
+            (SECURITY_NOTE, locations - {"source"}),
+            (SOURCE_SECURITY_NOTE, locations & {"source"}),
+        )
+        if found
+    ]
     if check.page:
         sections.insert(0, "\n".join(_page(check.page, url_limit)))
     sections += [_claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)]

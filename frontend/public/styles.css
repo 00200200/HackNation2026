@@ -241,7 +241,7 @@ body.checked .status-pill { margin-bottom: 1rem; }
 .verdict-confirmed { background: #127a4b; color: #fff; }
 .verdict-false { background: #b0162f; color: #fff; }
 .verdict-misleading { background: #fdf0dc; color: #8a4106; }
-.verdict-insufficient_evidence { background: #e3e6eb; color: #2e3848; }
+.verdict-insufficient_evidence, .verdict-not_checked { background: #e3e6eb; color: #2e3848; }
 .verdict-not_verifiable { background: #fff; color: #2e3848; box-shadow: inset 0 0 0 2px #8a93a3; }
 
 .legend { margin-top: 3.5rem; }

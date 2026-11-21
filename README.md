@@ -5,10 +5,14 @@ it, written in plain Polish. This repository holds the service around the verifi
 the shared contract, the HTTP API and the web frontend.
 
 **Status:** the verifier sends the text to Claude (through PydanticAI) and gets back a list of
-claims, each marked checkable or not. The model never decides whether a claim is true. There are
-no sources yet, so the verdict is set in code: a checkable claim is always `insufficient_evidence`
-with a note that the source base is not connected, and an opinion, forecast or question is
-`not_verifiable`. `sources` is always empty. A link is fetched (`prawdowid/link.py`) and the page's
+claims, each marked checkable or not. The model never decides whether a claim is true. Each
+checkable claim then goes through `prawdowid/pipeline.py` in parallel with the others: Google Fact
+Check, EUvsDisinfo known narratives (context only, never a verdict on its own) and web search on
+allowlisted domains (our own database, #19, is out of the pipeline for now), then
+rerank and a judge that labels quotes; the verdict is set in code (`judge.decide`). The whole check
+has one time budget (`PRAWDOWID_CHECK_BUDGET_S`, 25 s). A claim that runs out of time, or whose
+web search, Fact Check and EUvsDisinfo all fail, comes back `not_checked` with the reason, never as a verdict. An
+opinion, forecast or question is `not_verifiable`. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
 paste the text. There is no check database: stdout is the only record. Each check logs its status,
@@ -25,6 +29,10 @@ image; `docker compose` and `make dev` read it at start-up.
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
 | `PRAWDOWID_MODEL` | no | `anthropic:claude-opus-5-5` | PydanticAI model id (`provider:model`). |
+| `PRAWDOWID_CHECK_BUDGET_S` | no | `25` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. |
+| `PRAWDOWID_WEB_SEARCH_BUDGET_S` | no | `10` | Longest one web search query may take, retry included, before it counts as unavailable. |
+| `PRAWDOWID_PAGE_BUDGET_S` | no | `8` | Longest one page fetch may take (robots.txt and page); a slower page is skipped, the others are kept. |
+| `PRAWDOWID_RETRY_MIN_S` | no | `18` | A claim without enough evidence is searched once more only if at least this many seconds remain. |
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
@@ -33,7 +41,7 @@ image; `docker compose` and `make dev` read it at start-up.
 | `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database. The backend never needs it; `compose.prod.yaml` sets it for production's separate `db`, which has no source-store schema, so enabling step 2c in production needs this migration applied there first. Start the database with `make db` (127.0.0.1:5433). |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 
-The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
+The model call has at most one retry and shares the check's time budget (`PRAWDOWID_CHECK_BUDGET_S`, 25 s), inside the API's 60 s limit. Provider
 errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns
 `cannot_check`. Both carry a Polish message and no claims.
 
@@ -86,7 +94,7 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   Tools (`claims:search`). Each review becomes a `Source` (`source_type="fact_check"`) with the
   fact-checker's rating and the reviewed claim kept beside it, not in `fragment`: the rating is a
   signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
-  message and no hits. Not wired into `verify()` yet (issue #11).
+  message and no hits. Called per claim from `prawdowid/pipeline.py` (#11).
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
 - `prawdowid/discord_bot.py`: the second channel, a `/sprawdz tekst:` slash command (discord.py).
   It sends the same `POST /api/checks` as the web form, with `X-Channel: discord`, and renders the

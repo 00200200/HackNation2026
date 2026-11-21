@@ -9,6 +9,7 @@ const example = document.getElementById("przyklad");
 const chips = document.querySelectorAll("[data-example]");
 
 const SECURITY_NOTE = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
+const SOURCE_SECURITY_NOTE = "W źródłach są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
 const SECURITY_NOTE_ONLY = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich.";
 const MAX_CHARS = 5000;
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
@@ -25,6 +26,7 @@ const SOURCE_TYPES = {
   fact_checker: "serwis fact-checkingowy",
   fact_check: "serwis fact-checkingowy",
   incident_base: "baza incydentów dezinformacji",
+  disinfo_database: "baza znanych narracji dezinformacyjnych",
   news: "serwis informacyjny",
 };
 // First words of the answer, in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić…"),
@@ -35,6 +37,8 @@ const ANSWER_LEAD = {
   misleading: "To wprowadza w błąd.",
   insufficient_evidence: "Nie udało mi się potwierdzić tej informacji.",
   not_verifiable: "Tego nie da się sprawdzić: to opinia, prognoza albo pytanie bez faktu do sprawdzenia.",
+  // Not a verdict: the reason follows from the limitations.
+  not_checked: "Nie sprawdziliśmy tego twierdzenia.",
 };
 // Enter sends only with a hardware keyboard; on touch keyboards it adds a new line.
 const ENTER_SENDS = window.matchMedia("(hover: hover) and (pointer: fine)");
@@ -183,8 +187,10 @@ function render(check, seconds) {
     return notice("Nie znaleźliśmy zdania do sprawdzenia",
       "Wklej fragment z konkretnym faktem, na przykład datą, liczbą albo nazwą instytucji.");
   }
+  const events = check.security_events ?? [];
   return el("article", { className: "card" },
-    check.security_events?.length ? notice("Polecenia dla modelu", SECURITY_NOTE) : null,
+    events.some((e) => e.location !== "source") ? notice("Polecenia dla modelu", SECURITY_NOTE) : null,
+    events.some((e) => e.location === "source") ? notice("Polecenia w źródle", SOURCE_SECURITY_NOTE) : null,
     el("div", { className: "card-head" },
       el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
         el("span", { className: "took", textContent: `w ${seconds} s` })),

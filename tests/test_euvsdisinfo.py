@@ -62,7 +62,7 @@ def test_known_case_returns_a_source_with_its_link():
     assert case.source.title == "Poland plans to annex western Ukraine"
     assert str(case.source.url) == RESULTS[0]["link"]
     assert case.source.publisher == "EUvsDisinfo (ESDZ)"
-    assert case.source.source_type == "official"
+    assert case.source.source_type == "disinfo_database"
     assert case.source.published_at is None  # `search` gives no date; never guessed
     assert isinstance(case.source.fetched_at, datetime)
     assert article.kind == "article"

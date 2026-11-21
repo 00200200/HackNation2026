@@ -64,7 +64,7 @@ def test_text_returns_claims_with_labels(client):
     body = resp.json()
     assert body["status"] == "ok"
     assert [c["verdict_label"] for c in body["claims"]] == [
-        "brak wystarczających dowodów",
+        "nie sprawdzono",
         "nie podlega weryfikacji",
     ]
     assert body["claims"][0]["source_sentence"] == "Fakt."

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -439,3 +440,21 @@ def test_backend_falls_back_to_the_next_checked_address(monkeypatch):
     inner = FirstFails()
     asyncio.run(safefetch.PublicOnlyBackend(inner).connect_tcp("www.gov.pl", 443))
     assert inner.connected == ["2001:db8::1", "93.184.216.34"]
+
+
+def test_a_hanging_provider_is_cut_by_the_search_budget(monkeypatch):
+    monkeypatch.setattr(websearch, "SEARCH_BUDGET_S", 0.2)
+
+    def hanging(query, *, domains, limit):
+        time.sleep(1)
+        return []
+
+    async def go():
+        started = time.perf_counter()
+        result = await websearch.search_web("sankcje", provider=hanging)
+        return result, time.perf_counter() - started
+
+    # asyncio.run then waits for the thread to end; the search itself does not.
+    result, elapsed = asyncio.run(go())
+    assert elapsed < 0.8
+    assert result.limitation == websearch.SEARCH_UNAVAILABLE

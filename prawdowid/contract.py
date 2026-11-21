@@ -13,6 +13,8 @@ class Verdict(StrEnum):
     MISLEADING = "misleading"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
     NOT_VERIFIABLE = "not_verifiable"
+    # Not a verdict: the time limit ran out or every source failed. Limitations say which.
+    NOT_CHECKED = "not_checked"
 
     @property
     def label(self) -> str:
@@ -25,6 +27,7 @@ VERDICT_LABELS = {
     Verdict.MISLEADING: "wprowadzające w błąd",
     Verdict.INSUFFICIENT_EVIDENCE: "brak wystarczających dowodów",
     Verdict.NOT_VERIFIABLE: "nie podlega weryfikacji",
+    Verdict.NOT_CHECKED: "nie sprawdzono",
 }
 
 
