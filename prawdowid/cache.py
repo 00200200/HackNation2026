@@ -3,10 +3,19 @@
 Step 2c is **disabled in the pipeline** (user decision, 2026-11-21) until the team chooses licensed
 sources: checks never write to the database and nothing in `verify()` calls `search_documents`.
 
-- `save_document` / `load_documents`: the local JSONL cache `corpus/docs.jsonl` (ignored by git:
-  full page text, not redistributed). Web search (#8) saves every fetched page here. Its line format
-  (`url`, `text`, ...) is what `evals.run --corpus` reads. Page text from the database is never
-  exported, so database retention and deletion cover every stored copy.
+- `save_document` / `load_documents` / `delete_document`: the local JSONL cache
+  `corpus/docs.jsonl` of the pages web search (#8) read, with publication and retrieval
+  timestamps. Brief: no archiving of full content without a legal basis, licence, retention,
+  access control and deletion, so:
+  - Metadata of every page: URL, title, publisher, dates, source type, domain, licence.
+  - Full text only when the domain's licence is confirmed (`Domain.licence` in websearch.py).
+    Today none is, so `text` is stored empty. The pipeline still uses the live text in memory.
+  - Retention: records older than `RETENTION_DAYS` (by `fetched_at`) are dropped on every save;
+    `delete_document(url)` removes one record, deleting the file removes everything.
+  - Access: one local file, owner read/write only (0600), ignored by git.
+  - A URL keeps one record: the latest fetch replaces the older one.
+  The line format (`url`, `text`, ...) is what `evals.run --corpus` reads. Page text from the
+  database is never exported, so database retention and deletion cover every stored copy.
 - `store_document` / `stored_documents`: the PostgreSQL store (`DATABASE_URL`, schema in
   `db/migrations/`). Only the seed script `prawdowid.corpus` writes to it.
 - `search_documents(claim)`: per-claim search of the store for rerank (#9). Without `DATABASE_URL`,
@@ -18,13 +27,12 @@ psycopg 3: a document and its chunks go in one transaction, and the ranked searc
 
 import asyncio
 import hashlib
-import json
 import logging
 import os
 import re
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import psycopg
@@ -38,6 +46,7 @@ from prawdowid.rerank import Fragment, canonical_url, split_text
 log = logging.getLogger("prawdowid")
 
 CACHE_PATH = Path(os.getenv("PRAWDOWID_CACHE") or "corpus/docs.jsonl")
+RETENTION_DAYS = 30
 DATABASE_ENV = "DATABASE_URL"
 LICENCE_UNCONFIRMED = "UNCONFIRMED (docs/sources.md)"
 
@@ -104,8 +113,10 @@ class Document(BaseModel):
     fetched_at: datetime
     source_type: str
     domain: str
+    # None: licence not confirmed, so the JSONL cache keeps no text (the database records
+    # LICENCE_UNCONFIRMED; the seed only stores approved sources with their licence).
+    licence: str | None = None
     text: str
-    licence: str = LICENCE_UNCONFIRMED
 
     def to_source(self, fragment: str | None = None) -> Source:
         return Source(
@@ -127,21 +138,40 @@ class DatabaseSearch(BaseModel):
 
 
 def load_documents(path: Path = CACHE_PATH) -> list[Document]:
+    """Records within retention. Expired ones are never returned, even before the next save."""
     if not path.exists():
         return []
+    cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)
     with path.open(encoding="utf-8") as f:
-        return [Document.model_validate_json(line) for line in f if line.strip()]
+        docs = [Document.model_validate_json(line) for line in f if line.strip()]
+    return [d for d in docs if d.fetched_at >= cutoff]
 
 
-def save_document(doc: Document, path: Path = CACHE_PATH) -> bool:
-    """Append the document unless its URL is cached already. True when it was added."""
-    # ponytail: rereads the file on every save; fine for a local demo cache.
-    if any(d.url == doc.url for d in load_documents(path)):
-        return False
+def save_document(doc: Document, path: Path = CACHE_PATH) -> None:
+    """Store the latest fetch of this URL (text only if licensed) and drop expired records."""
+    kept = [d for d in load_documents(path) if d.url != doc.url]
+    _write(path, [*kept, doc])
+
+
+def delete_document(url: str, path: Path = CACHE_PATH) -> bool:
+    """Remove the record of this URL. True when there was one."""
+    docs = load_documents(path)
+    kept = [d for d in docs if d.url != url]
+    _write(path, kept)
+    return len(kept) < len(docs)
+
+
+def _write(path: Path, docs: list[Document]) -> None:
+    """Rewrite the file. Text of unlicensed records is dropped here, old records included."""
+    # ponytail: whole-file rewrite, one writer process at a time (two concurrent savers can
+    # lose a record). Fine for the demo corpus; the Supabase store (#19) replaces it.
+    docs = [d if d.licence else d.model_copy(update={"text": ""}) for d in docs]
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(doc.model_dump(mode="json"), ensure_ascii=False) + "\n")
-    return True
+    tmp = path.with_suffix(".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.writelines(d.model_dump_json() + "\n" for d in docs)
+    tmp.replace(path)
 
 
 def stored_documents() -> list[Document]:
@@ -290,7 +320,7 @@ def _insert(doc: Document) -> bool:
                 doc.publisher,
                 doc.domain,
                 doc.source_type,
-                doc.licence,
+                doc.licence or LICENCE_UNCONFIRMED,
                 doc.published_at,
                 doc.fetched_at,
                 hashlib.sha256(doc.text.encode()).hexdigest(),

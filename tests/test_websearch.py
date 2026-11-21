@@ -1,12 +1,14 @@
 import asyncio
-from datetime import date
+import os
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+import httpcore2
 import httpx2
 import pytest
 from ddgs.exceptions import DDGSException
 
-from prawdowid import cache, websearch
+from prawdowid import cache, safefetch, websearch
 from prawdowid.privacy import mask_personal_data
 from prawdowid.websearch import (
     ALLOWLIST,
@@ -37,7 +39,7 @@ def isolated(monkeypatch, tmp_path):
         "save_document",
         lambda d: cache.save_document(d, tmp_path / "docs.jsonl"),
     )
-    websearch._robots.clear()
+    safefetch._robots.clear()
     return tmp_path / "docs.jsonl"
 
 
@@ -82,12 +84,13 @@ def run(provider, routes, seen=None, **kwargs):
 def test_personal_data_is_masked_but_amounts_are_kept():
     text = (
         "Pisz na jan.kowalski@example.com, tel. +48 600 100 200 lub 600-100-200, "
-        "PESEL 44051401359, konto PL61 1090 1014 0000 0712 1981 2874. "
+        "PESEL 44051401359, PESEL:44051401359, PESEL44051401359, konto PL61 1090 1014 0000 0712 1981 2874. "
         "Rząd wydał 500 000 000 zł, czyli 100000000 euro, w 2024; rejestr 12345678901."
     )
     masked = mask_personal_data(text)
     assert "example.com" not in masked and "600" not in masked
     assert "44051401359" not in masked and "1090" not in masked
+    assert masked.count("[PESEL]") == 3
     # Amounts, years and 11 digits without a valid PESEL checksum stay.
     assert (
         "500 000 000 zł, czyli 100000000 euro, w 2024; rejestr 12345678901." in masked
@@ -129,7 +132,9 @@ def test_hits_are_fetched_extracted_and_cached(isolated):
     assert "gazu skroplonego" in doc.text
     source = doc.to_source()
     assert source.title and source.publisher and source.published_at and source.url
-    assert [d.url for d in cache.load_documents(isolated)] == [doc.url]
+    # Licence UNCONFIRMED: the cache keeps metadata, not the page text.
+    [stored] = cache.load_documents(isolated)
+    assert stored.url == doc.url and stored.title == doc.title and stored.text == ""
     assert calls == ["sankcje"]
 
 
@@ -168,6 +173,7 @@ def test_no_allowlisted_hit_is_a_limitation():
     "routes",
     [
         {"www.gov.pl/p": httpx2.Response(403)},
+        {"www.gov.pl/p": httpx2.Response(302)},  # redirect without Location
         {
             "www.gov.pl/p": httpx2.Response(
                 200, content=b"%PDF", headers={"content-type": "application/pdf"}
@@ -187,7 +193,14 @@ def test_no_allowlisted_hit_is_a_limitation():
             "example.com/p": html(),
         },
     ],
-    ids=["blocked", "not-html", "undated", "robots", "redirect-off-allowlist"],
+    ids=[
+        "blocked",
+        "redirect-without-location",
+        "not-html",
+        "undated",
+        "robots",
+        "redirect-off-allowlist",
+    ],
 )
 def test_unusable_pages_are_skipped(routes, isolated):
     result = run(provider_returning("https://www.gov.pl/p"), routes)
@@ -196,15 +209,51 @@ def test_unusable_pages_are_skipped(routes, isolated):
     assert not isolated.exists()
 
 
-def test_cache_keeps_one_document_per_url(tmp_path):
+def fetched_doc():
     result = run(
         provider_returning("https://www.gov.pl/p"), {"www.gov.pl/p": html()}, save=False
     )
-    [doc] = result.documents
+    return result.documents[0]
+
+
+def test_cache_keeps_the_latest_fetch_of_a_url(tmp_path):
     path = tmp_path / "c.jsonl"
-    assert cache.save_document(doc, path) is True
-    assert cache.save_document(doc, path) is False
-    assert cache.load_documents(path) == [doc]
+    old = fetched_doc()
+    new = old.model_copy(
+        update={
+            "title": "Nowy tytuł",
+            "fetched_at": old.fetched_at + timedelta(hours=1),
+        }
+    )
+    cache.save_document(old, path)
+    cache.save_document(new, path)
+    [stored] = cache.load_documents(path)
+    assert stored.title == "Nowy tytuł" and stored.fetched_at == new.fetched_at
+    assert os.stat(path).st_mode & 0o777 == 0o600
+
+
+def test_cache_keeps_text_only_with_a_licence_and_drops_expired(tmp_path):
+    path = tmp_path / "c.jsonl"
+    doc = fetched_doc()
+    licensed = doc.model_copy(
+        update={"url": "https://www.gov.pl/l", "licence": "CC BY 4.0"}
+    )
+    expired = doc.model_copy(
+        update={
+            "url": "https://www.gov.pl/old",
+            "fetched_at": datetime.now(UTC) - timedelta(days=cache.RETENTION_DAYS + 1),
+        }
+    )
+    cache.save_document(expired, path)
+    cache.save_document(licensed, path)
+    cache.save_document(doc, path)
+    stored = {d.url: d for d in cache.load_documents(path)}
+    assert set(stored) == {licensed.url, doc.url}
+    assert stored[licensed.url].text == licensed.text
+    assert stored[doc.url].text == ""
+    assert cache.delete_document(doc.url, path) is True
+    assert cache.delete_document(doc.url, path) is False
+    assert [d.url for d in cache.load_documents(path)] == [licensed.url]
 
 
 def test_ddg_errors_become_search_unavailable(monkeypatch):
@@ -262,3 +311,131 @@ def test_slow_page_is_cut_off(monkeypatch):
         )
 
     assert asyncio.run(go()).limitation == NOTHING_FETCHED
+
+
+DISALLOW_PRIVATE = httpx2.Response(200, text="User-agent: *\nDisallow: /private")
+
+
+@pytest.mark.parametrize(
+    "routes",
+    [
+        {  # same host, redirect to a disallowed path
+            "www.gov.pl/robots.txt": DISALLOW_PRIVATE,
+            "www.gov.pl/p": httpx2.Response(302, headers={"location": "/private"}),
+            "www.gov.pl/private": html(),
+        },
+        {  # another allowlisted host whose robots.txt disallows everything
+            "www.gov.pl/p": httpx2.Response(
+                302, headers={"location": "https://www.sejm.gov.pl/x"}
+            ),
+            "www.sejm.gov.pl/robots.txt": httpx2.Response(
+                200, text="User-agent: *\nDisallow: /"
+            ),
+            "www.sejm.gov.pl/x": html(),
+        },
+    ],
+    ids=["same-host", "other-host"],
+)
+def test_robots_txt_is_checked_on_every_redirect_hop(routes):
+    seen = []
+    result = run(provider_returning("https://www.gov.pl/p"), routes, seen=seen)
+    assert result.documents == []
+    assert not [u for u in seen if u.endswith(("/private", "/x"))]
+
+
+@pytest.mark.parametrize("status", [429, 500, 503])
+def test_unreadable_robots_txt_means_no_fetch(status):
+    seen = []
+    routes = {"www.gov.pl/robots.txt": httpx2.Response(status), "www.gov.pl/p": html()}
+    result = run(provider_returning("https://www.gov.pl/p"), routes, seen=seen)
+    assert result.documents == []
+    assert "https://www.gov.pl/p" not in seen
+    assert "https://www.gov.pl" not in safefetch._robots  # retried later, not cached
+
+
+def test_oversized_robots_txt_and_page_are_refused(monkeypatch):
+    big_robots = {
+        "www.gov.pl/robots.txt": httpx2.Response(
+            200, text="#" * (safefetch.ROBOTS_MAX_BYTES + 1)
+        ),
+        "www.gov.pl/p": html(),
+    }
+    assert run(provider_returning("https://www.gov.pl/p"), big_robots).documents == []
+
+    monkeypatch.setattr(websearch, "MAX_PAGE_BYTES", 100)
+    page_routes = {"www.gov.pl/p": html()}
+    assert run(provider_returning("https://www.gov.pl/p"), page_routes).documents == []
+
+
+class RecordingBackend(httpcore2.AsyncNetworkBackend):
+    def __init__(self):
+        self.connected = []
+
+    async def connect_tcp(self, host, port, **kwargs):
+        self.connected.append(host)
+        return httpcore2.AsyncMockStream([])
+
+
+@pytest.mark.parametrize(
+    "addresses",
+    [
+        ["127.0.0.1"],
+        ["10.0.0.5"],
+        ["169.254.169.254"],
+        ["::1"],
+        ["::ffff:127.0.0.1"],
+        ["93.184.216.34", "192.168.1.1"],  # one private answer is enough to refuse
+    ],
+)
+def test_backend_refuses_hosts_resolving_to_non_public_addresses(
+    monkeypatch, addresses
+):
+    async def fake_resolve(host, port):
+        return addresses
+
+    monkeypatch.setattr(safefetch, "resolve", fake_resolve)
+    inner = RecordingBackend()
+    with pytest.raises(httpcore2.ConnectError):
+        asyncio.run(
+            safefetch.PublicOnlyBackend(inner).connect_tcp("intranet.gov.pl", 443)
+        )
+    assert inner.connected == []
+
+
+def test_backend_connects_to_the_address_it_checked(monkeypatch):
+    answers = iter([["93.184.216.34"], ["127.0.0.1"]])  # a rebinding resolver
+
+    async def fake_resolve(host, port):
+        return next(answers)
+
+    monkeypatch.setattr(safefetch, "resolve", fake_resolve)
+    inner = RecordingBackend()
+    asyncio.run(safefetch.PublicOnlyBackend(inner).connect_tcp("www.gov.pl", 443))
+    assert inner.connected == ["93.184.216.34"]
+
+
+def test_default_transport_refuses_a_real_loopback_connection():
+    async def go():
+        async with safefetch.client(2) as http:
+            await http.get("http://localhost/")
+
+    with pytest.raises(httpx2.ConnectError, match="non-public"):
+        asyncio.run(go())
+
+
+def test_backend_falls_back_to_the_next_checked_address(monkeypatch):
+    async def fake_resolve(host, port):
+        return ["2001:db8::1", "93.184.216.34"]
+
+    class FirstFails(RecordingBackend):
+        async def connect_tcp(self, host, port, **kwargs):
+            self.connected.append(host)
+            if len(self.connected) == 1:
+                raise httpcore2.ConnectTimeout("no route")
+            return httpcore2.AsyncMockStream([])
+
+    monkeypatch.setattr(safefetch, "resolve", fake_resolve)
+    monkeypatch.setattr(safefetch, "is_public", lambda a: True)
+    inner = FirstFails()
+    asyncio.run(safefetch.PublicOnlyBackend(inner).connect_tcp("www.gov.pl", 443))
+    assert inner.connected == ["2001:db8::1", "93.184.216.34"]

@@ -1,8 +1,12 @@
 import asyncio
+import json
+import threading
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from fastmcp import FastMCP
+from mcp.shared.exceptions import MCPError
 
 from prawdowid import euvsdisinfo
 from prawdowid.euvsdisinfo import KEY_ENV, LOOKUP_UNAVAILABLE, search_cases
@@ -22,6 +26,7 @@ RESULTS = [
         "link": "https://euvsdisinfo.eu/disinfo-review/",
     },
     {"type": "claim_review", "title": "No link"},
+    {"type": "claim_review", "title": "Broken", "link": "https://[broken"},
     {"type": "claim_review", "title": "Elsewhere", "link": "https://example.com/a"},
     {"type": "unknown", "title": "Other", "link": "https://euvsdisinfo.eu/x/"},
 ]
@@ -50,7 +55,9 @@ def test_known_case_returns_a_source_with_its_link():
 
     assert lookup.limitation is None
     assert queries == ["Polska chce zaanektować zachodnią Ukrainę"]
-    case, article = lookup.hits  # no link, foreign link and unknown type are dropped
+    case, article = (
+        lookup.hits
+    )  # no, broken or foreign link and unknown type are dropped
     assert case.kind == "claim_review"
     assert case.source.title == "Poland plans to annex western Ukraine"
     assert str(case.source.url) == RESULTS[0]["link"]
@@ -134,3 +141,79 @@ def test_too_short_query_is_not_sent(query):
     lookup = run(fake_server(search), query)
 
     assert lookup.hits == [] and lookup.limitation is None
+
+
+def test_bad_key_is_not_retried(monkeypatch):
+    """Production HTTP branch against a local server that answers like mcp.euvsd.info on a bad key."""
+    seen = []
+
+    class Unauthorized(BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen.append((self.path, self.headers.get("X-API-Key")))
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            body = json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {"code": -32001, "message": "Unauthorized"},
+                }
+            ).encode()
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    http = ThreadingHTTPServer(("127.0.0.1", 0), Unauthorized)
+    threading.Thread(target=http.serve_forever, daemon=True).start()
+    attempts = []
+    real_toolset = euvsdisinfo.MCPToolset
+
+    def counting_toolset(*args, **kwargs):
+        attempts.append(args)
+        return real_toolset(*args, **kwargs)
+
+    monkeypatch.setattr(euvsdisinfo, "URL", f"http://127.0.0.1:{http.server_port}/mcp")
+    monkeypatch.setattr(euvsdisinfo, "MCPToolset", counting_toolset)
+    monkeypatch.setenv(KEY_ENV, "bad-test-key")
+    try:
+        lookup = asyncio.run(search_cases("biolab Ukraine"))
+    finally:
+        http.shutdown()
+        http.server_close()
+
+    assert lookup.limitation == LOOKUP_UNAVAILABLE
+    assert len(attempts) == 1
+    assert seen and all(path == "/mcp" and key == "bad-test-key" for path, key in seen)
+
+
+def test_sdk_timeout_with_the_same_code_is_still_retried(monkeypatch):
+    # The MCP SDK reports its own read timeout with -32001, the server's bad-key code.
+    calls = []
+
+    class FlakyToolset:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def direct_call_tool(self, name, args):
+            calls.append(name)
+            if len(calls) == 1:
+                raise MCPError(code=-32001, message="Request 'tools/call' timed out")
+            return RESULTS[:1]
+
+    monkeypatch.setattr(euvsdisinfo, "MCPToolset", FlakyToolset)
+    monkeypatch.setenv(KEY_ENV, "test-key")
+
+    lookup = asyncio.run(search_cases("biolab Ukraine"))
+
+    assert len(calls) == 2
+    assert len(lookup.hits) == 1 and lookup.limitation is None

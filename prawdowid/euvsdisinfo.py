@@ -33,6 +33,7 @@ MAX_QUERY_CHARS = 200
 MAX_FRAGMENT_CHARS = 800
 MAX_TITLE_CHARS = 300
 MIN_QUERY_CHARS = 3  # the server rejects shorter queries
+AUTH_ERROR_CODE = -32001  # JSON-RPC code of HTTP 401, missing or invalid key
 _DOMAIN = ALLOWLIST["euvsdisinfo.eu"]
 
 LOOKUP_UNAVAILABLE = (
@@ -108,7 +109,16 @@ async def _search(query: str, server: Any, key: str | None) -> Any:
             log.warning(
                 "euvsdisinfo attempt %d failed: %s", attempt, type(exc).__name__
             )
+            if _is_bad_key(exc):
+                break  # a bad key stays bad: no retry
     return None
+
+
+def _is_bad_key(exc: Exception) -> bool:
+    # -32001 is the server's "missing or invalid API key" and also the MCP SDK's own
+    # request timeout ("Request 'tools/call' timed out"), which is worth a retry.
+    message = str(getattr(exc, "message", ""))
+    return getattr(exc, "code", None) == AUTH_ERROR_CODE and "timed out" not in message
 
 
 def _to_hit(item: Any, fetched_at: datetime) -> EuvsdisinfoHit | None:
@@ -118,7 +128,11 @@ def _to_hit(item: Any, fetched_at: datetime) -> EuvsdisinfoHit | None:
     ):
         return None
     # Only EUvsDisinfo's own pages carry its source type; a link elsewhere is not its case.
-    host = urlsplit(str(item.get("link") or "")).hostname or ""
+    try:
+        host = urlsplit(str(item.get("link") or "")).hostname or ""
+    except ValueError:  # e.g. "https://[broken"
+        log.warning("euvsdisinfo hit skipped: malformed link")
+        return None
     if host != "euvsdisinfo.eu" and not host.endswith(".euvsdisinfo.eu"):
         log.warning("euvsdisinfo hit skipped: link is not on euvsdisinfo.eu")
         return None

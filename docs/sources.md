@@ -11,8 +11,21 @@ goes to `corpus/manifest.jsonl` when the corpus is built with `uv run python -m 
 **The corpus is not built yet:** DuckDuckGo returned no results from our machine on 2026-11-21, and
 the team will replace the provider (#7, #8).
 
-What we store: web search saves the extracted text of every fetched page to the local cache
-`corpus/docs.jsonl`. Our own database (step 2c: local PostgreSQL, tables `documents` and `chunks`,
+What we store (`prawdowid/cache.py`): metadata of every page (URL, title, publisher, dates,
+type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo.
+Full page text is stored only for a domain whose licence is confirmed (`licence` in `ALLOWLIST`);
+today none is, so no page text is archived. The pipeline uses the live text in memory for the
+current check only. Records older than 30 days (`RETENTION_DAYS`, by `fetched_at`) are never loaded
+and are dropped on every save, a new fetch of the same URL replaces the old record, `delete_document(url)` deletes one
+record and deleting the file deletes all. Until licences are confirmed the cache cannot serve as
+the eval corpus for citation correctness, which needs the text.
+
+How pages are fetched (`prawdowid/safefetch.py`): every hop, redirects included, must be on the
+allowlist, use http(s) on the default port, resolve only to public IP addresses (the connection
+goes to the checked address) and be allowed by that host's robots.txt. A robots.txt answering 429,
+5xx or not at all means we do not fetch. We never get around a 401, 403, 429 or a bot challenge.
+
+Our own database (step 2c: local PostgreSQL, tables `documents` and `chunks`,
 schema in `db/migrations/`, compose service `sourcedb`, profile `sourcedb`, volume `sourcedb_data`) is **disabled in the pipeline** until the team
 chooses licensed sources: checks never read or write it. It starts empty; only the seed script
 writes to it (`make db-seed`, queries in `corpus/queries.txt`). Neither store is in the repo and we
