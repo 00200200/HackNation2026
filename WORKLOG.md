@@ -199,6 +199,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał: README opens in the pitch deck's style: banner, live home page, a real answer from the live API, verdicts and pipeline images in `docs/readme/` (regenerate from `docs/readme/assets.html`); technical sections kept below.
 - 2026-11-21 Michał (session korpus): Demagog dropped as a direct source (user decision: Demagog only through Google Fact Check Tools): catalogue entry excluded with the reason, ClaimReview page collector and its `claim_author`/`claim_source`/`cited_links` fields removed, `demagog.org.pl` out of the web-search allowlist and `docs/sources.md`; corpus rebuilt: 1,158 records, 11 registered domains (7 with *.gov.pl as one), official 1,143 + fact-checker 15, thresholds met. Eval labels from Demagog ClaimReview kept. Branch `claude/drop-demagog`.
 - 2026-11-21 Michał: web UI as one view in the pitch deck's crimson (Sherlock-cover cloth, white page): the name "faktczyfejk" with a glass magnifier and outlined echo, one box for text or a link, the answer with sources below. Example card, legend, chips and chat preview removed; logo and favicon recoloured.
 - 2026-11-21 Łukasz (Claude worker): eval history on `LukiLenkiewicz/eval-history` (`cc58dac`): every `evals/run.py`

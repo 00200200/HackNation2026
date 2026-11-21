@@ -1,10 +1,55 @@
-# PRAWDOWID
+<p align="center">
+  <img src="docs/readme/banner.png" alt="faktczyfejk.pl: sprawdź, zanim podasz dalej" width="100%">
+</p>
 
-You paste a text or a link and get back, for each claim in it, a verdict and the sources behind
-it, written in plain Polish. This repository holds the service around the verification pipeline:
-the shared contract, the HTTP API and the web frontend.
+<p align="center">
+  <b><a href="https://faktczyfejk.pl">faktczyfejk.pl</a></b> · HackNation 2026, challenge <b>Prawdowid</b><br>
+  Michał Furgała · Łukasz Lenkiewicz · Dominik Galus
+</p>
 
-**Status:** the verifier sends the text to Claude (through PydanticAI) and gets back a list of
+# faktczyfejk
+
+Paste a message or a link you were sent. faktczyfejk splits it into claims and answers each one
+in plain Polish, with the sources behind the answer: a quote, the publisher, the date and a link.
+When the evidence is not there, it says so instead of guessing.
+
+| One box for text or a link | The answer, claim by claim |
+|---|---|
+| <img src="docs/readme/home.png" alt="faktczyfejk.pl home page: the name, one box for text or a link" width="100%"> | <img src="docs/readme/answer.png" alt="An answer from the live API: two claims, each with its verdict, the answer's first words and what could not be established" width="100%"> |
+
+The answer on the right is a real response from the live API (21.11.2026). Google Fact Check and
+EUvsDisinfo were not configured on the server yet and web search found nothing, so both claims come
+back as `brak wystarczających dowodów` ("nie udało mi się potwierdzić") with the reasons listed,
+not as a guess.
+
+## How an answer reads
+
+<img src="docs/readme/verdicts.png" alt="Five verdicts and the first words of each answer: Tak, Nie, To wprowadza w błąd, Nie udało mi się potwierdzić, Tego nie da się sprawdzić" width="100%">
+
+Answers follow the organiser's sample format: the first words come from the verdict, then the
+sources by name. "Skopiuj odpowiedź na czat" copies the same text. A technical failure or a
+request to clarify is a grey notice, never a verdict, and a claim whose sources all failed comes
+back as `nie sprawdzono` with the reason.
+
+## How it works
+
+<img src="docs/readme/flow.png" alt="Pipeline: text or link, sources in parallel per claim, rerank, a model judge labels quotes, the verdict is set by rules in code" width="100%">
+
+- **The model reads, the code decides.** Claude (through PydanticAI) splits the text into claims
+  and labels quotes. The verdict comes from rules in `judge.decide()`.
+- **Sources per claim, in parallel:** Google Fact Check Tools (fact-checkers' ratings), EUvsDisinfo as context only, the www.gov.pl site search, and
+  Tavily web search restricted to allowlisted domains.
+- **Privacy:** PESEL, phone, e-mail, account and card numbers are masked before the model. Checks
+  are kept for 30 days and can be deleted per session.
+- **Two channels, one API:** the web page and the Discord command `/sprawdz` call the same
+  `POST /api/checks`.
+
+Measured results live in [`evals/results/HISTORY.md`](evals/results/HISTORY.md), one row per eval
+run with its commit and notes. Read [`docs/eval-notes.md`](docs/eval-notes.md) before quoting a number.
+
+## Status in detail
+
+The verifier sends the text to Claude (through PydanticAI) and gets back a list of
 claims, each marked checkable or not. The model never decides whether a claim is true. Each
 checkable claim then goes through `prawdowid/pipeline.py` in parallel with the others: Google Fact
 Check, EUvsDisinfo known narratives (context only, never a verdict on its own), the www.gov.pl site
