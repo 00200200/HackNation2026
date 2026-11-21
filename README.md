@@ -54,3 +54,16 @@ back as 422 with a Polish message in `detail[0].msg`.
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
 their own copy of the labels.
+
+## Pre-push gate
+
+Run once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-push` refuses a push without a `judge` agent PASS for the pushed commit, and on secrets, tracked
+`.env` files, files over 10 MB, or failing ruff or pytest. Once an eval has run in the clone, product changes also
+need a clean eval run on the pushed commit (`uv run python -m evals.run --quick`). The submission push is
+`HN_FINAL=1 git push`. Rules: `.claude/skills/hacknation-judging/SKILL.md` and `.claude/skills/prawdowid-eval/SKILL.md`.
