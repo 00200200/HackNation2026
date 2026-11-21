@@ -14,9 +14,12 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from collections import Counter
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
+
+import psycopg
 
 from prawdowid.cache import (
     DATABASE_ENV,
@@ -30,6 +33,8 @@ from prawdowid.websearch import ALLOWLIST, search_web
 MANIFEST = Path("corpus/manifest.jsonl")
 # Seed queries, one per line; "#" starts a comment. Committed so the seed is reproducible.
 QUERIES = Path("corpus/queries.txt")
+# Exact final host -> approved full-text licence; prerequisites and approval record: docs/sources.md.
+APPROVED_SOURCES: dict[str, str] = {}
 
 
 def queries(path: Path = QUERIES) -> list[str]:
@@ -38,7 +43,7 @@ def queries(path: Path = QUERIES) -> list[str]:
 
 
 def local_database_url() -> str:
-    """URI of the compose `db` service from the same settings compose reads (.env)."""
+    """URI of the compose `sourcedb` service from the same settings compose reads (.env)."""
     password = quote(os.getenv("POSTGRES_PASSWORD") or "prawdowid", safe="")
     port = os.getenv("DB_PORT") or "5433"
     return f"postgresql://prawdowid:{password}@127.0.0.1:{port}/prawdowid"
@@ -49,9 +54,20 @@ def _use_database() -> bool:
 
 
 async def build(target: int) -> None:
+    approved = {
+        host: licence
+        for host, licence in APPROVED_SOURCES.items()
+        if licence.strip() and "UNCONFIRMED" not in licence.upper()
+    }
+    if _use_database():
+        if not approved:
+            raise SystemExit(
+                "Seed refused: no approved sources; see docs/sources.md before archiving full text."
+            )
+        print(f"retention: {delete_expired()} expired documents deleted")
     documents = stored_documents if _use_database() else load_documents
     for topic in queries():
-        for domain in ALLOWLIST:
+        for domain in approved if _use_database() else ALLOWLIST:
             if len(documents()) >= target:
                 return
             # The seed is the only writer of the database: search itself saves only to JSONL.
@@ -60,7 +76,11 @@ async def build(target: int) -> None:
             )
             if _use_database():
                 for d in result.documents:
-                    await asyncio.to_thread(store_document, d)
+                    # Check the final URL too: search results may redirect outside the approval.
+                    if licence := approved.get(urlsplit(d.url).hostname):
+                        await asyncio.to_thread(
+                            store_document, d.model_copy(update={"licence": licence})
+                        )
             print(f"{domain:22} {topic:32} {len(result.documents)} docs")
 
 
@@ -79,19 +99,26 @@ def write_manifest() -> None:
     )
 
 
-if __name__ == "__main__":
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", type=int, default=120)
     parser.add_argument(
         "--local-db",
         action="store_true",
-        help="seed the compose db service unless DATABASE_URL is set",
+        help="seed the compose sourcedb service unless DATABASE_URL is set",
     )
     args = parser.parse_args()
     if args.local_db and not os.getenv(DATABASE_ENV):
         os.environ[DATABASE_ENV] = local_database_url()
     logging.basicConfig(level=logging.WARNING)
-    if _use_database():
-        print(f"retention: {delete_expired()} expired documents deleted")
-    asyncio.run(build(args.target))
-    write_manifest()
+    try:
+        asyncio.run(build(args.target))
+        write_manifest()
+    except psycopg.Error as exc:
+        print(f"Seed failed: {type(exc).__name__}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

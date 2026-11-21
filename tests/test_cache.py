@@ -9,7 +9,7 @@ import httpx2
 import psycopg
 import pytest
 
-from prawdowid import cache, websearch
+from prawdowid import cache, safefetch, websearch
 from prawdowid.cache import (
     DATABASE_UNAVAILABLE,
     Document,
@@ -47,6 +47,7 @@ def doc(url="https://www.gov.pl/web/kas/sankcje"):
         fetched_at=FETCHED,
         source_type="official",
         domain="www.gov.pl",
+        licence="Synthetic test licence",  # the database refuses a page without one
         text="Akapit pierwszy.\n\nAkapit drugi.",
     )
 
@@ -172,7 +173,7 @@ def test_database_save_writes_document_and_chunks(monkeypatch):
     timeout, insert, chunks = conn.statements
     assert "statement_timeout" in timeout[0]
     assert insert[1][0] == "https://gov.pl/web/kas/sankcje"  # canonical doc id
-    assert insert[1][6] == cache.LICENCE_UNCONFIRMED
+    assert insert[1][6] == "Synthetic test licence"
     assert chunks[1] == [(7, 0, "Akapit pierwszy.\n\nAkapit drugi.")]
 
 
@@ -188,7 +189,8 @@ def test_checks_never_write_to_the_database(monkeypatch, tmp_path):
     """Step 2c is disabled: web search saves only to the JSONL cache, even with DATABASE_URL."""
     monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
     monkeypatch.setattr(psycopg, "connect", connect_failing(calls := []))
-    assert cache.save_document(doc(), tmp_path / "docs.jsonl") is True
+    cache.save_document(doc(), tmp_path / "docs.jsonl")
+    assert len(cache.load_documents(tmp_path / "docs.jsonl")) == 1
     assert calls == []
 
 
@@ -197,7 +199,7 @@ def test_user_submitted_link_page_is_never_saved(monkeypatch):
     saved = []
     monkeypatch.setattr(websearch, "save_document", saved.append)
     monkeypatch.setattr(cache, "save_document", saved.append)
-    websearch._robots.clear()
+    safefetch._robots.clear()
 
     async def go():
         transport = httpx2.MockTransport(
@@ -205,7 +207,7 @@ def test_user_submitted_link_page_is_never_saved(monkeypatch):
                 html() if r.url.path == "/web/kas/sankcje" else httpx2.Response(404)
             )
         )
-        async with websearch._http_client(transport) as client:
+        async with safefetch.client(websearch.FETCH_TIMEOUT_S, transport) as client:
             return await websearch.fetch_document(
                 "https://www.gov.pl/web/kas/sankcje", client
             )
@@ -219,7 +221,7 @@ def test_slow_store_does_not_hold_up_web_search(monkeypatch):
 
     monkeypatch.setattr(websearch, "SAVE_BUDGET_S", 0.05)
     monkeypatch.setattr(websearch, "save_document", lambda d: time.sleep(0.3))
-    websearch._robots.clear()
+    safefetch._robots.clear()
 
     async def go():
         started = time.monotonic()
@@ -241,6 +243,10 @@ def test_seed_is_the_only_database_writer(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://u@127.0.0.1:1/db")
     monkeypatch.setattr(corpus, "queries", lambda: ["sankcje"])
     monkeypatch.setattr(corpus, "ALLOWLIST", {"gov.pl": None})
+    monkeypatch.setattr(
+        corpus, "APPROVED_SOURCES", {"www.gov.pl": "Synthetic test licence"}
+    )
+    monkeypatch.setattr(corpus, "delete_expired", lambda: 0)
     monkeypatch.setattr(corpus, "stored_documents", list)
     stored, saves = [], []
 

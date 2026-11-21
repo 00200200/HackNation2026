@@ -16,7 +16,6 @@ from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
 from typing import NamedTuple, Protocol
 from urllib.parse import urlsplit
-from urllib.robotparser import RobotFileParser
 
 import httpx2
 import requests
@@ -31,6 +30,7 @@ from tavily import (
 from tavily.errors import ForbiddenError
 from tavily.errors import TimeoutError as TavilyTimeoutError
 
+from prawdowid import safefetch
 from prawdowid.cache import Document, save_document
 from prawdowid.privacy import mask_personal_data
 
@@ -43,6 +43,8 @@ class Domain(NamedTuple):
     source_type: str
     # None: take the site name from the page (blanket entries such as gov.pl).
     publisher: str | None
+    # Licence that allows us to keep the full text. None: UNCONFIRMED, the cache keeps metadata only.
+    licence: str | None = None
 
 
 # Why each domain qualifies, and its licence: docs/sources.md (a test keeps both in sync).
@@ -71,7 +73,6 @@ ALLOWLIST = {
 SEARCH_TIMEOUT_S = 10
 FETCH_TIMEOUT_S = 10
 ATTEMPTS = 2  # first call plus one retry
-MAX_REDIRECTS = 3
 MAX_PAGE_BYTES = 2_000_000
 # Both caps keep one claim inside the check's time budget (#11): DuckDuckGo took ~20 s to say
 # "no results" over two attempts in the full eval on f1e1684.
@@ -82,7 +83,6 @@ PAGE_BUDGET_S = float(
     os.getenv("PRAWDOWID_PAGE_BUDGET_S") or 8
 )  # robots.txt and page; reads time out at 10 s, so no retry after a stall
 SAVE_BUDGET_S = 10  # saving every fetched page to the source store
-USER_AGENT = "PrawdowidBot/0.1 (fact-checking demo, HackNation 2026)"
 
 SEARCH_UNAVAILABLE = (
     "Wyszukiwarka internetowa nie odpowiedziała albo nie zwróciła wyników, "
@@ -204,7 +204,7 @@ async def search_web(
     if not by_url:
         return WebSearch(limitation=SEARCH_UNAVAILABLE)
 
-    async with _http_client(transport) as http:
+    async with safefetch.client(FETCH_TIMEOUT_S, transport) as http:
         docs = await asyncio.gather(
             *(_fetch_bounded(u, http, h.published_date) for u, h in by_url.items())
         )
@@ -247,25 +247,8 @@ async def _search(
     return None
 
 
-class OffAllowlist(httpx2.RequestError):
-    pass
-
-
-async def _only_allowlisted(request: httpx2.Request) -> None:
-    """Runs before every request, redirect hops included, so no hop leaves the allowlist."""
-    if not allowed(str(request.url)):
-        raise OffAllowlist(f"{request.url} is not allowlisted", request=request)
-
-
-def _http_client(transport: httpx2.AsyncBaseTransport | None) -> httpx2.AsyncClient:
-    return httpx2.AsyncClient(
-        headers={"User-Agent": USER_AGENT},
-        timeout=FETCH_TIMEOUT_S,
-        follow_redirects=True,
-        max_redirects=MAX_REDIRECTS,
-        event_hooks={"request": [_only_allowlisted]},
-        transport=transport,
-    )
+def _allowed(url: str) -> bool:
+    return allowed(url) is not None
 
 
 async def _fetch_bounded(
@@ -288,102 +271,61 @@ async def fetch_document(
     `fallback_published`: the search provider's own publication date, used only when the page
     itself carries none (common on Polish gov/news pages without date metadata).
     """
-    entry = allowed(url)
-    if not entry or not await _robots_allow(url, client):
+    page = await _get_html(url, client)
+    if page is None or not (entry := allowed(page.url)):
         return None
-    html, final_url = await _get_html(url, client)
-    if html is None:
-        return None
-    # Fallback for a client without the hook: a redirect may leave the allowlist.
-    if not (entry := allowed(final_url)):
-        log.info("fetch skipped %s: redirected off the allowlist", url)
-        return None
-    page = await asyncio.to_thread(
+    extracted = await asyncio.to_thread(
         trafilatura.bare_extraction,
-        html,
-        url=final_url,
+        page.text(),
+        url=page.url,
         with_metadata=True,
         # No extensive search (URL, free text). htmldate still matches a plain date pattern on a
         # page without metadata. ponytail: accepted; a stricter metadata-only check if it misleads.
         date_extraction_params={"original_date": True, "extensive_search": False},
     )
-    published = (_date(page.date) if page else None) or fallback_published
-    if not page or not page.text or not page.title or not published:
+    published = (_date(extracted.date) if extracted else None) or fallback_published
+    if not extracted or not extracted.text or not extracted.title or not published:
         # No publication date: the brief requires one on every source.
         log.info("fetch skipped %s: no text, title or publication date", url)
         return None
+    host = urlsplit(page.url).hostname or ""
     return Document(
-        url=final_url,
-        title=page.title,
-        publisher=entry.publisher
-        or page.sitename
-        or urlsplit(final_url).hostname
-        or "",
+        url=page.url,
+        title=extracted.title,
+        publisher=entry.publisher or extracted.sitename or host,
         published_at=published,
         fetched_at=datetime.now(UTC),
         source_type=entry.source_type,
-        domain=urlsplit(final_url).hostname or "",
-        text=page.text,
+        domain=host,
+        licence=entry.licence,
+        text=extracted.text,
     )
 
 
-async def _get_html(url: str, client: httpx2.AsyncClient) -> tuple[str | None, str]:
-    """GET with one retry on a network error or 5xx. HTML under the size cap only."""
+async def _get_html(url: str, client: httpx2.AsyncClient) -> safefetch.Page | None:
+    """safefetch.get with one retry on a network error or 5xx. A 200 HTML page or None."""
     for attempt in range(1, ATTEMPTS + 1):
         try:
-            async with client.stream("GET", url) as resp:
-                if resp.status_code >= 500:
-                    log.warning(
-                        "fetch attempt %d %s: HTTP %d", attempt, url, resp.status_code
-                    )
-                    continue
-                # 401, 403, 429, paywalls: we never get around a block.
-                if resp.status_code != 200:
-                    log.info("fetch skipped %s: HTTP %d", url, resp.status_code)
-                    return None, url
-                if "html" not in resp.headers.get("content-type", ""):
-                    log.info("fetch skipped %s: not HTML", url)
-                    return None, url
-                body = b""
-                async for chunk in resp.aiter_bytes():
-                    body += chunk
-                    if len(body) > MAX_PAGE_BYTES:
-                        log.info("fetch skipped %s: over %d bytes", url, MAX_PAGE_BYTES)
-                        return None, url
-                return body.decode(resp.encoding or "utf-8", errors="replace"), str(
-                    resp.url
-                )
-        # Deterministic: the same request would fail again.
-        except (OffAllowlist, httpx2.TooManyRedirects, httpx2.InvalidURL) as exc:
-            log.info("fetch skipped %s: %r", url, exc)
-            return None, url
-        except httpx2.HTTPError as exc:  # network, timeout
+            page = await safefetch.get(
+                url, client, allow=_allowed, max_bytes=MAX_PAGE_BYTES
+            )
+        except (safefetch.Blocked, httpx2.InvalidURL) as exc:
+            log.info("fetch skipped %s: %s", url, exc)
+            return None
+        except httpx2.HTTPError as exc:  # network, timeout, non-public address
             log.warning("fetch attempt %d %s failed: %r", attempt, url, exc)
-    return None, url
-
-
-_robots: dict[str, RobotFileParser] = {}
-
-
-async def _robots_allow(url: str, client: httpx2.AsyncClient) -> bool:
-    """Respect robots.txt. A missing file allows everything; an unreadable one, nothing."""
-    parts = urlsplit(url)
-    origin = f"{parts.scheme}://{parts.netloc}"
-    if origin not in _robots:
-        parser = RobotFileParser()
-        try:
-            resp = await client.get(f"{origin}/robots.txt")
-        except (httpx2.HTTPError, httpx2.InvalidURL) as exc:
-            log.warning("robots.txt %s unreadable: %r", origin, exc)
-            return False
-        if resp.status_code >= 500:
-            return False  # not cached: retry on the next page
-        if resp.status_code in (401, 403):
-            parser.disallow_all = True  # same rule as RobotFileParser.read()
-        else:
-            parser.parse(resp.text.splitlines() if resp.status_code == 200 else [])
-        _robots[origin] = parser
-    return _robots[origin].can_fetch(USER_AGENT, url)
+            continue
+        if page.status >= 500:
+            log.warning("fetch attempt %d %s: HTTP %d", attempt, url, page.status)
+            continue
+        # 401, 403, 429, paywalls: we never get around a block.
+        if page.status != 200 or "html" not in page.content_type:
+            log.info(
+                "fetch skipped %s: HTTP %d %s", url, page.status, page.content_type
+            )
+            return None
+        return page
+    return None
 
 
 def _date(value: str | None) -> date | None:
