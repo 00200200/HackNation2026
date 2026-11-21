@@ -1,8 +1,8 @@
 {
-  "commit": "dd0a9767ca0e8c0da422de6ac88e4bacbc3689f0",
+  "commit": "ba48fc7f653968ea620096877426376dad2a239c",
   "dirty": false,
   "mode": "quick",
-  "timestamp": "2026-11-21T17:36:50+00:00",
+  "timestamp": "2026-11-21T18:33:44+00:00",
   "n_cases": 8,
   "scenarios": [
     "A",
@@ -41,7 +41,7 @@
       "pass": false
     },
     "median_latency_s": {
-      "value": 3.3928620625520125,
+      "value": 4.846260729013011,
       "target": "<= 30.0",
       "pass": true
     },
@@ -56,7 +56,7 @@
       "pass": null
     },
     "cost_per_100_usd": {
-      "value": 1.5900999999999998,
+      "value": 1.59585,
       "target": "reported",
       "pass": true
     }
@@ -77,7 +77,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.56
+        5.12
       ],
       "errors": []
     },
@@ -89,7 +89,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        8.1
+        7.88
       ],
       "errors": []
     },
@@ -101,7 +101,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.22
+        3.43
       ],
       "errors": []
     },
@@ -113,7 +113,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.8
+        4.57
       ],
       "errors": []
     },
@@ -125,7 +125,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        7.0
+        8.02
       ],
       "errors": []
     },
@@ -137,7 +137,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.75
+        3.4
       ],
       "errors": []
     },
@@ -149,7 +149,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        7.08
+        7.6
       ],
       "errors": []
     },
@@ -161,7 +161,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.5
+        2.73
       ],
       "errors": []
     }

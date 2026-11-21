@@ -30,11 +30,10 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, stacked on `LukiLenkiewicz/issue4-link-input` (PR #28). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `d655078` (#5 merged into #16), no corpus):
-macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail: no `security_events`, verdicts
-wrong), median latency 5.0 s, end_to_end 0.94 (fail: both J cases, no eval switch to simulate a failure). Citation metrics,
-channel consistency and cost: not measured (no corpus, no second channel, no `cost_usd`). Every checkable case returns
-`brak wystarczających dowodów`: expected while there are no sources.
+**Last eval** (`evals/results/latest.json`, **quick**, 8 cases, product at `ba48fc7` on this branch, no corpus):
+macro_f1 0.111 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail), median latency 4.8 s,
+end_to_end 0.875 (fail), $1.60 per 100 checks. Citation metrics and channel consistency: not measured (no corpus, no
+second channel). Earlier runs (the 31-case full run at `d655078`, quick runs at `88ae501` and `dd0a976`) are historical.
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -65,7 +64,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 ## Decisions
 
 - 2026-11-21: **User decision:** step 2c disabled until licensed sources are chosen. The #19 store, migration, compose service and seed script stay in the repo, but `verify()` does not call `search_documents`, checks never write to the database, and the backend runs without Postgres. (#19)
-- 2026-11-21: **User decision:** step 2c uses a local PostgreSQL (compose service `db`), not Supabase. Driver psycopg 3 on `DATABASE_URL` (researcher check: one transaction for a document and its chunks, one SQL search query). Full-text search only: `simple` config (stock Postgres 17 has no Polish config, checked in `pg_ts_config`) plus prefix terms built in code as a crude stem. pgvector and the embedding model stay UNDECIDED. The database starts empty; the team seeds it after merge. (#19)
+- 2026-11-21: **User decision:** step 2c uses a local PostgreSQL (compose service `db`, renamed `sourcedb` after the PR #34 review), not Supabase. Driver psycopg 3 on `DATABASE_URL` (researcher check: one transaction for a document and its chunks, one SQL search query). Full-text search only: `simple` config (stock Postgres 17 has no Polish config, checked in `pg_ts_config`) plus prefix terms built in code as a crude stem. pgvector and the embedding model stay UNDECIDED. The database starts empty; the team seeds it after merge. (#19)
 - 2026-11-21: Verdict rules (#10, `judge.decide`). A side counts when one `official`/`primary`/`fact_check` source or two independent origins back it with a verified quote. Origins: evidence sharing a publisher, the same quote or a named news agency (PAP, Reuters, ...) counts once. A publisher on both sides keeps the side the model marks as its own conclusion, else neither. Missing context counts only on a context/refute label whose verified quote shares a number or word with it. Quotes match with typography, case and spacing folded; digits, signs and separators exact. Both sides count: `brak wystarczających dowodów`, conflict shown (scenario C). Named missing context counts: `wprowadzające w błąd` (B). Else refute: `fałszywe`, support: `potwierdzone`, nothing: `brak wystarczających dowodów`. Sources older than `PRAWDOWID_ARCHIVE_DAYS` (730) get an archival warning. Thresholds are UNCONFIRMED guesses; corpus source-type labels are not fixed yet.
 - 2026-11-21: Web search starts with **DuckDuckGo** through `ddgs` (backend `duckduckgo` only, no `auto` fallback to
   other engines), user decision; the Tavily proposal (#7) stays as the later replacement. DuckDuckGo has no official
@@ -113,7 +112,8 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
-- 2026-11-21 Łukasz (Codex worker): PR #34 scoped review fixes (this commit): isolated local `sourcedb`/`sourcedb_data` from production, required source approval before database seeding, removed connection error text from diagnostics; added failing-before/passing-after tests and `.env` recipe regression coverage. Checks: Ruff clean, 220 passed / 1 skipped; production overlay renders with unchanged database settings.
+- 2026-11-21 Łukasz (Claude worker): PR #34 review fixes on `ba48fc7` checked: production overlay (`compose.yaml` + `origin/main:compose.prod.yaml`) renders `db backend frontend caddy` with the production `db` unchanged, 220 passed / 1 skipped; quick eval on `ba48fc7` (macro_f1 0.111, injection 0.0, end_to_end 0.875, 4.8 s, $1.60 per 100).
+- 2026-11-21 Łukasz (Codex worker): PR #34 scoped review fixes (`ba48fc7`): isolated local `sourcedb`/`sourcedb_data` from production, required source approval before database seeding, removed connection error text from diagnostics; added failing-before/passing-after tests and `.env` recipe regression coverage. Checks: Ruff clean, 220 passed / 1 skipped; production overlay renders with unchanged database settings.
 - 2026-11-21 Łukasz (Claude worker): #19 PR #34 Codex review fixes: per-document chunk cap before the document limit (regression test, passes on Postgres 17, old SQL returned only the long page), seed reads `.env` (`--local-db`), no full-text export of the database.
 - 2026-11-21 Łukasz (Claude worker): #19 merged `origin/LukiLenkiewicz/issue31-euvsdisinfo` (#33) to keep the stack linear; kept the newer quick eval (8 cases, 17:23 UTC) over the older full run from #31's base; quick eval rerun on the merge: macro_f1 0.111, injection 0.0, end_to_end 0.875, latency 3.4 s, $1.50 per 100.
 - 2026-11-21 Łukasz (Claude worker): #19 step 2c taken out of the pipeline (user decision): only the seed script writes to the database, web search saves to JSONL only, compose `db` is opt-in (profile `db`), backend has no `DATABASE_URL`. Branch `LukiLenkiewicz/issue19-supabase`.
