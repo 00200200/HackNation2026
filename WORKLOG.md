@@ -51,6 +51,9 @@ keys are in `.env`.
 | `prod` | What runs on https://faktczyfejk.pl. Only takes commits already on `main` (`docs/deploy.md`). |
 
 **Last eval** ([`evals/results/latest.json`](evals/results/latest.json), **quick**, 9 cases, product at `95e6177`, timestamp `2026-11-21T19:10:57+00:00`, clean): macro_f1 `0.1` (fail), citation_coverage `null`, citation_correctness `null`, abstention `1.0`, injection_resistance `0.0` (fail), median latency `3.8964525419287384` s, end_to_end `0.8888888888888888` (fail), channel_consistency `null`, moderator_loop `0.0` (fail), cost per 100 checks `$1.8220444444444441`; `overall_pass: false`. Scenarios A, B, C, D, E, G, H, I, J; FC-J01/FC-J02 skipped (need a product eval fault switch, not built). This predates PR #40 (docs only) landing on `main`; **a fresh eval on the merged commit is pending** (eval skipped for this merge by user decision, `HN_SKIP_EVAL=1`).
+Every run since is logged in [`evals/results/HISTORY.md`](evals/results/HISTORY.md), not only `latest.json`; read
+[`docs/eval-notes.md`](docs/eval-notes.md) for why some runs (notably "Run 2", `8c6f396`) are distorted. **Rule:
+read `evals/results/HISTORY.md`, not only `latest.json`; check the commit and notes before concluding anything.**
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -197,6 +200,13 @@ Basic requirements first: the jury gives no points for extras if one of these is
 ## Log (newest first, append only)
 
 - 2026-11-21 Michał (session korpus): Demagog dropped as a direct source (user decision: Demagog only through Google Fact Check Tools): catalogue entry excluded with the reason, ClaimReview page collector and its `claim_author`/`claim_source`/`cited_links` fields removed, `demagog.org.pl` out of the web-search allowlist and `docs/sources.md`; corpus rebuilt: 1,158 records, 11 registered domains (7 with *.gov.pl as one), official 1,143 + fact-checker 15, thresholds met. Eval labels from Demagog ClaimReview kept. Branch `claude/drop-demagog`.
+- 2026-11-21 Michał: web UI as one view in the pitch deck's crimson (Sherlock-cover cloth, white page): the name "faktczyfejk" with a glass magnifier and outlined echo, one box for text or a link, the answer with sources below. Example card, legend, chips and chat preview removed; logo and favicon recoloured.
+- 2026-11-21 Łukasz (Claude worker): eval history on `LukiLenkiewicz/eval-history` (`cc58dac`): every `evals/run.py`
+  run now writes `evals/results/history/<timestamp>-<sha>-<mode>.json` (full report) and appends one row to
+  `evals/results/HISTORY.md` (both tracked), plus a per-scenario/per-case-set (FC-* vs A-J) summary in the report;
+  `--note` flag. Backfilled HISTORY.md with the 3 runs known so far (reconstructed rows marked as such, real row for
+  `95e6177`) and added `docs/eval-notes.md` explaining why `8c6f396`'s runs are distorted. README/WORKLOG/skill now
+  point at HISTORY.md, not only `latest.json`. No eval run (user decision).
 - 2026-11-21 Łukasz (Claude worker): gov.pl site search as an evidence source on `LukiLenkiewicz/govpl-search`: `prawdowid/govpl.py` (search per gov.pl query, top 5 pages through the safe fetch, publisher from the unit path, date from `publishDate`, limitation on failure), wired into the per-claim fan-out, extraction writes `govpl_queries`, web search leaves www.gov.pl to it; live smoke on 3 government claims (no eval, user decision).
 - 2026-11-21 Łukasz (Claude worker): eval runner on `LukiLenkiewicz/eval-parallel`: `--concurrency N` (default 4, thread pool; requests still start 6.5 s apart for the API's 10/minute limit), one flushed line per finished case with ETA, `evals/results/run-<ts>.partial.jsonl` (git-ignored) appended per case, `--resume` / `--retry-failed` / `--only`, one retry on 429/5xx/timeout. Live smoke: 3 cases, concurrency 3, local backend. No full eval run.
 - 2026-11-21 Łukasz (Claude worker): CodeRabbit full review of main (PR #46) triaged on `fix/coderabbit-main`: 9 fixed with tests (deploy record, canary scan, self-contradiction context, dedupe signs and provenance, cache write, deletion race, session storage, deploy keys doc), 2 not bugs (EUvsDisinfo as one of two origins, http links with secret params), J01/J02 fault switch deferred (coordinator).

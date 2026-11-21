@@ -197,6 +197,11 @@ git config core.hooksPath .githooks
 `.githooks/pre-push` refuses a push without a `judge` agent PASS for the pushed commit, and on secrets, tracked
 `.env` files, files over 10 MB, or failing ruff or pytest. Once an eval has run in the clone, product changes also
 need a clean eval run on the pushed commit (`uv run python -m evals.run --quick`). Eval runs print one line per
-finished case and take `--concurrency N`, `--resume`, `--retry-failed` and `--only` (see the prawdowid-eval
+finished case and take `--concurrency N`, `--resume`, `--retry-failed`, `--only` and `--note` (see the prawdowid-eval
 skill). The submission push is
 `HN_FINAL=1 git push`. Rules: `.claude/skills/hacknation-judging/SKILL.md` and `.claude/skills/prawdowid-eval/SKILL.md`.
+
+Every eval run is logged in [`evals/results/HISTORY.md`](evals/results/HISTORY.md) (one row per run, full JSON
+under `evals/results/history/`), not only `evals/results/latest.json`. Read
+[`docs/eval-notes.md`](docs/eval-notes.md) first: it explains why some past runs are distorted. **Rule: check the
+commit and the notes column before concluding anything from a number.**

@@ -164,6 +164,71 @@ def test_crash_stops_starting_new_cases(tmp_path, monkeypatch):
     assert len(started) < len(CASES)
 
 
+def test_run_writes_one_history_entry(tmp_path, monkeypatch):
+    report, _ = run_eval(tmp_path, monkeypatch, "--note", "smoke")
+
+    history_files = sorted((tmp_path / "evals/results/history").glob("*.json"))
+    assert len(history_files) == 1
+    assert json.loads(history_files[0].read_text()) == report
+
+    lines = (tmp_path / "evals/results/HISTORY.md").read_text().splitlines()
+    assert lines[0].startswith("| timestamp |")
+    assert len(lines) == 3  # header + separator + one row
+    assert (
+        "nocommit" in lines[2]
+    )  # commit is "" in tests -> sha falls back to "nocommit"
+    assert "smoke" in lines[2]
+
+    summary = report["summary"]
+    assert summary["by_case_set"]["A-J"]["cases"] == len(CASES)
+    assert summary["by_case_set"]["FC"]["cases"] == 0
+
+
+def test_summary_counts_status_expected_cases_correctly(tmp_path, monkeypatch):
+    cases = [
+        {
+            "id": "J1",
+            "scenario": "J",
+            "input": {"text": "t0"},
+            "expected_status": "technical_error",
+        }
+    ]
+
+    def ask(payload, channel):
+        return {"status": "technical_error"}
+
+    report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
+    assert report["summary"]["by_scenario"]["J"] == {"cases": 1, "correct": 1}
+
+
+def test_two_runs_append_two_history_lines(tmp_path, monkeypatch):
+    run_eval(tmp_path, monkeypatch)
+    run_eval(tmp_path, monkeypatch)
+
+    history_files = sorted((tmp_path / "evals/results/history").glob("*.json"))
+    assert len(history_files) == 2
+    lines = (tmp_path / "evals/results/HISTORY.md").read_text().splitlines()
+    assert len(lines) == 4  # header + separator + two rows
+
+
+def test_summary_splits_fc_and_az_case_sets(tmp_path, monkeypatch):
+    cases = CASES + [
+        {"id": "FC-1", "scenario": "A", "input": {"text": "t100"}}
+        | {"expected_verdict": "potwierdzone"}
+    ]
+
+    def ask(payload, channel):
+        if payload["text"] == "t100":
+            return {
+                "claims": [{"text": "c", "verdict": "potwierdzone", "evidence": []}]
+            }
+        return fake_answer(payload, channel)
+
+    report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
+    assert report["summary"]["by_case_set"]["FC"] == {"cases": 1, "correct": 1}
+    assert report["summary"]["by_case_set"]["A-J"]["cases"] == len(CASES)
+
+
 def test_dirty_rows_are_reused_only_by_a_dirty_run(tmp_path):
     case = CASES[0]
     row = {"case": case, "runs": [], "repeat": None, "commit": "abc", "dirty": True}

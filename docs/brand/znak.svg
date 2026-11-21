@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="faktczyfejk.pl">
-  <rect width="200" height="200" rx="44" fill="#D4213D"/>
+  <rect width="200" height="200" rx="44" fill="#8A1C2F"/>
   <path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#FFFFFF" stroke-width="27" stroke-linejoin="round"/>
   <rect x="86.5" y="154" width="27" height="28" fill="#FFFFFF"/>
   <g transform="translate(98 60) rotate(-12) scale(0.95)">
-    <path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#0B1F3A"/>
-    <path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#0B1F3A"/>
+    <path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#1D1215"/>
+    <path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#1D1215"/>
     <path d="M-27 -9 C-12 -15 12 -15 27 -9" fill="none" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="3" stroke-linecap="round"/>
     <path d="M-18 -24 L-12 -18 M-4 -30 L2 -24 M10 -24 L16 -18" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#0B1F3A"/>
-    <path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#0B1F3A"/>
+    <path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#1D1215"/>
+    <path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#1D1215"/>
   </g>
 </svg>
