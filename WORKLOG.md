@@ -130,6 +130,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): merged `main` into `feat/16-eval-set` (PR #23); both eval sets kept, #16 cases renamed `FC-*` (73 cases). Quick eval on `69f1f82`: abstention 1.00, median 4.1 s, macro_f1 0.10, end_to_end 0.89.
 - 2026-11-21 Łukasz (Claude worker): #16 Codex review fixes on PR #23: `skip` field in `evals/run.py` (J01–J02 skipped, not scored), single-assertion inputs for B05, B06, B02, G01, G03, G04, A05, E02, new A08, I01–I03 marked as stand-ins; corpus run marked blocked. Full no-corpus eval on `3ce9bae`: macro_f1 0.09, end_to_end 1.00.
 - 2026-11-21 Łukasz (Claude worker): #16 `evals/cases.jsonl` with 31 labelled cases, full eval on `7ee1410` committed (macro_f1 0.09).
 - 2026-11-21 Łukasz (Claude worker): #16 merged `feat/5-self-contained-claims` (stack), full eval rerun on `d655078`: macro_f1 0.09, median latency 5.0 s.
