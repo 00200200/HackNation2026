@@ -226,3 +226,6 @@ __marimo__/
 .claude/settings.local.json
 CLAUDE.local.md
 !.claude/skills/build/
+
+# PRAWDOWID check log
+/data/
