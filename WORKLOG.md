@@ -24,6 +24,7 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `feat/ui-frontend` | merged into `main` as #29. |
 | `feat/7-search-provider` | #7 search provider research, WORKLOG only. Merged into `main` as #20. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue9-rerank` | #9 step 3 rerank and dedupe, PR #25 against `main` (#24 merged). PR open, not merged. Owner: Łukasz (Claude worker). |
+| `feat/8-web-search` | #8 web search (DuckDuckGo via `ddgs`), page fetch, source cache, `docs/sources.md`. PR #26 against `main` (#25 merged), PR open, not merged. Corpus not built. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 | `claude/deploy-config-43a484` | Deploy config, merged into `main` as #32. |
 | `claude/pull-deploy` | Deploy by pulling `prod` on the server (`deploy/`), Actions workflow removed. |
@@ -50,7 +51,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
   (`claude/pull-deploy`, replaces the Actions workflow); its read-only deploy key `faktczyfejk-vps` is in GitHub.
   Open: Anthropic key in the server's `.env`, the timer on the server once this is on `prod` (`docs/deploy.md`).
   Owner: Michał
-- [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: ?
+- [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: Łukasz (Claude worker)
+  - [x] Code (#8): `prawdowid/websearch.py` (search on the allowlist, fetch, trafilatura extraction, PII masking of the query), `prawdowid/safefetch.py` (per-hop allowlist, public-IP check pinned at connect, robots.txt per hop, byte caps; for #4 to reuse), `prawdowid/cache.py` (local JSONL, metadata only until a licence is confirmed, 30-day retention, delete, swap point for #19), builder `python -m prawdowid.corpus`, source list `docs/sources.md` (licences UNCONFIRMED). Branch `feat/8-web-search`.
+  - [ ] Build the corpus: **open**. DuckDuckGo (`ddgs`, backend `duckduckgo`) returned "No results found" for every query from our machine on 2026-11-21, so 0 documents are cached. Needs the replacement provider (#7), then `uv run python -m prawdowid.corpus`.
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
   - [x] Step 3 (#9): `prawdowid/rerank.py`, per claim: drops the linked page (`exclude_url`) and repeated canonical URLs (IDNA host, NFC, percent-encoding normalised; fetched text wins over a title-only hit for the same URL), reads at most `PRAWDOWID_RERANK_MAX_DOCUMENTS` (30) documents × `PRAWDOWID_RERANK_MAX_DOC_CHARS` (20k), splits page text into fragments of ≤ `PRAWDOWID_FRAGMENT_CHARS` (800), drops only exact duplicates (same words; a changed number, date or negation keeps both), interleaves documents and sends at most `PRAWDOWID_RERANK_MAX_FRAGMENTS` (60), Claude Haiku via PydanticAI orders them, top `PRAWDOWID_RERANK_TOP_K` (12) kept with `doc_id` = canonical URL. Model failure or no key: unranked order plus a limitation. Not wired into `verify()` (#11). Ranking quality not measured, no key yet. Owner: Łukasz (Claude worker)
@@ -73,6 +76,12 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Team OK on the web search provider (PROPOSED below, #7); then run ~20 Polish test queries once a key exists. Owner: Łukasz (Claude worker)
 
 ## Decisions
+
+- 2026-11-21: Web search starts with **DuckDuckGo** through `ddgs` (backend `duckduckgo` only, no `auto` fallback to
+  other engines), user decision; the Tavily proposal (#7) stays as the later replacement. DuckDuckGo has no official
+  web search API (`ddgs` scrapes), which conflicts with the brief's rule on official APIs: needs a team OK before
+  submission. The provider is one function (`SearchProvider` in `prawdowid/websearch.py`), so a Tavily wrapper is one
+  new function. (#8)
 
 - 2026-11-21: Verdicts are per claim. One extraction call returns ranked, self-contained claims with a source sentence and search queries; the top `PRAWDOWID_MAX_CHECKED_CLAIMS` (default 5) come in full (source sentence, reason, queries) and get a verdict; every other claim comes as one short sentence in `unchecked_claims`, no verdict. Reason: full detail for every claim timed out (45 s) on one long text in a manual run; UNCONFIRMED, no reproducible measurement in the repo yet. Values below 1 stop the service at startup. Queries per claim: `PRAWDOWID_QUERIES_PER_CLAIM` (default 3). Defaults are UNCONFIRMED guesses, not tuned. (#5)
 - 2026-11-21: **PROPOSED, needs team OK** (#7). Web search for step 2b: **Tavily** `/search` as the provider, called
@@ -140,6 +149,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (via Claude): merged `main` (#25 squashed) into `feat/8-web-search` (PR #26), retargeted PR #26 to `main`; WORKLOG conflicts resolved by keeping both sides.
+- 2026-11-21 Łukasz (Claude worker): #8 review fixes (PR #26, Codex review): `prawdowid/safefetch.py` with DNS/IP SSRF guard, robots.txt per redirect hop and refusal on 429/5xx, capped robots and page bodies; cache keeps metadata only (no full text without a confirmed licence), 30-day retention, `delete_document`, latest fetch replaces the old one; PESEL masked next to a label. Branch `feat/8-web-search`.
+- 2026-11-21 Łukasz (Claude worker): #8 web search (DuckDuckGo via `ddgs`), fetch, trafilatura extraction, JSONL source cache, `docs/sources.md`, offline tests. Corpus not built (DDG returns no results here). Branch `feat/8-web-search`.
 - 2026-11-21 Łukasz (via Claude): merged `main` (#24 squashed) into `LukiLenkiewicz/issue9-rerank` (PR #25), retargeted PR #25 to `main`; WORKLOG conflicts resolved by keeping both sides.
 - 2026-11-21 Łukasz (Claude worker): #9 PR #25 review fixes: Unicode/IDN URL exclusion, fetched text over title-only hits, exact dedupe keeps conflicting facts, input budget before splitting.
 - 2026-11-21 Łukasz (Claude worker): #9 `prawdowid/rerank.py` dedupe and rerank of evidence per claim (Claude Haiku listwise, stdlib dedupe), offline FunctionModel tests. Branch `LukiLenkiewicz/issue9-rerank`.
