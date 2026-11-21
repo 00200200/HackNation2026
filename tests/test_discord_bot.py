@@ -132,6 +132,15 @@ def test_security_event_is_shown_first():
     assert "sprawdziliśmy resztę" not in render(only)
 
 
+def test_injection_in_a_source_says_it_came_from_a_source():
+    flagged = CHECK.model_copy(
+        update={"security_events": [SecurityEvent(location="source")]}
+    )
+    text = render(flagged)
+    assert text.startswith("**Polecenia dla modelu.** W źródłach")
+    assert "Treść zawierała" not in text
+
+
 def test_non_ok_status_is_a_notice_not_a_verdict():
     text = render(CheckResult(status=Status.TECHNICAL_ERROR, message="Błąd."))
     assert text == "**Brak oceny.** Błąd."

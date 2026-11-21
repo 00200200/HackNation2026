@@ -12,8 +12,8 @@ masking is applied: docs/privacy.md.
 
 import re
 
-# One retention period for everything we keep: check log records (prawdowid/checklog.py) and pages
-# in the source store (prawdowid/cache.py, `delete_after`). The web page text
+# One retention period for everything we keep: check log records (prawdowid/checklog.py), the source
+# cache corpus/docs.jsonl and pages in the source store (prawdowid/cache.py, `delete_after`). The web page text
 # (frontend/public/index.html, "do 30 dni") repeats it: change both.
 RETENTION_DAYS = 30
 

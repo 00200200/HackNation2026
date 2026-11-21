@@ -53,9 +53,17 @@ republish pages.
 | `nbp.pl` | Narodowy Bank Polski | central bank data and reports | UNCONFIRMED |
 | `europa.eu` | the EU institution named on the page | official EU institutions (Commission, Council, Parliament) | europa.eu legal notice, UNCONFIRMED |
 | `eur-lex.europa.eu` | EUR-Lex, Urząd Publikacji UE | official EU law | EUR-Lex legal notice, UNCONFIRMED |
-| `euvsdisinfo.eu` | EUvsDisinfo (ESDZ) | EEAS East StratCom Task Force disinformation cases | UNCONFIRMED |
 | `nato.int` | NATO | official NATO statements | UNCONFIRMED |
 | `who.int` | Światowa Organizacja Zdrowia | official health data | UNCONFIRMED |
+
+## Known-narrative database (`disinfo_database`)
+
+An official EU body, but a match only says that a claim resembles a documented pro-Kremlin
+narrative. It is context: the verdict rules never count it as a reliable source on its own.
+
+| Domain | Publisher | Why it qualifies | Licence (check) |
+|---|---|---|---|
+| `euvsdisinfo.eu` | EUvsDisinfo (ESDZ) | EEAS East StratCom Task Force disinformation cases | UNCONFIRMED |
 
 ## Reliable secondary sources (`fact_check`, `news`)
 

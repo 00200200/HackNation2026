@@ -24,7 +24,7 @@ import os
 import re
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import psycopg
@@ -134,13 +134,25 @@ def load_documents(path: Path = CACHE_PATH) -> list[Document]:
 
 
 def save_document(doc: Document, path: Path = CACHE_PATH) -> bool:
-    """Append the document unless its URL is cached already. True when it was added."""
+    """Append the document unless its URL is cached already. True when it was added.
+
+    Retention: pages fetched more than RETENTION_DAYS ago are dropped on the same write.
+    """
     # ponytail: rereads the file on every save; fine for a local demo cache.
-    if any(d.url == doc.url for d in load_documents(path)):
+    docs = load_documents(path)
+    if any(d.url == doc.url for d in docs):
         return False
+    cutoff = datetime.now(UTC) - timedelta(days=RETENTION_DAYS)
+    fresh = [
+        d
+        for d in docs
+        if d.fetched_at.replace(tzinfo=d.fetched_at.tzinfo or UTC) > cutoff
+    ]
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(doc.model_dump(mode="json"), ensure_ascii=False) + "\n")
+    mode = "a" if len(fresh) == len(docs) else "w"
+    with path.open(mode, encoding="utf-8") as f:
+        for d in ([] if mode == "a" else fresh) + [doc]:
+            f.write(json.dumps(d.model_dump(mode="json"), ensure_ascii=False) + "\n")
     return True
 
 

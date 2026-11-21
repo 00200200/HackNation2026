@@ -6,6 +6,7 @@ const submit = document.getElementById("submit");
 const result = document.getElementById("result");
 
 const SECURITY_NOTE = "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je i sprawdziliśmy resztę.";
+const SOURCE_SECURITY_NOTE = "W źródłach znaleźliśmy polecenia skierowane do modelu. Zignorowaliśmy je i sprawdziliśmy resztę.";
 const SECURITY_NOTE_ONLY = "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je.";
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 
@@ -58,16 +59,40 @@ function claimCard(c) {
     c.limitations.length ? list(c.limitations) : null);
 }
 
+// Scenario I: a known incident the input looks like. Context only, never a verdict.
+const MATCH_LABELS = { url: "ten sam adres", domain: "domena z bazy", text: "podobny tekst" };
+
+function incidentItem(m) {
+  const safeUrl = m.url && /^https?:\/\//.test(m.url) ? m.url : null;
+  const how = MATCH_LABELS[m.matched_on] + (m.similarity != null ? ` ${Math.round(m.similarity * 100)}%` : "");
+  return el("li", {}, m.incident_text, ` (${m.incident_id}, ${how})`,
+    safeUrl ? el("span", {}, " ", el("a", { href: safeUrl, textContent: "adres", rel: "noopener noreferrer", target: "_blank" })) : null);
+}
+
+function incidentWarning(matches) {
+  return el("section", { className: "incidents", role: "note" },
+    el("h2", { textContent: "Podobne znane incydenty" }),
+    el("p", { textContent: INCIDENT_NOTE }),
+    el("ul", {}, ...matches.map(incidentItem)));
+}
+
+const INCIDENT_NOTE = "Ta treść przypomina incydenty z bazy organizatora. "
+  + "To tylko kontekst: nie zmienia oceny twierdzeń.";
+
 function render(check) {
+  const warning = check.incident_matches?.length ? [incidentWarning(check.incident_matches)] : [];
   // Statuses other than "ok" are notices, never verdicts.
   if (check.status !== "ok") {
     const notice = [box("notice", "Brak oceny", check.message)];
     if (check.security_events?.length) notice.unshift(box("notice", "Polecenia dla modelu", SECURITY_NOTE_ONLY));
-    return notice;
+    return [...notice, ...warning];
   }
-  if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia.")];
-  const nodes = check.security_events?.length ? [box("notice", "Polecenia dla modelu", SECURITY_NOTE)] : [];
-  nodes.push(...check.claims.map(claimCard));
+  if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia."), ...warning];
+  const events = check.security_events || [];
+  const nodes = [];
+  if (events.some((e) => e.location !== "source")) nodes.push(box("notice", "Polecenia dla modelu", SECURITY_NOTE));
+  if (events.some((e) => e.location === "source")) nodes.push(box("notice", "Polecenia w źródle", SOURCE_SECURITY_NOTE));
+  nodes.push(...warning, ...check.claims.map(claimCard));
   if (check.page) nodes.unshift(pageNote(check.page));
   if (check.unchecked_claims?.length) nodes.push(uncheckedList(check.unchecked_claims));
   return nodes;

@@ -16,6 +16,7 @@ from slowapi.util import get_remote_address
 
 from prawdowid import checklog
 from prawdowid.contract import CheckResult, Status
+from prawdowid.incidents import match_incidents
 from prawdowid.verifier import is_link, verify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:  %(name)s %(message)s")
@@ -98,6 +99,13 @@ async def create_check(
         result = CheckResult(
             status=Status.TECHNICAL_ERROR, message=TECHNICAL_ERROR_MESSAGE
         )
+    # Scenario I context, added after the verdicts so it cannot change them.
+    try:
+        # The final address after redirects counts too (a short link to a known page).
+        final_url = result.page.url if result.page else ""
+        result.incident_matches = match_incidents(f"{body.input} {final_url}")
+    except Exception:
+        log.exception("incident matching failed")
     channel = request.headers.get("x-channel", "web")
     channel = channel if channel in CHANNELS else "other"
     log.info(

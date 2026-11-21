@@ -128,3 +128,28 @@ def test_damaged_lines_never_block_logging_or_deletion(check_log):
     )
     assert [r["session"] for r in records(check_log)] == ["s-000001"]
     assert checklog.delete_session("s-000001") == 1
+
+
+def test_cached_pages_past_retention_are_dropped(tmp_path):
+    from prawdowid.cache import Document, load_documents, save_document
+
+    def page(url, age_days):
+        return Document(
+            url=url,
+            title="t",
+            publisher="p",
+            published_at="2026-01-01",
+            fetched_at=datetime.now(UTC) - timedelta(days=age_days),
+            source_type="official",
+            domain="gov.pl",
+            text="x",
+        )
+
+    path = tmp_path / "docs.jsonl"
+    save_document(page("https://gov.pl/old", RETENTION_DAYS + 1), path)
+    save_document(page("https://gov.pl/kept", 1), path)
+    save_document(page("https://gov.pl/new", 0), path)
+    assert [d.url for d in load_documents(path)] == [
+        "https://gov.pl/kept",
+        "https://gov.pl/new",
+    ]

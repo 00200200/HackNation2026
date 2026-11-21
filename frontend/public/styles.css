@@ -98,7 +98,7 @@ a { color: var(--blue); }
 .verdict-confirmed { color: #155d2f; background: #e5f3e9; }
 .verdict-false { color: #a3111d; background: #fbe7e8; }
 .verdict-misleading { color: #7f4600; background: #fdf0dc; }
-.verdict-insufficient_evidence, .verdict-not_verifiable { color: #3d4753; background: #eceff2; }
+.verdict-insufficient_evidence, .verdict-not_verifiable, .verdict-not_checked { color: #3d4753; background: #eceff2; }
 
 .legend { margin: 3rem 0; }
 .legend h2 { font-size: 1.25rem; margin: 0 0 .75rem; }
@@ -109,3 +109,6 @@ a { color: var(--blue); }
 @media (max-width: 600px) { .legend dl > div { grid-template-columns: 1fr; } }
 
 .foot { background: var(--soft); border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; padding: 1.5rem 0 2.5rem; }
+.incidents { border-left: 4px solid var(--line); padding: .2rem 0 .2rem 1rem; margin-bottom: 1.5rem; }
+.incidents h2 { font-size: 1rem; margin: 0 0 .3rem; }
+.incidents p, .incidents ul { margin: .2rem 0; }

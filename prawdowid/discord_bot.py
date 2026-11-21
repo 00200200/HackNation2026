@@ -10,6 +10,7 @@ Run: `make discord` (reads DISCORD_BOT_TOKEN and PRAWDOWID_API_URL from the envi
 
 import logging
 import os
+import re
 import sys
 
 import discord
@@ -19,7 +20,15 @@ from discord.utils import escape_markdown, escape_mentions
 from pydantic import ValidationError
 
 from prawdowid.app import MAX_INPUT_CHARS, TECHNICAL_ERROR_MESSAGE
-from prawdowid.contract import CheckResult, ClaimKind, ClaimResult, Source, Status
+from prawdowid.contract import (
+    CheckResult,
+    ClaimKind,
+    ClaimResult,
+    IncidentMatch,
+    MatchKind,
+    Source,
+    Status,
+)
 
 log = logging.getLogger("prawdowid.discord")
 
@@ -68,6 +77,10 @@ SECURITY_NOTE = (
 SECURITY_NOTE_ONLY = (
     "Treść zawierała polecenia skierowane do modelu. Zignorowaliśmy je."
 )
+SOURCE_SECURITY_NOTE = (
+    "W źródłach znaleźliśmy polecenia skierowane do modelu. "
+    "Zignorowaliśmy je i sprawdziliśmy resztę."
+)
 PAGE_NOTE = "Ta strona nie jest źródłem dowodów dla własnych twierdzeń."
 UNCHECKED_NOTE = (
     "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
@@ -93,19 +106,55 @@ def _claim(n: int, c: ClaimResult) -> str:
     return "\n".join(lines)
 
 
+# Scenario I: a known incident the input looks like. Context only, never a verdict.
+MATCH_LABELS = {
+    MatchKind.URL: "ten sam adres",
+    MatchKind.DOMAIN: "domena z bazy",
+    MatchKind.TEXT: "podobny tekst",
+}
+PLAIN_URL = re.compile(r"https?://[^\s<>]+")
+INCIDENT_NOTE = (
+    "Ta treść przypomina incydenty z bazy organizatora. "
+    "To tylko kontekst: nie zmienia oceny twierdzeń."
+)
+
+
+def _incident(m: IncidentMatch) -> str:
+    how = MATCH_LABELS[m.matched_on]
+    if m.similarity is not None:
+        how += f" {round(m.similarity * 100)}%"
+    # The base is outside data: only a plain http(s) URL, so it cannot break out of <...>.
+    url = f" <{m.url}>" if m.url and PLAIN_URL.fullmatch(m.url) else ""
+    return f"- {_safe(m.incident_text)} ({_safe(m.incident_id)}, {how}){url}"
+
+
+def _incidents(matches: list[IncidentMatch]) -> str:
+    return "\n".join(
+        ["### Podobne znane incydenty", INCIDENT_NOTE, *map(_incident, matches)]
+    )
+
+
 def render(check: CheckResult) -> str:
     """CheckResult as Discord Markdown, with the same sections as the web form."""
+    warning = [_incidents(check.incident_matches)] if check.incident_matches else []
     # Statuses other than "ok" are notices, never verdicts.
     if check.status is not Status.OK:
         notice = f"**Brak oceny.** {_safe(check.message or '')}"
         if check.security_events:
             notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
-        return notice
+        return "\n\n".join([notice, *warning])
     if not check.claims and not check.unchecked_claims:
-        return "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
-    sections = (
-        [f"**Polecenia dla modelu.** {SECURITY_NOTE}"] if check.security_events else []
-    )
+        notice = "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
+        return "\n\n".join([notice, *warning])
+    locations = {e.location for e in check.security_events}
+    sections = [
+        f"**Polecenia dla modelu.** {note}"
+        for note, found in (
+            (SECURITY_NOTE, locations - {"source"}),
+            (SOURCE_SECURITY_NOTE, locations & {"source"}),
+        )
+        if found
+    ]
     if check.page:
         p = check.page
         meta = ", ".join(
@@ -122,7 +171,7 @@ def render(check: CheckResult) -> str:
             + (f", {meta}" if meta else "")
             + f" <{p.url}>. {PAGE_NOTE}",
         )
-    sections += [_claim(n, c) for n, c in enumerate(check.claims, 1)]
+    sections += warning + [_claim(n, c) for n, c in enumerate(check.claims, 1)]
     if check.unchecked_claims:
         sections.append(
             "\n".join(

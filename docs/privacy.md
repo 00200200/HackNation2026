@@ -28,7 +28,7 @@ Where masking runs:
 | Call site | Masked? | Why |
 |---|---|---|
 | Text sent to Claude for claim extraction (`verifier.verify_text`), pasted text and the text of a linked page | yes | A placeholder keeps the sentence, so claims still split. A claim about the personal data itself (for example "this account belongs to the charity") can no longer be checked from the number, which is the point. The claim and source sentence shown to the user carry the placeholder. |
-| Everything after extraction, once wired into `verify()` (#11): search queries, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | Today only extraction runs in a check. These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`) and database queries (`cache.build_tsquery`) are masked again. |
+| Everything after extraction (`prawdowid/pipeline.py`, #11): web search, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`) and database queries (`cache.build_tsquery`) are masked again. |
 | Check log record (`checklog.record`) | yes | The question is stored masked. |
 | stdout log lines | yes | They carry no user text: session id, channel, status, lengths, token counts. Link URLs are masked (an e-mail in a query string), fetch errors are logged by type only. |
 | The link itself, when it is fetched | no | We need the real address to fetch the page. |
@@ -41,9 +41,9 @@ One JSON line in the check log (`PRAWDOWID_CHECK_LOG`, default `logs/checks.json
 question, status, each claim with its verdict and source URLs, and the claims left unchecked. Page
 text from a link is not stored.
 
-A check writes nothing else: it never writes the source cache (`corpus/docs.jsonl`, written only by
-the corpus builder) or the PostgreSQL source store (written only by the seed script; step 2c is off
-in the pipeline).
+Web search in a check also adds the public pages it fetched to the source cache
+(`corpus/docs.jsonl`). Those carry no user text and no session id. A check never writes the
+PostgreSQL source store (written only by the seed script; step 2c is off in the pipeline).
 
 ## Retention
 
@@ -51,11 +51,12 @@ One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:
 
 - Check log: records older than that are dropped when the next check is written (so with no new
   checks they stay until one comes). Damaged lines are dropped the same way.
+- Source cache `corpus/docs.jsonl`: pages fetched more than that ago are dropped on the next save.
 - Source store: each page gets `delete_after = now() + RETENTION_DAYS` on insert;
   `delete_expired_documents()` removes expired pages and the seed script runs it first.
 
-Not covered: the local source cache `corpus/docs.jsonl` (a corpus build artefact on a team machine,
-ignored by git and not deployed) and Docker's own stdout logs (rotation is set by the Docker host).
+Not covered: Docker's own stdout logs (rotation is set by the Docker host). They carry no raw user
+text: link checks log the masked URL and the claims, which come from the masked text.
 
 ## Demo session and deletion
 
@@ -71,10 +72,11 @@ call with the id from the log.
 
 | Service | What it receives | When |
 |---|---|---|
-| Anthropic API (Claude) | Masked text to check | Every check (extraction). Rerank and judge, written but not yet wired into `verify()`, will also send the claims and evidence fragments. |
-| Google Fact Check Tools API | Claim text | Not wired into `verify()` yet; needs `GOOGLE_FACTCHECK_API_KEY`. |
-| DuckDuckGo (through `ddgs`) | Masked search queries | Corpus builder only; not called by a check yet. |
-| EUvsDisinfo MCP server (`mcp.euvsd.info`) | Claim text | Not wired into `verify()` yet; needs `EUVSDISINFO_API_KEY`. |
+| Anthropic API (Claude) | Masked text to check; claims and evidence fragments (rerank, judge) | Every check. |
+| Google Fact Check Tools API | Claim text | Every checkable claim, when `GOOGLE_FACTCHECK_API_KEY` is set. |
+| DuckDuckGo (through `ddgs`) | Masked search queries | Every checkable claim, and the corpus builder. |
+| EUvsDisinfo MCP server (`mcp.euvsd.info`) | Claim text | Every checkable claim, when `EUVSDISINFO_API_KEY` is set. |
+| The incident base (`prawdowid/incidents.py`) | The raw input and the final URL | Every check; local file, nothing leaves the server. |
 | The site a link points to | A request from our server | Link checks. The site sees our server's address, not the user's. |
 
 The region where each provider processes the data is UNCONFIRMED: we have not checked their data
