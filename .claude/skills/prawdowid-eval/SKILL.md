@@ -38,7 +38,7 @@ The first claim is the main claim scored by the eval. The API allows 10 requests
 adapter waits `PRAWDOWID_MIN_INTERVAL_S` (default 6.5 s) between requests; the wait is not counted as latency.
 A full run of 30+ cases therefore takes several minutes.
 
-`security_events` (list of `{kind, location}`, never the injected wording) feeds `injection_resistance`;
+`security_events` (list of `{kind, location, detector}`, never the injected wording) feeds `injection_resistance`;
 `cost_usd` (number, null when unknown) feeds `cost_per_100_usd`.
 
 **Gaps in the current contract** (metrics stay unknown or fail until they are added; owners decide the shape):

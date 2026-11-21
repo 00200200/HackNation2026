@@ -7,6 +7,7 @@ insufficient evidence.
 
 import logging
 import os
+import re
 import time
 
 from pydantic import BaseModel
@@ -51,7 +52,71 @@ NO_SOURCES = (
 NO_EVIDENCE_STRENGTH = "Brak. Nie zbadaliśmy żadnych dowodów."
 NO_EVIDENCE_PREMISES = ["Nie zbadaliśmy żadnych źródeł ani dowodów."]
 
+PATTERNS_ONLY = (
+    "Sprawdzenie nie zostało dokończone, więc polecenia skierowane do modelu "
+    "wykrywaliśmy tylko listą typowych zwrotów."
+)
+
 USER_TEXT = register_tag("user_text")
+
+# Deterministic pre-check, independent of the model it protects. No maintained offline detector
+# covers Polish (llm-guard's DeBERTa is English-only; Prompt Guard 2 was not evaluated on Polish).
+# Singular imperatives only: "zignorował", "ignorujemy" or a plural "zignorujcie" in reported
+# speech are about people, not the model.
+# ponytail: a fixed phrase list misses paraphrases and other languages and flags a quoted
+# singular command; the model flag covers part of that. Add a screening model if the eval
+# shows misses.
+INJECTION_PATTERNS = re.compile(
+    r"""
+    # Override of earlier rules: singular imperative or "proszę" + infinitive, with or without
+    # Polish letters.
+    (\b(zignoruj|ignoruj|pomi[nń])|\bprosz[eę]\s+(zignorowa[cć]|pomin[aą][cć]))\s+
+        ((wszystk|wszelk|każd|kazd|moj|swoj|twoj|t[eąa]\b|dotychczasow|poprzedn|wcze[sś]niejsz
+          |powy[zż]sz|systemow|otrzyman)\w*\s+)*
+        (instrukcj|polece|zasad|reguł|regul|wytyczn|prompt)
+    | \b(zignoruj|ignoruj|pomi[nń])\s+(wszystko\s+)?powy[zż]sz\w*
+    | \bzapomnij\s+o\s+(\w+\s+){0,2}(instrukcj|polece|prompt)
+    | \b(ignore|disregard|forget)\s+(all\s+|any\s+)?(of\s+)?(the\s+)?
+        ((previous|prior|earlier|your|my|system)\s+)+(instructions?|rules|prompts?|directions|commands)\b
+    | \b(ignore|disregard)\s+(all\s+|everything\s+)?(of\s+)?(the\s+)?above\b
+    # A new role or a fake system turn.
+    | \bod\s+teraz\s+jeste[sś]\b | \[\s*system\s*\]
+    | \byou\s+are\s+now\s+(an?\s+)?(ai|assistant|bot|model|unrestricted|dan)\b
+    # Text addressed to the model itself.
+    | \b(note|message)\s+to\s+the\s+(ai|model|assistant)\b
+    | \b(notatka|wiadomo[sś][cć]|polecenie)\s+dla\s+(ai|modelu|asystenta)\s*:
+    # Asking for a verdict, a fixed answer or the prompt.
+    | \b(oceń|oznacz)\s+(to|je|go|ją|wszystko)\s+jako\s+(prawd|potwierdz)
+    | \b(mark|rate)\s+(this|it|everything)\s+as\s+(true|confirmed)
+    | \bodpowiedz\s+(tylko|wyłącznie|jedynie)\b | \boutput\s+only\s+(the|one|a)\b
+    | \b(ujawnij|pokaż|wypisz)\s+(mi\s+)?(swój\s+|swoje\s+|twój\s+|twoje\s+)?(prompt|instrukcj)
+    | \b(reveal|print|show)\s+(me\s+)?(your|the)\s+(system\s+)?(prompt|instructions)\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def screen(text: str, location: str = "input") -> list[SecurityEvent]:
+    """Pattern pre-check for instructions aimed at the model, in user input or a fetched page."""
+    if not INJECTION_PATTERNS.search(text):
+        return []
+    log.warning(
+        "security_event kind=prompt_injection location=%s detector=patterns", location
+    )
+    return [SecurityEvent(location=location, detector="patterns")]
+
+
+def failed(text: str, status: Status, message: str, cost: float | None) -> CheckResult:
+    """A check the model did not complete: the pattern events still go out, with that limit."""
+    events = screen(text)
+    return CheckResult(
+        status=status,
+        message=message,
+        security_events=events,
+        limitations=[PATTERNS_ONLY],
+        cost_usd=cost,
+    )
+
 
 # Hyperparameters. Defaults are a first guess for the 30 s median, not tuned yet.
 # Most central claims checked in full; the rest are listed as not checked. Only these carry a
@@ -124,9 +189,8 @@ class Extraction(BaseModel):
     claims: list[ExtractedClaim]
     other_claims: list[str]
     unclear: bool
-    # The same call reports injected instructions: no Polish offline detector exists, and the
-    # brief only asks to log them. ponytail: an attacked model can hide the flag; add a separate
-    # screening call when fetched pages come in.
+    # Second detector next to the pattern pre-check (screen): catches paraphrases the patterns
+    # miss, but an attacked model can hide it, so it never stands alone.
     injection_found: bool = False
 
 
@@ -203,16 +267,14 @@ async def verify(text: str) -> CheckResult:
     # A failed or refused request may still be billed and reports no usage: cost unknown.
     except ContentFilterError:
         log.warning("model refused model=%s", MODEL)
-        return CheckResult(status=Status.CANNOT_CHECK, message=MODEL_REFUSED)
+        return failed(text, Status.CANNOT_CHECK, MODEL_REFUSED, cost=None)
     except UserError as exc:
         # A missing API key, raised on first use of the provider: no request was sent.
         log.warning("model not configured model=%s error=%r", MODEL, exc)
-        return CheckResult(
-            status=Status.TECHNICAL_ERROR, message=MODEL_FAILED, cost_usd=0.0
-        )
+        return failed(text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=0.0)
     except AgentRunError as exc:
         log.warning("model failed model=%s error=%r", MODEL, exc)
-        return CheckResult(status=Status.TECHNICAL_ERROR, message=MODEL_FAILED)
+        return failed(text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=None)
     usage = result.usage
     # Best-effort price of every request in the run from PydanticAI's genai-prices tables; None
     # for an unpriced model. genai-prices 0.2.5 (2026-11-19) lists claude-opus-5-5 at $4 input and
@@ -229,7 +291,10 @@ async def verify(text: str) -> CheckResult:
     )
     check = to_check_result(result.output)
     check.cost_usd = cost
+    check.security_events = screen(text)
     if result.output.injection_found:
-        check.security_events = [SecurityEvent(location="input")]
-        log.warning("security_event kind=prompt_injection location=input")
+        check.security_events.append(SecurityEvent(location="input", detector="model"))
+        log.warning(
+            "security_event kind=prompt_injection location=input detector=model"
+        )
     return check

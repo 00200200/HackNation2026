@@ -5,8 +5,8 @@ const count = document.getElementById("count");
 const submit = document.getElementById("submit");
 const result = document.getElementById("result");
 
-const SECURITY_NOTE = "Tekst zawierał polecenia skierowane do modelu. Zignorowaliśmy je i sprawdziliśmy resztę.";
-const SECURITY_NOTE_ONLY = "Tekst zawierał polecenia skierowane do modelu. Zignorowaliśmy je.";
+const SECURITY_NOTE = "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
+const SECURITY_NOTE_ONLY = "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich.";
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 
 function el(tag, attrs = {}, ...children) {
@@ -63,6 +63,7 @@ function render(check) {
   if (check.status !== "ok") {
     const notice = [box("notice", "Brak oceny", check.message)];
     if (check.security_events?.length) notice.unshift(box("notice", "Polecenia dla modelu", SECURITY_NOTE_ONLY));
+    if (check.limitations?.length) notice.push(el("h3", { textContent: "Ograniczenia" }), list(check.limitations));
     return notice;
   }
   if (!check.claims.length && !check.unchecked_claims?.length) return [box("notice", "Brak twierdzeń", "Usługa nie zwróciła żadnego twierdzenia.")];

@@ -80,6 +80,8 @@ class SecurityEvent(BaseModel):
     kind: Literal["prompt_injection"] = "prompt_injection"
     # Where they were found: "input" (the user's text); "page" once links are fetched.
     location: Literal["input", "page"]
+    # "patterns": the fixed pre-check in code; "model": the extraction model's own flag.
+    detector: Literal["patterns", "model"]
 
 
 class CheckResult(BaseModel):
@@ -89,6 +91,8 @@ class CheckResult(BaseModel):
     # Claims found but left out by the per-check cap. They have no verdict.
     unchecked_claims: list[str] = []
     security_events: list[SecurityEvent] = []
+    # Limits of the check as a whole, e.g. injection detection ran on patterns only.
+    limitations: list[str] = []
     # Model tokens plus paid API calls for this answer; None when it cannot be known.
     cost_usd: float | None = None
 

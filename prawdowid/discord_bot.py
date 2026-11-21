@@ -62,10 +62,12 @@ KIND_LABELS = {
     ClaimKind.QUOTED: "Treść cytatu",
 }
 SECURITY_NOTE = (
-    "Tekst zawierał polecenia skierowane do modelu. "
-    "Zignorowaliśmy je i sprawdziliśmy resztę."
+    "W tekście są zwroty, które wyglądają na polecenia dla modelu. "
+    "Nie wykonaliśmy ich i sprawdziliśmy resztę."
 )
-SECURITY_NOTE_ONLY = "Tekst zawierał polecenia skierowane do modelu. Zignorowaliśmy je."
+SECURITY_NOTE_ONLY = (
+    "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich."
+)
 UNCHECKED_NOTE = (
     "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
     "Tych nie oceniliśmy. Możesz wkleić je osobno."
@@ -97,6 +99,8 @@ def render(check: CheckResult) -> str:
         notice = f"**Brak oceny.** {_safe(check.message or '')}"
         if check.security_events:
             notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
+        if check.limitations:
+            notice += "\n**Ograniczenia:**\n" + "\n".join(_bullets(check.limitations))
         return notice
     if not check.claims and not check.unchecked_claims:
         return "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
