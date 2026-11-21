@@ -304,7 +304,7 @@ async function errorMessage(resp) {
 // screen readers may skip updates made while it is set, and the waiting notice should be heard.
 function setBusy(value) {
   busy = value;
-  [submit, ...chips].forEach((control) => control.setAttribute("aria-disabled", String(value)));
+  [submit, ...chips, deleteSession].forEach((control) => control.setAttribute("aria-disabled", String(value)));
 }
 
 // Cleared first so the same message is announced again on a repeated attempt.
@@ -374,7 +374,6 @@ input.addEventListener("keydown", (event) => {
 
 // Demo session: the API issues an id on the first check; this tab sends it back and can delete it.
 const SESSION_KEY = "prawdowid-session";
-const sessionNote = document.getElementById("session");
 const sessionStatus = document.getElementById("session-status");
 const deleteSession = document.getElementById("delete-session");
 
@@ -395,14 +394,14 @@ function storeSession(id) {
 function rememberSession(id) {
   if (!id) return;
   storeSession(id);
-  sessionNote.hidden = false;
   deleteSession.hidden = false;
   sessionStatus.textContent = "";
 }
 
 deleteSession.addEventListener("click", async () => {
   const id = storedSession();
-  if (!id) return;
+  // Not while a check runs: its response would bring the deleted session back.
+  if (!id || busy) return;
   deleteSession.disabled = true;
   try {
     const resp = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
@@ -412,6 +411,7 @@ deleteSession.addEventListener("click", async () => {
     if (!resp.ok) throw new Error(String(resp.status));
     storeSession(null);
     deleteSession.hidden = true;
+    input.focus();
     sessionStatus.textContent = "Usunęliśmy sprawdzenia z tej sesji.";
   } catch {
     sessionStatus.textContent = "Nie udało się usunąć sprawdzeń. Spróbuj ponownie za chwilę.";
@@ -420,7 +420,7 @@ deleteSession.addEventListener("click", async () => {
   }
 });
 
-if (storedSession()) sessionNote.hidden = false;
+if (storedSession()) deleteSession.hidden = false;
 
 chips.forEach((chip) => chip.addEventListener("click", () => {
   if (busy) return;

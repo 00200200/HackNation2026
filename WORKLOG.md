@@ -199,6 +199,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Michał: web: the session paragraph under the answer is gone (user request); "Usuń moje sprawdzenia" now sits at the end of the note under the box and appears once a session exists, so deletion (brief §5) stays.
 - 2026-11-21 Michał: web hero in the layout of doc2json.pl: centred name with the lens and a tagline over a white two-pane panel (check box with examples on the left, "Jak odpowiadamy" guide with verdict chips and the first words of each answer on the right); outlined echo removed; after a check the panel collapses to the box; field and chip borders at 3.9:1. Reviewer and a11y-reviewer findings fixed.
 - 2026-11-21 Michał: web UX pass against the brief: example questions back under the box, "bezpłatnie i bez konta", the waiting notice names the sources searched, a verdict summary and one-line meaning per verdict (the page has no legend), an archival flag on sources 5+ years old, time and model cost per answer when the API reports it.
 - 2026-11-21 Michał: README opens in the pitch deck's style: banner, live home page, a real answer from the live API, verdicts and pipeline images in `docs/readme/` (regenerate from `docs/readme/assets.html`); technical sections kept below.
