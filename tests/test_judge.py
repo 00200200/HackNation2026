@@ -521,7 +521,10 @@ def test_quote_from_the_title_counts():
     j = run(
         [titled], answering(label(titled, "supports", "podatek od wypieków od 2025"))
     )
-    assert j.verdict is Verdict.CONFIRMED
+    # The quote is found, but a headline alone is not enough even from an official source.
+    assert [s.fragment for s in j.sources] == ["podatek od wypieków od 2025"]
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert NOT_ENOUGH in j.limitations
 
 
 def test_quote_across_the_title_and_body_join_is_dropped():
@@ -557,3 +560,87 @@ def test_pap_finding_against_weak_sources_only_is_no_conflict():
     )
     assert j.verdict is Verdict.FALSE
     assert CONFLICT not in j.limitations
+
+
+# --- #66: a fact-checker's rating reaches the judge; a review title alone confirms nothing ---
+
+REVIEW_URL = "https://demagog.org.pl/fake_news/mikroczipy/"
+REVIEW_TITLE = "Szczepionki zawierają mikroczipy? Sprawdzamy"
+
+
+def review(fragment):
+    source = Source(
+        title=REVIEW_TITLE,
+        publisher="Demagog",
+        published_at=TODAY,
+        fetched_at=datetime(2026, 11, 21, tzinfo=UTC),
+        url=REVIEW_URL,
+        source_type="fact_check",
+        fragment=fragment,
+    )
+    return Fragment(doc_id=REVIEW_URL, source=source)
+
+
+def test_review_title_repeating_a_false_claim_cannot_confirm_it():
+    # No rating reached the judge, the model reads the headline as backing the claim.
+    titled = review(None)
+    j = run([titled], answering(label(titled, "supports", REVIEW_TITLE)))
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert NOT_ENOUGH in j.limitations
+    assert j.strength == "słaba"
+
+
+def test_review_with_its_rating_in_the_fragment_refutes():
+    rated = review(
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Szczepionki zawierają mikroczipy."
+    )
+    j = run(
+        [rated],
+        answering(
+            label(rated, "refutes", "Ocena fact-checkera: Fałsz.", own_conclusion=True)
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert "Ocena fact-checkera: Fałsz" in j.premises[0]
+
+
+def test_two_labels_on_one_page_list_its_url_once():
+    first = fragment(
+        "https://a.pl/x", "Pierwsze zdanie dowodu o podatku. " + NO_TAX, "Portal A"
+    )
+    j = run(
+        [first],
+        answering(
+            label(first, "refutes", NO_TAX),
+            label(first, "refutes", "Pierwsze zdanie dowodu o podatku."),
+        ),
+    )
+    assert len(j.premises) == 2
+    assert [str(s.url) for s in j.sources] == ["https://a.pl/x"]
+
+
+def test_quoting_only_the_reviewed_claim_of_a_review_confirms_nothing():
+    rated = review(
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Szczepionki zawierają mikroczipy."
+    )
+    j = run(
+        [rated],
+        answering(label(rated, "supports", "Szczepionki zawierają mikroczipy.")),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    # Dropped like an unverified quote: never shown as the publisher backing the claim.
+    assert j.premises == [] and j.sources == []
+
+
+def test_two_headlines_from_two_publishers_are_not_enough():
+    a = fragment("https://a.pl/x", None, "Portal A")
+    a.source.title = "Szczepionki zawierają mikroczipy według portalu"
+    b = fragment("https://b.pl/y", None, "Portal B")
+    b.source.title = "Mikroczipy w szczepionkach potwierdzone przez portal"
+    j = run(
+        [a, b],
+        answering(
+            label(a, "supports", a.source.title), label(b, "supports", b.source.title)
+        ),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE

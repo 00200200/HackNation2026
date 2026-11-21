@@ -1,8 +1,9 @@
 """Known-claim lookup in Google Fact Check Tools (claims:search).
 
 Fact-checkers that publish ClaimReview markup may already have reviewed a claim. Each review comes
-back as a `Source` candidate for reranking. Its `textualRating` is only a signal kept next to the
-source: the verdict is still set in code. A missing key, quota error or outage is a limitation,
+back as a `Source` candidate for reranking. Its `textualRating` and the reviewed claim travel in the
+source's fragment ("Ocena fact-checkera: Fałsz." and the claim in a second paragraph), so the judge reads
+them as data; the verdict is still set in code. A missing key, quota error or outage is a limitation,
 never a verdict.
 
 Docs: https://developers.google.com/fact-check/tools/api/reference/rest/v1alpha1/claims/search
@@ -29,6 +30,11 @@ DEADLINE_S = 15
 ATTEMPTS = 2  # first call plus one retry
 PAGE_SIZE = 10
 SOURCE_TYPE = "fact_check"
+# Start of the fragment's two lines: the rating (the review's own finding) and the claim it was
+# given to (the disputed statement, not the review's words, so never a quotable finding).
+RATING_PREFIX = "Ocena fact-checkera:"
+CLAIM_PREFIX = "Sprawdzane twierdzenie:"
+CLAIM_CHARS = 500
 
 LOOKUP_UNAVAILABLE = (
     "Wyszukiwanie w bazie Google Fact Check było niedostępne, "
@@ -130,8 +136,7 @@ def _to_hit(found: dict, review: dict, fetched_at: datetime) -> FactCheckHit | N
             fetched_at=fetched_at,
             url=review["url"],
             source_type=SOURCE_TYPE,
-            # No excerpt of the review page yet; the reviewed claim stays in FactCheckHit.
-            fragment=None,
+            fragment=_fragment(review.get("textualRating"), reviewed_claim),
         )
     except (KeyError, ValidationError):
         log.warning("factcheck review skipped: no usable url")
@@ -139,6 +144,20 @@ def _to_hit(found: dict, review: dict, fetched_at: datetime) -> FactCheckHit | N
     return FactCheckHit(
         source=source, rating=review.get("textualRating"), reviewed_claim=reviewed_claim
     )
+
+
+def _fragment(rating: str | None, claim: str | None) -> str | None:
+    """The fact-checker's rating and the claim it was given to, as data for rerank and the judge.
+
+    No rating: None, so a bare review title (often the disputed claim itself) never stands as
+    evidence on its own.
+    """
+    if not (rating or "").strip():
+        return None
+    text = f"{RATING_PREFIX} {rating.strip()}."
+    # One short paragraph: the judge must be able to tell the whole claim from the rating.
+    claim = " ".join((claim or "").split())[:CLAIM_CHARS]
+    return f"{text}\n\n{CLAIM_PREFIX} {claim}" if claim else text
 
 
 def _date(value: str | None) -> date | None:
