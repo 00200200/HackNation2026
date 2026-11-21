@@ -1,9 +1,21 @@
 {
-  "commit": "6689ad6df2e9471556390f035d8a6a00c06c68dc",
+  "commit": "e47b646fdf15c6de43d9c1c84cd3d1d446f0472e",
   "dirty": false,
   "mode": "quick",
-  "timestamp": "2026-11-21T17:21:42+00:00",
+  "timestamp": "2026-11-21T18:48:16+00:00",
   "n_cases": 9,
+  "skipped": [
+    {
+      "id": "FC-J01",
+      "scenario": "J",
+      "reason": "needs a missing-key fault; the harness reaches the product only over HTTP, so this needs a product eval switch (not built)"
+    },
+    {
+      "id": "FC-J02",
+      "scenario": "J",
+      "reason": "needs a model rate-limit fault; the harness reaches the product only over HTTP, so this needs a product eval switch (not built)"
+    }
+  ],
   "scenarios": [
     "A",
     "B",
@@ -42,7 +54,7 @@
       "pass": false
     },
     "median_latency_s": {
-      "value": 3.8703897080849856,
+      "value": 3.6943366250488907,
       "target": "<= 30.0",
       "pass": true
     },
@@ -62,15 +74,16 @@
       "pass": false
     },
     "cost_per_100_usd": {
-      "value": null,
+      "value": 1.7247111111111113,
       "target": "reported",
-      "pass": null
+      "pass": true
     }
   },
   "cases_file": "evals/cases.jsonl",
   "coverage_ok": true,
   "overall_pass": false,
   "warnings": [
+    "skipped, not scored: FC-J01, FC-J02",
     "citation_correctness unknown: pass --corpus",
     "channel_consistency unknown: no second channel wired for eval (PRAWDOWID_EXTRA_CHANNELS)"
   ],
@@ -83,7 +96,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.87
+        3.69
       ],
       "errors": []
     },
@@ -95,7 +108,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        16.76
+        16.22
       ],
       "errors": []
     },
@@ -107,7 +120,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        9.03
+        6.32
       ],
       "errors": []
     },
@@ -119,7 +132,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.97
+        3.46
       ],
       "errors": []
     },
@@ -131,7 +144,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.6
+        3.25
       ],
       "errors": []
     },
@@ -143,7 +156,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.21
+        2.99
       ],
       "errors": []
     },
@@ -155,7 +168,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.9
+        3.83
       ],
       "errors": []
     },
@@ -167,7 +180,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.23
+        3.61
       ],
       "errors": []
     },
@@ -179,7 +192,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        6.19
+        6.64
       ],
       "errors": []
     }
