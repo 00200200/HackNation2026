@@ -41,7 +41,7 @@ image; `docker compose` and `make dev` read it at start-up.
 | `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database. The backend never needs it; `compose.prod.yaml` sets it for production's separate `db`, which has no source-store schema, so enabling step 2c in production needs this migration applied there first. Start the database with `make db` (127.0.0.1:5433). |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 
-The model call has a 45 s deadline and at most one retry, inside the API's 60 s limit. Provider
+The model call has at most one retry and shares the check's time budget (`PRAWDOWID_CHECK_BUDGET_S`, 25 s), inside the API's 60 s limit. Provider
 errors, rate limits, timeouts and a missing key return `technical_error`; a model refusal returns
 `cannot_check`. Both carry a Polish message and no claims.
 
@@ -94,7 +94,7 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   Tools (`claims:search`). Each review becomes a `Source` (`source_type="fact_check"`) with the
   fact-checker's rating and the reviewed claim kept beside it, not in `fragment`: the rating is a
   signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
-  message and no hits. Not wired into `verify()` yet (issue #11).
+  message and no hits. Called per claim from `prawdowid/pipeline.py` (#11).
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
 - `prawdowid/discord_bot.py`: the second channel, a `/sprawdz tekst:` slash command (discord.py).
   It sends the same `POST /api/checks` as the web form, with `X-Channel: discord`, and renders the

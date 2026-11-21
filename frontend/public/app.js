@@ -26,6 +26,7 @@ const SOURCE_TYPES = {
   fact_checker: "serwis fact-checkingowy",
   fact_check: "serwis fact-checkingowy",
   incident_base: "baza incydentów dezinformacji",
+  disinfo_database: "baza znanych narracji dezinformacyjnych",
   news: "serwis informacyjny",
 };
 // First words of the answer, in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić…"),
