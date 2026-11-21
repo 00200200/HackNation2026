@@ -669,3 +669,52 @@ def test_redirect_to_credentials_is_refused():
     )
     assert refusal.message == link.CREDENTIALS
     assert net.connected == ["93.184.216.34"]
+
+
+def test_paywall_marked_in_microdata_is_not_worked_around():
+    meta = '<meta itemprop="isAccessibleForFree" content="false">'
+    body = ARTICLE.replace("<article>", "<article>" + meta)
+    refusal, _ = fetch("http://news.example/a", {"93.184.216.34": http(body=body)})
+    assert refusal.message == PAYWALL
+
+
+FORM_NOTICE = '<form action="/sub"><p>Subscribe to read the full story.</p><button>Go</button></form>'
+
+
+def test_free_article_beside_a_newsletter_form_is_checked():
+    body = ARTICLE.replace(ARTICLE_TEXT, ARTICLE_TEXT * 5).replace(
+        "</article>", "</article>" + FORM_NOTICE
+    )
+    page, _ = fetch("http://news.example/a", {"93.184.216.34": http(body=body)})
+    assert ARTICLE_TEXT.strip() in page.text
+
+
+def test_subscribe_notice_in_a_small_form_is_a_wall():
+    # trafilatura drops a small <form> from its text, so the notice must be read from the HTML.
+    body = ARTICLE.replace("</article>", "</article>" + FORM_NOTICE)
+    net = FakeNet({"93.184.216.34": http(body=body)})
+
+    def never(messages, info):
+        raise AssertionError("model must not be called for a walled page")
+
+    async def guarded_fetch(url):
+        return await fetch_page(url, backend=net)
+
+    with pytest.MonkeyPatch.context() as mp, agent.override(model=FunctionModel(never)):
+        mp.setattr("prawdowid.verifier.fetch_page", guarded_fetch)
+        result = asyncio.run(verify("http://news.example/a"))
+    assert result.status is Status.CANNOT_CHECK and result.message == PAYWALL
+
+
+@pytest.mark.parametrize("name", ["session_id", "session-id", "SESSIONID"])
+def test_session_id_spellings_are_secret(name):
+    assert link.redact(f"http://news.example/a?{name}=SECRET&id=7") == (
+        f"http://news.example/a?{name}=REDACTED&id=7"
+    )
+
+
+def test_url_secrets_never_reach_any_log_record(caplog):
+    with caplog.at_level("INFO"):
+        page, _ = fetch("http://news.example/a?token=SECRET", {"93.184.216.34": http()})
+    assert page.url.endswith("token=REDACTED")
+    assert "SECRET" not in caplog.text and "news.example" in caplog.text

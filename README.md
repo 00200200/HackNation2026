@@ -11,8 +11,10 @@ with a note that the source base is not connected, and an opinion, forecast or q
 `not_verifiable`. `sources` is always empty. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
-paste the text. Nothing is stored; each check is logged to stdout (status, latency, input length)
-with a second line for the model call (model, input and output tokens, latency).
+paste the text. There is no check database: stdout is the only record. Each check logs its status,
+latency and input length, plus a line for the model call (model, input and output tokens, latency).
+A link check also logs the final URL with secret query values removed, the page's SHA-256, and the
+text and verdict of every claim. The page text itself is never logged.
 
 ## Configuration
 
