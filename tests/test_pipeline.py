@@ -164,6 +164,7 @@ def test_no_retry_without_time_left(monkeypatch, models):
     assert result.judgement.limitations == [
         pipeline.SOURCES_FAILED,
         pipeline.factcheck.LOOKUP_UNAVAILABLE,
+        pipeline.euvsdisinfo.LOOKUP_UNAVAILABLE,
         websearch.SEARCH_UNAVAILABLE,
     ]
 
@@ -244,3 +245,26 @@ def test_injection_in_a_source_reaches_the_check_result(monkeypatch):
         result = verify("tekst", claims(2))
     assert [e.location for e in result.security_events] == ["source"]
     assert all(c.verdict is Verdict.CONFIRMED for c in result.claims)
+
+
+def test_euvsdisinfo_match_alone_gives_no_verdict(monkeypatch, models):
+    """A known-narrative match is context: one EUvsDisinfo case never decides the verdict."""
+    case = pipeline.euvsdisinfo.EuvsdisinfoHit(
+        kind="claim_review",
+        source=document("https://euvsdisinfo.eu/report/x")
+        .to_source(fragment=f"Wstęp. {QUOTE}")
+        .model_copy(
+            update={"source_type": "disinfo_database", "publisher": "EUvsDisinfo"}
+        ),
+    )
+
+    async def search_cases(claim, **kwargs):
+        return pipeline.euvsdisinfo.EuvsdisinfoLookup(hits=[case])
+
+    monkeypatch.setattr(pipeline.euvsdisinfo, "search_cases", search_cases)
+    fake_search(monkeypatch, found=lambda q: False)
+    result = check("Twierdzenie.", ["model 1"], 5)
+    assert result.judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert [str(s.url) for s in result.judgement.sources] == [
+        "https://euvsdisinfo.eu/report/x"
+    ]

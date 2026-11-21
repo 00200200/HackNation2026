@@ -14,6 +14,26 @@ services:
       retries: 3
       start_period: 5s
 
+  # Step 2c source store, opt-in (`make db`). Step 2c is disabled in the pipeline until licensed
+  # sources are chosen (user decision), so the backend gets no DATABASE_URL and never needs it.
+  # Starts empty: the team seeds it with `make db-seed`. Schema from db/migrations/ on first start
+  # of the volume. Port bound to 127.0.0.1 only. The default password is for this local-only
+  # database; POSTGRES_PASSWORD applies only when the volume is created (`docker compose
+  # --profile db down -v` to recreate), URL-safe characters only.
+  db:
+    profiles: [db]
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: prawdowid
+      POSTGRES_DB: prawdowid
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prawdowid}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+
   # Second channel. Opt-in (make up DISCORD=1): it exits at once without DISCORD_BOT_TOKEN.
   discord:
     build: .
@@ -37,3 +57,6 @@ services:
       backend:
         condition: service_healthy
         restart: true
+
+volumes:
+  pgdata:

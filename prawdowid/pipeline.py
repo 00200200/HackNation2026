@@ -1,8 +1,9 @@
 """Steps 2 to 5 for one claim, under the time budget of the whole check.
 
-Step 2 runs two lookups at once: 2a Google Fact Check (`factcheck.search_claims`) and 2b web search
+Step 2 runs three lookups at once: 2a Google Fact Check (`factcheck.search_claims`), EUvsDisinfo
+known narratives (`euvsdisinfo.search_cases`, context that never decides alone) and 2b web search
 and fetch (`websearch.search_web`, one search per query of the claim). Step 2c (our own database,
-#19) is out of the pipeline for now (team decision). The 2a and 2b candidates go to step 3 (`rerank.rerank`, the linked page left out) and
+#19) is out of the pipeline for now (team decision). The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
 steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
 remains, the web is searched once more with a rewritten query and the claim is judged again.
 
@@ -20,7 +21,7 @@ from pydantic import BaseModel
 from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
-from prawdowid import factcheck, judge, rerank, websearch
+from prawdowid import euvsdisinfo, factcheck, judge, rerank, websearch
 from prawdowid.contract import SecurityEvent, Source, Verdict
 
 log = logging.getLogger("prawdowid")
@@ -30,6 +31,8 @@ log = logging.getLogger("prawdowid")
 CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 25)
 # The retry starts only with at least this much time left: search, rerank and judge again.
 RETRY_MIN_S = float(os.getenv("PRAWDOWID_RETRY_MIN_S") or 10)
+# EUvsDisinfo only adds context: it may not hold up the claim for its own 15 s deadline.
+EUVSDISINFO_BUDGET_S = float(os.getenv("PRAWDOWID_EUVSDISINFO_BUDGET_S") or 5)
 
 TIME_LIMIT = (
     "Nie sprawdzono: skończył się czas przeznaczony na sprawdzenie ({budget:g} s). "
@@ -91,7 +94,7 @@ async def check_claim(
             log.info("retry cut by the time limit claim=%r", claim)
             cut = True
 
-    if len(limits) == 2 and not candidates:  # 2a and 2b both failed
+    if len(limits) == 3 and not candidates:  # every source failed
         reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
         judgement = _not_checked(reason)
     # The main reason first, then what each source said.
@@ -106,22 +109,30 @@ async def check_claim(
 async def _retrieve(
     claim: str, queries: list[str], steps: dict[str, int]
 ) -> tuple[list[Source], dict[str, str]]:
-    """Steps 2a and 2b at once: candidates and the limitation of each failed source."""
-    lookup, webs = await asyncio.gather(
+    """Steps 2a, EUvsDisinfo and 2b at once: candidates and the limitation of each failed
+    source."""
+    lookup, cases, webs = await asyncio.gather(
         _timed(steps, "factcheck", _search_claims(claim)),
+        _timed(steps, "euvsdisinfo", _search_cases(claim)),
         _timed(
             steps,
             "web",
             asyncio.gather(*(_search_web(q) for q in queries or [claim])),
         ),
-        # Step 2c plugs in here: `search_documents` on the #19 branch (not merged) when it is back in the pipeline.
+        # Step 2c (`cache.search_documents`, #19) plugs in here when it is back in the pipeline.
     )
     documents = [d for w in webs for d in w.documents]
-    candidates = [h.source for h in lookup.hits] + [
-        d.to_source(fragment=d.text) for d in documents
-    ]
+    candidates = (
+        [h.source for h in lookup.hits]
+        + [h.source for h in cases.hits]
+        + [d.to_source(fragment=d.text) for d in documents]
+    )
     web_limit = None if documents else next((w.limitation for w in webs), None)
-    limits = {"factcheck": lookup.limitation, "web": web_limit}
+    limits = {
+        "factcheck": lookup.limitation,
+        "euvsdisinfo": cases.limitation,
+        "web": web_limit,
+    }
     return candidates, {k: v for k, v in limits.items() if v}
 
 
@@ -140,6 +151,16 @@ async def _search_claims(claim: str) -> factcheck.FactCheckLookup:
     except Exception:
         log.exception("factcheck failed")
         return factcheck.FactCheckLookup(limitation=factcheck.LOOKUP_UNAVAILABLE)
+
+
+async def _search_cases(claim: str) -> euvsdisinfo.EuvsdisinfoLookup:
+    try:
+        return await asyncio.wait_for(
+            euvsdisinfo.search_cases(claim), EUVSDISINFO_BUDGET_S
+        )
+    except Exception:  # TimeoutError of its own budget included
+        log.exception("euvsdisinfo failed")
+        return euvsdisinfo.EuvsdisinfoLookup(limitation=euvsdisinfo.LOOKUP_UNAVAILABLE)
 
 
 async def _judge(

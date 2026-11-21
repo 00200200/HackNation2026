@@ -11,8 +11,26 @@ goes to `corpus/manifest.jsonl` when the corpus is built with `uv run python -m 
 **The corpus is not built yet:** DuckDuckGo returned no results from our machine on 2026-11-21, and
 the team will replace the provider (#7, #8).
 
-What we store: the extracted page text stays in the local cache `corpus/docs.jsonl`, which is not
-in the repo. We do not redistribute page content. Delete the file to clear the cache.
+What we store: web search saves the extracted text of every fetched page to the local cache
+`corpus/docs.jsonl`. Our own database (step 2c: local PostgreSQL, tables `documents` and `chunks`,
+schema in `db/migrations/`, compose service `db`) is **disabled in the pipeline** until the team
+chooses licensed sources: checks never read or write it. It starts empty; only the seed script
+writes to it (`make db-seed`, queries in `corpus/queries.txt`). Neither store is in the repo and we
+do not redistribute page content. Controls on the database:
+
+- Only pages found by the seed's web search are stored, never pages from links users submit.
+- Licence per document (`licence`, UNCONFIRMED until checked, see below).
+- Retention: `delete_after` defaults to 90 days after the page was stored (UNCONFIRMED: the team
+  has not set the period; #17). `select delete_expired_documents()` deletes expired pages and their
+  chunks; the seed script runs it first.
+- Access: the database is reachable only on the compose network and on 127.0.0.1; no service is
+  given `DATABASE_URL`, only the seed script on the host.
+- Deletion: `delete from documents where doc_id = '<canonical url>'` removes one page and its
+  chunks. `docker compose --profile db down -v` deletes the whole database volume. Delete
+  `corpus/docs.jsonl` to clear the local cache. After a seed, the database export for
+  `evals.run --corpus` is `corpus/db-export.jsonl`.
+
+Where the data is processed: on the machine that runs the compose stack.
 
 Licences: **UNCONFIRMED for every domain.** Nobody on the team has checked each site's terms yet.
 The column says where to check. Until it is checked we quote short passages with a link, and do not
@@ -30,9 +48,17 @@ republish pages.
 | `nbp.pl` | Narodowy Bank Polski | central bank data and reports | UNCONFIRMED |
 | `europa.eu` | the EU institution named on the page | official EU institutions (Commission, Council, Parliament) | europa.eu legal notice, UNCONFIRMED |
 | `eur-lex.europa.eu` | EUR-Lex, Urząd Publikacji UE | official EU law | EUR-Lex legal notice, UNCONFIRMED |
-| `euvsdisinfo.eu` | EUvsDisinfo (ESDZ) | EEAS East StratCom Task Force disinformation cases | UNCONFIRMED |
 | `nato.int` | NATO | official NATO statements | UNCONFIRMED |
 | `who.int` | Światowa Organizacja Zdrowia | official health data | UNCONFIRMED |
+
+## Known-narrative database (`disinfo_database`)
+
+An official EU body, but a match only says that a claim resembles a documented pro-Kremlin
+narrative. It is context: the verdict rules never count it as a reliable source on its own.
+
+| Domain | Publisher | Why it qualifies | Licence (check) |
+|---|---|---|---|
+| `euvsdisinfo.eu` | EUvsDisinfo (ESDZ) | EEAS East StratCom Task Force disinformation cases | UNCONFIRMED |
 
 ## Reliable secondary sources (`fact_check`, `news`)
 
