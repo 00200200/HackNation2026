@@ -118,6 +118,28 @@ def test_slow_server_hits_the_deadline(monkeypatch):
     assert lookup.limitation == LOOKUP_UNAVAILABLE
 
 
+def test_empty_results_page_is_no_match_not_a_limitation():
+    def search(query: str) -> dict:
+        return {"results": [], "currentPage": 1, "totalPages": 0, "hasNextPage": False}
+
+    lookup = run(fake_server(search))
+
+    assert lookup.hits == [] and lookup.limitation is None
+
+
+def test_live_reply_shape_with_paging_and_html_content():
+    # Shape the live server returned on 2026-11-21: results wrapped with paging, HTML content.
+    def search(query: str) -> dict:
+        page = [
+            {**RESULTS[0], "content": "<p><em>Poland &amp; Ukraine</em></p> <p>“A”</p>"}
+        ]
+        return {"results": page, "currentPage": 1, "totalPages": 3, "hasNextPage": True}
+
+    (hit,) = run(fake_server(search)).hits
+
+    assert hit.source.fragment == "Poland & Ukraine “A”"
+
+
 def test_single_hit_unwrapped_by_the_client_still_counts():
     def search(query: str) -> dict:
         return RESULTS[0]
@@ -125,7 +147,7 @@ def test_single_hit_unwrapped_by_the_client_still_counts():
     assert len(run(fake_server(search)).hits) == 1
 
 
-@pytest.mark.parametrize("reply", ["not a list", {"error": "boom"}])
+@pytest.mark.parametrize("reply", ["not a list", {"error": "boom"}, {"results": "x"}])
 def test_unexpected_shape_is_a_limitation(reply):
     def search(query: str) -> str | dict:
         return reply

@@ -1,8 +1,8 @@
 {
-  "commit": "484d6fc652e7875beb9d9773c7361465575a0e7a",
+  "commit": "e47b646fdf15c6de43d9c1c84cd3d1d446f0472e",
   "dirty": false,
   "mode": "quick",
-  "timestamp": "2026-11-21T19:00:45+00:00",
+  "timestamp": "2026-11-21T18:48:16+00:00",
   "n_cases": 9,
   "skipped": [
     {
@@ -54,7 +54,7 @@
       "pass": false
     },
     "median_latency_s": {
-      "value": 3.8347414159215987,
+      "value": 3.6943366250488907,
       "target": "<= 30.0",
       "pass": true
     },
@@ -74,7 +74,7 @@
       "pass": false
     },
     "cost_per_100_usd": {
-      "value": 1.7349333333333334,
+      "value": 1.7247111111111113,
       "target": "reported",
       "pass": true
     }
@@ -96,7 +96,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.57
+        3.69
       ],
       "errors": []
     },
@@ -108,7 +108,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        16.31
+        16.22
       ],
       "errors": []
     },
@@ -120,7 +120,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        6.54
+        6.32
       ],
       "errors": []
     },
@@ -132,7 +132,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.83
+        3.46
       ],
       "errors": []
     },
@@ -144,7 +144,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.19
+        3.25
       ],
       "errors": []
     },
@@ -156,7 +156,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.22
+        2.99
       ],
       "errors": []
     },
@@ -168,7 +168,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        4.05
+        3.83
       ],
       "errors": []
     },
@@ -180,7 +180,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.33
+        3.61
       ],
       "errors": []
     },
@@ -192,7 +192,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        4.53
+        6.64
       ],
       "errors": []
     }
