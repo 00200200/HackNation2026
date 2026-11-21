@@ -8,14 +8,36 @@ from pydantic_ai.models.function import FunctionModel
 
 from prawdowid import app as app_module
 from prawdowid.app import MAX_INPUT_CHARS, RATE_LIMIT_MESSAGE, app, limiter
-from prawdowid.contract import CheckResult, ClaimResult, Source, Status, Verdict
+from prawdowid.contract import (
+    CheckResult,
+    ClaimKind,
+    ClaimResult,
+    Source,
+    Status,
+    Verdict,
+)
 from prawdowid.verifier import ExtractedClaim, Extraction, agent
 
 MIXED = Extraction(
     claims=[
-        ExtractedClaim(claim="Fakt.", checkable=True, reason="Da się sprawdzić."),
-        ExtractedClaim(claim="Opinia.", checkable=False, reason="To opinia."),
+        ExtractedClaim(
+            claim="Fakt.",
+            kind=ClaimKind.STATEMENT,
+            source_sentence="Fakt.",
+            checkable=True,
+            reason="Da się sprawdzić.",
+            queries=["fakt"],
+        ),
+        ExtractedClaim(
+            claim="Opinia.",
+            kind=ClaimKind.STATEMENT,
+            source_sentence="Opinia.",
+            checkable=False,
+            reason="To opinia.",
+            queries=[],
+        ),
     ],
+    other_claims=[],
     unclear=False,
 )
 
@@ -45,6 +67,8 @@ def test_text_returns_claims_with_labels(client):
         "brak wystarczających dowodów",
         "nie podlega weryfikacji",
     ]
+    assert body["claims"][0]["source_sentence"] == "Fakt."
+    assert body["unchecked_claims"] == []
 
 
 @pytest.mark.parametrize(
@@ -98,6 +122,8 @@ def test_rate_limit(client):
 def test_claim_serializes_polish_verdict_label():
     claim = ClaimResult(
         claim="c",
+        kind=ClaimKind.STATEMENT,
+        source_sentence="c",
         verdict=Verdict.MISLEADING,
         reasoning="r",
         strength="s",

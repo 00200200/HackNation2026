@@ -153,6 +153,11 @@ body.checked .status-pill { margin: 1rem 0 1.25rem; }
 .claim:last-child { border-bottom: 0; padding-bottom: .25rem; }
 .claim-text { margin: 0 0 .7rem; font-size: clamp(1.25rem, 2.6vw, 1.6rem); font-weight: 800; line-height: 1.25; text-wrap: pretty; }
 .claim-meta { margin: 0 0 .25rem; }
+.origin { margin: 0 0 .5rem; font-size: .9rem; color: var(--muted); }
+.kind { display: inline-block; margin-right: .5rem; padding: 0 .4rem; border-radius: 3px;
+        background: var(--soft); border: 1px solid var(--line); color: var(--navy); }
+.unchecked { padding-top: 1.6rem; border-top: 1px solid var(--line); }
+.unchecked h2 { font-size: 1.15rem; margin: 0 0 .5rem; }
 .part { margin: 1.4rem 0 .6rem; font-size: 1rem; font-weight: 800; }
 
 .sources { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 1rem; }

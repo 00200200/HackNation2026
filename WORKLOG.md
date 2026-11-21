@@ -38,6 +38,7 @@ Every case returns `brak wystarczających dowodów`: expected while there are no
 Basic requirements first: the jury gives no points for extras if one of these is missing.
 
 - [x] Merge `feat/llm-verifier` into `main`: done as #2 (`390d483`). Owner: Łukasz
+- [x] Step 1 (#5): self-contained claims, quote split, search queries per claim, top N checked, rest listed as not checked. Owner: Łukasz (Claude worker), branch `feat/5-self-contained-claims`, PR #22, merged into `main`.
 - [ ] Deployment: public demo on https://faktczyfejk.pl. Server (OVHcloud VPS-2, Limburg) and domain (OVHcloud)
   bought; DNS A records for the domain and `www` point at the server. The stack (Caddy, nginx, API, Postgres) runs
   there from `claude/deploy-config-43a484`, HTTPS checked from outside; GitHub variables and the `DEPLOY_SSH_KEY`
@@ -65,6 +66,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Decisions
 
+- 2026-11-21: Verdicts are per claim. One extraction call returns ranked, self-contained claims with a source sentence and search queries; the top `PRAWDOWID_MAX_CHECKED_CLAIMS` (default 5) come in full (source sentence, reason, queries) and get a verdict; every other claim comes as one short sentence in `unchecked_claims`, no verdict. Reason: full detail for every claim timed out (45 s) on one long text in a manual run; UNCONFIRMED, no reproducible measurement in the repo yet. Values below 1 stop the service at startup. Queries per claim: `PRAWDOWID_QUERIES_PER_CLAIM` (default 3). Defaults are UNCONFIRMED guesses, not tuned. (#5)
 - 2026-11-21: **PROPOSED, needs team OK** (#7). Web search for step 2b: **Tavily** `/search` as the provider, called
   with `include_domains` (allowlist, `include_domains_mode=restrict`) and `language="pl"` (a ranking boost, not a
   filter; `filter_by_language=True` makes it strict), through the official
@@ -125,6 +127,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): merged `main` (#29 web UI) into `feat/5-self-contained-claims`; claim origin line and unchecked-claims list ported into the new UI. Quick eval on `6689ad6`: abstention 1.00, median 3.87 s, macro_f1 0.10, end_to_end 0.89 (no sources yet).
+- 2026-11-21 Łukasz (Claude worker): #5 review fixes on PR #22: reject hyperparameters below 1, latency numbers marked UNCONFIRMED, quote test fixture uses only names from its input.
+- 2026-11-21 Łukasz (Claude worker): #5 claims stand alone (pronouns, relative dates from the text), quotes split into attribution + quoted, queries per claim, top-N cap with `unchecked_claims`, source sentence shown in the UI. Branch `feat/5-self-contained-claims`.
 - 2026-11-21 Michał (via Claude): deploy config on `claude/deploy-config-43a484` (`compose.prod.yaml`,
   `caddy/Caddyfile`, deploy workflow for `prod`, `docs/deploy.md`, README pointers). Compose files and the workflow
   pass their JSON schemas; reviewed. Bought OVHcloud VPS-2 and faktczyfejk.pl; DNS A records point at the server.

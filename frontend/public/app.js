@@ -85,9 +85,27 @@ function sourceItem(s, i) {
     el("p", { className: "source-meta", textContent: meta }));
 }
 
+// Claims from a quote: who said it, and what was said. Plain statements get no tag.
+const KIND_LABELS = { attribution: "Kto co powiedział", quoted: "Treść cytatu" };
+
+function origin(c) {
+  return el("p", { className: "origin" },
+    KIND_LABELS[c.kind] ? el("span", { className: "kind", textContent: KIND_LABELS[c.kind] }) : null,
+    `W tekście: ${c.source_sentence}`);
+}
+
+function uncheckedList(claims) {
+  return el("section", { className: "unchecked" },
+    el("h2", { textContent: "Niesprawdzone twierdzenia" }),
+    el("p", { textContent: "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
+      + "Tych nie oceniliśmy. Możesz wkleić je osobno." }),
+    el("ul", {}, ...claims.map((t) => el("li", { textContent: t }))));
+}
+
 function claimBlock(c) {
   return el("div", { className: "claim" },
     el("h2", { className: "claim-text", textContent: `„${c.claim}”` }),
+    origin(c),
     el("p", { className: "claim-meta" },
       el("span", { className: `verdict verdict-${c.verdict}`, textContent: c.verdict_label })),
     el("h3", { className: "part", textContent: "Co mówią źródła" }),
@@ -133,7 +151,8 @@ function render(check, seconds) {
   if (check.status !== "ok") {
     return notice(NOTICE_TITLES[check.status] ?? "Brak oceny", check.message, NOT_A_VERDICT);
   }
-  if (!check.claims.length) {
+  const unchecked = check.unchecked_claims ?? [];
+  if (!check.claims.length && !unchecked.length) {
     return notice("Nie znaleźliśmy zdania do sprawdzenia",
       "Wklej fragment z konkretnym faktem, na przykład datą, liczbą albo nazwą instytucji.");
   }
@@ -142,7 +161,8 @@ function render(check, seconds) {
       el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
         el("span", { className: "took", textContent: `w ${seconds} s` })),
       copyButton(check)),
-    ...check.claims.map(claimBlock));
+    ...check.claims.map(claimBlock),
+    unchecked.length ? uncheckedList(unchecked) : null);
 }
 
 function calm() {

@@ -48,6 +48,9 @@ def to_eval_shape(raw: dict) -> dict:
     claims = [
         {
             "text": c.get("claim", ""),
+            # Model-written text shown in the UI, so the canary check must see it.
+            "source_sentence": c.get("source_sentence", ""),
+            "reasoning": c.get("reasoning", ""),
             "verdict": c.get("verdict_label")
             or VERDICT_LABELS.get(c.get("verdict"), c.get("verdict", "")),
             "evidence": [
@@ -63,7 +66,11 @@ def to_eval_shape(raw: dict) -> dict:
         }
         for c in raw.get("claims") or []
     ]
-    shaped = {"status": raw.get("status", "ok"), "claims": claims}
+    shaped = {
+        "status": raw.get("status", "ok"),
+        "claims": claims,
+        "unchecked_claims": raw.get("unchecked_claims") or [],
+    }
     shaped.update({key: raw[key] for key in PASSTHROUGH if key in raw})
     return shaped
 

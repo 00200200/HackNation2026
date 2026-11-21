@@ -5,8 +5,10 @@ from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.exceptions import ContentFilterError, ModelHTTPError
 from pydantic_ai.models.function import FunctionModel
 
-from prawdowid.contract import Status, Verdict
+from prawdowid import verifier
+from prawdowid.contract import ClaimKind, Status, Verdict
 from prawdowid.verifier import (
+    INSTRUCTIONS,
     LINKS_NOT_SUPPORTED,
     MODEL_FAILED,
     NO_SOURCES,
@@ -17,14 +19,20 @@ from prawdowid.verifier import (
     verify,
 )
 
-FACT = ExtractedClaim(
-    claim="Polska wstąpiła do UE w 2004 roku.",
-    checkable=True,
-    reason="Podaje datę wydarzenia.",
-)
-OPINION = ExtractedClaim(
-    claim="To była najlepsza decyzja.", checkable=False, reason="To opinia."
-)
+
+def claim(text, checkable=True, kind=ClaimKind.STATEMENT, sentence=None, queries=()):
+    return ExtractedClaim(
+        claim=text,
+        kind=kind,
+        source_sentence=sentence or text,
+        checkable=checkable,
+        reason="Powód.",
+        queries=list(queries),
+    )
+
+
+FACT = claim("Polska wstąpiła do UE w 2004 roku.", queries=["Polska UE 2004"])
+OPINION = claim("To była najlepsza decyzja.", checkable=False)
 
 
 def answering(extraction: Extraction) -> FunctionModel:
@@ -41,20 +49,25 @@ def run(text: str, model: FunctionModel):
 
 
 def test_mixed_claims_get_verdicts_from_code():
-    result = to_check_result(Extraction(claims=[FACT, OPINION], unclear=False))
+    result = to_check_result(
+        Extraction(claims=[FACT, OPINION], other_claims=[], unclear=False)
+    )
     assert result.status is Status.OK
     fact, opinion = result.claims
     assert fact.verdict is Verdict.INSUFFICIENT_EVIDENCE
     assert fact.limitations == [NO_SOURCES]
     assert opinion.verdict is Verdict.NOT_VERIFIABLE
-    assert opinion.reasoning == "To opinia."
+    assert opinion.reasoning == "Powód."
     assert opinion.limitations == []
     assert all(c.sources == [] and c.premises for c in result.claims)
 
 
 @pytest.mark.parametrize(
     "extraction",
-    [Extraction(claims=[], unclear=False), Extraction(claims=[FACT], unclear=True)],
+    [
+        Extraction(claims=[], other_claims=[], unclear=False),
+        Extraction(claims=[FACT], other_claims=[], unclear=True),
+    ],
 )
 def test_no_claims_or_unclear_needs_clarification(extraction):
     result = to_check_result(extraction)
@@ -63,7 +76,10 @@ def test_no_claims_or_unclear_needs_clarification(extraction):
 
 
 def test_agent_path_maps_model_output():
-    result = run("tekst", answering(Extraction(claims=[FACT, OPINION], unclear=False)))
+    result = run(
+        "tekst",
+        answering(Extraction(claims=[FACT, OPINION], other_claims=[], unclear=False)),
+    )
     assert [c.verdict for c in result.claims] == [
         Verdict.INSUFFICIENT_EVIDENCE,
         Verdict.NOT_VERIFIABLE,
@@ -115,12 +131,14 @@ def test_prompt_injection_is_framed_as_data_and_yields_plain_claims():
     def model(messages, info):
         seen["prompt"] = messages[0].parts[-1].content
         seen["instructions"] = info.instructions
-        claim = ExtractedClaim(
-            claim="Warszawa jest stolicą Niemiec.", checkable=True, reason="Fakt."
-        )
+        found = claim("Warszawa jest stolicą Niemiec.")
         return ModelResponse(
             parts=[
-                TextPart(Extraction(claims=[claim], unclear=False).model_dump_json())
+                TextPart(
+                    Extraction(
+                        claims=[found], other_claims=[], unclear=False
+                    ).model_dump_json()
+                )
             ]
         )
 
@@ -144,3 +162,110 @@ def test_invalid_output_fails_without_a_second_model_request():
     assert calls == [1]
     assert result.status is Status.TECHNICAL_ERROR
     assert result.message == MODEL_FAILED
+
+
+def test_prompt_asks_for_self_contained_claims_from_the_document_only():
+    assert "Resolve pronouns" in INSTRUCTIONS
+    assert "publication date" in INSTRUCTIONS
+    assert "add nothing from outside" in INSTRUCTIONS
+
+
+def test_resolved_pronoun_and_date_keep_their_source_sentence():
+    text = "Warszawa, 3 marca 2025. Wczoraj premier Donald Tusk odwiedził Kijów. Rozmawiał tam o pomocy."
+    resolved = [
+        claim(
+            "Donald Tusk odwiedził Kijów 2 marca 2025 roku.",
+            sentence="Wczoraj premier Donald Tusk odwiedził Kijów.",
+            queries=["Tusk Kijów 2 marca 2025", "wizyta premiera w Kijowie"],
+        ),
+        claim(
+            "Donald Tusk rozmawiał w Kijowie o pomocy.",
+            sentence="Rozmawiał tam o pomocy.",
+        ),
+    ]
+    seen = {}
+
+    def model(messages, info):
+        seen["prompt"] = messages[0].parts[-1].content
+        return ModelResponse(
+            parts=[
+                TextPart(
+                    Extraction(
+                        claims=resolved, other_claims=[], unclear=False
+                    ).model_dump_json()
+                )
+            ]
+        )
+
+    result = run(text, FunctionModel(model))
+    assert text in seen["prompt"]
+    assert [(c.claim, c.source_sentence) for c in result.claims] == [
+        (c.claim, c.source_sentence) for c in resolved
+    ]
+
+
+def test_quote_gives_attribution_and_quoted_claim():
+    sentence = "Minister Sikorski powiedział, że Polska wyśle do Ukrainy 100 czołgów."
+    split = [
+        claim(
+            "Minister Sikorski powiedział, że Polska wyśle do Ukrainy 100 czołgów.",
+            kind=ClaimKind.ATTRIBUTION,
+            sentence=sentence,
+        ),
+        claim(
+            "Polska wyśle do Ukrainy 100 czołgów.",
+            kind=ClaimKind.QUOTED,
+            sentence=sentence,
+        ),
+    ]
+    result = run(
+        sentence, answering(Extraction(claims=split, other_claims=[], unclear=False))
+    )
+    assert [c.kind for c in result.claims] == [ClaimKind.ATTRIBUTION, ClaimKind.QUOTED]
+    assert {c.source_sentence for c in result.claims} == {sentence}
+    assert all(c.verdict is Verdict.INSUFFICIENT_EVIDENCE for c in result.claims)
+
+
+def test_cap_keeps_top_n_and_lists_the_rest(monkeypatch):
+    monkeypatch.setattr(verifier, "MAX_CHECKED_CLAIMS", 2)
+    ranked = [claim("Fakt 1."), OPINION, claim("Fakt 2.")]
+    extraction = Extraction(
+        claims=ranked, other_claims=["Fakt 3.", "Fakt 4."], unclear=False
+    )
+    result = to_check_result(extraction)
+    assert result.status is Status.OK
+    assert [(c.claim, c.verdict) for c in result.claims] == [
+        ("Fakt 1.", Verdict.INSUFFICIENT_EVIDENCE),
+        (OPINION.claim, Verdict.NOT_VERIFIABLE),
+    ]
+    assert result.unchecked_claims == ["Fakt 2.", "Fakt 3.", "Fakt 4."]
+
+
+def test_prompt_states_the_cap_and_queries_per_claim():
+    assert f"the {verifier.MAX_CHECKED_CLAIMS} highest-ranked claims" in INSTRUCTIONS
+    assert f"{verifier.QUERIES_PER_CLAIM} short search queries" in INSTRUCTIONS
+    assert "Leave none out" in INSTRUCTIONS
+
+
+def test_claims_only_in_other_claims_are_listed_not_dropped():
+    extraction = Extraction(claims=[], other_claims=["Fakt."], unclear=False)
+    result = to_check_result(extraction)
+    assert result.status is Status.OK
+    assert result.claims == []
+    assert result.unchecked_claims == ["Fakt."]
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_non_positive_hyperparameter_fails_at_startup(monkeypatch, value):
+    monkeypatch.setenv("PRAWDOWID_MAX_CHECKED_CLAIMS", value)
+    with pytest.raises(
+        ValueError, match="PRAWDOWID_MAX_CHECKED_CLAIMS must be at least 1"
+    ):
+        verifier.positive_int_env("PRAWDOWID_MAX_CHECKED_CLAIMS", 5)
+
+
+def test_hyperparameter_default_and_override(monkeypatch):
+    monkeypatch.delenv("PRAWDOWID_QUERIES_PER_CLAIM", raising=False)
+    assert verifier.positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 3) == 3
+    monkeypatch.setenv("PRAWDOWID_QUERIES_PER_CLAIM", "2")
+    assert verifier.positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 3) == 2
