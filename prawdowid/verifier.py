@@ -5,6 +5,7 @@ says whether each one is checkable and writes search queries for the top ones. I
 insufficient evidence.
 """
 
+import json
 import logging
 import os
 import re
@@ -16,6 +17,7 @@ from pydantic_ai.exceptions import AgentRunError, ContentFilterError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
 from prawdowid.contract import (
+    CheckedPage,
     CheckResult,
     ClaimKind,
     ClaimResult,
@@ -23,6 +25,7 @@ from prawdowid.contract import (
     Status,
     Verdict,
 )
+from prawdowid.link import Page, Refusal, fetch_page
 
 log = logging.getLogger("prawdowid")
 
@@ -31,8 +34,13 @@ MODEL = os.getenv("PRAWDOWID_MODEL") or "anthropic:claude-opus-5-5"
 MODEL_TIMEOUT_S = 45
 MODEL_MAX_RETRIES = 1
 
-LINKS_NOT_SUPPORTED = (
-    "Nie obsługujemy jeszcze linków. Wklej tekst, który chcesz sprawdzić."
+# ponytail: page text is cut to the size of a pasted text, so one link costs what one text does.
+MAX_PAGE_CHARS = 5000
+# Title and publisher each; two of them still leave over 4500 characters for the text.
+MAX_META_CHARS = 200
+PAGE_CUT = (
+    f"Strona jest długa: sprawdziliśmy tylko jej początek (razem z tytułem do {MAX_PAGE_CHARS} znaków). "
+    "Resztę tekstu możesz wkleić osobno."
 )
 NEEDS_CLARIFICATION = (
     "Nie znaleźliśmy w tym tekście żadnego twierdzenia. "
@@ -106,9 +114,15 @@ def screen(text: str, location: str = "input") -> list[SecurityEvent]:
     return [SecurityEvent(location=location, detector="patterns")]
 
 
-def failed(text: str, status: Status, message: str, cost: float | None) -> CheckResult:
+def failed(
+    text: str,
+    status: Status,
+    message: str,
+    cost: float | None,
+    location: str = "input",
+) -> CheckResult:
     """A check the model did not complete: the pattern events still go out, with that limit."""
-    events = screen(text)
+    events = screen(text, location)
     return CheckResult(
         status=status,
         message=message,
@@ -263,26 +277,74 @@ def claim_result(
     )
 
 
+def page_text(page: Page) -> tuple[str, bool]:
+    """Model input for a page, at most MAX_PAGE_CHARS in all, and whether its text was cut.
+
+    Metadata comes first, so the model can resolve relative dates from the publication date. It
+    is page content too, so it shares the budget and each field is capped, leaving room for text.
+    """
+    fields = [("Tytuł", page.title), ("Wydawca", page.publisher)]
+    # A trimmed title loses no claims to check, so only a cut in the text counts as cut.
+    header = [f"{name}: {value[:MAX_META_CHARS]}" for name, value in fields if value]
+    if page.published_at:
+        header.append(f"Data publikacji: {page.published_at}")
+    head = "\n".join(header + ["", ""])
+    room = MAX_PAGE_CHARS - len(head)
+    return head + page.text[:room], len(page.text) > room
+
+
 async def verify(text: str) -> CheckResult:
-    """The one entry point every channel calls."""
-    if is_link(text):
-        return CheckResult(
-            status=Status.CANNOT_CHECK, message=LINKS_NOT_SUPPORTED, cost_usd=0.0
-        )
+    """The one entry point every channel calls. A link is fetched and its text checked as text."""
+    if not is_link(text):
+        return await verify_text(text)
+    try:
+        page = await fetch_page(text)
+    except Refusal as refusal:
+        status = Status.TECHNICAL_ERROR if refusal.technical else Status.CANNOT_CHECK
+        # No model request was sent.
+        return CheckResult(status=status, message=refusal.message, cost_usd=0.0)
+    text, cut = page_text(page)
+    result = await verify_text(text, location="page")
+    if cut:
+        for c in result.claims:
+            c.limitations.append(PAGE_CUT)
+    result.page = CheckedPage(**page.model_dump(exclude={"text"}))
+    # ponytail: the stdout log is the check store until storage is decided; the page text is not kept.
+    log.info(
+        "link check url=%s sha256=%s status=%s claims=%s",
+        page.url,
+        page.sha256,
+        result.status,
+        json.dumps(
+            [{"claim": c.claim, "verdict": c.verdict} for c in result.claims]
+            + [{"claim": c, "verdict": None} for c in result.unchecked_claims],
+            ensure_ascii=False,
+        ),
+    )
+    return result
+
+
+async def verify_text(text: str, location: str = "input") -> CheckResult:
     started = time.perf_counter()
     try:
         result = await agent.run(wrap(USER_TEXT, text))
     # A failed or refused request may still be billed and reports no usage: cost unknown.
     except ContentFilterError:
         log.warning("model refused model=%s", MODEL)
-        return failed(text, Status.CANNOT_CHECK, MODEL_REFUSED, cost=None)
+        return failed(
+            text, Status.CANNOT_CHECK, MODEL_REFUSED, cost=None, location=location
+        )
     except UserError as exc:
         # A missing API key, raised on first use of the provider: no request was sent.
         log.warning("model not configured model=%s error=%r", MODEL, exc)
-        return failed(text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=0.0)
+        return failed(
+            text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=0.0, location=location
+        )
     except AgentRunError as exc:
         log.warning("model failed model=%s error=%r", MODEL, exc)
-        return failed(text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=None)
+        return failed(
+            text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=None, location=location
+        )
     usage = result.usage
     # Best-effort price of every request in the run from PydanticAI's genai-prices tables; None
     # for an unpriced model. genai-prices 0.2.5 (2026-11-19) lists claude-opus-5-5 at $4 input and
@@ -299,10 +361,10 @@ async def verify(text: str) -> CheckResult:
     )
     check = to_check_result(result.output)
     check.cost_usd = cost
-    check.security_events = screen(text)
+    check.security_events = screen(text, location)
     if result.output.injection_found:
-        check.security_events.append(SecurityEvent(location="input", detector="model"))
+        check.security_events.append(SecurityEvent(location=location, detector="model"))
         log.warning(
-            "security_event kind=prompt_injection location=input detector=model"
+            "security_event kind=prompt_injection location=%s detector=model", location
         )
     return check

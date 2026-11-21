@@ -455,3 +455,25 @@ def test_refused_attachment_ends_with_a_notice(monkeypatch):
     sent = slash(monkeypatch, five_claims(), refuse_files=True)
     assert all(f is None for _, f, _ in sent)
     assert sent[-1][0].endswith(discord_bot.ATTACHMENT_FAILED)
+
+
+def test_render_names_the_checked_page():
+    from prawdowid.contract import CheckedPage
+
+    check = CHECK.model_copy(
+        update={
+            "page": CheckedPage(
+                url="https://news.example/a",
+                sha256="0" * 64,
+                title="Rząd *przyjął* projekt",
+                publisher="Gazeta",
+                published_at=date(2026, 11, 16),
+            )
+        }
+    )
+    first = render(check).split("\n\n")[0]
+    assert first.startswith(
+        "Sprawdzony tekst pochodzi ze strony: Rząd \\*przyjął\\* projekt"
+    )
+    assert "projekt, Gazeta, 2026-11-16\n  <https://news.example/a>\n" in first
+    assert first.endswith(discord_bot.PAGE_NOTE)

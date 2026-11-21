@@ -8,8 +8,8 @@ const result = document.getElementById("result");
 const example = document.getElementById("przyklad");
 const chips = document.querySelectorAll("[data-example]");
 
-const SECURITY_NOTE = "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
-const SECURITY_NOTE_ONLY = "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich.";
+const SECURITY_NOTE = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
+const SECURITY_NOTE_ONLY = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich.";
 const MAX_CHARS = 5000;
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 const NOT_A_VERDICT = "To nie jest ocena prawdziwości tej treści.";
@@ -189,8 +189,18 @@ function render(check, seconds) {
       el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
         el("span", { className: "took", textContent: `w ${seconds} s` })),
       copyButton(check)),
+    check.page ? pageNote(check.page) : null,
     ...check.claims.map(claimBlock),
     unchecked.length ? uncheckedList(unchecked) : null);
+}
+
+// The page behind a link: what was read, not evidence for its own claims.
+function pageNote(p) {
+  const meta = [p.publisher, plDate(p.published_at)].filter(Boolean).join(", ");
+  const url = safeUrl(p.url);
+  return el("p", { className: "origin" }, "Sprawdzony tekst pochodzi ze strony: ",
+    url ? el("a", { href: url, textContent: p.title || url, rel: "noopener noreferrer", target: "_blank" }) : (p.title || p.url),
+    meta ? `, ${meta}` : null, ". Ta strona nie jest źródłem dowodów dla własnych twierdzeń.");
 }
 
 function calm() {

@@ -87,6 +87,9 @@ async def create_check(request: Request, body: CheckRequest) -> CheckResult:
         result = failed(
             body.input, Status.TECHNICAL_ERROR, TECHNICAL_ERROR_MESSAGE, cost=None
         )
+        if is_link(body.input):
+            # Only the URL was screened, not the page, so the "patterns only" note would mislead.
+            result.limitations = []
     # ponytail: stdout log instead of a check store until the team picks storage.
     channel = request.headers.get("x-channel", "web")
     log.info(

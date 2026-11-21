@@ -23,7 +23,14 @@ from discord.utils import escape_markdown, escape_mentions
 from pydantic import ValidationError
 
 from prawdowid.app import MAX_INPUT_CHARS, TECHNICAL_ERROR_MESSAGE
-from prawdowid.contract import CheckResult, ClaimKind, ClaimResult, Source, Status
+from prawdowid.contract import (
+    CheckedPage,
+    CheckResult,
+    ClaimKind,
+    ClaimResult,
+    Source,
+    Status,
+)
 
 log = logging.getLogger("prawdowid.discord")
 
@@ -88,18 +95,33 @@ def _source(s: Source, url_limit: int | None) -> list[str]:
     return lines
 
 
+def _page(p: CheckedPage, url_limit: int | None) -> list[str]:
+    """The page behind a link: what was read, not evidence for its own claims."""
+    meta = ", ".join(
+        part for part in (p.publisher, p.published_at and str(p.published_at)) if part
+    )
+    title = p.title or p.url
+    lines = _field(
+        "Sprawdzony tekst pochodzi ze strony: ", f"{title}, {meta}" if meta else title
+    )
+    fits = url_limit is None or len(p.url) <= url_limit
+    lines.append(f"  <{p.url}>" if fits else URL_TOO_LONG)
+    return lines + [PAGE_NOTE]
+
+
 # Claims from a quote: who said it, and what was said. Plain statements get no tag.
 KIND_LABELS = {
     ClaimKind.ATTRIBUTION: "Kto co powiedział",
     ClaimKind.QUOTED: "Treść cytatu",
 }
 SECURITY_NOTE = (
-    "W tekście są zwroty, które wyglądają na polecenia dla modelu. "
+    "W treści są zwroty, które wyglądają na polecenia dla modelu. "
     "Nie wykonaliśmy ich i sprawdziliśmy resztę."
 )
 SECURITY_NOTE_ONLY = (
-    "W tekście są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich."
+    "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich."
 )
+PAGE_NOTE = "Ta strona nie jest źródłem dowodów dla własnych twierdzeń."
 UNCHECKED_NOTE = (
     "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
     "Tych nie oceniliśmy. Możesz wkleić je osobno."
@@ -142,6 +164,8 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
     sections = (
         [f"**Polecenia dla modelu.** {SECURITY_NOTE}"] if check.security_events else []
     )
+    if check.page:
+        sections.insert(0, "\n".join(_page(check.page, url_limit)))
     sections += [_claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)]
     if check.unchecked_claims:
         sections.append(

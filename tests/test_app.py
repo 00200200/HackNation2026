@@ -52,8 +52,8 @@ def client():
         yield TestClient(app)
 
 
-def test_http_link_is_accepted(client):
-    resp = client.post("/api/checks", json={"input": "https://example.com/artykul"})
+def test_link_to_a_private_address_is_a_notice(client):
+    resp = client.post("/api/checks", json={"input": "http://127.0.0.1:8000/admin"})
     assert resp.status_code == 200
     assert resp.json()["status"] == "cannot_check"
 
@@ -153,3 +153,15 @@ def test_claim_serializes_polish_verdict_label():
 def test_non_ok_status_needs_a_message():
     with pytest.raises(ValueError):
         CheckResult(status=Status.CANNOT_CHECK)
+
+
+def test_link_timeout_claims_no_pattern_screening(client, monkeypatch):
+    async def slow(text):
+        await asyncio.sleep(1)
+
+    monkeypatch.setattr(app_module, "verify", slow)
+    monkeypatch.setattr(app_module, "VERIFY_TIMEOUT_S", 0.01)
+    resp = client.post("/api/checks", json={"input": "https://example.com/artykul"})
+    body = resp.json()
+    assert body["status"] == "technical_error"
+    assert body["limitations"] == []

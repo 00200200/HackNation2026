@@ -14,7 +14,7 @@ Updated: 2026-11-21 20:35, by Michał (via Claude).
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
 not → verdict set in code. No sources yet, so every checkable claim is `brak wystarczających dowodów` and the rest
-`nie podlega weryfikacji`. Links return `cannot_check`. Nothing is stored.
+`nie podlega weryfikacji`. Links (#4, branch `LukiLenkiewicz/issue4-link-input`): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls (incl. inline sign-in or subscribe walls), social media, URLs with a login or password, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Nothing is stored; each link check logs URL (secret query values, userinfo and fragment redacted, also in the answer), content hash, claims and result to stdout.
 
 **Branches**
 
@@ -72,7 +72,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Eval-only fault switch for scenario J (`simulate` in `evals/cases.jsonl`: `factcheck_api_unavailable`,
   `llm_unavailable`), passed by `evals/adapter.py` and honoured only for eval traffic. Owner: ?
 - [x] Contract gaps for metrics (#15): `security_events` from two detectors, a fixed pattern pre-check in code and the extraction model's flag (events carry no wording; the pattern event and a "patterns only" limitation survive a failed model call) and `cost_usd` per answer (token usage priced by genai-prices through PydanticAI; 0.0 when no request was sent, null when unknown). Web and Discord show a notice when an event is logged. Not measured with a real key yet. Branch `LukiLenkiewicz/issue15-contract-metrics`. Owner: Łukasz (Claude worker)
-- [ ] Link input (fetch page, treat it as untrusted source text). Owner: ?
+- [x] Link input (#4): safe fetch (http/https, SSRF guard on every connection incl. redirects and DNS, ≤ 3 redirects, 10 s, 2 MB, HTML via trafilatura, PDF via pypdf), page URL kept in `CheckResult.page` for later evidence exclusion. Branch `LukiLenkiewicz/issue4-link-input`, stacked on #15, in review. Prompt injection found in a page is logged with `location="page"`. Owner: Łukasz (Claude worker). Open: page text cut to 5000 chars (same as pasted text, UNCONFIRMED choice); no eval case uses a URL yet.
 - [ ] Privacy: mask obvious personal data, retention, deletable demo session. Owner: ?
 - [ ] Deliverables: description ≤ 4000 chars, PDF ≤ 12 slides, video ≤ 3 min, cost estimate, risks. Owner: ?
 - [ ] Optional after basics: moderator loop (scenario H), screenshots (F).
@@ -152,6 +152,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): merged `main` (`ebfcf76`) into #4 `LukiLenkiewicz/issue4-link-input` (PR #28): main's squashed #6–#15, UI and deploy kept; #4 link input re-applied on top; page checks screen patterns with `location="page"` too; security notice wording from main generalised to "W treści"; Discord page line uses main's `_field` escaping and URL limit; `uv.lock` re-locked (mcp + pypdf); a link that times out no longer claims pattern screening (only the URL was screened). Quick eval on `9993410` (9 cases, no corpus): macro_f1 0.10, abstention 1.00, injection_resistance 0.00, end_to_end 0.89 (J01 not simulated), median 3.8 s, cost $1.70/100.
 - 2026-11-21 Łukasz (via Claude): #19 local Postgres source store ported from PR #34 onto `main` alone (`main`'s JSONL cache kept as is); live test against postgres:17 passes; database empty, seed blocked. Branch `feat/19-local-source-store`.
 - 2026-11-21 Łukasz (via Claude): EUvsDisinfo lookup fixed against the live server (results wrapper, HTML stripped from fragments); branch `fix/euvsdisinfo-live-response`.
 - 2026-11-21 Łukasz (via Claude): rebased #31 (PR #33) onto `main`: only its own changes (`prawdowid/euvsdisinfo.py`, tests, `mcp` extra); no longer stacked on #28 and #30.
@@ -159,6 +160,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - 2026-11-21 Łukasz (Claude worker): #31 `prawdowid/euvsdisinfo.py` EUvsDisinfo MCP `search` lookup (pydantic-ai MCP client), offline tests against an in-process FastMCP server. Branch `LukiLenkiewicz/issue31-euvsdisinfo`.
 - 2026-11-21 Łukasz (via Claude): merged `main` (#26 squashed) into `LukiLenkiewicz/issue15-contract-metrics` (PR #27), retargeted PR #27 to `main`; security notices ported into the new web UI `render()` and the Discord `_field` notice.
 - 2026-11-21 Łukasz (Claude worker): #15 review fixes on PR #27: pattern pre-check for injected instructions next to the model flag, event and limitation kept on failed checks, `cost_usd` and event count in the per-check log. Patterns are generic, but E01–E03 existed when they were written and all three hit them, so `injection_resistance` on those cases partly measures the patterns; new holdout E cases are needed for an honest number. No false positive on the other 28 cases. Branch `LukiLenkiewicz/issue15-contract-metrics`.
+- 2026-11-21 Łukasz (Claude worker): #4 second review (PR #28): inline sign-in or subscribe walls and a password form beside a short preview return `cannot_check` with the paste-text message; worker concurrency test asserts peak live parsers instead of total started (deterministic); URLs with userinfo refused on every hop, secret query values and fragments redacted in logs, worker arguments and `page.url`.
+- 2026-11-21 Łukasz (Claude worker): #4 review fixes (PR #28): redirects followed by hand with bodies never read, URL policy on every hop (trailing-dot social hosts too), extraction in a child process killed at the deadline (max 2 at once, PDF ≤ 50 pages, ≤ 20,000 chars, 20 MB per stream), title and publisher share the 5000-char budget.
+- 2026-11-21 Łukasz (Claude worker): #4 link input: `prawdowid/link.py`, `CheckResult.page`, offline tests `tests/test_link.py`.
 - 2026-11-21 Łukasz (Claude worker): #15 `security_events` and `cost_usd` in `CheckResult`, offline FunctionModel tests; quick eval without an API key now reports injection_resistance and cost_per_100_usd instead of unknown. Branch `LukiLenkiewicz/issue15-contract-metrics`.
 - 2026-11-21 Łukasz (via Claude): merged `main` (#25 squashed) into `feat/8-web-search` (PR #26), retargeted PR #26 to `main`; WORKLOG conflicts resolved by keeping both sides.
 - 2026-11-21 Łukasz (Claude worker): #8 review fixes (PR #26, Codex review): `prawdowid/safefetch.py` with DNS/IP SSRF guard, robots.txt per redirect hop and refusal on 429/5xx, capped robots and page bodies; cache keeps metadata only (no full text without a confirmed licence), 30-day retention, `delete_document`, latest fetch replaces the old one; PESEL masked next to a label. Branch `feat/8-web-search`.

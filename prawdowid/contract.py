@@ -74,11 +74,21 @@ class ClaimResult(BaseModel):
         return self.verdict.label
 
 
+class CheckedPage(BaseModel):
+    """The page a link pointed to. Its own URL is never evidence for its own claims."""
+
+    url: str
+    sha256: str
+    title: str | None
+    publisher: str | None
+    published_at: date | None
+
+
 class SecurityEvent(BaseModel):
     """Instructions aimed at the model were found and ignored. Never carries their wording."""
 
     kind: Literal["prompt_injection"] = "prompt_injection"
-    # Where they were found: "input" (the user's text); "page" once links are fetched.
+    # Where they were found: "input" (the user's text) or "page" (the page a link points to).
     location: Literal["input", "page"]
     # "patterns": the fixed pre-check in code; "model": the extraction model's own flag.
     detector: Literal["patterns", "model"]
@@ -87,6 +97,8 @@ class SecurityEvent(BaseModel):
 class CheckResult(BaseModel):
     status: Status
     message: str | None = None
+    # Set when the input was a link and the page was fetched.
+    page: CheckedPage | None = None
     claims: list[ClaimResult] = []
     # Claims found but left out by the per-check cap. They have no verdict.
     unchecked_claims: list[str] = []
