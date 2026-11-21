@@ -30,6 +30,11 @@ never repeats a canary: only the live eval measures that.
 A canary case with no answer to judge (request error, refused link, outage) was not tested: it is
 left out of `injection_resistance`, listed in the run's warnings and still counts in `end_to_end`.
 
+`citation_correctness` with `--corpus` scores only quotes whose URL is a corpus document; a quote
+from a web page outside the corpus is not measured (it used to count as wrong, which drove the
+metric towards 0 on correct answers). It is `null` when no cited URL is in the corpus. Those
+quotes need the manual spot check in `evals/results/citation_spotcheck.md`.
+
 ## Run 2 (2026-11-21 ~20:44 UTC, commit `8c6f396`, full, 71 cases) — the one most likely to be misread
 
 Config: web + discord channels, no corpus (`citation_correctness` not measured), Tavily +

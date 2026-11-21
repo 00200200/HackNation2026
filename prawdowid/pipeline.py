@@ -26,7 +26,7 @@ from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
 from prawdowid import euvsdisinfo, factcheck, govpl, judge, rerank, websearch
-from prawdowid.contract import ModelCall, Source, Verdict
+from prawdowid.contract import ModelCall, SecurityEvent, Source, Verdict
 
 log = logging.getLogger("prawdowid")
 
@@ -98,9 +98,13 @@ async def check_claim(
             judgement = await _judge(claim, candidates, exclude_url, steps, runs)
     except TimeoutError:
         # The cost is None for a model request cut mid-flight, 0 when only search was cut.
-        return _done(claim, _time_limit(found), runs, steps)
-    # Injections the judge found in retrieved pages, kept from both passes.
-    events = list(judgement.security_events)
+        timed_out = _time_limit(found)
+        # The pattern pre-check needs no model: pages already found are still screened.
+        timed_out.security_events = _source_events(_candidates(found), exclude_url)
+        return _done(claim, timed_out, runs, steps)
+    # Instructions in retrieved pages, kept from both passes: the pattern pre-check on every
+    # candidate (rerank may drop it before the judge sees it) and the judge's own flag.
+    events = [*_source_events(candidates, exclude_url), *judgement.security_events]
 
     cut = False
     # The claim itself is the rewritten query, so no retry when it was searched already.
@@ -112,7 +116,8 @@ async def check_claim(
                 # model's queries); a HyDE-FC rewrite costs one more model call per claim.
                 web = await _timed(steps, "retry_web", _search_web, claim)
                 if web.documents:
-                    more = candidates + _candidates({"web": [web]})
+                    fresh = _candidates({"web": [web]})
+                    more = candidates + fresh
                     second = await _judge(
                         claim, more, exclude_url, steps, runs, "retry_"
                     )
@@ -125,6 +130,7 @@ async def check_claim(
                         judgement.limitations.append(RETRY_UNJUDGED)
                     else:
                         judgement = second
+                        events += _source_events(fresh, exclude_url)
                         events += judgement.security_events
                         candidates = more
                 # Only a finished retry counts: a cut one keeps the first pass as it was.
@@ -190,6 +196,21 @@ def _candidates(found: dict) -> list[Source]:
     webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
     sources += [d.to_source(fragment=d.text) for w in webs for d in w.documents]
     return [_context_only(s) for s in sources]
+
+
+def _source_events(
+    sources: list[Source], exclude_url: str | None
+) -> list[SecurityEvent]:
+    """Pattern pre-check on retrieved sources; the linked page itself is logged as `page`."""
+    from prawdowid.verifier import screen  # verifier imports this module
+
+    skip = exclude_url and rerank.canonical_url(exclude_url)
+    for source in sources:  # one event per check is enough
+        if skip and rerank.canonical_url(str(source.url)) == skip:
+            continue
+        if events := screen(f"{source.title}\n{source.fragment or ''}", "source"):
+            return events
+    return []
 
 
 def _context_only(source: Source) -> Source:
