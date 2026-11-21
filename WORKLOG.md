@@ -29,11 +29,11 @@ not → verdict set in code. No sources yet, so every checkable claim is `brak w
 | `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, stacked on `LukiLenkiewicz/issue4-link-input` (PR #28). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `d655078` (#5 merged into #16), no corpus):
-macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail: no `security_events`, verdicts
-wrong), median latency 5.0 s, end_to_end 0.94 (fail: both J cases, no eval switch to simulate a failure). Citation metrics,
-channel consistency and cost: not measured (no corpus, no second channel, no `cost_usd`). Every checkable case returns
-`brak wystarczających dowodów`: expected while there are no sources.
+**Last eval** (`evals/results/latest.json`, **full**, 31 real cases from `evals/cases.jsonl`, product at `4bd8471` (#12 merged with the #10 stack tip), no corpus):
+macro_f1 0.09 (fail, target ≥ 0.75), abstention 1.00, injection_resistance 0.00 (fail), median latency 4.6 s,
+end_to_end 0.94 (fail: both J cases, no eval switch to simulate a failure), cost per 100 checks $1.61. Citation metrics and
+channel consistency: not measured (no corpus, no second channel). Retrieval is not wired into `verify()` yet (#11), so every
+checkable case returns `brak wystarczających dowodów`. The incident base is empty, so I01–I03 show no incident warning.
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -109,6 +109,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #12 full eval on `4bd8471` committed: macro_f1 0.09, abstention 1.00, injection_resistance 0.00, median latency 4.6 s, cost $1.61 per 100.
 - 2026-11-21 Łukasz (Claude worker): #12 merged `origin/LukiLenkiewicz/issue10-judge` (stack tip) into `LukiLenkiewicz/issue12-incidents`; the incident warning sits next to the page note and security notice on web and Discord, and also matches the final URL after redirects.
 - 2026-11-21 Łukasz (Claude worker): #12 incident matcher (URL, domain, difflib text similarity) with an empty shipped base, `incident_matches` in the contract, rendered on web and Discord, offline tests with a test-only fixture. Branch `LukiLenkiewicz/issue12-incidents`.
 - 2026-11-21 Łukasz (Claude worker): #10 `prawdowid/judge.py` steps 4 and 5, model labels with quotes, verdict rules in code, offline FunctionModel tests per rule. Branch `LukiLenkiewicz/issue10-judge`.

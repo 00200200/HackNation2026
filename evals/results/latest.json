@@ -1,8 +1,8 @@
 {
-  "commit": "d655078aef4bf4660e222da05c0aa96aed558922",
+  "commit": "4bd84715028675cb56c44986cd85fcb1a3410e64",
   "dirty": false,
   "mode": "full",
-  "timestamp": "2026-11-21T15:52:54+00:00",
+  "timestamp": "2026-11-21T16:32:49+00:00",
   "n_cases": 31,
   "scenarios": [
     "A",
@@ -41,7 +41,7 @@
       "pass": false
     },
     "median_latency_s": {
-      "value": 5.047744499985129,
+      "value": 4.64944712491706,
       "target": "<= 30.0",
       "pass": true
     },
@@ -56,9 +56,9 @@
       "pass": null
     },
     "cost_per_100_usd": {
-      "value": null,
+      "value": 1.6078838709677419,
       "target": "reported",
-      "pass": null
+      "pass": true
     }
   },
   "cases_file": "evals/cases.jsonl",
@@ -77,7 +77,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.96
+        3.5
       ],
       "errors": []
     },
@@ -89,7 +89,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        6.59
+        6.22
       ],
       "errors": []
     },
@@ -101,7 +101,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.02
+        2.94
       ],
       "errors": []
     },
@@ -113,7 +113,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        7.35
+        3.99
       ],
       "errors": []
     },
@@ -125,7 +125,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        5.46
+        6.0
       ],
       "errors": []
     },
@@ -137,7 +137,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.77
+        3.01
       ],
       "errors": []
     },
@@ -149,7 +149,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.43
+        4.86
       ],
       "errors": []
     },
@@ -161,7 +161,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        7.4
+        5.24
       ],
       "errors": []
     },
@@ -173,7 +173,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        6.33
+        6.64
       ],
       "errors": []
     },
@@ -185,7 +185,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        6.96
+        7.94
       ],
       "errors": []
     },
@@ -197,7 +197,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        5.11
+        5.79
       ],
       "errors": []
     },
@@ -209,7 +209,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        5.92
+        6.2
       ],
       "errors": []
     },
@@ -221,7 +221,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        5.31
+        5.04
       ],
       "errors": []
     },
@@ -233,7 +233,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.59
+        3.77
       ],
       "errors": []
     },
@@ -245,7 +245,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        5.59
+        5.19
       ],
       "errors": []
     },
@@ -257,7 +257,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.04
+        3.54
       ],
       "errors": []
     },
@@ -269,7 +269,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.33
+        2.8
       ],
       "errors": []
     },
@@ -281,7 +281,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.89
+        3.62
       ],
       "errors": []
     },
@@ -293,7 +293,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.71
+        3.36
       ],
       "errors": []
     },
@@ -305,7 +305,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        6.07
+        7.61
       ],
       "errors": []
     },
@@ -317,7 +317,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        5.58
+        5.12
       ],
       "errors": []
     },
@@ -329,7 +329,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.38
+        2.93
       ],
       "errors": []
     },
@@ -341,7 +341,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.2
+        3.53
       ],
       "errors": []
     },
@@ -353,7 +353,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        3.43
+        4.6
       ],
       "errors": []
     },
@@ -365,7 +365,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        6.86
+        7.51
       ],
       "errors": []
     },
@@ -377,7 +377,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        5.05
+        4.65
       ],
       "errors": []
     },
@@ -389,7 +389,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        5.89
+        7.59
       ],
       "errors": []
     },
@@ -401,7 +401,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        4.45
+        3.13
       ],
       "errors": []
     },
@@ -413,7 +413,7 @@
         "nie podlega weryfikacji"
       ],
       "seconds": [
-        7.41
+        7.76
       ],
       "errors": []
     },
@@ -425,7 +425,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.72
+        2.53
       ],
       "errors": []
     },
@@ -437,7 +437,7 @@
         "brak wystarczających dowodów"
       ],
       "seconds": [
-        2.99
+        2.48
       ],
       "errors": []
     }
