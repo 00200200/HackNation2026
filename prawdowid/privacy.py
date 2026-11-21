@@ -11,7 +11,8 @@ import re
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 ACCOUNT = re.compile(r"\b(?:PL ?)?\d{2}(?: ?\d{4}){6}\b")
 PHONE = re.compile(r"\+48[ -]?\d{3}[ -]?\d{3}[ -]?\d{3}\b|\b\d{3}-\d{3}-\d{3}\b")
-ELEVEN_DIGITS = re.compile(r"\b\d{11}\b")
+# Digit boundaries, not \b: "PESEL44051401359" has no word boundary before the digits.
+ELEVEN_DIGITS = re.compile(r"(?<!\d)\d{11}(?!\d)")
 PESEL_WEIGHTS = (1, 3, 7, 9, 1, 3, 7, 9, 1, 3)
 
 

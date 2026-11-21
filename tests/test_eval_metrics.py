@@ -73,7 +73,9 @@ def test_adapter_maps_check_result_to_eval_shape():
             }
         ],
         "unchecked_claims": ["Inne twierdzenie."],
-        "security_events": [{"kind": "prompt_injection", "location": "input"}],
+        "security_events": [
+            {"kind": "prompt_injection", "location": "input", "detector": "model"}
+        ],
         "cost_usd": 0.014,
     }
     shaped = adapter.to_eval_shape(raw)

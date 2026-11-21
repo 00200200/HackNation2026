@@ -1,0 +1,88 @@
+# Production overlay for the public demo: Caddy terminates HTTPS in front of the nginx frontend,
+# Postgres with pgvector holds the data. On the server, .env sets COMPOSE_FILE=compose.yaml:compose.prod.yaml,
+# so plain `docker compose up -d --build` loads both files. Deploys: deploy/pull-deploy.sh, docs/deploy.md.
+services:
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, see docs/deploy.md}
+    volumes:
+      # The directory, not the single file: a replaced Caddyfile is then visible to `caddy reload`.
+      - ./caddy:/etc/caddy:ro
+      # Certificates and the ACME account. Keep this volume between deploys: a fresh one
+      # requests new certificates and can run into Let's Encrypt rate limits.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+
+  frontend:
+    # Only Caddy reaches nginx in production, so the host port from compose.yaml is dropped.
+    ports: !reset []
+    configs:
+      - source: nginx_real_ip
+        target: /etc/nginx/conf.d/00-real-ip.conf
+    healthcheck:
+      # Goes through nginx to the backend, so "healthy" means the whole request path answers.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  backend:
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: pgvector/pgvector:0.8.7-pg18
+    restart: unless-stopped
+    # No ports: only services on the Compose network reach Postgres.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env, see docs/deploy.md}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env, see docs/deploy.md}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env, see docs/deploy.md}
+    volumes:
+      # Postgres 18 images keep their data in /var/lib/postgresql/18/docker, so the volume goes one level up.
+      - db_data:/var/lib/postgresql
+    configs:
+      - source: db_extensions
+        target: /docker-entrypoint-initdb.d/extensions.sql
+    healthcheck:
+      # Over TCP: during first-run initialisation Postgres listens only on its socket, so this
+      # turns healthy once the init script has run and the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+configs:
+  nginx_real_ip:
+    # Without this nginx sees Caddy as the client and every visitor shares one rate-limit
+    # bucket. Caddy replaces any X-Forwarded-For sent by the client with the address it saw,
+    # so nginx can take the visitor's address from it and pass it on to the backend.
+    content: |
+      set_real_ip_from 10.0.0.0/8;
+      set_real_ip_from 172.16.0.0/12;
+      set_real_ip_from 192.168.0.0/16;
+      real_ip_header X-Forwarded-For;
+  db_extensions:
+    # Runs once, when the data volume is still empty.
+    content: |
+      CREATE EXTENSION IF NOT EXISTS vector;
+      CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+volumes:
+  caddy_data:
+  caddy_config:
+  db_data:

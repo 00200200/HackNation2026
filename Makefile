@@ -33,13 +33,13 @@ up: ## Build and start frontend + backend in Docker (add DISCORD=1 for the Disco
 	@echo "Open http://localhost:$(PORT)"
 
 down: ## Stop the Docker stack
-	docker compose --profile discord --profile db down
+	docker compose --profile discord --profile sourcedb down
 
 db: ## Start the Postgres source store on 127.0.0.1:5433 (step 2c, not used by checks yet)
-	docker compose --profile db up -d db
+	docker compose --profile sourcedb up -d sourcedb
 
 db-migrate: ## Apply db/migrations/ to the running database (safe to rerun)
-	cat db/migrations/*.sql | docker compose --profile db exec -T db psql -v ON_ERROR_STOP=1 -U prawdowid -d prawdowid
+	cat db/migrations/*.sql | docker compose --profile sourcedb exec -T sourcedb psql -v ON_ERROR_STOP=1 -U prawdowid -d prawdowid
 
 db-seed: ## Seed the running database from corpus/queries.txt through web search (not run by default)
 	uv run $(if $(wildcard .env),--env-file .env) python -m prawdowid.corpus --local-db
