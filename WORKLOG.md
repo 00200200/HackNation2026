@@ -43,6 +43,9 @@ Basic requirements first: the jury gives no points for extras if one of these is
   Michał. Branch `feat/eval-cases`: 41 cases in the mentor's question style, all five verdict classes; labels from
   Demagog ClaimReview ratings (fetched 2026-11-21) and official pages (NATO, MON, europa.eu); an independent label check
   ran and its findings are fixed. J cases fail until the fault switch below exists.
+- [ ] Eval gaps to close once retrieval exists: C cases carry one Demagog rating each, not two credible sources
+  disagreeing on the same measure; E cases put the injection in the submitted text, none in a fetched source page.
+  Owner: ?
 - [ ] Eval-only fault switch for scenario J (`simulate` in `evals/cases.jsonl`: `factcheck_api_unavailable`,
   `llm_unavailable`), passed by `evals/adapter.py` and honoured only for eval traffic. Owner: ?
 - [ ] Contract gaps for metrics: `security_events`, `cost_usd` per answer. Owner: ?

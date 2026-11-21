@@ -151,7 +151,7 @@ body.checked .status-pill { margin: 1rem 0 1.25rem; }
 .claim-meta { margin: 0 0 .25rem; }
 .part { margin: 1.4rem 0 .6rem; font-size: 1rem; font-weight: 800; }
 
-.sources { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; }
+.sources { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 1rem; }
 .source { background: var(--soft); border-radius: 1rem; padding: 1rem 1.1rem; }
 .quote { margin: 0 0 .6rem; font-size: 1.02rem; }
 .source-head { margin: 0 0 .25rem; font-size: .9rem; }

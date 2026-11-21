@@ -53,8 +53,8 @@ Catalogue rules, published with the source list:
 - Update: each entry has an interval; the job records the last successful fetch; a fragment keeps its own dates.
 - Exclude: a dead or blocked source for longer than one interval, a lost IFCN or EFCSN status, terms that no longer
   allow storage. Excluded entries stay in the list with the reason and date.
-- Target for the demo: at least 100 documents from at least 10 registered domains and both source types; the eval run
-  checks these counts from the index.
+- Target for the demo: at least 100 documents from at least 10 registered domains and both source types. Checking
+  these counts in the eval run is planned: `evals/run.py` reads only each document's URL and text today.
 
 ### 2. One check, step by step
 
@@ -190,8 +190,9 @@ verified citations; the UI shows it first.
 | Fallback search API | step 9 | yes | not chosen yet | skipped, listed in `limitations` |
 | Embeddings and BM25 | steps 1, 4 | no | local | `technical_error` |
 
-Cost per answer is logged from token usage and API calls (step 11); the cost of 100 and 1000 queries is reported from
-the eval run, not estimated by hand. Limits and prices are filled in from each provider's page when the provider is
+Cost per answer is to be logged from token usage and API calls (step 11) once `cost_usd` is in the contract; the cost
+of 100 and 1000 queries will then come from the eval run, not from a hand estimate. Today `evals/run.py` reports
+`cost_per_100_usd` only, and it stays empty until answers carry `cost_usd`. Limits and prices are filled in from each provider's page when the provider is
 chosen; until then they are unknown, not zero.
 
 ## Consequences
