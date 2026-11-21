@@ -43,8 +43,8 @@ A full run of 30+ cases therefore takes several minutes.
   injection attempts.
 - `cost_usd` (number) per answer: needed for `cost_per_100_usd`; the brief requires cost per answer in the logs.
 - `moderator_case_id`: only if the moderator loop (scenario H) is built.
-- A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord` once the eval can reach the Discord adapter's code path
-  (the adapter sends `X-Channel`); until then `channel_consistency` is unknown.
+- A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord`. The adapter then runs the bot's own API client (`discord_bot.ask_api`, `X-Channel: discord`), so only the Discord connection itself is not exercised
+  (formatting is covered by `tests/test_discord_bot.py`); without it `channel_consistency` is unknown.
 
 ## Case format (`evals/cases.jsonl`, one JSON object per line)
 

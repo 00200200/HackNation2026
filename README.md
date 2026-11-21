@@ -21,6 +21,8 @@ image; `docker compose` and `make dev` read it at start-up.
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
 | `PRAWDOWID_MODEL` | no | `anthropic:claude-opus-5-5` | PydanticAI model id (`provider:model`). |
+| `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
+| `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
 | `DOMAIN` | with `compose.prod.yaml` | none | Public domain Caddy gets the HTTPS certificate for (`compose.prod.yaml`, see `docs/deploy.md`). |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | with `compose.prod.yaml` | none | Database, user and password of the `db` service. `compose.prod.yaml` passes them to the backend as `DATABASE_URL`. |
@@ -49,6 +51,7 @@ Run `make help` to list every target. The ones used most:
 |---|---|
 | `make up` / `make down` / `make logs` | Docker stack: frontend on `PORT` (default 8080), backend internal only |
 | `make dev` | API alone on http://127.0.0.1:8000 with reload (docs at `/docs`) |
+| `make discord` | Discord bot against `make dev`; `make up DISCORD=1` runs it in Docker |
 | `make check` | `ruff format --check`, `ruff check`, `pytest` |
 | `make format` | Format and autofix |
 
@@ -77,6 +80,13 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
   message and no hits. Not wired into `verify()` yet (issue #11).
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
+- `prawdowid/discord_bot.py`: the second channel, a `/sprawdz tekst:` slash command (discord.py).
+  It sends the same `POST /api/checks` as the web form, with `X-Channel: discord`, and renders the
+  `CheckResult` with the same sections (verdict, reasoning, strength, premises, sources with
+  quotes, limitations). User and source text is escaped and messages never ping anyone. An answer
+  goes out in at most 5 messages of 2000 characters; whatever does not fit is in an attached
+  `odpowiedz.md` with the whole answer. API errors are shown as notices.
+  The bot shares one API rate limit (10 per minute) for all its users.
 
 ## API
 

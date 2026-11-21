@@ -52,7 +52,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - [ ] Demo corpus: ≥ 100 documents, ≥ 10 domains, ≥ 2 source types, publication and retrieval dates. Owner: ?
 - [ ] Retrieval and evidence: sources with title, publisher, date, URL, quote; verdicts beyond "no evidence". Owner: ?
   - [x] Step 2a (#6): Google Fact Check `claims:search` lookup, `prawdowid/factcheck.py`, branch `feat/6-factcheck`. Not wired into `verify()` (#11). Polish coverage and `pl` vs no language filter: not measured, no key yet. Owner: Łukasz (Claude worker)
-- [ ] Second channel (Discord or other allowed one; not Telegram/WeChat) on the same `verify()`. Owner: ?
+- [x] Second channel (#13): Discord `/sprawdz` bot, `prawdowid/discord_bot.py`, calls the same `POST /api/checks` with `X-Channel: discord`, branch `LukiLenkiewicz/issue13-discord`. Not run against real Discord (token not used by the worker); eval `channel_consistency` needs `PRAWDOWID_EXTRA_CHANNELS=discord` and multi-channel cases. Owner: Łukasz (Claude worker)
 - [x] Real eval set `evals/cases.jsonl`: ≥ 30 cases, scenarios A–E, G, I, J at least twice, labelled sources. Owner:
   Michał. Branch `feat/eval-cases`: 41 cases in the mentor's question style, all five verdict classes; labels from
   Demagog ClaimReview ratings (fetched 2026-11-21) and official pages (NATO, MON, europa.eu); an independent label check
@@ -138,10 +138,15 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (via Claude): merged `main` into `LukiLenkiewicz/issue13-discord` (PR #24); WORKLOG conflict resolved by keeping both sides.
 - 2026-11-21 Michał (via Claude): merged #29, #20, #21 (WORKLOG conflicts resolved, judge PASS each) and #32 (deploy
   config); `prod` created at `8ff84db`. The Actions deploy job was not started (account billing), so `prod` was
   deployed by hand; new UI live on https://faktczyfejk.pl. `claude/pull-deploy`: deploy by pulling `prod` on the server.
   Actions leftovers removed: the `DEPLOY_*` variables, the `DEPLOY_SSH_KEY` secret and the CI key on the server.
+- 2026-11-21 Łukasz (Claude worker): #13 Codex round 2 on PR #24: Discord no longer truncates; overflow and URLs longer than one message go to an `odpowiedz.md` attachment with every verdict and link; slash-callback test; a refused attachment ends with a notice. Merged `main` (stack base `feat/16-eval-set` is in `main`). Quick eval on `98983d6` with `PRAWDOWID_EXTRA_CHANNELS=discord`: channel_consistency 1.00, abstention 1.00, median 3.6 s, macro_f1 0.10, end_to_end 0.89. Still not run against a real Discord server.
+- 2026-11-21 Łukasz (Claude worker): #13 Codex review on PR #24: Discord answers split only between lines (untrusted fields wrapped, then escaped, quotes reopened per line, long URLs on their own line or replaced, masked links broken), 75 s overall deadline on the API call.
+- 2026-11-21 Łukasz (Claude worker): #13 merged `origin/feat/16-eval-set` (stack tip) into `LukiLenkiewicz/issue13-discord` (`59c3eaf`); Discord renders `kind`, `source_sentence` and `unchecked_claims` like the web form. Quick eval without an API key: every case `technical_error`, not committed.
+- 2026-11-21 Łukasz (Claude worker): #13 Discord bot (discord.py 2.7.1) on the same API and `verify()`, offline formatter and web/Discord consistency tests, `make discord`, compose profile `discord`. Branch `LukiLenkiewicz/issue13-discord`.
 - 2026-11-21 Michał: web answer in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić tej informacji." plus sources), the same text in copy-to-chat; example chips use the organiser's questions.
 - 2026-11-21 Michał: web UI matched to the pitch deck: Figtree, flat red hero with the outlined title echo, labelled chat preview, verdict card with sources one per row and quotes on a red rule.
 - 2026-11-21 Łukasz (Claude worker): merged `main` into `feat/16-eval-set` (PR #23); both eval sets kept, #16 cases renamed `FC-*` (73 cases). Quick eval on `69f1f82`: abstention 1.00, median 4.1 s, macro_f1 0.10, end_to_end 0.89.
