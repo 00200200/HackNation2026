@@ -1,0 +1,11 @@
+# HTTPS for the public demo. Caddy gets and renews Let's Encrypt certificates for DOMAIN and
+# www.DOMAIN (DOMAIN is set in .env and passed in by compose.prod.yaml) and redirects HTTP to HTTPS.
+{$DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy frontend:80
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
