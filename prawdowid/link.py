@@ -18,7 +18,7 @@ import socket
 import sys
 from datetime import date
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote_plus, urlsplit, urlunsplit
 
 import anyio
 import httpcore2
@@ -80,6 +80,7 @@ UNSUPPORTED_TYPE = (
 )
 TOO_LARGE = "Ta strona jest za duża, by ją pobrać (limit 2 MB). " + PASTE
 PRIVATE_ADDRESS = "Ten adres prowadzi do sieci prywatnej lub lokalnej. Sprawdzamy tylko publiczne strony."
+CREDENTIALS = "Nie pobieramy linków z loginem lub hasłem w adresie. " + PASTE
 BAD_URL = "Przyjmujemy tylko adresy zaczynające się od http:// lub https://."
 NOT_FOUND = (
     "Pod tym linkiem nie ma strony (błąd {code}). Sprawdź adres albo wklej tekst."
@@ -94,7 +95,7 @@ UNREACHABLE = (
 class Page(BaseModel):
     """What later steps need from the page: never the page itself."""
 
-    url: str  # final URL after redirects; later steps exclude it as evidence for its own claims
+    url: str  # final URL after redirects, redacted; later steps exclude it as evidence for its own claims
     sha256: str  # of the fetched bytes
     title: str | None
     publisher: str | None
@@ -178,10 +179,39 @@ def is_social(url: str) -> bool:
     return any(host == h or host.endswith("." + h) for h in SOCIAL_HOSTS)
 
 
+# Query parameters that carry secrets: their values never reach logs, the worker or the answer.
+# Matched on the whole decoded name, as is and camelCase split ("accessToken" is "access_Token"), so
+# "author" or "zipcode" stay readable for evidence exclusion.
+SECRET_PARAM = re.compile(
+    r"(.*[_-])?(token|key|apikey|sig|signature|secret|auth|password|passwd|pwd|pass"
+    r"|session|sessionid|sid|code|credential|credentials|jwt)",
+    re.IGNORECASE,
+)
+
+
+def is_secret(name: str) -> bool:
+    name = unquote_plus(name)
+    split = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name)
+    return any(SECRET_PARAM.fullmatch(n) for n in (name, split))
+
+
+def redact(url: str) -> str:
+    """The URL for logs, the worker and the answer: no userinfo, no secret values, no fragment."""
+    parts = urlsplit(url)
+    query = "&".join(
+        f"{p.split('=')[0]}=REDACTED" if is_secret(p.split("=")[0]) else p
+        for p in parts.query.split("&")
+    )
+    netloc = parts.netloc.rpartition("@")[2]
+    return urlunsplit((parts.scheme, netloc, parts.path, query, ""))
+
+
 def check_url(url: str) -> None:
     """Policy for every URL we are about to request: the link itself and each redirect."""
     if urlsplit(url).scheme not in ("http", "https"):
         raise Refusal(BAD_URL)
+    if "@" in urlsplit(url).netloc:
+        raise Refusal(CREDENTIALS)
     if is_social(url):
         raise Refusal(SOCIAL_MEDIA)
     if LOGIN_PATH.search(urlsplit(url).path):
@@ -212,14 +242,13 @@ async def fetch_page(
                     await resp.aclose()
             else:
                 raise Refusal(TOO_MANY_REDIRECTS)
-            final_url = str(resp.url)
-            page = await extract(body, content_type(resp), final_url)
+            page = await extract(body, content_type(resp), redact(str(resp.url)))
     except _PrivateAddress:
         raise Refusal(PRIVATE_ADDRESS) from None
     except httpx2.UnsupportedProtocol:
         raise Refusal(BAD_URL) from None
     except (TimeoutError, httpx2.HTTPError) as exc:
-        log.warning("link fetch failed url=%s error=%r", url, exc)
+        log.warning("link fetch failed url=%s error=%r", redact(url), exc)
         raise Refusal(UNREACHABLE, technical=True) from None
     log.info(
         "link fetched url=%s sha256=%s bytes=%d chars=%d",
@@ -259,7 +288,7 @@ async def read_capped(resp: httpx2.Response) -> bytes:
 
 
 async def extract(body: bytes, ctype: str, url: str) -> Page:
-    """Run the parser in a child process, killed if the caller's deadline ends first.
+    """Run the parser on a redacted `url` in a child process, killed if the caller's deadline ends first.
 
     At most MAX_EXTRACTIONS run at once; a request waits for a slot within its own deadline.
     """

@@ -460,6 +460,19 @@ def test_extraction_past_the_deadline_is_killed(slow_worker):
 
 
 def test_parallel_extractions_are_capped(slow_worker, monkeypatch):
+    # Count live parsers in-process at each spawn: a waiter whose deadline ends just after a slot
+    # frees may still start a worker, so the total started is timing-dependent; the peak is not.
+    procs, peak = [], []
+    spawn = asyncio.create_subprocess_exec
+
+    async def counted(*args, **kwargs):
+        procs.append(await spawn(*args, **kwargs))
+        # Counted once this one runs: the first two both sleep 60 s, so the second sees two.
+        peak.append(sum(p.returncode is None for p in procs))
+        return procs[-1]
+
+    monkeypatch.setattr(link.asyncio, "create_subprocess_exec", counted)
+
     async def go():
         monkeypatch.setattr(link, "_extractions", asyncio.Semaphore(2))
         net = FakeNet({"93.184.216.34": http()})
@@ -470,10 +483,9 @@ def test_parallel_extractions_are_capped(slow_worker, monkeypatch):
 
     results = asyncio.run(go())
     assert all(isinstance(r, Refusal) and r.technical for r in results)
-    started = pids(slow_worker)
-    # Never more than two parser processes; the others got no slot within their deadline.
-    assert 1 <= len(started) <= 2
-    assert not any(alive(pid) for pid in started)
+    assert max(peak) == 2  # two ran at once, never three
+    assert all(p.returncode is not None for p in procs)  # every parser was reaped
+    assert not any(alive(p.pid) for p in procs)
 
 
 def test_pdf_extraction_stops_at_its_page_and_text_budget():
@@ -570,3 +582,90 @@ def test_crashed_worker_is_no_text(tmp_path, monkeypatch):
     monkeypatch.setattr(link, "WORKER", str(worker))
     refusal, _ = fetch("http://news.example/a", {"93.184.216.34": http()})
     assert refusal.message == NO_TEXT
+
+
+WALL = """<html><head><title>Rząd przyjął projekt</title></head><body><article>
+<h1>Rząd przyjął projekt</h1><p>{lead}</p><p>{notice}</p>
+<form action="/login" method="post"><input name="email"><input type="password" name="p">
+<button>Zaloguj</button></form></article></body></html>"""
+
+
+@pytest.mark.parametrize(
+    "notice",
+    [
+        "Zaloguj się, aby przeczytać cały artykuł.",
+        "Ten artykuł jest dostępny tylko dla subskrybentów.",
+        "Subscribe to read the full story.",
+    ],
+)
+def test_inline_access_wall_is_not_checked(notice):
+    # No password form and a lead past PREVIEW_CHARS: only the notice can refuse it.
+    body = ARTICLE.replace(ARTICLE_TEXT, ARTICLE_TEXT * 5 + "</p><p>" + notice)
+    net = FakeNet({"93.184.216.34": http(body=body)})
+
+    def never(messages, info):
+        raise AssertionError("model must not be called for a walled page")
+
+    async def guarded_fetch(url):
+        return await fetch_page(url, backend=net)
+
+    with pytest.MonkeyPatch.context() as mp, agent.override(model=FunctionModel(never)):
+        mp.setattr("prawdowid.verifier.fetch_page", guarded_fetch)
+        result = asyncio.run(verify("http://news.example/a"))
+    assert result.status is Status.CANNOT_CHECK
+    assert result.message == PAYWALL and result.claims == []
+
+
+def test_password_form_beside_a_preview_is_a_wall():
+    body = WALL.format(lead=ARTICLE_TEXT, notice="")
+    refusal, _ = fetch("http://news.example/a", {"93.184.216.34": http(body=body)})
+    assert refusal.message == PAYWALL
+
+
+def test_article_quoting_a_login_prompt_is_checked():
+    text = (ARTICLE_TEXT + " Oszuści piszą: zaloguj się na stronie banku. ") * 3
+    body = ARTICLE.replace(ARTICLE_TEXT, text)
+    page, _ = fetch("http://news.example/a", {"93.184.216.34": http(body=body)})
+    assert "zaloguj się na stronie banku" in page.text
+
+
+def test_url_secrets_never_reach_logs_or_the_page(caplog, monkeypatch):
+    argv = []
+    spawn = asyncio.create_subprocess_exec
+
+    async def record(*args, **kwargs):
+        argv.extend(args)
+        return await spawn(*args, **kwargs)
+
+    monkeypatch.setattr(link.asyncio, "create_subprocess_exec", record)
+    url = (
+        "http://news.example/a?id=7&author=Kowalski&token=SECRET1&X-Amz-Signature=SECRET2"
+        "&%61pi_key=SECRET4&accessToken=SECRET5&sessionId=SECRET6#access_token=SECRET3"
+    )
+    with caplog.at_level("INFO", logger="prawdowid"):
+        page, _ = fetch(url, {"93.184.216.34": http()})
+    assert page.url == (
+        "http://news.example/a?id=7&author=Kowalski&token=REDACTED"
+        "&X-Amz-Signature=REDACTED&%61pi_key=REDACTED&accessToken=REDACTED&sessionId=REDACTED"
+    )
+    seen = caplog.text + " ".join(map(str, argv))
+    assert "SECRET" not in seen and "news.example" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "url", ["http://user:SECRET@news.example/a", "http://SECRET@news.example/a"]
+)
+def test_url_with_credentials_is_refused(url, caplog):
+    with caplog.at_level("INFO", logger="prawdowid"):
+        refusal, net = fetch(url, {"93.184.216.34": http()})
+    assert refusal.message == link.CREDENTIALS
+    assert net.connected == [] and "SECRET" not in caplog.text
+
+
+def test_redirect_to_credentials_is_refused():
+    redirect = http(302, body="", headers=["Location: http://u:SECRET@other.example/"])
+    refusal, net = fetch(
+        "http://news.example/a", {"93.184.216.34": redirect, "93.184.216.35": http()}
+    )
+    assert refusal.message == link.CREDENTIALS
+    assert net.connected == ["93.184.216.34"]

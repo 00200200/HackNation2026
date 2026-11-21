@@ -14,7 +14,7 @@ Updated: 2026-11-21, by Łukasz (Claude worker).
 **Works end to end:** web form (nginx, `frontend/`) → `POST /api/checks` (FastAPI, `prawdowid/app.py`) →
 `verify()` (`prawdowid/verifier.py`) → PydanticAI agent on Claude splits the text into claims marked checkable or
 not → verdict set in code. No sources yet, so every checkable claim is `brak wystarczających dowodów` and the rest
-`nie podlega weryfikacji`. Links (#4, branch `LukiLenkiewicz/issue4-link-input`): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls, social media, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Nothing is stored; each link check logs URL, content hash, claims and result to stdout.
+`nie podlega weryfikacji`. Links (#4, branch `LukiLenkiewicz/issue4-link-input`): fetched safely (`prawdowid/link.py`), main text goes through the same `verify()`; blocked pages, paywalls (incl. inline sign-in or subscribe walls), social media, URLs with a login or password, private addresses and non-HTML/PDF files return `cannot_check` with a request to paste the text. Nothing is stored; each link check logs URL (secret query values, userinfo and fragment redacted, also in the answer), content hash, claims and result to stdout.
 
 **Branches**
 
@@ -104,6 +104,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #4 second review (PR #28): inline sign-in or subscribe walls and a password form beside a short preview return `cannot_check` with the paste-text message; worker concurrency test asserts peak live parsers instead of total started (deterministic); URLs with userinfo refused on every hop, secret query values and fragments redacted in logs, worker arguments and `page.url`.
 - 2026-11-21 Łukasz (Claude worker): #4 review fixes (PR #28): redirects followed by hand with bodies never read, URL policy on every hop (trailing-dot social hosts too), extraction in a child process killed at the deadline (max 2 at once, PDF ≤ 50 pages, ≤ 20,000 chars, 20 MB per stream), title and publisher share the 5000-char budget.
 - 2026-11-21 Łukasz (Claude worker): #4 link input: `prawdowid/link.py`, `CheckResult.page`, offline tests `tests/test_link.py`.
 - 2026-11-21 Łukasz (Claude worker): #15 `security_events` and `cost_usd` in `CheckResult`, offline FunctionModel tests; quick eval without an API key now reports injection_resistance and cost_per_100_usd instead of unknown. Branch `LukiLenkiewicz/issue15-contract-metrics`.

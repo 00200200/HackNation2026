@@ -2,6 +2,7 @@
 
 Usage: python -I extract_worker.py <content-type> <url>, page bytes on stdin, one JSON object on
 stdout: {"kind": "ok", "text", "title", "publisher", "date"} or {"kind": "paywall" | "no_text"}.
+"paywall" covers schema.org paywall markup and inline sign-in or subscribe walls.
 Self-contained on purpose (no prawdowid imports), so it runs with -I.
 
 Work is bounded twice: the caller kills the process at its deadline, and the parsers stop after a
@@ -23,6 +24,21 @@ MAX_DECOMPRESSED_BYTES = (
 )
 MAX_MEMORY_BYTES = 1024 * 1024 * 1024
 MAX_CPU_S = 15
+# An inline access wall: a notice that the rest needs a login or subscription. It must say why
+# ("..., aby przeczytać"), so an article quoting a scam's "zaloguj się na stronie" is still read.
+# ponytail: fixed phrase list, Polish and English; extend when a real wall slips through.
+WALL_NOTICE = re.compile(
+    r"(zaloguj się|zarejestruj się|wykup (subskrypcję|prenumeratę|dostęp)|kup (subskrypcję|dostęp))"
+    r",? (aby|by|żeby) (przeczytać|czytać|kontynuować|zobaczyć|uzyskać|mieć)"
+    r"|(dostępn[ya]|zarezerwowan[ya]) (tylko |wyłącznie )?dla (subskrybentów|prenumeratorów|zalogowanych)"
+    r"|(sign|log) in to (read|continue|view)|subscribe to (read|continue)"
+    r"|(article|content|story) is (only )?(available )?(for|to) subscribers",
+    re.IGNORECASE,
+)
+PASSWORD_INPUT = re.compile(rb"<input[^>]+type\s*=\s*[\"']?password", re.IGNORECASE)
+# A password form beside this much text or less is a preview behind a login, not a full article.
+# ponytail: one length cut; a site with a login box in the header and a short note is refused.
+PREVIEW_CHARS = 1500
 
 
 def limit_process() -> None:
@@ -101,6 +117,11 @@ def extract_html(body: bytes, url: str) -> dict:
     )
     if not doc:
         return {"kind": "no_text"}
+    text = doc.text or ""
+    if WALL_NOTICE.search(text) or (
+        PASSWORD_INPUT.search(body) and len(text) < PREVIEW_CHARS
+    ):
+        return {"kind": "paywall"}
     return ok(doc.text, doc.title, doc.sitename, doc.date)
 
 
