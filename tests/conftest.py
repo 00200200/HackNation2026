@@ -27,3 +27,11 @@ def check_log(monkeypatch, tmp_path):
     monkeypatch.setattr(checklog, "CHECK_LOG", path)
     monkeypatch.setattr(checklog, "DELETED", {})
     return path
+
+
+@pytest.fixture(autouse=True)
+def empty_result_cache():
+    """The API's result cache is module state: no answer may leak from one test into another."""
+    from prawdowid import app
+
+    app._results.clear()

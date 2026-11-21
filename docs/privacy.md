@@ -68,6 +68,13 @@ One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:
   `delete_expired_documents()` runs, and only the seed script runs it (before it writes). The seed
   script is the only writer, so expired pages stay in the database until the next seed. Before step
   2c is switched on, run it on a schedule (cron or `pg_cron`).
+- Result cache (`prawdowid/app.py`, #59): the finished answer for a text is kept in the API
+  process's memory for 30 minutes (at most 500 answers), under a hash of the normalised input, so
+  the same text from the web form and from Discord gets the same answer. The answer holds the
+  claims and the sentences they came from. It is never written to disk, a restart empties it, and
+  "Usuń moje sprawdzenia" does not reach it (it expires on its own). A fast answer shows that the
+  same text was checked in the last 30 minutes (response header `X-Cache: hit`), whoever sent it.
+  This is not governed by `RETENTION_DAYS`.
 
 Not covered: Docker's own stdout logs (rotation is set by the Docker host). They carry no raw user
 text: claims, queries and link URLs, all from masked text.
