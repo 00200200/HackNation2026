@@ -132,7 +132,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
-- 2026-11-21 Łukasz (Claude worker): #13 Codex round 2 on PR #24: Discord no longer truncates; overflow and URLs longer than one message go to an `odpowiedz.md` attachment with every verdict and link; slash-callback test. Merged `main` (stack base `feat/16-eval-set` is in `main`).
+- 2026-11-21 Łukasz (Claude worker): #13 Codex round 2 on PR #24: Discord no longer truncates; overflow and URLs longer than one message go to an `odpowiedz.md` attachment with every verdict and link; slash-callback test; a refused attachment ends with a notice. Merged `main` (stack base `feat/16-eval-set` is in `main`). Quick eval on `98983d6` with `PRAWDOWID_EXTRA_CHANNELS=discord`: channel_consistency 1.00, abstention 1.00, median 3.6 s, macro_f1 0.10, end_to_end 0.89. Still not run against a real Discord server.
 - 2026-11-21 Łukasz (Claude worker): #13 Codex review on PR #24: Discord answers split only between lines (untrusted fields wrapped, then escaped, quotes reopened per line, long URLs on their own line or replaced, masked links broken), 75 s overall deadline on the API call.
 - 2026-11-21 Łukasz (Claude worker): #13 merged `origin/feat/16-eval-set` (stack tip) into `LukiLenkiewicz/issue13-discord` (`59c3eaf`); Discord renders `kind`, `source_sentence` and `unchecked_claims` like the web form. Quick eval without an API key: every case `technical_error`, not committed.
 - 2026-11-21 Łukasz (Claude worker): #13 Discord bot (discord.py 2.7.1) on the same API and `verify()`, offline formatter and web/Discord consistency tests, `make discord`, compose profile `discord`. Branch `LukiLenkiewicz/issue13-discord`.
