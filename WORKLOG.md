@@ -25,18 +25,20 @@ not → on branch `LukiLenkiewicz/issue11-fanout` each checkable claim runs Fact
 | `feat/8-web-search` | #8 web search (DuckDuckGo via `ddgs`), page fetch, source cache, `docs/sources.md`. Stacked on `LukiLenkiewicz/issue9-rerank`, PR open, not merged. Corpus not built. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue19-supabase` | #19 step 2c: local PostgreSQL source store (compose `db`) and per-claim full-text search, stacked on `LukiLenkiewicz/issue10-judge` (#30; the #11 and #12 branches were not on origin after 45 min). PR open, not merged. **Disabled in the pipeline** (user decision). Database empty, not seeded. Owner: Łukasz (Claude worker). |
 | `feat/16-eval-set` | #16 eval set (31 cases) and full eval, stacked on `feat/5-self-contained-claims`. PR open, not merged. Owner: Łukasz (Claude worker). |
-| `LukiLenkiewicz/issue12-incidents` | #12 scenario I incident matcher, empty base. Stacked on `LukiLenkiewicz/issue10-judge` (merged in, with #4 and #15), PR open, not merged. Owner: Łukasz (Claude worker). |
+| `LukiLenkiewicz/issue12-incidents` | #12 scenario I incident matcher, empty base. Stacked on `LukiLenkiewicz/issue11-fanout` (#37, merged in), PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue9-rerank` | #9 step 3 rerank and dedupe, stacked on `LukiLenkiewicz/issue13-discord` (PR #24). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue11-fanout` | #11 orchestration: `verify()` runs steps 2 to 5 per claim (`prawdowid/pipeline.py`), stacked on `LukiLenkiewicz/issue19-supabase` (PR #34). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue31-euvsdisinfo` | #31 EUvsDisinfo MCP lookup, stacked on the stack tip. PR open, not merged. Owner: Łukasz (Claude worker). |
 | `LukiLenkiewicz/issue10-judge` | #10 steps 4 and 5 judge with quotes and verdict rules, stacked on `LukiLenkiewicz/issue4-link-input` (PR #28). PR open, not merged. Owner: Łukasz (Claude worker). |
 | `origin/feat/service-skeleton`, `origin/tooling/judge-eval-gate` | already in `main` (squashed). Safe to delete after a team OK. |
 
-**Last eval** (`evals/results/latest.json`, **full**, 31 cases, product at `91d610c` (#11 fan-out on the #19 stack), real Anthropic
-and Google Fact Check keys, no EUvsDisinfo key, no corpus; DuckDuckGo still returns no results): macro_f1 0.32 (fail), citation_coverage 1.00,
-abstention 1.00, injection_resistance 0.67 (fail), median latency 15.8 s, end_to_end 0.94 (both J cases, no eval switch), cost per 100
-checks $1.75. Citation correctness and channel consistency: not measured. Verdicts come from Fact Check reviews only: 34 of 44
-checked claims had no source. Before the search cap (`f1e1684`) the judge step was cut on most cases (macro_f1 0.09, abstention 0.50).
+**Last eval** (`evals/results/latest.json`, **full**, 31 cases, product at `729b220` (#12 incident matcher merged on the #11 stack tip), real Anthropic
+and Google Fact Check keys, no corpus; DuckDuckGo timed out): macro_f1 0.24 (fail), citation_coverage 1.00, abstention 1.00,
+injection_resistance 0.33 (fail), median latency 14.3 s, end_to_end 0.94 (both J cases, no eval switch). Cost per 100 checks, citation
+correctness and channel consistency: not measured. The #11 run on `91d610c` gave macro_f1 0.32 and injection_resistance 0.67 on the same
+code path; #12 only adds `incident_matches` (empty base, returns at once), so the gap is run-to-run variance of live model and search
+calls (UNCONFIRMED, one run each). A first run on `729b220` lost 18 cases to Anthropic timeouts and connection errors and was discarded.
+The incident base is empty, so I01–I03 show no incident warning.
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
@@ -119,6 +121,7 @@ Basic requirements first: the jury gives no points for extras if one of these is
 
 ## Log (newest first, append only)
 
+- 2026-11-21 Łukasz (Claude worker): #12 merged `origin/LukiLenkiewicz/issue11-fanout` (stack tip, PR #37) into `LukiLenkiewicz/issue12-incidents`, full eval on `729b220` committed: macro_f1 0.24, abstention 1.00, injection_resistance 0.33, median latency 14.3 s.
 - 2026-11-21 Łukasz (Claude worker): #12 full eval on `4bd8471` committed: macro_f1 0.09, abstention 1.00, injection_resistance 0.00, median latency 4.6 s, cost $1.61 per 100.
 - 2026-11-21 Łukasz (Claude worker): #12 merged `origin/LukiLenkiewicz/issue10-judge` (stack tip) into `LukiLenkiewicz/issue12-incidents`; the incident warning sits next to the page note and security notice on web and Discord, and also matches the final URL after redirects.
 - 2026-11-21 Łukasz (Claude worker): #12 incident matcher (URL, domain, difflib text similarity) with an empty shipped base, `incident_matches` in the contract, rendered on web and Discord, offline tests with a test-only fixture. Branch `LukiLenkiewicz/issue12-incidents`.
