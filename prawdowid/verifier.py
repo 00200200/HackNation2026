@@ -390,7 +390,8 @@ async def verify_text(
     # Best-effort price of every request in the run from PydanticAI's genai-prices tables; None
     # for an unpriced model. genai-prices 0.2.5 (2026-11-19) lists claude-opus-5-5 at $4 input and
     # $20 output per million tokens, from https://platform.claude.com/docs/en/about-claude/pricing.
-    # Rerank and judge calls are added per claim; Fact Check and DuckDuckGo are free.
+    # Rerank and judge calls are added per claim; Fact Check is free. Tavily web search costs API
+    # credits but is not priced into cost_usd (#7/#8: not measured yet, no key in this clone).
     cost = None if usage.cost is None else float(usage.cost)
     log.info(
         "model name=%s input_tokens=%d output_tokens=%d cost_usd=%s latency_ms=%d",

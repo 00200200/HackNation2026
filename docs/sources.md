@@ -5,11 +5,14 @@ matches its own entry or the closest parent entry (`nik.gov.pl` falls under `gov
 lives in `ALLOWLIST`; `tests/test_websearch.py` fails when a domain there is missing here.
 
 Every cached document has a title, publisher, publication date (`published_at`, found by
-trafilatura/htmldate, mostly in page metadata; on a page without date metadata it can come from a
-date written on the page, so it may be wrong there; pages with no date are skipped) and retrieval time (`fetched_at`). The per-document list
-goes to `corpus/manifest.jsonl` when the corpus is built with `uv run python -m prawdowid.corpus`.
-**The corpus is not built yet:** DuckDuckGo returned no results from our machine on 2026-11-21, and
-the team will replace the provider (#7, #8).
+trafilatura/htmldate, mostly in page metadata; falls back to the search provider's own
+`published_date` when the page carries none; on a page without date metadata it can come from a
+date written on the page, so it may be wrong there; pages with no date anywhere are skipped) and
+retrieval time (`fetched_at`). The per-document list goes to `corpus/manifest.jsonl` when the
+corpus is built with `uv run python -m prawdowid.corpus`.
+**The corpus is not built yet:** it needs `TAVILY_API_KEY`, which no one on the team has set yet.
+Search provider is now **Tavily** (`/search`, official API, see `WORKLOG.md` Decisions, #7, #8);
+it replaced DuckDuckGo (`ddgs`), which returned no results from our machine on 2026-11-21.
 
 What we store (`prawdowid/cache.py`): metadata of every page (URL, title, publisher, dates,
 type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo.
