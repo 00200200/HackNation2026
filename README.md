@@ -84,8 +84,8 @@ path. Other tuning variables need an explicit Compose environment override.
 | Variable | Required | Default | What it does |
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
-| `PRAWDOWID_MODEL` | no | `anthropic:claude-sonnet-5-5` | PydanticAI model id (`provider:model`) for claim extraction. Sonnet since 2026-11-22: same accuracy as Opus in the full eval (51/71 each), 3.0 s median extraction vs 4.3 s. |
-| `PRAWDOWID_CHECK_BUDGET_S` | no | `25` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. |
+| `PRAWDOWID_MODEL` | no | `anthropic:claude-sonnet-5-5` | PydanticAI model id (`provider:model`) for claim extraction. Sonnet since 2026-11-22: same accuracy as Opus in a full eval run with `PRAWDOWID_CHECK_BUDGET_S=600` (51/71 each), 3.0 s median extraction vs 4.3 s. |
+| `PRAWDOWID_CHECK_BUDGET_S` | no | `25` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. The best accuracy so far (51/71, macro_f1 0.763, 2026-11-22) was measured with `600`, which is not shippable (the API allows 60 s). At the default 25 s the runs that night had 31–54 of 71 checks cut while external services were slow, and failed every accuracy target: see `evals/results/HISTORY.md`. |
 | `PRAWDOWID_WEB_SEARCH_BUDGET_S` | no | `10` | Longest one web search query may take, retry included, before it counts as unavailable. |
 | `PRAWDOWID_PAGE_BUDGET_S` | no | `8` | Longest one page fetch may take (robots.txt and page); a slower page is skipped, the others are kept. |
 | `PRAWDOWID_GOVPL` | no | `1` | `0` switches off the www.gov.pl site search (`prawdowid/govpl.py`); its queries then go to web search, which searches www.gov.pl again. See [docs/sources.md](docs/sources.md). |
@@ -107,7 +107,7 @@ path. Other tuning variables need an explicit Compose environment override.
 | `PRAWDOWID_EMBEDDING_MODEL` | no | `intfloat/multilingual-e5-large` | Local embedding model for corpus search (fastembed). Changing it rebuilds the index on the next `make index`. |
 | `FASTEMBED_CACHE_PATH` | no | fastembed's temp dir | Where the embedding model files are kept (`/models` in the image). |
 
-The extraction call has a 45 s provider request timeout and at most one SDK retry, but shares
+The extraction call has a 20 s timeout per attempt and up to 3 SDK retries, but shares
 the 25 s whole-check deadline with URL fetching and per-claim checks, inside the API's 60 s
 limit. Extraction errors and a missing model key return `technical_error`; a
 model refusal returns `cannot_check`. Both carry a Polish message and no claims. Retrieval
