@@ -44,7 +44,15 @@ def group_metrics(rows: list[dict]) -> dict:
     labelled = [
         (label(r), first_prediction(r)) for r in rows if label(r) in metrics.VERDICTS
     ]
-    correct = [not r.get("errors") and first_prediction(r) == label(r) for r in rows]
+    # The report's own per-case verdict when it has one (evals.run, answered_as_expected: every
+    # channel run, the checked-claim rule of status:ok cases); older reports without it are judged
+    # here from the first prediction.
+    correct = [
+        r["correct"]
+        if "correct" in r
+        else not r.get("errors") and first_prediction(r) == label(r)
+        for r in rows
+    ]
     return {
         "cases": len(rows),
         "errored": sum(bool(r.get("errors")) for r in rows),

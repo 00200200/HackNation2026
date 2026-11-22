@@ -12,6 +12,7 @@ def row(case_id, expected, predicted, seconds=1.0, errors=()):
         "predicted": [predicted],
         "seconds": [seconds],
         "errors": list(errors),
+        "correct": not errors and predicted == expected,
     }
 
 
