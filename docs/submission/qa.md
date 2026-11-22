@@ -105,22 +105,27 @@ odświeżania na serwerze jeszcze nie ma (#90).
 
 ### 6. Polscy fact-checkerzy blokują wasz serwer. Co wtedy?
 
-Krótko: nie obchodzimy blokady. Bierzemy tylko to, co zwraca wyszukiwarka, i oznaczamy to jako
-fragment z wyników.
+Krótko: nie obchodzimy blokady. W buildzie `integration/r3` bierzemy tylko to, co zwraca
+wyszukiwarka, i oznaczamy to jako fragment z wyników (#95). Na `main`, bez #95, takie trafienie
+jeszcze wypada.
 
 Szczegóły: w nocy 22.11 z naszego serwera konkret24.tvn24.pl, sprawdzam.afp.com i
 demagog.org.pl odpowiadały 403, i z naszym user agentem, i z przeglądarkowym, a oko.press i
 pravda.org.pl odpowiadały 200 (#95). Brief zabrania obchodzenia zabezpieczeń, a nasze pobieranie nigdy nie
 omija odpowiedzi 401, 403, 429 ani blokady botów. Dziś trafienie, którego strony nie da się pobrać,
-po prostu wypada, choć wyszukiwarka zwróciła jego fragment (#95).
+po prostu wypada na `main`, choć wyszukiwarka zwróciła jego fragment. W `integration/r3` (#95) ten
+fragment zostaje, ale tylko gdy strona odmawia, nie odpowiada na czas, jest za duża albo nie da
+się jej odczytać. Gdy robots.txt zabrania pobrania, strona zniknęła albo wymaga logowania lub
+płatności, nie bierzemy nawet fragmentu.
 
 Zasadę na ten przypadek zatwierdził Michał 22.11.2026 ([WORKLOG](../../WORKLOG.md), sekcja
 „Decisions”). Gdy nie możemy pobrać strony sami (blokada,
 przekroczony czas, za duży plik, nieobsługiwany typ), dowodem staje się tytuł i fragment zwrócone
 przez wyszukiwarkę. Odpowiedź oznacza go jako „fragment z wyników wyszukiwarki; strona nie pozwala
 na pobranie”. Cytat sprawdzamy na tym fragmencie jak na każdym innym. Pełnej treści takiej strony nie
-zapisujemy i nigdy nie pobieramy jej inną drogą. Stan: wdrożenie trwa w #95, na `main` go jeszcze
-nie ma.
+zapisujemy i nigdy nie pobieramy jej inną drogą. Stan: #95 jest w `integration/r3` i nie
+wszedł jeszcze do `main`. Po stronie jakości: nie mierzyliśmy jeszcze, jak często taki fragment
+wystarcza do cytatu.
 
 Źródła: [#95](https://github.com/00200200/HackNation2026/issues/95),
 [#76](https://github.com/00200200/HackNation2026/issues/76), [docs/sources.md](../sources.md),
@@ -144,19 +149,24 @@ PAP i EUvsDisinfo.
 ### 8. Co, jeśli tekst albo strona źródłowa zawiera polecenia dla modelu?
 
 Krótko: traktujemy je jak dane. Nie wykonujemy ich, mówimy o tym użytkownikowi i zapisujemy
-zdarzenie.
+zdarzenie. Dla poleceń w pobranych stronach to stan buildu `integration/r3` (#61, PR #72), nie
+`main`.
 
 Szczegóły: instrukcje systemowe są oddzielone od danych. Dwa detektory: stałe wzorce w kodzie i
 flaga od modelu, który wyodrębnia twierdzenia. Zdarzenie bezpieczeństwa zapisujemy bez treści ataku,
 a strona pokazuje: „W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich
-i sprawdziliśmy resztę”. Polecenie, które sędzia znajdzie w pobranej stronie, też trafia do
-zdarzeń, z miejscem `source`.
+i sprawdziliśmy resztę”. W buildzie `integration/r3` pobrane źródła są też przeglądane w kodzie
+tymi samymi wzorcami, niezależnie od modeli, a strona pokazuje wtedy: „W źródłach są zwroty, które
+wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę”. Polecenie, które
+sędzia znajdzie w pobranej stronie, też trafia do zdarzeń, z miejscem `source` (zdarzenie bez
+treści ataku, `detector=model`). Na `main`, bez PR #72, działa tylko to drugie.
 
 Wyniki z [HISTORY.md](../../evals/results/HISTORY.md): odporność na injection 0,000 w szybkim
 przebiegu na `95e6177` i 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jest zniekształcony),
 przy progu 0,90. Wzorce pisaliśmy, znając pierwsze trzy przypadki E, więc potrzebujemy nowych.
-Przypadki z poleceniem ukrytym w stronie jeszcze się nie uruchamiają (#94), a sprawdzanie pobranych
-źródeł czeka w PR #72.
+Przypadki z poleceniem ukrytym w stronie mają fixtures w `integration/r3` (#94), ale nie
+uruchamialiśmy na nich evalu (brak kluczy w tym klonie). Sprawdzanie pobranych źródeł (PR #72) też
+jest tylko w `integration/r3`.
 
 Źródła: [risks.md](risks.md), [prawdowid/verifier.py](../../prawdowid/verifier.py),
 [frontend/public/app.js](../../frontend/public/app.js), [WORKLOG.md](../../WORKLOG.md) (wpis do #15),
@@ -166,25 +176,29 @@ Przypadki z poleceniem ukrytym w stronie jeszcze się nie uruchamiają (#94), a 
 ### 9. Co się dzieje, gdy źródło nie działa albo skończy się limit?
 
 Krótko: mówimy, co nie zadziałało. Gdy padną wszystkie źródła albo model, werdyktu nie ma. Gdy
-padnie tylko część źródeł, mamy dziś lukę i mówimy o niej wprost.
+padnie źródło, które może rozstrzygnąć, a dowodów nie starcza, werdyktu też nie ma, ale to reguła
+z #60 z buildu `integration/r3`. Na `main` jest tu jeszcze luka i mówimy o niej wprost.
 
 Szczegóły: każde źródło ma własny limit czasu. Google Fact Check ma 15 s, EUvsDisinfo 5 s w potoku,
-jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 25 s. Twierdzenie,
+jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 40 s (w
+`integration/r3`, #63; na `main` 25 s). Twierdzenie,
 którego wszystkie źródła padły, dostaje „nie sprawdzono” z powodem. Tak samo, gdy skończy się czas
 albo nie odpowie model-sędzia. Brak klucza do modelu albo jego błąd przy wyodrębnianiu twierdzeń daje
 komunikat techniczny. Jedenaste zapytanie w ciągu minuty dostaje komunikat „Wysłano za dużo zapytań w
 krótkim czasie”. Eval ma 4 przypadki J. Dwa (FC-J01, FC-J02) pomijamy, a dwa pozostałe (J01, J02)
 liczymy bez zasymulowanej awarii, bo przełącznika awarii jeszcze nie ma (#60).
 
-Znana luka (#60): gdy padnie tylko część źródeł, a reszta nic nie znajdzie, wynik brzmi „brak
-wystarczających dowodów”. W ograniczeniach odpowiedzi stoi wtedy, które źródło nie odpowiedziało, ale
-sam werdykt wygląda jak brak dowodów, a brief w scenariuszu J tego zabrania. Przykład: Tavily odmawia,
-bo skończyły się kredyty, co kod traktuje jak każdą awarię wyszukiwarki, a Google Fact Check
-odpowiada, że nic nie znalazł. Poprawka czeka w PR #109: gdy padnie źródło, które może rozstrzygnąć
-(Fact Check albo wyszukiwarka), a dowodów nie starcza, twierdzenie dostaje „nie sprawdzono”.
+Luka (#60), zamknięta w buildzie `integration/r3` (PR #109), na `main` jeszcze otwarta: gdy
+padnie tylko część źródeł, a reszta nic nie znajdzie, `main` zwraca „brak wystarczających dowodów”.
+W ograniczeniach odpowiedzi stoi wtedy, które źródło nie odpowiedziało, ale sam werdykt wygląda jak
+brak dowodów, a brief w scenariuszu J tego zabrania. Przykład: Tavily odmawia, bo skończyły się
+kredyty, co kod traktuje jak każdą awarię wyszukiwarki, a Google Fact Check odpowiada, że nic nie
+znalazł. W `integration/r3`, gdy padnie źródło, które może rozstrzygnąć (Fact Check albo
+wyszukiwarka, dla twierdzeń rządowych także wyszukiwarka gov.pl), a dowodów nie starcza,
+twierdzenie dostaje „nie sprawdzono”. Korpus nie liczy się jako źródło, które odpowiedziało.
 
-Źródła: [prawdowid/pipeline.py](../../prawdowid/pipeline.py#L137),
-[prawdowid/websearch.py](../../prawdowid/websearch.py#L113),
+Źródła: [prawdowid/pipeline.py](../../prawdowid/pipeline.py#L14),
+[prawdowid/websearch.py](../../prawdowid/websearch.py#L190),
 [prawdowid/factcheck.py](../../prawdowid/factcheck.py), [prawdowid/app.py](../../prawdowid/app.py),
 [README](../../README.md#configuration), [#60](https://github.com/00200200/HackNation2026/issues/60),
 [#75](https://github.com/00200200/HackNation2026/issues/75),
@@ -201,8 +215,9 @@ brzmiały „brak wystarczających dowodów” (macro-F1 0,100). Zniekształcony
 dał 0,583 ([HISTORY.md](../../evals/results/HISTORY.md)). Do tego w szybkim przebiegu na stagingu
 22.11 (`75c1e20`) wyszukiwarka znajdowała strony, a potem je odrzucała: 102, bo
 robots.txt odpowiadał 403 (czytane jako zakaz wszystkiego), 36 bez tekstu, tytułu albo daty, 17 po
-przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95. Korpus urzędowy też
-jeszcze nie jest podpięty (#74).
+przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 (w `integration/r3`, jeszcze nie w `main`) i do pełnego przebiegu na tym stanie
+(#16) nie wiemy, o ile poprawią wyniki. Korpus urzędowy jest w `integration/r3` podpięty do
+sprawdzania (#74), ale tego też nie zmierzyliśmy.
 
 Źródła: [HISTORY.md](../../evals/results/HISTORY.md),
 [#95](https://github.com/00200200/HackNation2026/issues/95),
@@ -262,12 +277,18 @@ powierzenia, to etap 3 pilotażu.
 
 ### 13. Ile to kosztuje?
 
-Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje według pomiarów z 21.11, zrobionych na
-starszym kodzie, od 31 do 37 groszy, a serwer z domeną około 43 zł miesięcznie.
+Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje według pomiarów z 21 i 22.11, zrobionych
+na starszym kodzie, około 36 groszy, a serwer z domeną około 43 zł miesięcznie.
 
-Szczegóły: modele to 0,0525 USD za sprawdzenie (jeden przebieg pełnego potoku na 8 przypadkach,
-wpis z 21.11 w WORKLOG). Tavily dokłada około 4,9 kredytu po 0,005 do 0,008 USD. Na 1000 sprawdzeń
-wychodzi od 77 do 92 USD, czyli od 312 do 372 zł. Koszty stałe: VPS-2 od 37,85 zł brutto miesięcznie,
+Szczegóły: modele to 0,0491 USD za sprawdzenie (szybki przebieg pełnego potoku na 10 przypadkach,
+`edd34a5`, wiersz w HISTORY.md na `integration/r3`). To górna granica, bo od #88 wyodrębnianie idzie
+na tańszym Sonnecie 5.5, czego nie mierzyliśmy. Tavily dokłada około 4,9 kredytu (wpis z 21.11 w
+WORKLOG). Konto jest na planie Researcher z opłatą za zużycie: 1000 kredytów miesięcznie za darmo,
+potem 0,008 USD za kredyt, limit konta podniesiony 22.11 do 4000 kredytów (czy z darmowymi:
+UNCONFIRMED). Na 1000 sprawdzeń wychodzi 80,10 USD, czyli 325 zł (88,10 USD, czyli 358 zł, gdy darmowe
+kredyty zużyją testy). Ten limit starcza na około 820 sprawdzeń, więc dla 1000 trzeba go podnieść.
+Abonamentowe stawki Tavily (do 0,005 USD za kredyt w planie Growth za 500 USD miesięcznie) nie
+obniżają tego rachunku przy takim ruchu. Koszty stałe: VPS-2 od 37,85 zł brutto miesięcznie,
 domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów w
 HISTORY.md to 1,82 USD, ale z wersji sprzed Tavily i sędziego. Ostateczne liczby policzymy z pełnego
 przebiegu (#16).
@@ -279,11 +300,12 @@ przebiegu (#16).
 Krótko: koszt rośnie liniowo, a rachunek to prawie wyłącznie tokeny modeli i kredyty wyszukiwarki.
 Serwer to poniżej 2%. Przepustowości jednego serwera jeszcze nie zmierzyliśmy.
 
-Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 3726 zł, przy 100 000 około
-37 171 zł plus kolejne serwery. Modele to od 57 do 63% kosztów zmiennych. Wyodrębnianie twierdzeń
-(Opus 5.5) to około jednej trzeciej kosztu modeli, a ranking i sędzia razem około dwóch trzecich.
-Przejście wyodrębniania na Sonnet 5.5, którego token kosztuje połowę tego co Opus, obetnie więc koszt
-modeli o około 17%. Zamianę zrobimy dopiero po pomiarze jakości (#88). Dziś backend to jeden proces z limitem zapytań w pamięci,
+Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 3588 zł, przy 100 000 około
+35 791 zł plus kolejne serwery (Tavily po 0,008 USD za kredyt, bez abonamentu). Modele to od 56 do
+61% kosztów zmiennych. Wyodrębnianie twierdzeń na Opusie 5.5 było około jednej trzeciej kosztu
+modeli, a ranking i sędzia razem około dwóch trzecich. Od #88 wyodrębnianie domyślnie idzie na
+Sonnet 5.5, którego token kosztuje połowę tego co Opus, co obcina koszt modeli o około 18%. To
+szacunek przy tej samej liczbie tokenów, a jakość po zmianie modelu sprawdza #88. Dziś backend to jeden proces z limitem zapytań w pamięci,
 na jednym serwerze bez zapasowego. Test obciążeniowy to #88.
 
 Źródła: [cost.md](cost.md), [Dockerfile](../../Dockerfile), [docs/deploy.md](../deploy.md),

@@ -4,7 +4,10 @@ Stan na 22.11.2026, gałąź `main` (commit `1aa173f`). Brief zadania w rozdzial
 hackathonie pięć etapów. Przy każdym piszemy, co już jest w repozytorium, czego brakuje i ile pracy
 to według nas zajmie. Pracochłonność podajemy w osobodniach jednej osoby z zespołu. To szacunek, nie
 pomiar, i zespół potwierdza go przed rozmową z MSZ. Numery z krzyżykiem (#74) to zgłoszenia w
-[repozytorium](https://github.com/00200200/HackNation2026/issues).
+[repozytorium](https://github.com/00200200/HackNation2026/issues). Stan kodu opisujemy dla
+buildu `integration/r3`, na którym oprzemy wdrożenie. Gdy coś jest tylko tam, a nie na `main`,
+piszemy to przy danym zdaniu. #100 (krótkie klucze Fact Check i mapa ocen) i #116 (adapter
+demo `/czat`) nie są jeszcze scalone i nie wchodzą w ten opis.
 
 ## Tryb pracy: wsparcie decyzji, publikację zatwierdza człowiek
 
@@ -17,13 +20,17 @@ Część tego działa już dziś:
 - Model nie rozstrzyga, co jest prawdą. Wyodrębnia twierdzenia i oznacza cytaty, a werdykt wylicza
   funkcja `judge.decide()` z dowodów, których cytat znaleźliśmy dosłownie w źródle
   ([prawdowid/judge.py](../../prawdowid/judge.py), [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md)).
-- Każda odpowiedź pokazuje tytuł źródła, wydawcę, datę publikacji i pobrania, link i cytat. Pokazuje
-  też, czego nie udało się ustalić ([frontend/public/app.js](../../frontend/public/app.js)).
+- Gdy odpowiedź ma dowody, pokazuje przy nich tytuł źródła, wydawcę, link i cytat oraz daty
+  publikacji i pobrania, o ile je znamy: strona bez daty publikacji jest dopuszczona (#95), a
+  odpowiedź bez dowodów nie ma żadnego źródła do pokazania. Pokazuje też, czego nie udało się
+  ustalić ([frontend/public/app.js](../../frontend/public/app.js)).
 - Bez dowodów odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji”. Gdy padną wszystkie
   źródła twierdzenia albo skończy się czas, twierdzenie dostaje „nie sprawdzono” z powodem, a
-  awaria modelu daje komunikat techniczny ([prawdowid/pipeline.py](../../prawdowid/pipeline.py#L137)).
-  Luka: gdy padnie tylko część źródeł, a reszta nic nie znajdzie, wynik brzmi dziś „brak
-  wystarczających dowodów” z dopiskiem, które źródło nie odpowiedziało (#60, poprawka w PR #109).
+  awaria modelu daje komunikat techniczny ([prawdowid/pipeline.py](../../prawdowid/pipeline.py#L14)).
+  Dotyczy to także awarii samego źródła, które może rozstrzygnąć werdykt (Fact Check albo
+  wyszukiwarka), gdy dowodów nie starcza (#60). Ta reguła jest w `integration/r3` (PR #109), a na
+  `main` jeszcze jej nie ma: tam taki wynik brzmi „brak wystarczających dowodów” z dopiskiem, które
+  źródło nie odpowiedziało.
 - Każde sprawdzenie zostawia jeden zamaskowany wpis w dzienniku: pytanie, czas, źródła, werdykty,
   czasy kroków, wywołania modelu i koszt ([prawdowid/checklog.py](../../prawdowid/checklog.py),
   [docs/privacy.md](../privacy.md)). Ekspert ma z czego odtworzyć, skąd wzięła się odpowiedź.
@@ -39,9 +46,11 @@ Na start proponujemy bezpieczeństwo podróży. To propozycja zespołu do uzgodn
 po stronie ministerstwa: korpus ma już 239 profili krajów z serwisu Odyseusz, każdy z aktualnym
 komunikatem i poziomem ostrzeżenia ([docs/corpus.md](../corpus.md)). Na pytanie „Czy MSZ odradza
 podróże do...?” istnieje jedna urzędowa odpowiedź, więc łatwo sprawdzić, czy narzędzie ją podaje.
-Tylko że dziś sprawdzanie nie czyta jeszcze korpusu (#74). Odyseusz to aplikacja w przeglądarce, a
-jego profile czyta tylko budowa korpusu, przez JSON serwisu. Dowody z Odyseusza takie pytanie
-dostanie więc dopiero po #74. To pierwsza praca etapu 2.
+W buildzie `integration/r3` każde sprawdzenie przeszukuje korpus (#74, BM25 po `corpus/evidence.jsonl`,
+w tym 251 dokumentów z Odyseusza). Na `main` korpusu jeszcze nie czyta. Nie mierzyliśmy, czy pytanie
+o podróż faktycznie trafia na właściwy profil kraju i czy cytat z niego przechodzi sędziego:
+`citation_correctness` jest niezmierzone, a tego pytania nie ma w zestawie testowym. To pierwsza
+praca etapu 2.
 
 ## Etap 1. Odtworzenie wyników, przegląd licencji, bezpieczeństwa i architektury
 
@@ -108,15 +117,16 @@ Co już jest:
 
 Czego brakuje:
 
-- Wyszukiwanie w korpusie nie jest podpięte do `verify()` (#74). Dziś odpowiedzi biorą dowody z
-  Google Fact Check, EUvsDisinfo, wyszukiwarki www.gov.pl i Tavily.
+- Pomiaru, że korpus poprawia odpowiedzi. Wyszukiwanie w nim jest podpięte do `verify()` w
+  `integration/r3` (#74), ale nie ma jeszcze pełnego przebiegu na tym stanie (#16). Odpowiedzi
+  biorą dowody z Google Fact Check, EUvsDisinfo, wyszukiwarki www.gov.pl, Tavily i korpusu.
 - Trybu „tylko zamknięty korpus”, który na czas pilotażu wyłącza otwartą wyszukiwarkę. Dziś osobnym
   przełącznikiem da się wyłączyć tylko wyszukiwarkę gov.pl (`PRAWDOWID_GOVPL=0`).
 - Kolejki eksperta i zatwierdzania publikacji (opis wyżej, #79).
 - Harmonogramu odświeżania szybkich źródeł urzędowych na serwerze (#90).
 - Drogi, która zamienia poprawki eksperta w nowe przypadki testowe.
 
-Szacunek: 8-11 osobodni (#74: 1-2, tryb zamkniętego korpusu: 1, kolejka z zatwierdzaniem: 4-6,
+Szacunek: 8-11 osobodni (pomiar korpusu po #74: 1-2, tryb zamkniętego korpusu: 1, kolejka z zatwierdzaniem: 4-6,
 #90: 1, poprawki jako przypadki testowe: 1). Do tego sam pilotaż, od 4 do 6 tygodni z ekspertami MSZ.
 
 ## Etap 3. Red team, ochrona danych, dostępność i konsultacje z użytkownikami
@@ -140,8 +150,9 @@ Czego brakuje:
 
 - Zewnętrznego red teamu. Mamy tylko własne przypadki, a wzorce wykrywania pisaliśmy, znając
   pierwsze trzy przypadki E ([WORKLOG](../../WORKLOG.md), wpis do #15). Potrzebne są przypadki,
-  których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej jeszcze się nie
-  uruchamiają (#94), a sprawdzanie pobranych źródeł czeka w PR #72.
+  których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures w
+  `integration/r3` (#94), ale eval z nimi jeszcze nie był uruchomiony (brak kluczy w tym klonie). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
+  `integration/r3`, nie w `main`.
 - Oceny skutków dla ochrony danych (DPIA) z inspektorem ochrony danych MSZ i umów powierzenia z
   dostawcami. Maskowanie nie łapie numerów dowodów, paszportów i części formatów telefonu (#82).
   Discord nie ma polecenia usuwania, a logi `stdout` Dockera są poza 30-dniową retencją
@@ -171,8 +182,8 @@ Czego brakuje:
 - Procedury korekt. Nie ustaliliśmy, kto poprawia błędną odpowiedź, w jakim czasie i gdzie wisi
   rejestr poprawek.
 - Kanału zgłoszeń. Przy odpowiedzi nie ma przycisku „zgłoś błąd”.
-- Trwałości. Dziennik sprawdzeń znika przy każdym wdrożeniu, bo nie ma wolumenu (#70, poprawka w
-  PR #109). Baza nie ma
+- Trwałości. Dziennik sprawdzeń znika przy każdym wdrożeniu, bo nie ma wolumenu (#70, wolumen
+  w PR #109, w `integration/r3`). Baza nie ma
   automatycznych kopii zapasowych, a serwer jest jeden, bez zapasowego ([docs/deploy.md](../deploy.md),
   sekcja „Known limits”).
 
@@ -220,7 +231,7 @@ Tytuł slajdu: Pilotaż z MSZ w pięciu etapach
 | Etap | Już jest | Brakuje |
 |---|---|---|
 | 1. Odtworzenie i przegląd | `make up`, 547 testów, eval z metrykami jury, rejestr ryzyk | licencji repo, SBOM, CI |
-| 2. 4-6 tygodni na zamkniętym korpusie | 1158 dokumentów z 11 domen, wyszukiwanie lokalne | podpięcia korpusu (#74), kolejki eksperta (#79) |
+| 2. 4-6 tygodni na zamkniętym korpusie | 1158 dokumentów z 11 domen, wyszukiwanie lokalne | pomiaru korpusu (#74 jest w `integration/r3`), kolejki eksperta (#79) |
 | 3. Red team, dane, dostępność | scenariusz E, maskowanie, 30 dni, usuwanie sesji | zewnętrznego red teamu, DPIA, audytu WCAG, konsultacji |
 | 4. Ograniczone wdrożenie | faktczyfejk.pl na serwerze w UE, dziennik sprawdzeń | alertów, procedury korekt, przycisku „zgłoś błąd” |
 | 5. Nowe kanały i źródła | bot Discord w kodzie, na tym samym API; hook z testami i kontrolą evalu przed pushem | bota na produkcji (#59), WhatsApp i SMS, CI, progów uzgodnionych z MSZ |

@@ -67,8 +67,11 @@ PDF i film nie są częścią tego pliku.
 - Zapisany szybki test na `95e6177`: `median_latency_s: 3.8964525419287384`,
   `cost_per_100_usd: 1.8220444444444441`. Ta wersja wołała model raz, tylko do wyodrębnienia
   twierdzeń, bez sędziego i bez Tavily. 1,82 USD za 100 to więc koszt samego wyodrębniania.
-- Pełny potok, jeden przebieg z 21.11 na 8 przypadkach: modele 0,0525 USD i około 4,9 kredytu
-  Tavily na sprawdzenie. 1000 sprawdzeń kosztuje od 76,88 do 91,50 USD, czyli od 312 do 372 zł.
+- Pełny potok, szybki przebieg `edd34a5` na 10 przypadkach: modele 0,0491 USD (górna granica, bo od
+  #88 wyodrębnianie idzie na tańszym Sonnecie), do tego około 4,9 kredytu Tavily na sprawdzenie
+  (przebieg z 21.11). Konto Tavily: plan Researcher z opłatą za zużycie, 1000 kredytów za darmo,
+  potem 0,008 USD. 1000 sprawdzeń kosztuje 80,10 USD, czyli 325 zł, ale limit konta (4000
+  kredytów) starcza na około 820 sprawdzeń.
   Obywatel płaci 0 zł.
 - Serwer i domena: około 42,77 zł miesięcznie. Zachowania pod obciążeniem nie mierzyliśmy (#88).
   Ostateczne liczby: z pełnego evalu (#16). [Założenia i rachunek](cost.md).
@@ -88,7 +91,8 @@ PDF i film nie są częścią tego pliku.
 ## Slajd 11. Ograniczenia
 
 - DuckDuckGo zastąpiono Tavily po problemach z wynikami. Korpus 1158 dokumentów jest zbudowany, ale
-  jeszcze nie jest podpięty do sprawdzania (#74).
+  jest w buildzie `integration/r3` podpięty do sprawdzania (#74), ale nie zmierzyliśmy jego wpływu na
+  jakość.
 - Baza incydentów organizatora jest wpięta, ale pusta (plik od organizatora jeszcze nie dotarł).
 - Prawa do przechowywania wybranych treści wymagają rozstrzygnięcia; w Discordzie brak komendy usuwania sesji.
 - Nie pokazujemy rozpoznawania obrazów ani kolejki moderatora jako gotowych funkcji.

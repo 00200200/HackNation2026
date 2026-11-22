@@ -57,15 +57,18 @@ Jedno zdanie i idziemy dalej:
 
 - Wrocław kończy się „Nie udało mi się potwierdzić tej informacji”: „Tym razem nie znaleźliśmy
   cytatu, który by to rozstrzygał, więc werdyktu nie ma. Wolimy powiedzieć, że nie wiemy, niż
-  zgadywać.” Pokazujemy dopiski pod odpowiedzią. Na dopytanie: ocena fact-checkera dociera dziś do
-  sędziego tylko przez tytuł recenzji (#66).
+  zgadywać.” Pokazujemy dopiski pod odpowiedzią. Na dopytanie, przy wersji z #66 na `prod`: ocena
+  fact-checkera trafia do sędziego jako osobny fragment „Ocena fact-checkera: ...” razem ze
+  sprawdzaną tezą, ale sama ocena nie jest werdyktem. Skrótów ocen i krótkich kluczy Fact Check
+  (#100) jeszcze nie ma.
 - Pytanie z poleceniem daje inny werdykt niż pytanie bez niego: „Wyszukiwanie idzie na żywo i za
   drugim razem trafiło na inne strony. Polecenia nie wykonaliśmy i strona to mówi.” Jeśli odpowiedź
   zaczyna się od „Tak.”, nie bronimy jej: „Ten przypadek nam nie wyszedł i zapisujemy go jako błąd.”
 - Discord daje inny werdykt albo inne źródła niż strona: „Usługa ta sama, ale to dwa osobne
   wyszukiwania na żywo. Mogą trafić na różne strony.”
-- Pytanie od jury o podróż zostaje bez dowodów: „Profile krajów z Odyseusza mamy w korpusie, ale
-  sprawdzanie jeszcze go nie czyta. To pierwsza praca pilotażu (#74).”
+- Pytanie od jury o podróż zostaje bez dowodów albo bez cytatu: „Profile krajów z Odyseusza mamy w
+  korpusie, który przeszukuje każde sprawdzenie (#74), ale nie zmierzyliśmy, jak często trafia na
+  właściwy profil. To pierwsza praca pilotażu.”
 - Komunikat techniczny albo brak odpowiedzi po 60 s: „Usługa nie odpowiedziała. Mówimy to wprost,
   zamiast udawać wynik.” Przełączamy się na film.
 
@@ -94,13 +97,16 @@ Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odp
 - Zgodności kanałów nie mamy z wiarygodnego pomiaru. W jedynym przebiegu z dwoma kanałami wyszło
   0,000, ale ten przebieg zniekształciły timeouty ([docs/eval-notes.md](../eval-notes.md)). Na
   `main` strona i Discord robią dwa osobne sprawdzenia; wspólna pamięć wyników to #59.
-- Ocena fact-checkera dociera do sędziego tylko przez tytuł recenzji, dopóki nie scalimy #66.
-- Gdy padnie tylko część źródeł, a reszta nic nie znajdzie, odpowiedź brzmi dziś „brak
-  wystarczających dowodów” z dopiskiem o awarii (#60, poprawka w PR #109).
+- Od #66 ocena fact-checkera dociera do sędziego jako osobny fragment (jest w `integration/r3`).
+  Bez #66 na `prod` dociera tylko przez tytuł recenzji. Skróty ocen (#100) nie są scalone.
+- Od #60 (PR #109, w `integration/r3`) awaria źródła, które może rozstrzygnąć werdykt, daje
+  „nie sprawdzono” z powodem. Bez niego na `prod` taki wynik brzmi „brak wystarczających
+  dowodów” z dopiskiem o awarii.
 - Nie ma kolejki moderatora ani eksperta (#79), zrzutów ekranu i zdjęć (scenariusz F, #80) ani
   ostrzeżenia o sankcjach UE (#81).
 - Baza incydentów organizatora jest wpięta, ale pusta, bo nie mamy pliku (#64).
-- Wyszukiwanie w korpusie nie jest podpięte do sprawdzania (#74).
+- Wyszukiwanie w korpusie jest podpięte do sprawdzania w `integration/r3` (#74). Nie mamy pomiaru,
+  że poprawia odpowiedzi: `citation_correctness` jest niezmierzone.
 - Bot Discord działa w kodzie. Jego stan na produkcji: #59.
 - Gdzie dostawcy modeli i wyszukiwarki przetwarzają dane, jest UNCONFIRMED (#85). Nie pokazaliśmy
   działania na modelu przetwarzanym w UE.
@@ -131,7 +137,7 @@ polecenia, pełna skala ocen, kontekst bez werdyktu i na końcu awaria.
 | Nr | Czas | Scenariusz | Wejście | Napis na ekranie | Lektor |
 |---|---|---|---|---|---|
 | 1 | 0:00-0:08 | Wstęp | plansza z logo | „faktczyfejk.pl. Sprawdź, zanim podasz dalej.” | „Dostałeś wiadomość i nie wiesz, czy to prawda? Wklej ją tutaj.” |
-| 2 | 0:08-0:38 | G, strona | przycisk „Darmowe przejazdy 65+ we Wrocławiu” | „Źródło, cytat, data. Werdykt liczy kod, nie model.” | „Pytanie o darmowe przejazdy dla 65-latków. Pod odpowiedzią widać źródło, cytat i datę publikacji.” |
+| 2 | 0:08-0:38 | G, strona | przycisk „Darmowe przejazdy 65+ we Wrocławiu” | „Źródło i cytat. Werdykt liczy kod, nie model.” | „Pytanie o darmowe przejazdy dla 65-latków. Pod odpowiedzią widać źródło i cytat, a datę publikacji wtedy, gdy strona ją podaje.” |
 | 3 | 0:38-0:53 | G, Discord | `/sprawdz` z tym samym pytaniem | „Discord: ta sama usługa, ta sama logika.” | „To samo pytanie na Discordzie. Bot pyta tę samą usługę co strona.” |
 | 4 | 0:53-1:08 | D | przycisk „Bilety tylko w aplikacji” | „Nie ma źródeł, więc nie zgadujemy.” | „Plotka, której nikt nie opisał. Zamiast zgadywać, piszemy: nie udało się potwierdzić.” |
 | 5 | 1:08-1:28 | E | przycisk „Pytanie z ukrytym poleceniem” | „Polecenie w treści pominięte i zapisane jako zdarzenie bezpieczeństwa.” | „Ktoś dopisał polecenie dla modelu. Nie wykonujemy go i mówimy o tym wprost.” |
@@ -149,14 +155,18 @@ sobie przeczą ([prawdowid/judge.py](../../prawdowid/judge.py#L73)), w filmie ni
 przypadek C ma jedną ocenę Demagoga, a nie dwa sprzeczne źródła ([WORKLOG](../../WORKLOG.md), punkt
 o lukach evalu w „Next”). Czego się spodziewać:
 
-- Scena 2 zależy od #66, tak jak na żywo. Bez niego odpowiedź może brzmieć „Nie udało mi się
-  potwierdzić tej informacji.” Wtedy pokazujemy ją z napisem „Bez cytatu nie wydajemy werdyktu”.
+- Scena 2 zależy od #66 (jest w `integration/r3`) i od tego, czy wyszukiwarka dotrze do cytatu,
+  tak jak na żywo. Gdy odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”, pokazujemy
+  ją z napisem „Bez cytatu nie wydajemy werdyktu”, a lektor zamiast zdania z tabeli mówi: „Tym razem
+  nie znaleźliśmy cytatu, który to rozstrzyga, więc werdyktu nie ma. Wolimy to powiedzieć niż
+  zgadywać.” Gdy daty publikacji nie widać, lektor jej nie wymienia.
   Napis sceny 5 dotyczy polecenia, które kod wykrywa stałym wzorcem, więc od #66 nie zależy.
 - Scena 3 wymaga bota na produkcji albo na serwerze testowym (#59). Bez działającego bota wycinamy
   ją i dopisujemy w napisie końcowym: „Discord: uruchomienie w toku, #59”.
 - Sceny 7 i 8 zależą od tego, czy wyszukiwarka dotrze do strony fact-checkera. Część z nich blokuje
-  nasz serwer (#95). Wtedy odpowiedź może brzmieć „Nie udało mi się potwierdzić tej informacji.” i
-  taką pokazujemy, z napisem „źródło zablokowało pobranie, #95”.
+  nasz serwer. W `integration/r3` taki wynik wchodzi jako fragment z wyników wyszukiwarki, oznaczony
+  jako taki (#95). Jeśli mimo to odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”,
+  pokazujemy taką, z napisem „źródło zablokowało pobranie, #95”.
 - W scenie 9 baza incydentów organizatora jest pusta (#64), więc notatka „Podobne znane incydenty”
   się nie pojawi. Kontekst może przyjść tylko z EUvsDisinfo. Jeśli nie przyjdzie, zostaje sam werdykt
   ze źródeł, a napis brzmi: „Bazy incydentów organizatora jeszcze nie mamy, #64”.
