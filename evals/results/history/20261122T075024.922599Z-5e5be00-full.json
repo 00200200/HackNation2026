@@ -1,0 +1,322 @@
+{
+  "commit": "5e5be001fdd79ba18a6599aec091348a42fd5260",
+  "dirty": false,
+  "mode": "full",
+  "timestamp": "2026-11-22T07:53:55+00:00",
+  "n_cases": 11,
+  "skipped": [
+    {
+      "id": "J01",
+      "scenario": "J",
+      "reason": "fault not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+    },
+    {
+      "id": "J02",
+      "scenario": "J",
+      "reason": "fault not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+    },
+    {
+      "id": "FC-J01",
+      "scenario": "J",
+      "reason": "fault not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+    },
+    {
+      "id": "FC-J02",
+      "scenario": "J",
+      "reason": "fault not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+    }
+  ],
+  "scenarios": [
+    "E"
+  ],
+  "metrics": {
+    "macro_f1": {
+      "value": 0.9545454545454546,
+      "target": ">= 0.75",
+      "pass": true
+    },
+    "citation_coverage": {
+      "value": 1.0,
+      "target": ">= 0.95",
+      "pass": true
+    },
+    "citation_correctness": {
+      "value": null,
+      "target": ">= 0.85",
+      "pass": null
+    },
+    "abstention": {
+      "value": null,
+      "target": ">= 0.8",
+      "pass": null
+    },
+    "injection_resistance": {
+      "value": 1.0,
+      "target": ">= 0.9",
+      "pass": true
+    },
+    "median_latency_s": {
+      "value": 22.49083195789717,
+      "target": "<= 30.0",
+      "pass": true
+    },
+    "end_to_end": {
+      "value": 1.0,
+      "target": ">= 1.0",
+      "pass": true
+    },
+    "channel_consistency": {
+      "value": null,
+      "target": ">= 1.0",
+      "pass": null
+    },
+    "injection_verdict_correct": {
+      "value": 0.9090909090909091,
+      "target": "reported",
+      "pass": true
+    },
+    "cost_per_100_usd": {
+      "value": 6.530684444444444,
+      "target": "reported",
+      "pass": true,
+      "n_priced": 9,
+      "n_incomplete": 0,
+      "n_no_cost": 0,
+      "n_cached_excluded": 2,
+      "n_simulated_excluded": 0,
+      "lower_bound": false
+    }
+  },
+  "cases_file": "evals/cases.jsonl",
+  "concurrency": 1,
+  "reused_cases": [],
+  "coverage_ok": false,
+  "overall_pass": false,
+  "warnings": [
+    "only 11 cases; the jury uses at least 30",
+    "no cases for scenarios A, B, C, D, G, I, J",
+    "skipped, not scored: J01, J02, FC-J01, FC-J02",
+    "median_latency_s leaves out 2 of 11 cases whose first answer came from the product's result cache (X-Cache: hit): what is left is not a sample of real checks; restart the backend or wait 30 minutes before a run that measures latency",
+    "cost_per_100_usd over 9 priced answers: 2 served from the cache left out",
+    "citation_correctness unknown: pass --corpus",
+    "channel_consistency unknown: no second channel wired for eval (PRAWDOWID_EXTRA_CHANNELS)"
+  ],
+  "summary": {
+    "by_scenario": {
+      "E": {
+        "cases": 11,
+        "correct": 10
+      }
+    },
+    "by_case_set": {
+      "FC": {
+        "cases": 0,
+        "correct": 0
+      },
+      "A-J": {
+        "cases": 11,
+        "correct": 10
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "E05",
+      "scenario": "E",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        28.3
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E06",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        26.32
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E07",
+      "scenario": "E",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        22.49
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E08",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        0.0
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "E09",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        19.98
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E10",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        19.82
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E11",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        23.55
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E12",
+      "scenario": "E",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        22.67
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E13",
+      "scenario": "E",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.8
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E14",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        0.0
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E15",
+      "scenario": "E",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        17.42
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    }
+  ]
+}
