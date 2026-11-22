@@ -80,6 +80,12 @@ COUNT_UNIT = re.compile(
 ID_CARD = re.compile(r"\b(?!PLN|EUR|USD|GBP|CHF)[A-Z]{3} ?\d{6}\b")
 # Shape only, no check digit: UNCONFIRMED, two unofficial sources disagree on where it sits (3rd or last
 # character). A space is not allowed, "nr 1234567" is an ordinary phrase (lower case never matches either).
+# A product code is public and is not a card: a label in front of it, or a URL around it.
+PRODUCT_LABEL = re.compile(
+    r"\b(?:ean|gtin|upc|sku|kod\w*|numer\w*|nr|partii|lot|id)\W{0,3}"
+    r"(?:(?:kreskow\w*|produktu|partii|seryjn\w*|katalogow\w*)\W{0,3})?$",
+    re.IGNORECASE,
+)
 PASSPORT = re.compile(r"\b[A-Z]{2}\d{7}\b")
 # Digit boundaries, not \b: "PESEL44051401359" has no word boundary before the digits.
 ELEVEN_DIGITS = re.compile(r"(?<!\d)\d{11}(?!\d)")
@@ -190,13 +196,35 @@ def mask_personal_data(text: str) -> str:
     text = ID_CARD.sub(_mask_id_card, text)
     text = PASSPORT.sub("[numer paszportu]", text)
     # ponytail: a 13+ digit run that passes Luhn (1 in 10) is masked even if it is an amount;
-    # amounts that large are rare in claims and usually written in groups of three.
-    return CARD.sub(_masker(_is_card, "[numer karty]"), text)
+    # amounts that large are rare in claims and usually written in groups of three. A product code
+    # (label, URL or EAN-13 check digit) stays: `_mask_card`.
+    return CARD.sub(_mask_card, text)
 
 
 def _is_card(text: str) -> bool:
     digits = _digits(text)
     return 13 <= len(digits) <= 19 and is_luhn(digits)
+
+
+def is_gtin13(digits: str) -> bool:
+    """GS1 check digit of an EAN-13: weights 1, 3, 1, 3 ... over the first 12 digits."""
+    if len(digits) != 13:
+        return False
+    total = sum(int(d) * (3 if i % 2 else 1) for i, d in enumerate(digits[:12]))
+    return (10 - total % 10) % 10 == int(digits[12])
+
+
+_mask_luhn = _masker(_is_card, "[numer karty]")
+
+
+def _mask_card(m: re.Match) -> str:
+    # ponytail: a 13-digit run with a valid EAN check digit is a product code, not a card (13-digit
+    # cards are nearly extinct); so is any number after a product label or inside a URL.
+    before = m.string[max(m.start() - 60, 0) : m.start()]
+    code = m.group()
+    if PRODUCT_LABEL.search(before) or URL_TAIL.search(before) or is_gtin13(code):
+        return code
+    return _mask_luhn(m)
 
 
 class MaskingFilter(logging.Filter):

@@ -21,7 +21,7 @@ from fastmcp import Client
 from corpus.catalog import Source
 from corpus.extract import plain_text
 from corpus.http import Blocked, FetchError, PoliteClient
-from corpus.schema import Doc, clip, parse_date, registered_domain
+from corpus.schema import Doc, clip, mask_personal, parse_date, registered_domain
 from corpus.sources.base import PLATFORMS, Stopped, make_doc
 
 log = logging.getLogger("corpus")
@@ -56,7 +56,7 @@ def review_docs(
     claimant is not kept: it is often a private account."""
     docs = []
     for claim in claims:
-        claim_text = " ".join(str(claim.get("text") or "").split())
+        claim_text = mask_personal(" ".join(str(claim.get("text") or "").split()))
         for review in claim.get("claimReview") or []:
             publisher = (review.get("publisher") or {}).get("name")
             url = review.get("url") or ""
@@ -150,7 +150,8 @@ def disinfo_domains(cases: list[dict]) -> dict[str, int]:
 
 
 def case_doc(source: Source, case: dict, retrieved_at: str) -> Doc | None:
-    claim, fact = plain_text(case.get("claim")), plain_text(case.get("fact"))
+    claim = mask_personal(plain_text(case.get("claim")))
+    fact = mask_personal(plain_text(case.get("fact")))
     if not (case.get("url") and case.get("title") and claim):
         return None
     published = None

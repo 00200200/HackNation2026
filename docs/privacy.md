@@ -16,7 +16,7 @@ brief section 5).
 | PESEL | 11 digits with a valid checksum | `[PESEL]` |
 | ID card number | 3 capital letters and 6 digits, with or without a space (`ABC123456`, `ABC 123456`), check digit valid | `[numer dowodu]` |
 | Passport number | 2 capital letters and 7 digits, no space (`AB1234567`) | `[numer paszportu]` |
-| Card number | 13–19 digits, in one run or groups of four, Luhn valid | `[numer karty]` |
+| Card number | 13–19 digits, in one run or groups of four, Luhn valid; not after a product label (EAN, GTIN, kod kreskowy, numer partii), not inside a URL, not a 13-digit run with a valid EAN-13 check digit | `[numer karty]` |
 
 It does not detect names or addresses. Names of public figures stay on purpose: the mentor's guidance
 (Discord, 21.11) is to mask PESEL, ID card and phone numbers, but not what changes the meaning of the
@@ -38,7 +38,7 @@ question or is needed to find evidence. For the same reason ordinary numbers sta
   happens to pass the check digit (`NFZ 100000 zł`, `GUS 550000 osób`) and a phrase such as `nr 1234567`
   (a passport number has no space and capital letters).
 
-What this can get wrong: a random 11-digit number passes the PESEL checksum 1 time in 10 and a random
+What this can get wrong: a 14 to 19 digit product or document id that passes Luhn (1 in 10) and has no label or URL around it is masked as a card; a random 11-digit number passes the PESEL checksum 1 time in 10 and a random
 3-letters-6-digits code passes the ID card check digit 1 time in 10, so both are sometimes masked
 although they are not personal data. The passport pattern has no check digit: UNCONFIRMED, the two
 unofficial descriptions we found put it in different places (3rd or last character). So any 2 capital
@@ -69,6 +69,7 @@ Where masking runs:
 | Text sent to Claude for claim extraction (`verifier.verify_text`), pasted text and the text of a linked page | yes | A placeholder keeps the sentence, so claims still split. A claim about the personal data itself (for example "this account belongs to the charity") can no longer be checked from the number, which is the point. The claim and source sentence shown to the user carry the placeholder. |
 | Everything after extraction (`prawdowid/pipeline.py`, #11): web search, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`) and database queries (`cache.build_tsquery`) are masked again. |
 | Check log record (`checklog.record`) | yes | The question, the claims, the unchecked claims and the source URLs are masked again when the record is written, so a call site that forgets to mask cannot leak into the log. |
+| Evidence corpus (`corpus/evidence.jsonl`, `prawdowid/corpus_bm25.py`) | yes, at build time | `corpus.sources.base.make_doc` masks title, text, claim and rating (`corpus.schema.mask_personal`) before a record exists, and `make corpus-check` fails on anything `mask_personal_data` would still change. Public switchboard numbers are masked too. Git history keeps the pre-22.11 record with a named person's mobile number (#112/#113: history decision open). |
 | stdout log lines | yes | No raw user text: session id, channel, status, lengths, token counts, and the claims and search queries of each check (written by the model from the masked text, so a name can still appear). Link URLs are masked (an e-mail in a query string), fetch errors are logged by type only. On top of that, every line of the `prawdowid` and `prawdowid.discord` loggers, tracebacks included, goes through `privacy.MaskingFilter` (set in `prawdowid/app.py` and `prawdowid/discord_bot.py`; uvicorn's own error log is not covered), so an unexpected exception that carries raw input is masked too. |
 | The link itself, when it is fetched | no | We need the real address to fetch the page. |
 | Evidence fragments from source pages | no | They are public pages, and the quote must match the page word for word. |

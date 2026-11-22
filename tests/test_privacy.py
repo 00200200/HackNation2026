@@ -525,6 +525,26 @@ def test_amounts_years_statutes_and_ids_in_urls_stay(text):
     assert mask_personal_data(text) == text
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Kod kreskowy: 5905784304458",  # EAN-13 passes Luhn too
+        "EAN 5900000000015",
+        "Nr partii: 4111111111111",  # a label beats the card shape
+        "https://example.eu/doc?qid=4111111111111",
+        "5905784304458",  # a valid GS1 check digit, no label
+    ],
+)
+def test_product_codes_are_not_cards(text):
+    assert mask_personal_data(text) == text
+
+
+def test_a_card_number_is_still_masked_next_to_a_product_code():
+    assert mask_personal_data("Karta 4111111111111111, EAN 5905784304458") == (
+        "Karta [numer karty], EAN 5905784304458"
+    )
+
+
 def test_names_of_public_figures_stay():
     text = "Donald Tusk powiedział, że Karol Nawrocki zawetował ustawę w 2025 roku."
     assert mask_personal_data(text) == text

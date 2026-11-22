@@ -13,6 +13,8 @@ from typing import Literal
 import tldextract
 from pydantic import BaseModel, field_validator
 
+from prawdowid.privacy import mask_personal_data
+
 SourceType = Literal["official", "fact_checker", "incident_base"]
 Storage = Literal["full_text", "excerpt"]
 
@@ -63,8 +65,15 @@ def clip(text: str, limit: int) -> tuple[str, bool]:
     return cut + "…", True
 
 
-def mask_emails(text: str) -> str:
-    return EMAIL_RE.sub(EMAIL_MASK, text)
+def mask_personal(text: str) -> str:
+    """Corpus text is masked before it is written: e-mail addresses, then the identifiers of
+    `prawdowid.privacy` (phone numbers, PESEL, ID card, passport, account and card numbers).
+    Names are not touched (docs/privacy.md)."""
+    # One pass is not always final: a masked passport in front of a mobile number hides it from the
+    # phone rule until the second pass. Repeat until the text stops changing.
+    while (masked := mask_personal_data(EMAIL_RE.sub(EMAIL_MASK, text))) != text:
+        text = masked
+    return text
 
 
 def parse_date(value: str | None) -> str | None:
