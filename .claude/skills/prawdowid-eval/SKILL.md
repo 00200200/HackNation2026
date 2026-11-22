@@ -53,14 +53,15 @@ only the latest one. `--note "<text>"` fills that row's notes column. **Read `ev
 runs are distorted (timeouts, missing keys, a too-tight time budget). On a merge conflict in `HISTORY.md` from
 parallel branches each appending a run, keep both rows (same rule as `WORKLOG.md`).
 
-## Provenance, leakage check and held-out split
+## Provenance, leakage check and FC-* split
 
 Write and label cases from sources (fact-check rating, official page, dated quote in `source`), never from what our
-system answered. `FC-*` cases were written by a different person and never used while tuning: they are the held-out
-set. `tests/test_eval_leakage.py` (part of `make check`) fails if a case input or a quote from a `source` field
-(word 8-grams, case, whitespace and quotes folded), a case id or a canary string appears under `prawdowid/`; never
-paste case text into prompts, rules or product fixtures. After a run, `uv run python -m evals.split_report
-[results.json]` prints the same metrics for FC-* and for the rest; report both, and trust FC-* more.
+system answered. `FC-*` is a second slice written apart from A-J, but it is NOT a verified held-out set
+(UNCONFIRMED; FC-E01..E03 are matched by the injection patterns, see `docs/eval-notes.md`). `tests/test_eval_leakage.py`
+(part of `make check`) fails if a case input or a quote from a `source` field (word 8-grams, case and punctuation
+folded), a case id or a canary string appears under `prawdowid/` or `frontend/`; only the web example chips are
+exempt. Never paste case text into prompts, rules or product fixtures. After a run, `uv run python -m
+evals.split_report [results.json]` prints the same metrics as `evals.run` for FC-* and for the rest; report both.
 
 ## Product contract and how the eval maps it
 

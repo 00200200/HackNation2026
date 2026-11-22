@@ -1,8 +1,8 @@
-"""Print the same metrics for the held-out FC-* cases and for the rest of the set.
+"""Print metrics for the FC-* cases and for the rest of the set, with the definitions of evals.run.
 
-FC-* cases were written by a different person and never used while tuning, so they are the closer
-estimate of the jury's hidden comparison set. Reads a results JSON (default
-evals/results/latest.json); does not run anything.
+Errored calls count as wrong (`status:technical_error`) and their time counts toward latency, exactly
+as in evals.run.score and evals.run.summarize. Provenance of the FC-* set is UNCONFIRMED, see
+docs/eval-notes.md. Reads a results JSON (default evals/results/latest.json); runs nothing.
 
     uv run python -m evals.split_report [path/to/results.json]
 """
@@ -18,29 +18,37 @@ from evals import metrics
 DEFAULT = Path(__file__).parent / "results" / "latest.json"
 
 
+ERRORED = "status:technical_error"
+
+
 def split(rows: list[dict]) -> dict[str, list[dict]]:
-    held_out = [r for r in rows if str(r["id"]).startswith("FC-")]
+    fc = [r for r in rows if str(r["id"]).startswith("FC-")]
     rest = [r for r in rows if not str(r["id"]).startswith("FC-")]
-    return {"FC-* (held out)": held_out, "rest": rest}
+    return {"FC-*": fc, "rest": rest}
+
+
+def label(row: dict) -> str:
+    """Expected label; old result files lack `expected_label`, so mirror evals.run.expected_label."""
+    if row.get("expected_label"):
+        return row["expected_label"]
+    expected = row.get("expected")
+    return expected if expected in metrics.VERDICTS else f"status:{expected or 'ok'}"
+
+
+def first_prediction(row: dict) -> str:
+    return (row.get("predicted") or [ERRORED])[0]
 
 
 def group_metrics(rows: list[dict]) -> dict:
-    """Metrics from per-case rows; `predicted` and `seconds` hold one entry per channel run."""
-    scored = [r for r in rows if not r.get("errors") and r.get("predicted")]
+    """Per-case rows to metrics; `predicted` and `seconds` hold one entry per channel run."""
     labelled = [
-        (r["expected"], r["predicted"][0])
-        for r in scored
-        if r["expected"] in metrics.VERDICTS
+        (label(r), first_prediction(r)) for r in rows if label(r) in metrics.VERDICTS
     ]
+    correct = [not r.get("errors") and first_prediction(r) == label(r) for r in rows]
     return {
         "cases": len(rows),
-        "errored": len(rows) - len(scored),
-        "accuracy": metrics.rate(
-            [
-                r["predicted"][0] == r.get("expected_label", r["expected"])
-                for r in scored
-            ]
-        ),
+        "errored": sum(bool(r.get("errors")) for r in rows),
+        "accuracy": metrics.rate(correct),
         "macro_f1": metrics.macro_f1(
             [g for g, _ in labelled], [p for _, p in labelled]
         ),
@@ -48,7 +56,7 @@ def group_metrics(rows: list[dict]) -> dict:
             [p == metrics.ABSTAIN for g, p in labelled if g == metrics.ABSTAIN]
         ),
         "median_latency_s": metrics.median(
-            [s for r in scored for s in r.get("seconds", [])]
+            [s for r in rows for s in r.get("seconds", [])]
         ),
     }
 
@@ -60,12 +68,12 @@ def format_report(report: dict) -> str:
     head = f"commit {str(report.get('commit', ''))[:7]}, mode {report.get('mode')}"
     lines = [
         head,
-        f"{'group':<16}{'cases':>6}{'errored':>9}{'accuracy':>10}{'macro_f1':>10}{'abstention':>12}{'median_s':>10}",
+        f"{'group':<8}{'cases':>6}{'errored':>9}{'accuracy':>10}{'macro_f1':>10}{'abstention':>12}{'median_s':>10}",
     ]
     for name, rows in split(report["cases"]).items():
         m = group_metrics(rows)
         lines.append(
-            f"{name:<16}{m['cases']:>6}{m['errored']:>9}{fmt(m['accuracy']):>10}"
+            f"{name:<8}{m['cases']:>6}{m['errored']:>9}{fmt(m['accuracy']):>10}"
             f"{fmt(m['macro_f1']):>10}{fmt(m['abstention']):>12}{fmt(m['median_latency_s']):>10}"
         )
     return "\n".join(lines)
