@@ -1,4 +1,5 @@
-"""Discord channel: a /sprawdz slash command that sends the text to the same API as the web form.
+"""Discord channel: a /sprawdz slash command that sends the text, and an attached image if there
+is one, to the same API as the web form.
 
 No verification logic here. The bot posts to `POST /api/checks` with `X-Channel: discord`, so web
 and Discord go through the same `verify()`, and renders the returned CheckResult as Discord
@@ -9,6 +10,7 @@ Run: `make discord` (reads DISCORD_BOT_TOKEN and PRAWDOWID_API_URL from the envi
 """
 
 import asyncio
+import base64
 import io
 import logging
 import os
@@ -16,12 +18,14 @@ import re
 import sys
 import textwrap
 
+import aiohttp
 import discord
 import httpx2
 from discord import app_commands
 from discord.utils import escape_markdown, escape_mentions
 from pydantic import ValidationError
 
+from prawdowid import image_input
 from prawdowid.app import MAX_INPUT_CHARS, TECHNICAL_ERROR_MESSAGE
 from prawdowid.contract import (
     CheckedPage,
@@ -62,6 +66,14 @@ URL_TOO_LONG = "  (link za długi na wiadomość Discorda; jest w załączniku)"
 CONNECTION_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę."
 # A source we know only from the search provider's result (`Source.snippet_only` says why).
 SNIPPET_LABEL = "fragment z wyników wyszukiwarki"
+# An image attached to /sprawdz (scenario F): checked here only by its declared type and size,
+# so a file the API would refuse is not downloaded; the API checks the file itself again.
+IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
+DOWNLOAD_TIMEOUT_S = 15
+ATTACHMENT_UNREAD = (
+    "Nie udało się pobrać obrazu z Discorda. Spróbuj ponownie za chwilę."
+)
+NOTHING_TO_CHECK = "Wpisz tekst albo dołącz obraz do sprawdzenia."
 
 
 def _escape(text: str) -> str:
@@ -232,6 +244,30 @@ def _incidents(matches: list[IncidentMatch], url_limit: int | None) -> str:
 MODERATOR_NOTE = "Zgłoszenie trafiło do kolejki moderatora"
 
 
+def _image(check: CheckResult, with_limits: bool) -> list[str]:
+    """The text read from an image, above the claims: what was checked, not evidence. On a
+    notice the limitations are already listed under it."""
+    image = check.image
+    if not image or not image.text:
+        return []
+    lines = ["### Odczytany tekst", *_field("> ", image.text, "> ")]
+    if image.visible_date:
+        lines += _field("Data widoczna na obrazie: ", image.visible_date)
+    exif = ", ".join(
+        part
+        for part in (
+            image.taken_at and f"zrobiono {image.taken_at}",
+            image.camera and f"aparat {image.camera}",
+        )
+        if part
+    )
+    if exif:
+        lines += _field("Metadane EXIF: ", exif)
+    if with_limits and check.limitations:
+        lines += ["**Ograniczenia:**", *_bullets(check.limitations)]
+    return ["\n".join(lines)]
+
+
 def _moderator(check: CheckResult) -> list[str]:
     case = check.moderator_case
     return [f"{MODERATOR_NOTE} (sprawa {case.id})."] if case else []
@@ -254,7 +290,9 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
             notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
         if check.limitations:
             notice += "\n**Ograniczenia:**\n" + "\n".join(_bullets(check.limitations))
-        return "\n\n".join([notice, *warning, *_moderator(check)])
+        return "\n\n".join(
+            [notice, *_image(check, False), *warning, *_moderator(check)]
+        )
     if not check.claims and not check.unchecked_claims:
         notice = "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
         return "\n\n".join([notice, *warning, *_moderator(check)])
@@ -269,6 +307,7 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
     ]
     if check.page:
         sections.insert(0, "\n".join(_page(check.page, url_limit)))
+    sections[:0] = _image(check, True)
     sections += warning + [
         _claim(n, c, url_limit) for n, c in enumerate(check.claims, 1)
     ]
@@ -320,13 +359,17 @@ def _notice(message: str) -> CheckResult:
     return CheckResult(status=Status.TECHNICAL_ERROR, message=message)
 
 
-async def ask_api(text: str, client: httpx2.AsyncClient) -> CheckResult:
-    """The same request the web form sends. Any failure becomes a notice, never a verdict."""
+async def ask_api(
+    text: str, client: httpx2.AsyncClient, image: str | None = None
+) -> CheckResult:
+    """The same request the web form sends; `image` is base64. Any failure becomes a notice,
+    never a verdict."""
+    body = {"input": text, **({"image": image} if image else {})}
     try:
         # httpx timeouts are per read; this caps the whole call, body included.
         async with asyncio.timeout(API_TIMEOUT_S):
             resp = await client.post(
-                "/api/checks", json={"input": text}, headers={"X-Channel": CHANNEL}
+                "/api/checks", json=body, headers={"X-Channel": CHANNEL}
             )
     except (httpx2.HTTPError, TimeoutError):
         log.exception("API call failed")
@@ -347,6 +390,42 @@ async def ask_api(text: str, client: httpx2.AsyncClient) -> CheckResult:
         return _notice(TECHNICAL_ERROR_MESSAGE)
 
 
+async def read_attachment(
+    attachment: discord.Attachment,
+) -> tuple[str | None, str | None]:
+    """The attached image as base64 for the API, or the Polish reason it is not sent."""
+    declared = (attachment.content_type or "").split(";")[0].strip()
+    # No declared type: the API tells from the file itself.
+    if declared and declared not in IMAGE_TYPES:
+        return None, image_input.WRONG_TYPE
+    if attachment.size > image_input.MAX_IMAGE_BYTES:
+        return None, image_input.TOO_LARGE
+    try:
+        async with asyncio.timeout(DOWNLOAD_TIMEOUT_S):
+            data = await attachment.read()
+    # discord.py fetches the file with aiohttp and lets its network errors through.
+    except (discord.HTTPException, aiohttp.ClientError, TimeoutError):
+        log.exception("attachment download failed")
+        return None, ATTACHMENT_UNREAD
+    return base64.b64encode(data).decode(), None
+
+
+async def check_command(
+    text: str, attachment: discord.Attachment | None, client: httpx2.AsyncClient
+) -> CheckResult:
+    """What /sprawdz answers: the API's check of the text and the attached image."""
+    image = None
+    if attachment is not None:
+        image, problem = await read_attachment(attachment)
+        if problem:
+            return CheckResult(status=Status.CANNOT_CHECK, message=problem)
+    if not image:
+        if not text:
+            return CheckResult(status=Status.CANNOT_CHECK, message=NOTHING_TO_CHECK)
+        return await ask_api(text, client)
+    return await ask_api(text, client, image=image)
+
+
 async def send(interaction: discord.Interaction, text: str, **kwargs) -> None:
     await interaction.followup.send(
         text,
@@ -364,16 +443,27 @@ class Bot(discord.Client):
         self.api: httpx2.AsyncClient | None = None
         self.tree = app_commands.CommandTree(self)
 
-        @self.tree.command(name="sprawdz", description="Sprawdź twierdzenia w tekście.")
-        @app_commands.describe(tekst="Tekst do sprawdzenia")
+        @self.tree.command(
+            name="sprawdz", description="Sprawdź twierdzenia w tekście albo na obrazie."
+        )
+        @app_commands.describe(
+            tekst="Tekst do sprawdzenia",
+            obraz="Zrzut ekranu albo zdjęcie: PNG, JPEG lub WebP, do 5 MB",
+        )
         async def sprawdz(
             interaction: discord.Interaction,
-            tekst: app_commands.Range[str, 1, MAX_INPUT_CHARS],
+            tekst: app_commands.Range[str, 1, MAX_INPUT_CHARS] | None = None,
+            obraz: discord.Attachment | None = None,
         ) -> None:
             # Acknowledge within Discord's 3 s window; the check can take up to a minute.
             await interaction.response.defer(thinking=True)
-            check = await ask_api(tekst, self.api)
-            log.info("check status=%s input_chars=%d", check.status, len(tekst))
+            check = await check_command(tekst or "", obraz, self.api)
+            log.info(
+                "check status=%s input_chars=%d image=%s",
+                check.status,
+                len(tekst or ""),
+                obraz is not None,
+            )
             parts, full = reply(check)
             last = parts.pop()
             for part in parts:

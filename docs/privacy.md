@@ -97,6 +97,7 @@ Where masking runs:
 | Call site | Masked? | Why |
 |---|---|---|
 | Text sent to Claude for claim extraction (`verifier.verify_text`), pasted text and the text of a linked page | yes | A placeholder keeps the sentence, so claims still split. A claim about the personal data itself (for example "this account belongs to the charity") can no longer be checked from the number, which is the point. The claim and source sentence shown to the user carry the placeholder. |
+| An image sent with a check (`prawdowid/image_input.py`, #80) | the image: no; its text: yes, once read | Nothing can be masked before it is read, so the image goes to Anthropic as uploaded, with any metadata the file holds (a photo's EXIF can include the GPS position). The text the model reads is screened for instructions, then masked before the extraction model, the answer, the check log and any log line. Names in it stay, as in pasted text. |
 | Everything after extraction (`prawdowid/pipeline.py`, #11): web search, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`), Fact Check keys (`factcheck.keys_for`) and database queries (`cache.build_tsquery`) are masked again. |
 | Check log record (`checklog.record`) | yes | The question, the claims, the unchecked claims and the source URLs are masked again when the record is written, so a call site that forgets to mask cannot leak into the log. |
 | Evidence corpus (`corpus/evidence.jsonl`, `prawdowid/corpus_bm25.py`) | yes, at build time | `corpus.sources.base.make_doc` masks title, text, claim and rating (`corpus.schema.mask_personal`) before a record exists, and `make corpus-check` fails on anything `mask_personal_data` would still change. Public switchboard numbers are masked too. Git history keeps the pre-22.11 record with a named person's mobile number (#112/#113: history decision open). |
@@ -122,6 +123,14 @@ records of one session as stored. A check cut by the API's 60 s limit (the pipel
 normally ends it first), or one where verify raised, keeps its total latency, `error`, the notice
 and the pattern-only screening: the steps and model calls it had made are lost with the cancelled
 task.
+
+An image check (#80) stores no image: the file stays in the API's memory for the length of the
+check. The record adds `image` with the image's SHA-256 and the text read from it, masked (`text` is
+null when the image could not be read). The date taken and the camera from EXIF are shown in the
+answer and written to no log; nothing else from EXIF is read. The API's result cache (in memory, 30
+minutes, see `RESULT_CACHE_TTL_S` in `prawdowid/app.py`) keys an image check by the text and the
+image's SHA-256 and keeps its answer, read text included, like any other answer. A moderator case
+for an image sent without text and without claims keeps the masked read text as its question.
 
 ## Moderator cases
 
@@ -231,13 +240,14 @@ Nothing here was tested by sending data to a provider, and no model or eval was 
 What a processor receives is limited by the masking above: e-mail, NRB and IBAN, card, PESEL and
 phone are replaced before the model (`main` lacks ID card and passport numbers and some phone
 formats, and `integration/r4` leaves a card number after a product label such as "nr" unmasked), names and
-addresses are not.
+addresses are not. An image sent with a check (#80) is not masked at all: it goes to Anthropic as
+uploaded (the Anthropic row below), and only the text read from it is masked.
 
 ### Processors
 
 | Processor and step | What it receives | Where it processes | Retention and training | Terms |
 |---|---|---|---|---|
-| Anthropic API (Claude): extraction, rerank, judge. Every check. | Extraction: the pasted text or the text of a linked page, masked, up to 5000 characters. Rerank and judge: the masked claim and public evidence fragments. | The default `inference_geo` is `global`, and Anthropic says it may route traffic by default to select countries in the US, Europe, Asia and Australia ([where its servers are](https://privacy.claude.com/en/articles/7996890-where-are-your-servers-located-do-you-host-your-models-on-eu-servers), 15.06.2026), with storage in the US. The only other setting is `us`. The first-party API has no EU-only option. The EEA contract partner is Anthropic Ireland, transfers rest on SCCs. | The Privacy Center says inputs and outputs are deleted from the backend within 30 days (content flagged by policy checks may stay up to 2 years). The API docs say content is not retained by default except for some models (30 days). The two pages disagree: which one applies to us is UNCONFIRMED. The Commercial Terms bar training on Customer Content. | [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), [DPA](https://www.anthropic.com/legal/data-processing-addendum) (SCC modules 2 and 3), [Privacy Policy](https://www.anthropic.com/legal/privacy), [data residency](https://platform.claude.com/docs/en/manage-claude/data-residency), [retention](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data). The sub-processor list did not render: UNCONFIRMED. |
+| Anthropic API (Claude): extraction, rerank, judge. Every check. | Extraction: the pasted text or the text of a linked page, masked, up to 5000 characters. Rerank and judge: the masked claim and public evidence fragments. Image reading (#80, image checks only, `PRAWDOWID_IMAGE_MODEL`, by default the extraction model): the image file as uploaded, before any masking (nothing can be masked before it is read), with any metadata the file holds (a photo's EXIF can include the GPS position). Anthropic's [vision guide](https://platform.claude.com/docs/en/build-with-claude/vision) (FAQ, 22.11.2026) says the model itself neither parses nor receives image metadata. | The default `inference_geo` is `global`, and Anthropic says it may route traffic by default to select countries in the US, Europe, Asia and Australia ([where its servers are](https://privacy.claude.com/en/articles/7996890-where-are-your-servers-located-do-you-host-your-models-on-eu-servers), 15.06.2026), with storage in the US. The only other setting is `us`. The first-party API has no EU-only option. The EEA contract partner is Anthropic Ireland, transfers rest on SCCs. | The Privacy Center says inputs and outputs are deleted from the backend within 30 days (content flagged by policy checks may stay up to 2 years). The API docs say content is not retained by default except for some models (30 days). The two pages disagree: which one applies to us is UNCONFIRMED. The Commercial Terms bar training on Customer Content. An image is part of the prompt, so the same rules apply to it; the vision guide adds that uploaded images cannot be deleted. | [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), [DPA](https://www.anthropic.com/legal/data-processing-addendum) (SCC modules 2 and 3), [Privacy Policy](https://www.anthropic.com/legal/privacy), [data residency](https://platform.claude.com/docs/en/manage-claude/data-residency), [retention](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data). The sub-processor list did not render: UNCONFIRMED. |
 | Tavily web search (`/search`). Every checkable claim, when `TAVILY_API_KEY` is set, and the corpus builder. | The search queries the model wrote from the masked text (2 per claim), the claim sentence, one search of the claim restricted to the fact-checker domains, and the masked claim itself when the model wrote no queries (#106; there is no second search), the domain allowlist, `language=pl` and our API key. No page text: we fetch pages ourselves. A query repeated within `PRAWDOWID_SEARCH_CACHE_TTL_S` (24 hours by default) is answered from our cache and not sent again (#110). | United States: the help center says the infrastructure is primarily there, cloud provider not stated. An EU endpoint (`api.eu.tavily.com`, API in Germany, index in France) is open to selected customers only. Tavily has belonged to Nebius since 19.02.2026, and says its terms and contracting entity did not change. | No retention period is stated. With the account setting "Allow Use of Query Data" off, queries are not stored or used for improvements. Its default is not stated and we have not checked ours: UNCONFIRMED. The EU endpoint page lists zero query retention as an account setting there, not as the default; for the global endpoint it is not stated: UNCONFIRMED. Terms §6.5 let Tavily and its AI providers train on Customer Input submitted to its "AI Functionality" (§6.1: generative research tools), which does not name `/search`, so whether it covers our queries is UNCONFIRMED. §1.3 counts queries as Customer Input. §9.2 gives Tavily a perpetual, irrevocable and sublicensable licence over Customer Input, not limited to the AI Functionality, to provide and improve its services and its other products and for market and product research. Terms §8.2 bar government-issued identification numbers (a), payment card information subject to PCI DSS (i) and special categories of data (l) in Customer Input. Our masking does not detect names or health content, on `main` it does not mask ID card or passport numbers, and it can let a card number through (see the scope note at the top). | [Terms](https://tavily.com/terms) (4.05.2026), [Privacy](https://tavily.com/privacy), [GDPR and DPA](https://help.tavily.com/articles/8202749643-gdpr-dpa-security-documentation), [query data setting](https://help.tavily.com/articles/4205958832-understanding-the-allow-use-of-query-data-setting), [EU endpoint](https://www.tavily.com/eu). A DPA exists on request, whether we hold one is UNCONFIRMED. |
 | Google Fact Check Tools (`claims:search`). Every checkable claim, when `GOOGLE_FACTCHECK_API_KEY` is set. | The masked claim text, `languageCode` and our API key. Up to 8 short queries per claim instead of one (#100; `main` sends one): the claim, the names in it, quoted spans and the search queries, each masked again. | Not stated for this API. Google's privacy policy says its servers are worldwide, the EEA controller is Google Ireland. | Not stated for API requests. The API Terms let Google monitor use of the APIs to improve its products (§3.a) and use submitted information as its privacy policies say (§7.a). Training use for this API is not stated. | [API Terms](https://developers.google.com/terms), [Privacy Policy](https://policies.google.com/privacy), [controller-to-controller terms](https://business.safety.google/controllerterms/) (DPF and SCCs). There is no processor DPA. |
 | EUvsDisinfo MCP (`mcp.euvsd.info`). Every checkable claim, when `EUVSDISINFO_API_KEY` is set. | The claim text as a search query, cut to 200 characters, and our API key. | Not stated. The landing page is also served from a Vercel hostname, so Vercel hosting is likely but unstated. The operator is the EEAS East StratCom Task Force. | Not stated for MCP requests, server logs or training. | No terms found for the MCP, access is by request ([about](https://euvsdisinfo.eu/about/)). The [EEAS privacy notice](https://euvsdisinfo.eu/eeas-privacy-statement-data-protection-notice/) covers the website, newsletter and feedback, not the MCP. |
@@ -254,12 +264,13 @@ Local only: the incident base (`prawdowid/incidents.py`, a local file that recei
 ### What leaves the EEA today
 
 With the defaults every check sends data outside the EEA, or to places the providers do not state.
-Outside the EEA, by the providers' own documents: the three model steps go to Anthropic (global
+Outside the EEA, by the providers' own documents: the three model steps (four with image reading, #80) go to Anthropic (global
 processing, storage in the US) and web search goes to Tavily (US). The Discord channel adds the US
 when it runs. Location not stated, so UNCONFIRMED either way: Google Fact Check (Google's privacy
 policy says its servers are worldwide, which does not say where this API runs), EUvsDisinfo and
 www.gov.pl. A link pasted by a user also sends its URL to the site it points to. Only the VPS is
-fixed in the EEA. Extraction matters most: it is the only step that sees the user's text. Rerank and
+fixed in the EEA. Extraction matters most: it is the only step that sees the user's text, and image reading (#80), on
+the same provider by default, the only one that sees an image the user sent. Rerank and
 judge see the claims and public page fragments.
 
 ### Migration path to an EU-processed model
@@ -273,6 +284,8 @@ a plan from documentation, not a result.
    `PRAWDOWID_RERANK_MODEL` (`prawdowid/rerank.py`, default
    `anthropic:claude-haiku-5-5`) and `PRAWDOWID_JUDGE_MODEL` (`prawdowid/judge.py`, default
    `anthropic:claude-sonnet-5-5`). The three agents use native structured output and have no tools.
+   Image reading (#80) has a fourth, `PRAWDOWID_IMAGE_MODEL` (`prawdowid/image_input.py`), which
+   defaults to `PRAWDOWID_MODEL`, so moving extraction moves it too; the model must take image input.
 2. Same Claude models, in the EU: Amazon Bedrock. Anthropic's own API has no EU setting, but
    Bedrock serves Opus, Sonnet and Haiku 5.5 through EU geographic inference profiles that stay in
    EU regions (from eu-central-1: Frankfurt, Stockholm, Milan, Spain, Ireland, Paris), as the
@@ -287,17 +300,18 @@ a plan from documentation, not a result.
      `PRAWDOWID_JUDGE_MODEL=bedrock:eu.anthropic.claude-sonnet-5-5`, `AWS_DEFAULT_REGION=eu-central-1`
      and either `AWS_BEARER_TOKEN_BEDROCK` or `AWS_ACCESS_KEY_ID` with `AWS_SECRET_ACCESS_KEY`. For
      the Sonnet default of #88, set `PRAWDOWID_MODEL=bedrock:eu.anthropic.claude-sonnet-5-5`.
-   - Of the model settings and credentials, `compose.yaml` forwards only `PRAWDOWID_MODEL` and
-     `ANTHROPIC_API_KEY` to the backend, and none of the `PRAWDOWID_*_THINKING` variables (#106). Add the other two
+   - Of the model settings and credentials, `compose.yaml` forwards only `PRAWDOWID_MODEL`, the image
+     reading settings (`PRAWDOWID_IMAGE_MODEL`, `PRAWDOWID_IMAGE_TIMEOUT_S`, `PRAWDOWID_IMAGE_THINKING`, #80)
+     and `ANTHROPIC_API_KEY` to the backend, and none of the other `PRAWDOWID_*_THINKING` variables (#106). Add the other two
      model variables and the AWS ones to its `environment:` list, or they never reach the container.
    - With a current `boto3`, native structured output keeps working, because PydanticAI gives these
      model names the same profile. A `botocore` that predates Converse `outputConfig` makes our
      `NativeOutput` agents raise a `UserError` (`pydantic_ai/models/bedrock.py`), so install the
      `bedrock` extra and keep `boto3` current. AWS warns that the profile prefix alone does not
      prove where a request runs: check the routing with `GetInferenceProfile`.
-   - Bedrock ignores the `max_retries` setting that our three agents pass (PydanticAI lists it as
+   - Bedrock ignores the `max_retries` setting that our agents pass (PydanticAI lists it as
      unsupported for Bedrock and warns), so botocore's own retry defaults apply. `request_timeout`
-     (45 s for extraction, 20 s for the judge, 10 s for rerank), which PydanticAI enforces for
+     (45 s for extraction, 20 s for the judge and for image reading, 10 s for rerank), which PydanticAI enforces for
      every model, still caps each request. This is the one setting that changes behaviour; the
      move is otherwise expected to need no prompt change.
    - UNCONFIRMED: access criteria for the 5.5 models on Bedrock, their default data retention

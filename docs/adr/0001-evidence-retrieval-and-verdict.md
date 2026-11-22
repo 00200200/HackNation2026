@@ -238,7 +238,7 @@ chosen; until then they are unknown, not zero.
 | C conflicting sources | same-measure check first; a real disagreement shows both sides |
 | D no evidence | steps 9–10 |
 | E injection | step 1 detection and note in the answer, delimited data in steps 3 and 6, verbatim check in step 7 |
-| F screenshot or photo | not handled yet; the answer says that images are not supported (target in section 7) |
+| F screenshot or photo | one model call reads the text and the visible date (`prawdowid/image_input.py`, #80), screened and masked, then checked like pasted text; the answer lists what an image check cannot tell, including that the visible date does not prove the publication date (section 7) |
 | G same answer on both channels | one `verify()` for web and Discord |
 | H repeated question | moderator case with deduplication, step 10 |
 | I known incident | section 5 warning, content match as context or checked citation |

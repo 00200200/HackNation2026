@@ -420,14 +420,21 @@ decyzji.
 
 ### 19. Czy obsługujecie zrzuty ekranu i zdjęcia?
 
-Krótko: nie. Scenariusz F zostawiliśmy na później (#80) i nie udajemy, że go mamy.
+Krótko: tak, czytamy z nich tekst (#80). Nie oceniamy, czy sam obraz jest prawdziwy.
 
-Szczegóły: brief zabrania deklarowania wyszukiwania odwrotnego obrazu bez działającego API albo
-jasno ograniczonej lokalnej bazy. Nie przechowujemy obrazów, dźwięku ani wideo. Link do pliku, który
-nie jest stroną HTML ani PDF-em, dostaje prośbę o wklejenie tekstu. Plan w #80: odczytać tekst i datę
-z obrazu, a potem sprawdzać tą samą drogą co tekst.
+Szczegóły: strona (przycisk albo wklejenie do pola) i `/sprawdz` na Discordzie przyjmują PNG, JPEG
+i WebP do 5 MB. Jedno wywołanie modelu odczytuje tekst i datę widoczną na obrazie. Potem ten tekst
+idzie tą samą drogą co wklejony: wykrywanie poleceń, maskowanie danych osobowych, twierdzenia i
+źródła. Odpowiedź pokazuje odczytany tekst i mówi, czego sprawdzenie obrazu nie daje: tekst odczytał
+model, data na obrazie nie dowodzi daty publikacji, nie szukaliśmy wcześniejszych kopii obrazu i nie
+sprawdzaliśmy, czy go przerobiono. Brief zabrania deklarowania wyszukiwania odwrotnego obrazu bez
+działającego API albo jasno ograniczonej lokalnej bazy, więc go nie deklarujemy. Obrazu nie
+przechowujemy, ale do odczytu trafia w całości, z metadanymi, do Anthropic. Na żywym modelu tego nie
+uruchomiliśmy: jakość odczytu, czas i koszt na obraz nie są zmierzone, a przypadki F01 do F03 nie
+mają jeszcze przebiegu. Dźwięku i wideo nie przyjmujemy.
 
-Źródła: [docs/corpus.md](../corpus.md), [prawdowid/link.py](../../prawdowid/link.py),
+Źródła: [prawdowid/image_input.py](../../prawdowid/image_input.py),
+[docs/privacy.md](../privacy.md), [cost.md](cost.md#image-checks-scenario-f-80),
 [#80](https://github.com/00200200/HackNation2026/issues/80).
 
 ### 20. Czy możemy to uruchomić sami?

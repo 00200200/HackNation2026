@@ -3,7 +3,7 @@
 A record holds the masked question, channel, start and end time, total and per-step latency, status
 (with why a technical error happened), claims with verdicts, sources and limitations (search errors
 and abstentions show up there), model calls with tokens, cost, security events, incident ids and the
-moderator case the check joined.
+moderator case the check joined. For an image, only its SHA-256 and the masked text read from it.
 
 The question is stored masked (prawdowid/privacy.py; a link without its secret query values, see
 `masked_question`), records older than `RETENTION_DAYS` are dropped on every write, and
@@ -55,7 +55,7 @@ def record(
     """Append one check. A write failure is logged and never fails the check.
 
     `error` says why verify did not return ("timeout" or the exception class)."""
-    page = result.page
+    page, image = result.page, result.image
     entry = {
         "session": session,
         # End of the check; retention counts from it.
@@ -68,6 +68,12 @@ def record(
         "error": error,
         "message": result.message,
         "page": page and {"url": mask_personal_data(page.url), "sha256": page.sha256},
+        # Never the image itself: its hash and the text read from it, masked again here.
+        "image": image
+        and {
+            "sha256": image.sha256,
+            "text": image.text and mask_personal_data(image.text),
+        },
         "steps_ms": result.steps_ms,
         "model_calls": [m.model_dump() for m in result.model_calls],
         "cost_usd": result.cost_usd,
