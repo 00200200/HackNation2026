@@ -71,7 +71,7 @@ agencja prasowa albo baza narracji. Status IFCN albo EFCSN tych trzech fact-chec
 potwierdzenia na listach obu sieci ([docs/sources.md](../sources.md)). Do korpusu przyjmujemy urzędy
 polskie i unijne oraz fact-checkerów, których status odczytaliśmy na stronie sieci, z datą odczytu.
 21.11 odczytaliśmy dwa: Pravda jest zweryfikowanym członkiem EFCSN do 23.02.2028, a Demagog do
-25.05.2027. Decyzja z 21.11 brzmiała: Demagoga bierzemy tylko przez Google Fact Check. W `integration/r3` (#76) lista wyszukiwarki ma też demagog.org.pl, ale tylko jako fragmenty z wyszukiwarki, bo jego serwis odpowiada naszemu serwerowi 403, oraz pravda.org.pl i oko.press (media). Reszta tego pytania opisuje `main`. Dowody od tego
+25.05.2027. Decyzja z 21.11 brzmiała: Demagoga bierzemy tylko przez Google Fact Check. Na `main` (#76) lista wyszukiwarki ma też demagog.org.pl, ale tylko jako fragmenty z wyszukiwarki, bo jego serwis odpowiada naszemu serwerowi 403, oraz pravda.org.pl i oko.press (media). Dowody od tego
 samego wydawcy, z tym samym cytatem albo z tej samej agencji prasowej liczą się jako jedno źródło.
 EUvsDisinfo nigdy sam nie rozstrzyga.
 
@@ -79,7 +79,7 @@ Słabe strony: listy to decyzja zespołu i nikt z zewnątrz nie badał ich róż
 fact-checkingowa korpusu to 15 rekordów Pravdy. Dwóch z trzech fact-checkerów z listy wyszukiwarki,
 Konkret24 i AFP Sprawdzam, blokuje nasz serwer (pytanie 6).
 
-Źródła: [prawdowid/websearch.py na main](https://github.com/00200200/HackNation2026/blob/1aa173f/prawdowid/websearch.py#L52), [na integration/r3](../../prawdowid/websearch.py), [docs/sources.md](../sources.md),
+Źródła: [prawdowid/websearch.py w starszym buildzie](https://github.com/00200200/HackNation2026/blob/1aa173f/prawdowid/websearch.py#L52), [obecnie na main](../../prawdowid/websearch.py), [docs/sources.md](../sources.md),
 [corpus/catalog.yaml](../../corpus/catalog.yaml), [docs/corpus.md](../corpus.md), [risks.md](risks.md).
 
 ### 5. Jak dodajecie i wykluczacie źródła?
@@ -104,15 +104,14 @@ odświeżania na serwerze jeszcze nie ma (#90).
 
 ### 6. Polscy fact-checkerzy blokują wasz serwer. Co wtedy?
 
-Krótko: nie obchodzimy blokady. W buildzie `integration/r3` bierzemy tylko to, co zwraca
-wyszukiwarka, i oznaczamy to jako fragment z wyników (#95). Na `main`, bez #95, takie trafienie
-jeszcze wypada.
+Krótko: nie obchodzimy blokady. Na `main` bierzemy tylko to, co zwraca
+wyszukiwarka, i oznaczamy to jako fragment z wyników (#95).
 
 Szczegóły: w nocy 22.11 z naszego serwera konkret24.tvn24.pl, sprawdzam.afp.com i
 demagog.org.pl odpowiadały 403, i z naszym user agentem, i z przeglądarkowym, a oko.press i
 pravda.org.pl odpowiadały 200 (#95). Brief zabrania obchodzenia zabezpieczeń, a nasze pobieranie nigdy nie
-omija odpowiedzi 401, 403, 429 ani blokady botów. Dziś trafienie, którego strony nie da się pobrać,
-po prostu wypada na `main`, choć wyszukiwarka zwróciła jego fragment. W `integration/r3` (#95) ten
+omija odpowiedzi 401, 403, 429 ani blokady botów. Trafienie, którego strony nie da się pobrać,
+nie wypada, choć wyszukiwarka zwróciła jego fragment (#95): ten
 fragment zostaje, ale tylko gdy strona odmawia, nie odpowiada na czas, jest za duża albo nie da
 się jej odczytać. Gdy robots.txt zabrania pobrania, strona zniknęła albo wymaga logowania lub
 płatności, nie bierzemy nawet fragmentu.
@@ -122,8 +121,7 @@ Zasadę na ten przypadek zatwierdził Michał 22.11.2026 ([WORKLOG](../../WORKLO
 przekroczony czas, za duży plik, nieobsługiwany typ), dowodem staje się tytuł i fragment zwrócone
 przez wyszukiwarkę. Odpowiedź oznacza go jako „fragment z wyników wyszukiwarki; strona nie pozwala
 na pobranie”. Cytat sprawdzamy na tym fragmencie jak na każdym innym. Pełnej treści takiej strony nie
-zapisujemy i nigdy nie pobieramy jej inną drogą. Stan: #95 jest w `integration/r3` i nie
-wszedł jeszcze do `main`. Po stronie jakości: nie mierzyliśmy jeszcze, jak często taki fragment
+zapisujemy i nigdy nie pobieramy jej inną drogą. Stan: #95 jest na `main` i `prod`. Po stronie jakości: nie mierzyliśmy jeszcze, jak często taki fragment
 wystarcza do cytatu.
 
 Źródła: [#95](https://github.com/00200200/HackNation2026/issues/95),
@@ -139,7 +137,7 @@ Szczegóły: brief zabrania rozstrzygania prawdziwości na podstawie statusu źr
 ADR 0001 proponuje notatkę z aktem prawnym i datą sprawdzenia, braną tylko z urzędowego źródła UE.
 Notatka nie zmienia werdyktu ani jego siły (#81). Media objęte sankcjami nie mogą dziś być dowodem,
 bo lista domen wyszukiwarki zawiera tylko urzędy, instytucje UE i międzynarodowe, fact-checkerów,
-PAP i EUvsDisinfo (w `integration/r3` także OKO.press jako media).
+PAP i EUvsDisinfo (oraz OKO.press jako media).
 
 Źródła: [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md), sekcje 5 i 6,
 [prawdowid/websearch.py](../../prawdowid/websearch.py),
@@ -176,25 +174,23 @@ więc nie łączymy go w jeden wynik (metoda: [docs/eval-notes.md](../eval-notes
 ### 9. Co się dzieje, gdy źródło nie działa albo skończy się limit?
 
 Krótko: mówimy, co nie zadziałało. Gdy padną wszystkie źródła albo model, werdyktu nie ma. Gdy
-padnie źródło, które może rozstrzygnąć, a dowodów nie starcza, werdyktu też nie ma, ale to reguła
-z #60 z buildu `integration/r3`. Na `main` jest tu jeszcze luka i mówimy o niej wprost.
+padnie źródło, które może rozstrzygnąć, a dowodów nie starcza, werdyktu też nie ma, i to reguła
+z #60 (PR #109), obecna na `main` i `prod`. Luka z #60 jest zamknięta.
 
 Szczegóły: każde źródło ma własny limit czasu. Google Fact Check ma 15 s, EUvsDisinfo 5 s w potoku,
-jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 40 s (w
-`integration/r3`, #63; na `main` 25 s). Twierdzenie,
+jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 40 s (#63; domyślnie
+`CHECK_BUDGET_S` w `prawdowid/pipeline.py`). Twierdzenie,
 którego wszystkie źródła padły, dostaje „nie sprawdzono” z powodem. Tak samo, gdy skończy się czas
 albo nie odpowie model-sędzia. Brak klucza do modelu albo jego błąd przy wyodrębnianiu twierdzeń daje
 komunikat techniczny. Jedenaste zapytanie w ciągu minuty dostaje komunikat „Wysłano za dużo zapytań w
-krótkim czasie”. Eval ma 4 przypadki J. Na `main` dwa (FC-J01, FC-J02) pomijamy, a dwa pozostałe (J01, J02)
-liczymy bez zasymulowanej awarii, bo przełącznika awarii jeszcze nie ma (#60). W `integration/r3` jest
-przełącznik ([prawdowid/faults.py](../../prawdowid/faults.py)) i FC-J01 oraz FC-J02 działają z `simulate`.
+krótkim czasie”. Eval ma 4 przypadki J. Jest przełącznik awarii ([prawdowid/faults.py](../../prawdowid/faults.py)) i przypadki FC-J01 oraz FC-J02 działają z `simulate` (#60).
 
-Luka (#60), zamknięta w buildzie `integration/r3` (PR #109), na `main` jeszcze otwarta: gdy
-padnie tylko część źródeł, a reszta nic nie znajdzie, `main` zwraca „brak wystarczających dowodów”.
-W ograniczeniach odpowiedzi stoi wtedy, które źródło nie odpowiedziało, ale sam werdykt wygląda jak
+Luka (#60), zamknięta na `main` i `prod` (PR #109). Wcześniej, gdy
+padła tylko część źródeł, a reszta nic nie znalazła, zwracaliśmy „brak wystarczających dowodów”.
+W ograniczeniach odpowiedzi stało wtedy, które źródło nie odpowiedziało, ale sam werdykt wyglądał jak
 brak dowodów, a brief w scenariuszu J tego zabrania. Przykład: Tavily odmawia, bo skończyły się
 kredyty, co kod traktuje jak każdą awarię wyszukiwarki, a Google Fact Check odpowiada, że nic nie
-znalazł. W `integration/r3`, gdy padnie źródło, które może rozstrzygnąć (Fact Check albo
+znalazł. Teraz, gdy padnie źródło, które może rozstrzygnąć (Fact Check albo
 wyszukiwarka, dla twierdzeń rządowych także wyszukiwarka gov.pl), a dowodów nie starcza,
 twierdzenie dostaje „nie sprawdzono”. Korpus nie liczy się jako źródło, które odpowiedziało.
 
@@ -217,10 +213,10 @@ dał 0,583, a pełny przebieg na `a14b93c` 1,000 (12 przypadków; [HISTORY.md](.
 tak małej liczbie przypadków bez dowodów to wciąż mało na wniosek o zbiorze ukrytym. Do tego w szybkim przebiegu na stagingu
 22.11 (`75c1e20`) wyszukiwarka znajdowała strony, a potem je odrzucała: 102, bo
 robots.txt odpowiadał 403 (czytane jako zakaz wszystkiego), 36 bez tekstu, tytułu albo daty, 17 po
-przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 (w `integration/r3`, jeszcze nie w `main`). Pełny przebieg na `a14b93c`, który je
+przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 (na `main`). Pełny przebieg na `a14b93c`, który je
 zawiera, dał macro-F1 0,918 wobec 0,278 w szybkim przebiegu na `edd34a5`, przed #95. To dwa przebiegi na
 różnych liczbach przypadków (75 i 10), więc nie rozdzielamy, ile dała sama poprawka #95, a ile
-pozostałe zmiany. Korpus urzędowy jest w `integration/r3` podpięty do sprawdzania (#74), a jego wpływu
+pozostałe zmiany. Korpus urzędowy jest na `main` podpięty do sprawdzania (#74), a jego wpływu
 osobno nie mierzyliśmy.
 
 Źródła: [HISTORY.md](../../evals/results/HISTORY.md),
@@ -235,8 +231,8 @@ każdy przebieg do HISTORY.md i `evals/results/history/`; nie zachowaliśmy plik
 stagingowego (3,96 USD za 100) ani z pomiaru z 21.11 (5,25 USD za 100), a część wierszy HISTORY.md jest
 odtworzona.
 
-Szczegóły: nasz zestaw to na `main` 73 przypadki (41 w zestawie A-J i 32 w zestawie FC), a w `integration/r3` 86 (54 w A-J i U oraz 32 w FC).
-Rozkład scenariuszy na `main`: A 23, B 10, C 6, D 8, E 7, G 6, H 2, I 7, J 4; w `integration/r3`: A 23, B 10, C 6, D 8,
+Szczegóły: nasz zestaw to na `main` 86 przypadków (54 w A-J i U oraz 32 w FC).
+Rozkład scenariuszy: A 23, B 10, C 6, D 8,
 E 18, G 6, H 2, I 7, J 4, U 2. Etykiety pochodzą z ocen Demagoga, Konkret24,
 EUvsDisinfo i stron urzędowych, a przy każdym przypadku zapisaliśmy, skąd jest etykieta. Wyjątek to
 przypadki D01-D04 oraz H01 i H02: plotki wymyślone przez zespół, o których nikt nie pisał, więc
