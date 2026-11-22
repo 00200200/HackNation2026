@@ -123,7 +123,7 @@ retention, training use and links to the terms, is in
 | Processor | Receives | Processes in |
 |---|---|---|
 | Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
-| Tavily (web search) | Masked search queries, or the masked claim when the model wrote none | United States. An EU endpoint exists for selected customers only |
+| Tavily (web search) | Masked search queries, or the masked claim when the model wrote none or the first search found too little | United States. An EU endpoint exists for selected customers only |
 | Google Fact Check Tools | Masked claim text | Not stated for this API. Google's servers are worldwide |
 | EUvsDisinfo MCP | Claim text, cut to 200 characters | Not stated, UNCONFIRMED |
 | www.gov.pl search | Search queries, or the claim when the model wrote none | Not stated, UNCONFIRMED |

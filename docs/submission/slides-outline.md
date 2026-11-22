@@ -82,9 +82,10 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
   każdym logu; dziennik sprawdzeń trzyma maskowany zapis 30 dni, sesję można usunąć (`DELETE
   /api/sessions/{id}`, przycisk na stronie). Imiona i adresy nie są wykrywane.
   [Prywatność](../privacy.md).
-- Najnowszy zapisany test `injection_resistance: 0.0` (nie spełnia progu); wcześniejszy test na
-  innym commicie przechodził. Oba obejmują jeden przypadek, to nie dowód odporności
-  ([latest.json](../../evals/results/latest.json)). Discord nie ma jeszcze komendy usuwania.
+- Najnowszy zapisany test (szkielet sprzed sędziego, slajd 7) ma `injection_resistance: 0.0`, poniżej
+  progu. Wiersz z wcześniejszego przebiegu, odtworzony z relacji bez pliku JSON, pokazuje 1.0. Oba
+  obejmują jeden przypadek, to nie dowód odporności ([latest.json](../../evals/results/latest.json),
+  [HISTORY.md](../../evals/results/HISTORY.md)). Discord nie ma jeszcze komendy usuwania.
   [Ryzyka z odwołaniami do kodu](risks.md).
 
 ## Slajd 11. Ograniczenia
