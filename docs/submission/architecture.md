@@ -3,8 +3,8 @@
 This is a submission draft for [issue #18](https://github.com/00200200/HackNation2026/issues/18).
 It was first written for `integration/r2` (2e0f8ce, [PR #109](https://github.com/00200200/HackNation2026/pull/109));
 the model table, the Fact Check route, the search pass and the moderator queue follow
-`integration/r4` at `df74cef`, the round-4 release candidate (#88, #100, #106, #127, #79). The saved
-test results below are the full run on `df74cef`; earlier runs stay in
+`integration/r4` and `main` at `c422f2d`, the round-4 release candidate (#88, #100, #106, #127, #79,
+#129, #133, #134). The saved test results below are the full run on `c422f2d`; earlier runs stay in
 [HISTORY.md](../../evals/results/HISTORY.md). This is not a claim of submission readiness.
 
 ## Request and evidence flow
@@ -217,55 +217,53 @@ their latency as a URL benchmark.
 ## Saved test results and reproduction
 
 Latest tracked result: [evals/results/latest.json](../../evals/results/latest.json), the same file as
-[history/20261122T053047.203200Z-f4c9aa8-full.json](../../evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json):
-timestamp `2026-11-22T05:40:07+00:00`, commit `f4c9aa81dc50df163cff7ceb33f28de6d3b40a53`,
-`dirty: false`, `mode: "full"`, `n_cases: 75`, `concurrency: 4`, `coverage_ok: true`,
-`overall_pass: false`, run with `--corpus`. Scenarios: `A, B, C, D, E, G, H, I, J, U`; E05-E15
-skipped (no public URL for the fixture pages). `f4c9aa8` is `df74cef` (`integration/r4`, the round-4
-release candidate) plus eval results only: `git diff --stat df74cef f4c9aa8` touches
-`evals/results/` alone. The commit field is the harness's checkout. The server was the VPS staging
-container, warmed up before the run. That it ran the `df74cef` code was checked by comparing the md5
-of `prawdowid/judge.py`, the only product-code file `df74cef` changes after `9983127`, in the container with
-the commit's (commit message of `fb13425`). The J cases ran with their fault applied
-(`PRAWDOWID_EVAL_TOKEN`) and the H cases filed
-moderator cases (`PRAWDOWID_ADMIN_TOKEN`). According to the same commit message the Tavily query
-cache (#110) was kept from the earlier runs that day, so part of the web searches came from it (the
-run file does not record cache hits); the cold-cache full run on `af7ec13` is quoted next to the
-latency. The cases are our own set, not the jury's, and the values and targets below are copied
-exactly from the file; the last column says what each value rests on:
+[history/20261122T071235.638303Z-c422f2d-full.json](../../evals/results/history/20261122T071235.638303Z-c422f2d-full.json):
+timestamp `2026-11-22T07:21:52+00:00`, commit `c422f2d6809059fb054a45a67bca7678b14d3e81` (`main`
+after #129 and #134), `dirty: false`, `mode: "full"`, `n_cases: 75`, `concurrency: 4`,
+`coverage_ok: true`, `overall_pass: false`, run with `--corpus`. Scenarios: `A, B, C, D, E, G, H, I,
+J, U`; E05-E15 skipped (no public URL for the fixture pages). The server was the VPS staging
+container built from `c422f2d` and checked by md5, so the commit field and the code under test are
+the same. Search ran on Tavily, as on production, because the server has no Perplexity key. The J
+cases ran with their fault applied (`PRAWDOWID_EVAL_TOKEN`) and the H cases filed moderator cases
+(`PRAWDOWID_ADMIN_TOKEN`). The file does not record whether the Tavily query cache (#110) was warm,
+so the median latency below is not a cold-cache figure; the cold-cache full run on `af7ec13` is
+quoted next to it. The cases are our own set, not the jury's, and the values and targets below are
+copied exactly from the file; the last column says what each value rests on:
 
 | Metric | value | target | pass | rests on |
 |---|---|---|---|---|
-| macro_f1 | 0.8875844155844156 | >= 0.75 | true | the 69 cases with an expected verdict. Per verdict class present in those labels (five here), F1 = 2PR/(P+R) from the class's true positives, false positives and false negatives on the main claim; macro_f1 is the plain mean of the five, so every class weighs the same whatever its size ([metrics.py](../../evals/metrics.py), `macro_f1`). A status answer such as `needs_clarification` is a miss for the expected class and a false positive for none. Per class: potwierdzone 0.960, fałszywe 0.945, wprowadzające w błąd 0.818, brak wystarczających dowodów 0.857, nie podlega weryfikacji 0.857. 42 of the 69 are labelled from a Demagog ClaimReview rating, which the product maps to its verdict when it finds the rating of the same claim (#100, #127), so on those cases the score also measures finding that rating |
+| macro_f1 | 0.9175824175824175 | >= 0.75 | true | the 69 cases with an expected verdict. Per verdict class present in those labels (five here), F1 = 2PR/(P+R) from the class's true positives, false positives and false negatives on the main claim; macro_f1 is the plain mean of the five, so every class weighs the same whatever its size ([metrics.py](../../evals/metrics.py), `macro_f1`). A status answer such as `needs_clarification` is a miss for the expected class and a false positive for none. Per class: potwierdzone 1.000, fałszywe 0.885, wprowadzające w błąd 0.846, brak wystarczających dowodów 0.857, nie podlega weryfikacji 1.000. 42 of the 69 are labelled from a Demagog ClaimReview rating, which the product maps to its verdict when it finds the rating of the same claim (#100, #127), so on those cases the score also measures finding that rating |
 | citation_coverage | 1.0 | >= 0.95 | true | claims with a factual verdict only |
 | citation_correctness | 1.0 | >= 0.85 | true | quotes that cite a corpus document, checked for verbatim presence in it, not for support of the claim; the JSON does not save their number |
 | abstention | 1.0 | >= 0.8 | true | 12 cases expecting `brak wystarczających dowodów` (D01-D04, H01, H02, FC-C01, FC-C02, FC-D01-FC-D04), all 12 abstained |
 | injection_resistance | 1.0 | >= 0.9 | true | 7 cases (E01-E04, FC-E01-FC-E03), each a canary in the pasted text; the patterns in `prawdowid/verifier.py` match FC-E01-FC-E03 phrase for phrase, so read those three as tuned on |
-| median_latency_s | 16.00594466700568 | <= 30.0 | true | the first run of each of the 75 cases, 4 in flight, none from the result cache; part of the web searches came from the Tavily query cache, and the cold-cache full run on `af7ec13` recorded 15.072229500001413 |
-| end_to_end | 0.9733333333333334 | >= 1.0 | false | 73 of 75; J01 came back `ok` with a factual verdict (`fałszywe`) where `technical_error`, or every claim `nie sprawdzono` with the outage named, is expected; A15 (an opinion) came back `needs_clarification` |
-| channel_consistency | 1.0 | >= 1.0 | true | 6 G cases; first answer a direct `POST /api/checks` with `X-Channel: web`, second through the one extra channel the run enabled (`PRAWDOWID_EXTRA_CHANNELS`: `discord` is the bot's API client, not Discord, and `demo` the /czat request; the file does not record which); the second answers took 0.13-0.47 s, from the shared result cache (#59), so this shows the cache returning the stored result |
+| median_latency_s | 14.553565916998195 | <= 30.0 | true | the first run of each of the 75 cases, 4 in flight, none from the result cache; the slowest was U01 (24.9 s); the file does not record Tavily query-cache hits, and the cold-cache full run on `af7ec13` recorded 15.072229500001413 |
+| end_to_end | 0.9866666666666667 | >= 1.0 | false | 74 of 75; only J01 misses: it came back `ok` with a factual verdict (`fałszywe`) where `technical_error`, or every claim `nie sprawdzono` with the outage named, is expected. A15 (an opinion), which came back `needs_clarification` in the `df74cef` run, now passes (the #133 extraction fix) |
+| channel_consistency | 1.0 | >= 1.0 | true | 6 G cases; first answer a direct `POST /api/checks` with `X-Channel: web`, second through the one extra channel the run enabled (`PRAWDOWID_EXTRA_CHANNELS`: `discord` is the bot's API client, not Discord, and `demo` the /czat request; the file does not record which); the second answers took 0.17-0.53 s, from the shared result cache (#59), so this shows the cache returning the stored result |
 | moderator_loop | 1.0 | >= 1.0 | true | 2 cases (H01, H02): the repeat joined the first answer's case (`updated`, a higher count); read from the answers' `moderator_case`, not from `GET /api/cases` |
-| injection_verdict_correct | 1.0 | reported | true | the 7 injection cases |
-| cost_per_100_usd | 3.5416000000000003 | reported | true | model tokens only, mean over 71 priced first answers; the 4 simulated outages are left out, none came from the result cache, no answer had unpriced requests |
+| injection_verdict_correct | 0.8571428571428571 | reported | true | the 7 injection cases: 6 got the right verdict, FC-E03 got `wprowadzające w błąd` where `fałszywe` is expected; the canary did not appear in any of them (`injection_resistance` 1.0) |
+| cost_per_100_usd | 3.458859718309859 | reported | true | model tokens only, mean over 71 priced first answers; the 4 simulated outages are left out, none came from the result cache, no answer had unpriced requests |
 
 Accuracy and macro_f1 are different numbers. Accuracy is the share of cases answered as labelled:
 62 of the 69 cases with an expected verdict (0.899), 67 of all 75 with the status cases. By
-scenario (correct of cases, status cases included): A 21/23, B 8/10, C 4/6, D 8/8, E 7/7, G 6/6,
-H 2/2, I 6/7, J 3/4, U 2/2; by case set: FC-* 30/32, A-J 37/43. The eight misses: J01 (above), A15
-(`needs_clarification` for an opinion), B01 (`potwierdzone` where `wprowadzające w błąd` is
-expected), B04 (`brak wystarczających dowodów` where `fałszywe` is expected; the label follows
-Demagog's "Fałsz", while scenario B expects `wprowadzające w błąd`, and the team has not decided
-that label policy yet), C01 and C04 (`brak wystarczających dowodów` where `wprowadzające w błąd` is
-expected), FC-A08 (`wprowadzające w błąd` where `fałszywe` is expected) and FC-I03 (`brak
-wystarczających dowodów` where `fałszywe` is expected). Citation coverage counts evidence URL/quote
+scenario (correct of cases, status cases included): A 22/23, B 9/10, C 5/6, D 8/8, E 6/7, G 4/6,
+H 2/2, I 6/7, J 3/4, U 2/2; by case set: FC-* 28/32, A-J 39/43. The eight misses: J01 (above),
+B04 (`brak wystarczających dowodów` where `fałszywe` is expected; the label follows Demagog's
+"Fałsz", while scenario B expects `wprowadzające w błąd`, and the team has not decided that label
+policy yet), C01 (`brak wystarczających dowodów` where `wprowadzające w błąd` is expected), G01 and
+FC-I03 (`brak wystarczających dowodów` where `fałszywe` is expected), and FC-A08, FC-E03 and FC-G01
+(`wprowadzające w błąd` where `fałszywe` is expected). Four of the seven verdict misses are `brak
+wystarczających dowodów` instead of a verdict (B04, C01, G01, FC-I03). The run file keeps verdicts
+and statuses, not the answer text, so it does not say why. Citation coverage counts evidence URL/quote
 presence for factual verdicts, not evidence correctness. Whether a quote fits the verdict was
-checked by an agent, not a person, on 12 of the 251 quotes the run showed with a URL, drawn with a
+checked by an agent, not a person, on 12 of the 251 quotes the earlier `df74cef` run showed with a URL (not
+repeated for this run), drawn with a
 fixed seed ([citation_spotcheck.md](../../evals/results/citation_spotcheck.md)): the quote or
 rating is on the page in 11 of 12 (A01's PAP page could not be read), 10 of 12 fit the verdict
 shown (FC-I03 only partly), I03 and A02 show a date other than the page's publication date, and
 FC-A04's source covers a different month than the claim.
 Verdict accuracy scores the main claim alone; citation metrics examine all returned claims. The JSON
-does not record per-provider retrieval outcomes or model overrides; the code default at `df74cef`
+does not record per-provider retrieval outcomes or model overrides; the code default at `c422f2d`
 extracts claims with Sonnet (#88) and searches in one pass (#106).
 
 Runs of the same code differ by a few points, because the models and the search results are not
@@ -273,8 +271,9 @@ the same from run to run. The round-4 full runs, with fixes to the judge and to 
 fact-checker ratings between them, are all in
 [HISTORY.md](../../evals/results/HISTORY.md): `af7ec13` macro_f1 0.823 (abstention 0.750, before
 the judge rule on stated ratings and data gaps), `af163ec` 0.899, `9983127` 0.846 (A01-A03 lost to
-a closed connection right after the staging container was recreated, end_to_end 0.933) and
-`df74cef` 0.888. The round-3 full run on `ca48b84` (macro_f1 0.803, abstention 0.917, median
+a closed connection right after the staging container was recreated, end_to_end 0.933), `df74cef` 0.888 and, with the #133 extraction fix, `c422f2d` 0.918 (the run
+above). Two runs from a laptop API, `a14b93c` (0.918) and `88ae860` (0.815, Perplexity search), are
+in the same file. The round-3 full run on `ca48b84` (macro_f1 0.803, abstention 0.917, median
 17.8 s, moderator_loop 0.0 before #79, $4.27 per 100) and the runs before it are there too, with
 [eval-notes.md](../eval-notes.md) on why some of them are distorted.
 Exact reproduction is UNCONFIRMED. Sources: [metrics](../../evals/metrics.py),

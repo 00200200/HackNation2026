@@ -25,7 +25,7 @@ siebie. Gdy dowodów brak, odpowiedź brzmi „brak wystarczających dowodów”
 
 Czego nie wiemy: dosłowny cytat w źródle nie dowodzi, że źródło potwierdza twierdzenie. Eval mierzy
 tylko, czy cytat występuje w źródle; czy go wspiera, nie mierzy (#62). Próbkę 12 z 251 cytatów z
-pełnego przebiegu na `df74cef`, wylosowaną ze stałym ziarnem, sprawdził agent, nie człowiek
+wcześniejszego pełnego przebiegu na `df74cef` (dla `c422f2d` jej nie powtarzaliśmy), wylosowaną ze stałym ziarnem, sprawdził agent, nie człowiek
 ([citation_spotcheck.md](../../evals/results/citation_spotcheck.md)): cytat albo ocena są na stronie
 w 11 z 12 (strony PAP przy A01 nie dało się odczytać), do werdyktu pasuje 10 z 12 (FC-I03 tylko
 częściowo). Przy I03 i A02 produkt pokazuje inną datę niż data publikacji strony, a źródło FC-A04
@@ -167,13 +167,13 @@ treści ataku, `detector=model`). Na `main`, bez PR #72, działa tylko to drugie
 
 Wyniki z [HISTORY.md](../../evals/results/HISTORY.md): odporność na injection 0,000 w szybkim
 przebiegu na `95e6177`, 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jest zniekształcony) i
-1,000 w pełnych przebiegach od `ca48b84` do `df74cef` (75 przypadków, E05-E15 pominięte), przy progu
-0,90. Przebieg na `df74cef` ma macro-F1 0,888, ale `end_to_end` 0,973 nie spełnia progu, więc
+1,000 w pełnych przebiegach od `ca48b84` do `c422f2d` (75 przypadków, E05-E15 pominięte), przy progu
+0,90. Przebieg na `c422f2d` ma macro-F1 0,918, ale `end_to_end` 0,987 nie spełnia progu, więc
 całość nadal nie przechodzi. Wzorce pisaliśmy, znając pierwsze trzy przypadki E (E01-E03), a
 przypadki FC-E01-FC-E03 `prawdowid/verifier.py` dopasowuje fraza po frazie, więc potrzebujemy nowych.
 Przypadki z poleceniem ukrytym w stronie mają fixtures w `integration/r4` (#94), ale nie
-uruchamialiśmy na nich evalu. Pełny przebieg na `df74cef` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu
-strony z fixture (`PRAWDOWID_FIXTURE_BASE`), więc wynik 1,000 dotyczy 7 przypadków E. Sprawdzanie pobranych źródeł (PR #72) też
+uruchamialiśmy na nich evalu. Pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu
+strony z fixture (`PRAWDOWID_FIXTURE_BASE`), więc wynik 1,000 dotyczy 7 przypadków E, a właściwą ocenę ma 6 z nich (FC-E03 nie). Sprawdzanie pobranych źródeł (PR #72) też
 jest w `integration/r4`, a nie na `main`.
 
 Źródła: [risks.md](risks.md), [prawdowid/verifier.py](../../prawdowid/verifier.py),
@@ -221,7 +221,7 @@ pobieraniu stron i właśnie go naprawiamy.
 Szczegóły: brief wymaga poprawnego wstrzymania się od oceny w co najmniej 80% przypadków bez
 dowodów. Szybki przebieg na `95e6177` dał 1,000, ale tylko dlatego, że wszystkie 9 odpowiedzi
 brzmiały „brak wystarczających dowodów” (macro-F1 0,100). Zniekształcony pełny przebieg na `8c6f396`
-dał 0,583, pełne przebiegi na `ca48b84` 0,917 i na `af7ec13` 0,750, a pełny przebieg na `df74cef`
+dał 0,583, pełne przebiegi na `ca48b84` 0,917 i na `af7ec13` 0,750, a pełne przebiegi na `df74cef` i `c422f2d`
 1,000, czyli 12 z 12 ([HISTORY.md](../../evals/results/HISTORY.md)). Przy tak małej liczbie przypadków
 bez dowodów to wciąż mało na wniosek o zbiorze ukrytym. Do tego w szybkim przebiegu na stagingu
 22.11 (`75c1e20`) wyszukiwarka znajdowała strony, a potem je odrzucała: 102, bo
@@ -239,8 +239,8 @@ osobno nie mierzyliśmy.
 ### 11. Jakie macie wyniki i czy utrzymacie je na zbiorze ukrytym?
 
 Krótko: żaden zapisany przebieg nie spełnia wszystkich progów i tego nie ukrywamy. Pełny przebieg na
-kodzie kandydata do zgłoszenia (`df74cef`) ma macro-F1 0,888 przy progu 0,75 i jedną metrykę poniżej
-progu: end-to-end 0,973. Runner zapisuje
+kodzie kandydata do zgłoszenia (`c422f2d`) ma macro-F1 0,918 przy progu 0,75 i jedną metrykę poniżej
+progu: end-to-end 0,987. Runner zapisuje
 każdy przebieg do HISTORY.md i `evals/results/history/`; nie zachowaliśmy pliku JSON z przebiegu
 stagingowego (3,96 USD za 100) ani z pomiaru z 21.11 (5,25 USD za 100), a część wierszy HISTORY.md jest
 odtworzona.
@@ -256,24 +256,27 @@ dowodów”. Pełny na `8c6f396` (71 przypadków) dał macro-F1 0,498,
 abstencję 0,583, odporność na injection 0,571 i medianę 18,2 s. Ten wiersz odtworzyliśmy bez pliku
 JSON, a sam przebieg zniekształciły timeouty Anthropic i zbyt ciasny budżet 25 s.
 
-Najnowszy, pełny przebieg na `df74cef` (22.11, `integration/r4`, kandydat do zgłoszenia, 75 ocenionych
-przypadków z 86, E05-E15 pominięte bez publicznego adresu fixture): macro-F1 0,888 (próg 0,75; to średnia
+Najnowszy, pełny przebieg na `c422f2d` (22.11, `main` po #129 i #134, kandydat do zgłoszenia, 75 ocenionych
+przypadków z 86, E05-E15 pominięte bez publicznego adresu fixture; serwer stagingu na VPS zbudowany z tego
+commita i sprawdzony sumą md5, wyszukiwanie na Tavily jak na produkcji): macro-F1 0,918 (próg 0,75; to średnia
 F1 pięciu klas, a trafnych werdyktów jest 62 z 69), citation_coverage 1,000 (0,95), citation_correctness
-1,000 (0,85), abstencja 1,000 (0,80), odporność na injection 1,000 (0,90), mediana 16,0 s (30 s; część
-wyszukiwań przyszła z pamięci zapytań Tavily, a przebieg z pustą pamięcią na `af7ec13` dał 15,1 s),
-zgodność kanałów 1,000, pętla moderatora 1,000, koszt 3,54 USD za 100 sprawdzeń. Poniżej progu:
-`end_to_end` 0,973 (wymagane 1,000; J01 i A15). Wynik ogólny: nie przechodzi. `citation_correctness`
+1,000 (0,85), abstencja 1,000 (0,80; 12 z 12), odporność na injection 1,000 (0,90), mediana 14,6 s (30 s; plik nie
+zapisuje, czy pamięć zapytań Tavily była pusta, a przebieg z pustą pamięcią na `af7ec13` dał 15,1 s),
+zgodność kanałów 1,000, pętla moderatora 1,000, koszt 3,46 USD za 100 sprawdzeń. Poniżej progu:
+`end_to_end` 0,987 (wymagane 1,000; tylko J01). Wynik ogólny: nie przechodzi. Siedem przypadków z etykietą
+oceny ma inną ocenę niż oczekiwaliśmy: B04, C01, G01, FC-A08, FC-E03, FC-G01 i FC-I03, a cztery z nich (B04, C01,
+G01, FC-I03) to „brak wystarczających dowodów” zamiast oceny. Z siedmiu przypadków ze wstrzykniętym poleceniem
+właściwą ocenę ma 6 (0,857). `citation_correctness`
 sprawdza tylko, czy cytat występuje w źródle, a nie czy dobrze wspiera werdykt. Zmierzyliśmy ją na
 1,000, ale to tylko warunek konieczny. Czy cytat wspiera tezę, sprawdził tylko agent na próbce 12
-cytatów (10 pasuje do werdyktu, [citation_spotcheck.md](../../evals/results/citation_spotcheck.md)),
+cytatów z wcześniejszego przebiegu na `df74cef` (10 pasuje do werdyktu, [citation_spotcheck.md](../../evals/results/citation_spotcheck.md)),
 a czy korpus poprawia odpowiedzi, nie wiemy. Zgodność kanałów 1,000 pokazuje, że wspólna pamięć
 wyników (#59, 30 minut) oddaje
-drugiemu kanałowi zapisaną odpowiedź (te odpowiedzi trwały 0,13-0,47 s), a nie że dwa niezależne
-sprawdzenia się zgadzają. Przebiegi tego samego kodu różnią się o kilka punktów: cztery pełne
-przebiegi rundy 4, z poprawkami sędziego i odczytu ocen fact-checkerów między nimi, dały macro-F1 od
-0,823 do 0,899, a przebieg rundy 3 na `ca48b84` 0,803. Wiersz jest w HISTORY.md jako `f4c9aa8` (to
-`df74cef` z samymi wynikami evalu) razem z plikiem JSON
-`evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json`; oba są w repozytorium.
+drugiemu kanałowi zapisaną odpowiedź (te odpowiedzi trwały 0,17-0,53 s), a nie że dwa niezależne
+sprawdzenia się zgadzają. Przebiegi tego samego kodu różnią się o kilka punktów: sześć wcześniejszych pełnych
+przebiegów rundy 4, z poprawkami sędziego i odczytu ocen fact-checkerów między nimi, dało macro-F1 od
+0,815 do 0,918 (w tym 0,888 na `df74cef`), a przebieg rundy 3 na `ca48b84` 0,803. Wiersz jest w HISTORY.md jako
+`c422f2d` razem z plikiem JSON `evals/results/history/20261122T071235.638303Z-c422f2d-full.json`; oba są w repozytorium.
 
 Zbioru ukrytego nie znamy. Zasada: żadnych przypadków ani odpowiedzi z evalu w promptach i w logice
 weryfikacji (w `prawdowid/` nie ma tekstu żadnego przypadku). Wyjątek jest na stronie: przycisk
@@ -316,22 +319,22 @@ powierzenia, to etap 3 pilotażu.
 
 ### 13. Ile to kosztuje?
 
-Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje około 30 groszy: modele według pełnego przebiegu na `df74cef`, a kredyty
+Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje około 30 groszy: modele według pełnego przebiegu na `c422f2d`, a kredyty
 Tavily według pomiaru z 21.11, a serwer z domeną około 43 zł miesięcznie.
 
-Szczegóły: modele to 0,0354 USD za sprawdzenie: pełny przebieg na `df74cef` (75 przypadków, kod
-`integration/r4` z #88, #95, #74 i #106; średnia z 71 odpowiedzi z ceną; cztery symulowane awarie nie wysyłają zapytań do modelu i są pominięte;
-wiersz `f4c9aa8` w HISTORY.md). Wcześniejsze pomiary: 4,27 USD za 100 na `ca48b84` (przed #106), 4,91 USD za 100 na `edd34a5` (Opus, przed #95) i 3,96 USD za
+Szczegóły: modele to 0,0346 USD za sprawdzenie: pełny przebieg na `c422f2d` (75 przypadków, kod
+`main` z #88, #95, #74 i #106; średnia z 71 odpowiedzi z ceną; cztery symulowane awarie nie wysyłają zapytań do modelu i są pominięte;
+wiersz `c422f2d` w HISTORY.md). Wcześniejsze pomiary: 3,54 USD za 100 na `df74cef`, 4,27 USD za 100 na `ca48b84` (przed #106), 4,91 USD za 100 na `edd34a5` (Opus, przed #95) i 3,96 USD za
 100 ze stagingu (bez wiersza w HISTORY.md i pliku JSON). Tavily dokłada około 4,9 kredytu (wpis z 21.11 w
 WORKLOG, sprzed #106; dziś to około 4 wyszukiwań na twierdzenie bez ponawiania). Konto jest na planie Researcher z opłatą za zużycie: 1000 kredytów miesięcznie za darmo,
 potem 0,008 USD za kredyt, limit konta podniesiony 22.11 do 4000 kredytów (czy z darmowymi:
-UNCONFIRMED). Na 1000 sprawdzeń wychodzi 66,40 USD, czyli 270 zł (74,40 USD, czyli 302 zł, gdy darmowe
+UNCONFIRMED). Na 1000 sprawdzeń wychodzi 65,60 USD, czyli 266 zł (73,60 USD, czyli 299 zł, gdy darmowe
 kredyty zużyją testy). Ten limit starcza na 820 do 1025 sprawdzeń, zależnie od tego, czy wlicza darmowe kredyty (UNCONFIRMED), więc
 1000 mieści się tylko przy górnej granicy. Kwoty dla 1000 sprawdzeń to szacunki: koszt modeli z jednego pełnego przebiegu, kredyty Tavily z pomiaru na 8 przypadkach.
 Abonamentowe stawki Tavily (do 0,005 USD za kredyt w planie Growth za 500 USD miesięcznie) nie
 obniżają tego rachunku przy takim ruchu. Koszty stałe: VPS-2 od 37,85 zł brutto miesięcznie,
-domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 3,54 USD za modele
-(`df74cef`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica).
+domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 3,46 USD za modele
+(`c422f2d`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica).
 Kredyty Tavily z pełnego przebiegu dopiero policzymy (#16).
 
 Źródła: [cost.md](cost.md), [HISTORY.md](../../evals/results/HISTORY.md), [WORKLOG.md](../../WORKLOG.md).
@@ -341,8 +344,8 @@ Kredyty Tavily z pełnego przebiegu dopiero policzymy (#16).
 Krótko: koszt rośnie liniowo, a rachunek to prawie wyłącznie tokeny modeli i kredyty wyszukiwarki.
 Serwer to poniżej 2%. Przepustowości jednego serwera jeszcze nie zmierzyliśmy.
 
-Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 3032 zł, przy 100 000 około
-30 227 zł plus kolejne serwery (Tavily po 0,008 USD za kredyt, bez abonamentu). Modele to od 48 do
+Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 2999 zł, przy 100 000 około
+29 902 zł plus kolejne serwery (Tavily po 0,008 USD za kredyt, bez abonamentu). Modele to od 47 do
 53% kosztów zmiennych. Podziału kosztu modeli na wyodrębnianie, ranking i sędziego nie zmierzyliśmy, więc nie podajemy, ile
 da tańszy model. Od #88 wyodrębnianie domyślnie idzie na Sonnet 5.5; pomiary 4,91 USD za 100 (`edd34a5`)
 i 4,27 USD (`ca48b84`) dotyczą różnych zestawów przypadków i różnego kodu, więc nie są czystym efektem tej
@@ -429,7 +432,7 @@ niepotwierdzone twierdzenie dotyczy tematu wysokiego ryzyka z krótkiej listy w 
 ustawionym `PRAWDOWID_ADMIN_TOKEN`:
 bez niego sprawy nie powstają i żadna odpowiedź nie mówi o moderatorze. Odpowiedź mówi, że sprawa
 trafiła do kolejki, dopiero po jej zapisaniu. Moderator czyta kolejkę jako listę JSON, bez ekranu i
-bez powiadomień. Eval ma dwa przypadki H: w pełnym przebiegu na `df74cef`
+bez powiadomień. Eval ma dwa przypadki H: w pełnym przebiegu na `c422f2d`
 ([evals/results/latest.json](../../evals/results/latest.json)) `moderator_loop` wynosi 1,0, bo
 powtórzone pytanie trafiło do tej samej sprawy, a w przebiegu na `ca48b84`, sprzed #79, było 0,0. Plan na pilotaż: widok administratora za tokenem i zatwierdzanie publikacji ze śladem
 decyzji.
@@ -453,8 +456,8 @@ z obrazu, a potem sprawdzać tą samą drogą co tekst.
 
 Krótko: tak. `make up` stawia całość w Dockerze, a eval jednym poleceniem liczy te same metryki co
 my. Wyniki różnią się między przebiegami: w powtórzeniach z 21.11 macro-F1 wahało się od 0,10 do 0,39
-([WORKLOG](../../WORKLOG.md), wpis o Tavily), cztery pełne przebiegi rundy 4 dały od 0,823 do 0,899, a
-część wierszy HISTORY.md odtworzyliśmy bez pliku JSON. Pełny przebieg na `df74cef` to jeden przebieg:
+([WORKLOG](../../WORKLOG.md), wpis o Tavily), sześć wcześniejszych pełnych przebiegów rundy 4 dało od 0,815 do 0,918, a
+część wierszy HISTORY.md odtworzyliśmy bez pliku JSON. Pełny przebieg na `c422f2d` to jeden przebieg:
 rozrzutu między powtórzeniami na dokładnie tym kodzie nie mierzyliśmy. Porównujcie więc z całą historią, nie z jedną liczbą.
 
 Szczegóły: klucze wpisuje się do ignorowanego pliku `.env`. Wymagany jest tylko `ANTHROPIC_API_KEY`.

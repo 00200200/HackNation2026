@@ -3,18 +3,18 @@
 This is an extrapolation from a saved test run, not an invoice or a hosting quote.
 The only monetary and measured latency inputs below come from
 [evals/results/latest.json](../../evals/results/latest.json) (the same file as
-`evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json`), timestamp
-`2026-11-22T05:40:07+00:00`, commit `f4c9aa81dc50df163cff7ceb33f28de6d3b40a53` (`df74cef` on
-`integration/r4`, the round-4 release candidate, plus eval results only), `mode: "full"`,
-`n_cases: 75`, `concurrency: 4`, `dirty: false`. The commit is the eval harness's; the server was
-the VPS staging container running `df74cef`, checked by the md5 of `prawdowid/judge.py` (see
-[architecture.md](architecture.md#saved-test-results-and-reproduction)). At that commit the code
+`evals/results/history/20261122T071235.638303Z-c422f2d-full.json`), timestamp
+`2026-11-22T07:21:52+00:00`, commit `c422f2d6809059fb054a45a67bca7678b14d3e81` (`main` after #129
+and #134), `mode: "full"`, `n_cases: 75`, `concurrency: 4`, `dirty: false`. The server was the VPS
+staging container built from that commit, checked by md5 (see
+[architecture.md](architecture.md#saved-test-results-and-reproduction)). Search ran on Tavily, as on
+production, because the server has no Perplexity key. At that commit the code
 default extracts claims with Claude Sonnet (#88) and searches in one pass, with no retry (#106).
 The run has `overall_pass: false`; it is not evidence of production quality or capacity.
 
 ## Estimate for 1,000 checks
 
-The recorded `metrics.cost_per_100_usd.value` is exactly `3.5416000000000003` USD: the mean of the
+The recorded `metrics.cost_per_100_usd.value` is exactly `3.458859718309859` USD: the mean of the
 per-answer `cost_usd` of the first answer of each case, times 100 (`cost_per_100` in
 [evals/run.py](../../evals/run.py)). It rests on 71 priced answers (`n_priced`); the 4 simulated
 outages (J01, J02, FC-J01, FC-J02) send no model request and are left out
@@ -22,10 +22,10 @@ outages (J01, J02, FC-J01, FC-J02) send no model request and are left out
 none had unpriced requests (`n_incomplete: 0`, `lower_bound: false`). Applying the measured rate:
 
 ```text
-Estimated USD/check = 3.5416 / 100 = 0.035416
-Estimated USD for 1,000 checks = 0.035416 * 1000
-                              = 35.416
-Rounded display estimate = USD 35.42 for 1,000 checks
+Estimated USD/check = 3.4589 / 100 = 0.034589
+Estimated USD for 1,000 checks = 0.034589 * 1000
+                              = 34.589
+Rounded display estimate = USD 34.59 for 1,000 checks
 ```
 
 This assumes the same request mix and retrieval conditions as the saved run: our 75 cases, two of
@@ -35,11 +35,13 @@ answered requests. A request that was cut, failed, refused or sent to an unprice
 in `unpriced_requests`, and above 0 the figure is a lower bound; failed calls may still be billed
 ([verifier.py](../../prawdowid/verifier.py), [pipeline.py](../../prawdowid/pipeline.py)).
 Earlier runs recorded $4.91 per 100 checks (quick, 10 cases, `edd34a5`, Opus extraction), $4.27
-(full, `ca48b84`, before #106) and $3.48 (full, `af7ec13`, round 4 with a cold search cache)
-([HISTORY.md](../../evals/results/HISTORY.md)); they are not used here. The four round-4 full
-runs, with fixes to the judge and to reading fact-checker ratings between them, recorded $3.43 to
-$3.61 per 100: runs differ because
-the models and the search results are not the same each time.
+(full, `ca48b84`, before #106), $3.48 (full, `af7ec13`, round 4 with a cold search cache) and $3.54
+(full, `df74cef`, the previous round-4 candidate)
+([HISTORY.md](../../evals/results/HISTORY.md)); they are not used here. The earlier round-4 full
+runs on Tavily, with fixes to the judge and to reading fact-checker ratings between them, recorded
+$3.43 to $3.61 per 100; `88ae860`, run with Perplexity search, recorded $3.37 and is not a clean
+provider measurement. Runs differ because the models and the search results are not the same each
+time.
 
 It excludes hosting, network, search fees, Discord operation and tax. Web search is the one fee
 with recorded inputs, both older than this run: about 4.9 Tavily credits per check (measured with Tavily; Perplexity pricing and usage are not measured here: UNCONFIRMED) in an 8-case
@@ -146,10 +148,10 @@ po pełnym evalu (#16)”. Cenniki odczytaliśmy 22.11.2026. Dolary przeliczamy 
 | Pomiar | Wartość | Skąd | Zastrzeżenia |
 |---|---|---|---|
 | Koszt modeli, sam etap wyodrębniania twierdzeń (Claude Opus 5.5) | 1,82 USD za 100 sprawdzeń, czyli 0,0182 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `95e6177`, szybki przebieg, 9 przypadków | Wersja z jednym wywołaniem modelu na sprawdzenie: bez sędziego (#30), bez równoległego sprawdzania twierdzeń (#37) i bez Tavily (#45). Widać to w `git show 95e6177:prawdowid/verifier.py`: „For now one LLM call that finds claims”. |
-| Koszt modeli w pełnym potoku, z dowodami z Tavily | 3,54 USD za 100 sprawdzeń, czyli 0,0354 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `f4c9aa8` (pełny przebieg 22.11 na kodzie `df74cef`, 75 przypadków; plik JSON `evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json`; `f4c9aa8` to `df74cef` z samymi wynikami evalu), pole `cost_per_100_usd` | Średnia z 71 odpowiedzi z ceną; cztery symulowane awarie nie wysyłają zapytań do modelu i są pominięte. To kod `df74cef` (`integration/r4`) z #88 (wyodrębnianie na Sonnet 5.5), #95, #74 i #106 (jedno przejście wyszukiwania, 2 zapytania modelu na twierdzenie, ustawienia myślenia dla poszczególnych agentów). Pole `cost_usd` liczy tylko modele, bez Tavily. Cztery pełne przebiegi rundy 4, z poprawkami sędziego i odczytu ocen fact-checkerów między nimi, dały od 3,43 do 3,61 USD za 100, bo modele i wyniki wyszukiwania nie są za każdym razem takie same. Wcześniejsze pomiary: 4,27 USD za 100 na `ca48b84` (pełny przebieg, przed #106), 4,91 USD za 100 na `edd34a5` (szybki przebieg, 10 przypadków, Opus, przed #95) i 3,96 USD za 100 ze stagingu (README, bez wiersza w HISTORY.md i bez pliku JSON). Pomiar z 21.11 (8 przypadków, bez pliku JSON) dał 5,25 USD za 100. |
+| Koszt modeli w pełnym potoku, z dowodami z Tavily | 3,46 USD za 100 sprawdzeń, czyli 0,0346 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `c422f2d` (pełny przebieg 22.11 na kodzie `c422f2d`, czyli `main` po #129 i #134, 75 przypadków; plik JSON `evals/results/history/20261122T071235.638303Z-c422f2d-full.json`), pole `cost_per_100_usd` | Średnia z 71 odpowiedzi z ceną; cztery symulowane awarie nie wysyłają zapytań do modelu i są pominięte. To kod `c422f2d` z #88 (wyodrębnianie na Sonnet 5.5), #95, #74 i #106 (jedno przejście wyszukiwania, 2 zapytania modelu na twierdzenie, ustawienia myślenia dla poszczególnych agentów). Pole `cost_usd` liczy tylko modele, bez Tavily. Wcześniejsze pełne przebiegi rundy 4 na Tavily, z poprawkami sędziego i odczytu ocen fact-checkerów między nimi, dały od 3,43 do 3,61 USD za 100 (w tym 3,54 na `df74cef`), a przebieg z Perplexity (`88ae860`) 3,37; modele i wyniki wyszukiwania nie są za każdym razem takie same. Wcześniejsze pomiary: 4,27 USD za 100 na `ca48b84` (pełny przebieg, przed #106), 4,91 USD za 100 na `edd34a5` (szybki przebieg, 10 przypadków, Opus, przed #95) i 3,96 USD za 100 ze stagingu (README, bez wiersza w HISTORY.md i bez pliku JSON). Pomiar z 21.11 (8 przypadków, bez pliku JSON) dał 5,25 USD za 100. |
 | Kredyty Tavily na sprawdzenie | około 4,9 (39 zapytań na 8 przypadków) | [WORKLOG.md](../../WORKLOG.md), wpis z 21.11 o Tavily (#7/#8) | Wyszukiwanie `basic`, 1 kredyt za zapytanie. Lepszego pomiaru nie mamy: [docs/eval-notes.md](../eval-notes.md) i HISTORY.md nie zapisują kredytów. Pomiar sprzed wyszukiwarki gov.pl (#53) i sprzed #106, który zmienił liczbę zapytań (dziś około 4 wyszukiwania na twierdzenie). Pole `cost_usd` w odpowiedzi liczy tylko modele ([prawdowid/verifier.py](../../prawdowid/verifier.py)), więc Tavily doliczamy osobno. |
 
-Pomiar 0,0182 USD pochodzi z innej wersji kodu (jedno wywołanie modelu, Opus) niż pomiar 0,0354 USD,
+Pomiar 0,0182 USD pochodzi z innej wersji kodu (jedno wywołanie modelu, Opus) niż pomiar 0,0346 USD,
 więc nie wyciągamy z nich podziału kosztu na etapy.
 
 ## Ceny
@@ -176,15 +178,15 @@ Cennik VPS podaje cenę „od”. Kwotę z faktury OVHcloud wpisuje zespół.
 koszt sprawdzenia = koszt modeli + kredyty Tavily × cena kredytu
                     (Google Fact Check, gov.pl, korpus i embeddingi: 0 zł za zapytanie, EUvsDisinfo: UNCONFIRMED)
 
-koszt modeli (pełny przebieg na df74cef)   = 0,0354 USD
+koszt modeli (pełny przebieg na c422f2d)   = 0,0346 USD
 Tavily, kredyt płatny        = 4,875 × 0,008 = 0,0390 USD
-jedno sprawdzenie (po wyczerpaniu darmowych kredytów) = 0,0744 USD, czyli 0,30 zł
+jedno sprawdzenie (po wyczerpaniu darmowych kredytów) = 0,0736 USD, czyli 0,30 zł
 
 1000 sprawdzeń:
-  modele                     = 35,40 USD (ze stawki zaokrąglonej do 0,0354; bez zaokrąglenia 35,42)
+  modele                     = 34,60 USD (ze stawki zaokrąglonej do 0,0346; bez zaokrąglenia 34,59)
   kredyty Tavily             = 4875, z czego 1000 darmowych, 3875 × 0,008 = 31,00 USD
-  razem                      = 66,40 USD, czyli 270 zł
-  bez darmowych kredytów     = 74,40 USD, czyli 302 zł (gdy darmowe 1000 zużyją testy)
+  razem                      = 65,60 USD, czyli 266 zł
+  bez darmowych kredytów     = 73,60 USD, czyli 299 zł (gdy darmowe 1000 zużyją testy)
 ```
 
 Plan Growth (500 USD miesięcznie) nie obniża tej kwoty: przy 1000 sprawdzeń kredyty z abonamentu
@@ -198,7 +200,7 @@ dotyczy tylko kredytów płatnych. Odczyt z 22.11 około 1:40 (plan 2281 z 1500,
 odmówiło z powodem „pay-as-you-go limit”) wskazuje na to drugie, ale rozstrzygnie to odczyt
 `GET https://api.tavily.com/usage` (pola `plan_limit`, `paygo_limit`, `paygo_usage`): UNCONFIRMED.
 Ten sam odczyt podaje w planie 1500 kredytów, a nie 1000 z publicznego cennika: UNCONFIRMED. Przy 1500
-wolnych kredytów 1000 sprawdzeń kosztuje 62,40 USD, czyli 253 zł. Gdy limit się kończy, API odmawia, a
+wolnych kredytów 1000 sprawdzeń kosztuje 61,60 USD, czyli 250 zł. Gdy limit się kończy, API odmawia, a
 kod traktuje odmowę jak każdą awarię wyszukiwarki (patrz niżej).
 
 Powtórzone zapytania do wyszukiwarki nie kosztują kredytów przez 24 godziny (#110,
@@ -208,21 +210,21 @@ pamięci wyników całych odpowiedzi ([prawdowid/app.py](../../prawdowid/app.py)
 może napisać inne zapytania i wydać kredyty. Ile kredytów to oszczędza w rzeczywistym ruchu, nie
 zmierzyliśmy, więc rachunek wyżej zakłada, że nikt nie powtarza pytań.
 
-Przy stawce 0,008 USD modele to 48% kosztu sprawdzenia, a Tavily 52%. Koszt modeli pochodzi z pełnego
+Przy stawce 0,008 USD modele to 47% kosztu sprawdzenia, a Tavily 53%. Koszt modeli pochodzi z pełnego
 przebiegu na 75 przypadkach, a liczba kredytów Tavily z wcześniejszego przebiegu na 8 przypadkach, więc
 to wciąż orientacja. Kredyty Tavily z pełnego przebiegu policzymy tak:
 
 ```text
 do uzupełnienia dla kredytów Tavily (#16):
-K_modele = cost_per_100_usd / 100           wiersz HISTORY.md dla kodu zgłoszenia (df74cef, wiersz f4c9aa8: 0,0354 USD)
+K_modele = cost_per_100_usd / 100           wiersz HISTORY.md dla kodu zgłoszenia (c422f2d: 0,0346 USD)
 N_Tavily = kredyty zużyte w tym przebiegu / liczba sprawdzeń
            (z odpowiedzi Tavily z `include_usage=True`, z `GET /usage` albo z licznika
            `search_cache.track()`; nie z panelu, który się spóźnia)
 K_1000   = 1000 × K_modele + max(0, 1000 × N_Tavily − 1000) × 0,008 USD
 ```
 
-Koszt 100 testów, o który pyta jury, to 3,54 USD za modele (pełny przebieg na `df74cef`, wiersz
-`f4c9aa8` w HISTORY.md z plikiem JSON `evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json`) plus
+Koszt 100 testów, o który pyta jury, to 3,46 USD za modele (pełny przebieg na `c422f2d`, wiersz
+`c422f2d` w HISTORY.md z plikiem JSON `evals/results/history/20261122T071235.638303Z-c422f2d-full.json`) plus
 około 3,90 USD za Tavily (szacunek: średnio około 4,9 kredytu na sprawdzenie × 100 × 0,008 USD, bez darmowych kredytów;
 przy górnej granicy 12 kredytów na sprawdzenie byłoby to 9,60 USD). Wiersz `95e6177`
 (1,82 USD za 100) to wersja z jednym wywołaniem modelu, bez sędziego i bez Tavily.
@@ -243,16 +245,16 @@ koszt VPS przypisany faktczyfejk.pl to więc górna granica.
 
 Ruchu produkcyjnego nie mierzyliśmy. Za punkt wyjścia bierzemy umowne 1000 sprawdzeń miesięcznie i
 to jest założenie do rachunku, nie prognoza. Tavily liczymy tak, jak konto jest rozliczane: po 0,008 USD za kredyt, po odjęciu 1000
-darmowych kredytów. Modele liczymy po 0,0354 USD za sprawdzenie (pełny przebieg na `df74cef`:
-3,5416 USD za 100, zaokrąglone; bez zaokrąglenia 1000 sprawdzeń to 35,42 USD, jak w części
+darmowych kredytów. Modele liczymy po 0,0346 USD za sprawdzenie (pełny przebieg na `c422f2d`:
+3,4589 USD za 100, zaokrąglone; bez zaokrąglenia 1000 sprawdzeń to 34,59 USD, jak w części
 angielskiej). Wiersze 1000, 10 000 i
 100 000 to szacunki: ten jeden pomiar razy liczba sprawdzeń.
 
 | Sprawdzeń w miesiącu | Modele | Tavily | Stałe | Razem | Udział kosztów stałych |
 |---|---|---|---|---|---|
-| 1000 | 35,40 USD (144 zł) | 3875 płatnych kredytów, 31,00 USD (126 zł) | 42,77 zł | około 313 zł | 14% |
-| 10 000 | 354 USD (1438 zł) | 47 750 płatnych kredytów, 382 USD (1551 zł) | 42,77 zł | około 3032 zł | 1,4% |
-| 100 000 | 3540 USD (14 377 zł) | 486 500 płatnych kredytów, 3892 USD (15 807 zł) | 42,77 zł i kolejne serwery, do uzupełnienia (#88) | około 30 227 zł plus serwery | 0,1% bez kolejnych serwerów |
+| 1000 | 34,60 USD (141 zł) | 3875 płatnych kredytów, 31,00 USD (126 zł) | 42,77 zł | około 309 zł | 14% |
+| 10 000 | 346 USD (1405 zł) | 47 750 płatnych kredytów, 382 USD (1551 zł) | 42,77 zł | około 2999 zł | 1,4% |
+| 100 000 | 3460 USD (14 052 zł) | 486 500 płatnych kredytów, 3892 USD (15 807 zł) | 42,77 zł i kolejne serwery, do uzupełnienia (#88) | około 29 902 zł plus serwery | 0,1% bez kolejnych serwerów |
 
 Limit konta Tavily (4000 kredytów) starcza na pierwszy wiersz tylko przy wąskim odczycie (do 1025
 sprawdzeń, patrz wyżej), a na dwa pozostałe nie starcza w żadnym. Przy większym ruchu trzeba go podnieść
@@ -262,7 +264,7 @@ Co z tego wynika:
 
 - Przy 10 i 100 razy większym ruchu liczą się już tylko koszty zmienne. Serwer i domena to poniżej
   2% rachunku.
-- Z kosztów zmiennych od 48 do 53% to tokeny modeli, reszta to kredyty wyszukiwarki. Przy 100 razy
+- Z kosztów zmiennych od 47 do 53% to tokeny modeli, reszta to kredyty wyszukiwarki. Przy 100 razy
   większym ruchu Tavily potrzebuje prawie 490 tys. kredytów miesięcznie, a największy plan z cennika
   ma 100 tys. Cena dla takiej skali: do negocjacji, UNCONFIRMED. Z cennika wychodzi, że plany
   z abonamentem wyjdą taniej niż opłata za zużycie dopiero przy dużym ruchu: Startup (220 USD za
@@ -274,7 +276,7 @@ Co z tego wynika:
   ([prawdowid/rerank.py](../../prawdowid/rerank.py)) i sędzia na Sonnet 5.5
   ([prawdowid/judge.py](../../prawdowid/judge.py)). Pomiar 0,0182 USD za samo wyodrębnianie
   pochodzi z wersji na Opus 5.5 z jednym wywołaniem modelu. Od #88 (`83d6c65`) wyodrębnianie domyślnie
-  idzie na Sonnet 5.5, a pomiar 0,0354 USD z `df74cef` obejmuje ten kod, #95, #74 i #106. Jak koszt
+  idzie na Sonnet 5.5, a pomiar 0,0346 USD z `c422f2d` obejmuje ten kod, #95, #74 i #106. Jak koszt
   dzieli się między wyodrębnianie, ranking i sędziego, nie zmierzyliśmy. Dziennik sprawdzeń zapisuje każde wywołanie modelu z
   tokenami, więc podział wyjdzie z pełnego przebiegu (#16).
 - Kredyty zależą od liczby zapytań na twierdzenie (`PRAWDOWID_QUERIES_PER_CLAIM`, domyślnie 2). Do

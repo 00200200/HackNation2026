@@ -53,66 +53,67 @@ from a web page outside the corpus is not measured (it used to count as wrong, w
 metric towards 0 on correct answers). It is `null` when no cited URL is in the corpus. Those
 quotes need the manual spot check in `evals/results/citation_spotcheck.md`.
 
-## Full run on `df74cef` (2026-11-22 05:40 UTC, 75 cases): the round-4 release candidate
+## Full run on `c422f2d` (2026-11-22 07:21 UTC, 75 cases): the round-4 release candidate
 
-JSON: `evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json`, also `latest.json`; the
+JSON: `evals/results/history/20261122T071235.638303Z-c422f2d-full.json`, also `latest.json`; the
 submission description, slide 9, README and `docs/submission/architecture.md` quote it. Read this
 before quoting it:
 
-- Stamp: `f4c9aa8` is `df74cef` (`integration/r4`) plus eval results only: `git diff --stat
-  df74cef f4c9aa8` lists `evals/results/HISTORY.md`, the `9983127` run file and `latest.json`. The
-  harness ran from a clean checkout of `f4c9aa8`. The server was the VPS staging container, warmed up
-  first; that it ran `df74cef` rests on the md5 of `prawdowid/judge.py` in the container, which matched
-  the commit's (commit message of `fb13425`); that file is the only product-code file `df74cef` changes after
-  `9983127`. The J cases ran faulted, so the server had
-  `PRAWDOWID_EVAL_TOKEN`, and the H cases filed moderator cases, so it had `PRAWDOWID_ADMIN_TOKEN`.
+- Stamp: `c422f2d` is `main` after #129 and #134 (the harness commit, `dirty: false`). The server
+  was the VPS staging container built from that commit and checked by md5, so the stamp and the code
+  under test are the same. Search ran on Tavily, as on production, because the server has no
+  Perplexity key. The J cases ran faulted, so the server had `PRAWDOWID_EVAL_TOKEN`, and the H cases
+  filed moderator cases, so it had `PRAWDOWID_ADMIN_TOKEN`. E05-E15 were skipped (no public URL for
+  the fixture pages).
 - The cases and labels are ours, as below; only the targets are the jury's.
-- `macro_f1` 0.888 covers the 69 cases with an expected verdict: the plain mean of the per-class F1
-  of the five verdict classes (potwierdzone 0.960, fałszywe 0.945, wprowadzające w błąd 0.818, brak
-  wystarczających dowodów 0.857, nie podlega weryfikacji 0.857). It is not accuracy: 62 of the 69
+- `macro_f1` 0.918 covers the 69 cases with an expected verdict: the plain mean of the per-class F1
+  of the five verdict classes (potwierdzone 1.000, fałszywe 0.885, wprowadzające w błąd 0.846, brak
+  wystarczających dowodów 0.857, nie podlega weryfikacji 1.000). It is not accuracy: 62 of the 69
   verdicts are right (0.899), and 67 of the 75 cases pass when the status cases are counted. 42 of
   the 69 take their label from a Demagog rating, as in the `ca48b84` run below.
 - The eight misses. The file keeps each case's verdict and status, not the answer text, so the
-  causes below go only as far as that, plus what the team recorded:
+  causes below go only as far as that, plus what the team recorded. Four of the seven verdict misses
+  are `brak wystarczających dowodów` instead of a verdict (B04, C01, G01, FC-I03):
   - J01: `fałszywe`, status `ok`, under a simulated Fact Check outage where `technical_error` (or
     every claim `nie sprawdzono` with the outage named) is expected. Per the team and the PR #126
     description, the answer names the outage and gives verdicts from the other sources; the case
-    allows no verdict, and the team decided not to relabel it. Missed in all five full runs that
-    have a results file.
-  - A15: `needs_clarification` for an opinion question where `nie podlega weryfikacji` is expected. Fixed on `main` since this run (#133): the extraction prompt now treats an opinion asked as a question as a claim, not as unclear. The run above does not include the fix (a14b93c on main, 75 cases, local API, scored e2e 0.987).
-    Missed in the same five runs.
+    allows no verdict, and the team decided not to relabel it. It is the only `end_to_end` miss,
+    and it was missed in all the full runs that have a results file.
   - B04: `brak wystarczających dowodów` where `fałszywe` is expected. The label follows Demagog's
     "Fałsz", while scenario B of the brief expects `wprowadzające w błąd`; the team has not decided
     that label policy. Under either label this run's answer is a miss.
-  - B01: `potwierdzone` where `wprowadzające w błąd` is expected (right in the `ca48b84`, `af163ec`
-    and `9983127` runs, wrong in `af7ec13` and here).
-  - C01 and C04: `brak wystarczających dowodów` where `wprowadzające w błąd` is expected.
-  - FC-A08: `wprowadzające w błąd` where `fałszywe` is expected.
+  - C01: `brak wystarczających dowodów` where `wprowadzające w błąd` is expected.
+  - G01: `brak wystarczających dowodów` where `fałszywe` is expected, in both channel answers.
   - FC-I03: `brak wystarczających dowodów` where `fałszywe` is expected (an EUvsDisinfo stand-in,
     see "How the cases were made").
+  - FC-A08, FC-E03 and FC-G01: `wprowadzające w błąd` where `fałszywe` is expected.
+  - Passing now: A15 (an opinion question, `nie podlega weryfikacji`), fixed by #133, where the
+    extraction prompt now treats an opinion asked as a question as a claim, not as unclear; it was
+    `needs_clarification` in the `df74cef` run. B01 and C04 are right as well; both missed in
+    the `df74cef` run.
 - `abstention` 1.0: all 12 cases (D01-D04, H01, H02, FC-C01, FC-C02, FC-D01-FC-D04) abstained. The
   `af7ec13` run (0.750) came before the judge rule that a fact-checker's data gap decides (ADR
-  0001), and `9983127` (0.917) lost FC-D03 to a Konkret24 snippet's missing context, which
-  `df74cef` addresses (its commit message).
-- `median_latency_s` 16.0: according to the commit message of `fb13425`, part of the web searches came
-  from the Tavily query cache (#110) of the earlier round-4 runs that day (the run file does not
-  record cache hits), so quote the cold-cache full run on `af7ec13` (15.1 s) next to it.
-  The slowest first answer was U01 (32.0 s).
-- `channel_consistency` 1.0: the 6 G cases. The second answers took 0.13-0.47 s, from the result
-  cache (#59). The file does not record which extra channel (`PRAWDOWID_EXTRA_CHANNELS`) was on.
-- `moderator_loop` 1.0: H01 and H02. The repeat joined the first answer's case, with status
-  `updated` and a higher count. The eval reads `moderator_case` from the answers, not
+  0001), and `9983127` (0.917) lost FC-D03 to a Konkret24 snippet's missing context.
+- `median_latency_s` 14.6: the file does not record whether the Tavily query cache (#110) was warm,
+  so quote the cold-cache full run on `af7ec13` (15.1 s) next to it. The slowest first answer was
+  U01 (24.9 s).
+- `channel_consistency` 1.0: the 6 G cases. The second answers took 0.17-0.53 s, from the result
+  cache (#59), so the metric holds also for G01 and FC-G01, whose verdict is wrong in both channels.
+  The file does not record which extra channel (`PRAWDOWID_EXTRA_CHANNELS`) was on.
+- `moderator_loop` 1.0: H01 and H02. The eval reads `moderator_case` from the answers, not
   `GET /api/cases`.
-- `cost_per_100_usd` 3.54: model tokens only, 71 priced first answers, the 4 simulated outages left
+- `cost_per_100_usd` 3.46: model tokens only, 71 priced first answers, the 4 simulated outages left
   out, no answer from the result cache.
 - `citation_correctness` 1.0 and `injection_resistance` 1.0 rest on the same kind of evidence as in
   the `ca48b84` run below: verbatim presence of corpus quotes, and 7 pasted-text injection cases of
-  which 3 are tuned on. The number of corpus quotes was not counted for this run. Whether a quote
-  fits the verdict was checked by an agent, not a person, on 12 of the 251 quotes this run showed
-  with a URL, drawn with a fixed seed ([citation_spotcheck.md](../evals/results/citation_spotcheck.md)):
-  the quote or rating is on the page in 11 of 12 (A01's PAP page could not be read), 10 of 12 fit
-  the verdict shown (FC-I03 only partly), I03 and A02 show a date other than the page's publication
-  date, and FC-A04's source covers a different month than the claim.
+  which 3 are tuned on. `injection_verdict_correct` is 0.857: 6 of the 7 got the right verdict
+  (FC-E03 is the miss). The number of corpus quotes was not counted for this run. Whether a quote
+  fits the verdict was checked by an agent, not a person, only for the earlier `df74cef` run, on 12
+  of the 251 quotes it showed with a URL, drawn with a fixed seed
+  ([citation_spotcheck.md](../evals/results/citation_spotcheck.md)): the quote or rating is on the
+  page in 11 of 12 (A01's PAP page could not be read), 10 of 12 fit the verdict shown (FC-I03 only
+  partly), I03 and A02 show a date other than the page's publication date, and FC-A04's source covers
+  a different month than the claim. The check was not repeated for `c422f2d`.
 
 Round 4 (22.11, all full runs on 75 cases of `evals/cases.jsonl`, rows in HISTORY.md):
 
@@ -121,18 +122,21 @@ Round 4 (22.11, all full runs on 75 cases of `evals/cases.jsonl`, rows in HISTOR
 | `af7ec13` | 0.823 | 0.750 | 0.973 | 15.1 | 3.48 | cold search cache; before the judge rule on stated ratings and data gaps |
 | `af163ec` | 0.899 | 1.000 | 0.973 | 14.9 | 3.43 | judge rule (a fact-checker's verdict sentence counts as its rating, its data gap decides) and the #127 review fix |
 | `9983127` | 0.846 | 0.917 | 0.933 | 13.9 | 3.61 | review fixes; A01-A03 lost to a closed connection right after the staging container was recreated (a transport error, not an answer) |
-| `df74cef` (`f4c9aa8`) | 0.888 | 1.000 | 0.973 | 16.0 | 3.54 | release candidate: any data-gap label of a fact-checker counts for the gap rule |
+| `df74cef` (`f4c9aa8`) | 0.888 | 1.000 | 0.973 | 16.0 | 3.54 | previous release candidate: any data-gap label of a fact-checker counts for the gap rule |
+| `a14b93c` | 0.918 | 1.000 | 0.987 | 20.5 | 3.45 | local API on a laptop, not VPS staging; A15 extraction fix (#133) |
+| `88ae860` | 0.815 | 0.833 | 0.947 | 14.1 | 3.37 | Perplexity search, local API on a laptop; not a clean provider measurement |
+| `c422f2d` | 0.918 | 1.000 | 0.987 | 14.6 | 3.46 | release candidate: `main` after #129 and #134, VPS staging built from the commit, Tavily search |
 
 Runs of the same code differ by a few points, because the models and the search results differ
 from run to run: repeats of one 8-case quick set on 21.11 ranged from 0.10 to 0.39 in macro_f1
 (WORKLOG, the #7/#8 Tavily entry). The judge and the reading of fact-checker ratings (#127 review
-fix) also changed between the four runs above, so their spread is not a clean measure of that
+fix) also changed between the first four runs above, so their spread is not a clean measure of that
 noise. Quote one run with its commit, never as a fixed value.
 
 ## Full run on `ca48b84` (2026-11-22 02:27 UTC, 75 cases): round 3, what each number rests on
 
 JSON: `evals/results/history/20261122T021757.182695Z-ca48b84-full.json`. The round-3 submission
-draft and slide 9 quoted it until the `df74cef` run above replaced it. It was run from a local
+draft and slide 9 quoted it until the later runs above replaced it. It was run from a local
 worktree at `ca48b84` (`integration/r3`) and committed later, unchanged. Read this before quoting
 it:
 

@@ -90,7 +90,7 @@ niej, na przykład Reddita albo Mastodona, jest pobierany jak zwykła strona. Ni
   zakłada sprawę, gdy twierdzenie kończy się `brak wystarczających dowodów`, padło zdarzenie bezpieczeństwa albo
   niepotwierdzone twierdzenie dotyczy tematu wysokiego ryzyka (`fałszywe`, `wprowadzające w błąd` albo `brak wystarczających dowodów`), i łączy podobne pytania w jedną sprawę. Robi to tylko wtedy, gdy ustawiono
   `PRAWDOWID_ADMIN_TOKEN` (czy jest ustawiony na serwerze demo: UNCONFIRMED); bez niego nic nie jest zgłaszane,
-  a odpowiedź nie wspomina moderatora. W pełnym przebiegu evalu na `df74cef` (serwer stagingu z tokenem) powtórzone
+  a odpowiedź nie wspomina moderatora. W pełnym przebiegu evalu na `c422f2d` (serwer stagingu z tokenem) powtórzone
   pytania H01 i H02 trafiły do tej samej sprawy (`moderator_loop` 1,0). Zdanie "Zgłoszenie trafiło do kolejki moderatora" pojawia się dopiero po
   zapisaniu sprawy. Na gałęzi `prod` (`24e92d4`) kolejki nie ma, a pytanie bez źródeł sprawdzamy tam od nowa za każdym razem. W `integration/r4` gotowa
   odpowiedź na ten sam tekst, także `brak wystarczających dowodów`, wraca z pamięci przez 30 minut
