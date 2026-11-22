@@ -60,8 +60,9 @@ date written on the page, so it may be wrong there; pages with no date anywhere 
 retrieval time (`fetched_at`). The per-document list goes to `corpus/manifest.jsonl` when the
 corpus is built with `uv run python -m prawdowid.corpus`.
 **The corpus is not built yet:** it needs `TAVILY_API_KEY`, which no one on the team has set yet.
-Search provider is now **Tavily** (`/search`, official API, see `WORKLOG.md` Decisions, #7, #8);
-it replaced DuckDuckGo (`ddgs`), which returned no results from our machine on 2026-11-21.
+Search provider is now the **Perplexity Search API** (`perplexityai`, see `WORKLOG.md` Decisions,
+2026-11-22); it replaced Tavily (`/search`, #7, #8), which had replaced DuckDuckGo (`ddgs`) after it
+returned no results from our machine on 2026-11-21.
 
 What we store (`prawdowid/cache.py`): metadata of every page (URL, title, publisher, dates,
 type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo.

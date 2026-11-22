@@ -38,6 +38,12 @@ log = logging.getLogger("prawdowid")
 # Allowlisted reliable secondary reporting (`websearch.ALLOWLIST`, e.g. PAP). Its own finding does
 # not decide a verdict alone, but against a reliable source it shows a conflict (scenario C).
 NEWS = "news"
+FACT_CHECK = "fact_check"
+# A fact-checker's own rating of this very claim decides before the context rows: AFP rating
+# "Fałsz" with three plain refutes became "wprowadzające w błąd" (FC-A06, full eval 2026-11-21).
+# Folded with `_rating_word`. Polish values seen in Google Fact Check for Demagog and AFP.
+FALSE_RATINGS = {"falsz", "false"}
+MISLEADING_RATINGS = {"manipulacja", "brak kontekstu", "misleading", "missing context"}
 # Sources older than this get an archival warning. First guess, not tuned.
 ARCHIVE_DAYS = int(os.getenv("PRAWDOWID_ARCHIVE_DAYS") or 730)
 # Shorter quotes ("Polska", "w 2024 roku") prove nothing even when found.
@@ -321,6 +327,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     | supports enough | refutes enough | missing context enough | verdict                      |
     |-----------------|----------------|------------------------|------------------------------|
     | yes             | yes            | any                    | insufficient, shown conflict |
+    | any             | false rating   | any                    | false                        |
     | any             | any            | yes                    | misleading                   |
     | any             | yes            | no                     | false                        |
     | yes             | no             | no                     | confirmed                    |
@@ -329,8 +336,11 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     "Enough" (`_enough`): one reliable source type, or two independent origins. For the conflict
     row, an allowlisted news agency's own finding (PAP, `own_conclusion`) against a reliable source
     type counts too; its report of what someone said does not.
-    Missing context counts only from a "context" or "refutes" label with a `context_quote` found
-    verbatim in the same document (`_grounded`). A "gap" label (the data cannot settle the claim)
+    A fact-checker's own conclusion with a false rating ("Fałsz") is the false row; one with a
+    manipulation or missing-context rating counts as missing context (`_rated`): its review is the
+    named context, also when its fragment has no other words to quote. Otherwise missing context
+    counts only from a "context" or "refutes" label with a `context_quote` found verbatim in the
+    same document (`_grounded`). A "gap" label (the data cannot settle the claim)
     never decides: it adds a limitation, and a publisher whose own conclusion is a gap counts for
     no side (its quote of the claim confirms nothing).
     """
@@ -372,8 +382,16 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
             evidence,
             limitations + [CONFLICT],
         )
+    rated_false = [e for e in refutes if _rated(e, FALSE_RATINGS)]
+    rated_misleading = [
+        e
+        for e in counted
+        if e.label.stance in (Stance.CONTEXT, Stance.REFUTES)
+        and _rated(e, MISLEADING_RATINGS)
+    ]
     for verdict, side, other in (
-        (Verdict.MISLEADING, context, []),
+        (Verdict.FALSE, rated_false, supports),
+        (Verdict.MISLEADING, context + rated_misleading, []),
         (Verdict.FALSE, refutes, supports),
         (Verdict.CONFIRMED, supports, refutes),
     ):
@@ -410,6 +428,23 @@ def _one_side_per_publisher(supports, refutes, limitations):
                 SELF_CONTRADICTION.format(publishers=publisher)
             ]
     return supports, refutes, limitations
+
+
+def _rated(e: Evidence, ratings: set[str]) -> bool:
+    """The fact-checker's own rating of this claim, one of `ratings`."""
+    return (
+        e.source.source_type == FACT_CHECK
+        and e.label.own_conclusion
+        and _rating_word(e.source.rating or "") in ratings
+    )
+
+
+def _rating_word(rating: str) -> str:
+    """ "Fałsz.", "fałsz" and "Falsz" alike: case, accents and closing punctuation folded."""
+    text = rating.casefold().replace("ł", "l").strip(" .!")
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)
+    )
 
 
 def _grounded(e: Evidence) -> bool:

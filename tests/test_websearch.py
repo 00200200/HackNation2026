@@ -3,9 +3,13 @@ import os
 import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpcore2
+import httpx
 import httpx2
+import openai
+import perplexity
 import pytest
 import requests
 from tavily import BadRequestError, InvalidAPIKeyError, UsageLimitExceededError
@@ -545,3 +549,135 @@ def test_a_hanging_provider_is_cut_by_the_search_budget(monkeypatch):
     result, elapsed = asyncio.run(go())
     assert elapsed < 0.8
     assert result.limitation == websearch.SEARCH_UNAVAILABLE
+
+
+def test_openai_without_a_key_is_search_unavailable():
+    with pytest.raises(SearchUnavailable):
+        websearch.openai_search("x", domains=["gov.pl"], limit=5)
+
+
+def test_openai_errors_become_search_unavailable(monkeypatch):
+    class Broken:
+        class responses:
+            @staticmethod
+            def create(**kwargs):
+                raise openai.APIConnectionError(
+                    request=httpx.Request("POST", "https://x")
+                )
+
+    monkeypatch.setattr(websearch, "_openai_client", Broken())
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    with pytest.raises(SearchUnavailable):
+        websearch.openai_search("x", domains=["gov.pl"], limit=5)
+
+
+def test_openai_citations_come_first_then_other_sources(monkeypatch):
+    text = "GUS podaje 4,9%."
+    output = [
+        SimpleNamespace(
+            type="web_search_call",
+            action=SimpleNamespace(
+                sources=[
+                    SimpleNamespace(url="https://www.gov.pl/other"),
+                    SimpleNamespace(url="https://stat.gov.pl/a"),
+                ]
+            ),
+        ),
+        SimpleNamespace(
+            type="message",
+            content=[
+                SimpleNamespace(
+                    text=text,
+                    annotations=[
+                        SimpleNamespace(
+                            type="url_citation",
+                            url="https://stat.gov.pl/a?utm_source=openai",
+                            title="GUS",
+                            start_index=0,
+                            end_index=3,
+                        )
+                    ],
+                )
+            ],
+        ),
+    ]
+    seen = {}
+
+    class Fake:
+        class responses:
+            @staticmethod
+            def create(**kwargs):
+                seen.update(kwargs)
+                return SimpleNamespace(output=output)
+
+    monkeypatch.setattr(websearch, "_openai_client", Fake())
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    hits = websearch.openai_search("x", domains=["gov.pl"], limit=5)
+    assert seen["tools"][0]["filters"] == {"allowed_domains": ["gov.pl"]}
+    assert [(h.url, h.title, h.snippet) for h in hits] == [
+        ("https://stat.gov.pl/a", "GUS", "GUS"),
+        ("https://www.gov.pl/other", "", ""),
+    ]
+    assert websearch.openai_search("x", domains=["gov.pl"], limit=1)[0].title == "GUS"
+
+
+def test_openai_tracking_tag_is_dropped_other_params_kept():
+    assert (
+        websearch._untagged("https://x.pl/a?id=1&utm_source=openai")
+        == "https://x.pl/a?id=1"
+    )
+    assert (
+        websearch._untagged("https://x.pl/a?utm_source=other")
+        == "https://x.pl/a?utm_source=other"
+    )
+
+
+def test_perplexity_without_a_key_is_search_unavailable():
+    with pytest.raises(SearchUnavailable):
+        websearch.perplexity_search("x", domains=["gov.pl"], limit=5)
+
+
+def test_perplexity_errors_become_search_unavailable(monkeypatch):
+    class Broken:
+        class search:
+            @staticmethod
+            def create(**kwargs):
+                raise perplexity.APIConnectionError(
+                    request=httpx.Request("POST", "https://x")
+                )
+
+    monkeypatch.setattr(websearch, "_perplexity_client", Broken())
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test")
+    with pytest.raises(SearchUnavailable):
+        websearch.perplexity_search("x", domains=["gov.pl"], limit=5)
+
+
+def test_perplexity_result_is_mapped_to_a_search_hit(monkeypatch):
+    seen = {}
+
+    class Fake:
+        class search:
+            @staticmethod
+            def create(**kwargs):
+                seen.update(kwargs)
+                return SimpleNamespace(
+                    results=[
+                        SimpleNamespace(
+                            url="https://stat.gov.pl/a",
+                            title="GUS",
+                            snippet="Inflacja 4,9%.",
+                            date="2026-10-30",
+                        ),
+                        SimpleNamespace(url="", title="no url", snippet="", date=None),
+                    ]
+                )
+
+    monkeypatch.setattr(websearch, "_perplexity_client", Fake())
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test")
+    [hit] = websearch.perplexity_search("x", domains=["gov.pl"], limit=5)
+    assert seen["search_domain_filter"] == ["gov.pl"]
+    assert (hit.url, hit.title, hit.published_date) == (
+        "https://stat.gov.pl/a",
+        "GUS",
+        date(2026, 10, 30),
+    )

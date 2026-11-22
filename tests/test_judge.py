@@ -603,3 +603,54 @@ def test_pap_finding_against_weak_sources_only_is_no_conflict():
     )
     assert j.verdict is Verdict.FALSE
     assert CONFLICT not in j.limitations
+
+
+def rated(rating, publisher="Demagog", doc_id="https://demagog.org.pl/r"):
+    f = fragment(doc_id, "Podatek od wypieków? Sprawdzamy", publisher, "fact_check")
+    f.source.rating = rating
+    return f
+
+
+@pytest.mark.parametrize("rating", ["Fałsz", "fałsz.", "Falsz"])
+def test_false_rating_beats_grounded_missing_context(rating):
+    review = rated(rating)
+    context = fragment(
+        "https://b.pl/c", "Nagranie pochodzi z 2019 roku, nie z UE.", "Portal B"
+    )
+    j = run(
+        [review, context, EC],
+        answering(
+            label(review, "refutes", "Podatek od wypieków", own_conclusion=True),
+            label(
+                context,
+                "context",
+                "Nagranie pochodzi z 2019 roku",
+                missing_context="inny czas",
+                context_quote="Nagranie pochodzi z 2019 roku",
+            ),
+            label(EC, "refutes", "UE nie nakłada podatku od wypieków."),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+
+
+@pytest.mark.parametrize("rating", ["Manipulacja", "brak kontekstu"])
+def test_manipulation_rating_is_misleading_without_a_context_quote(rating):
+    review = rated(rating)
+    j = run(
+        [review],
+        answering(label(review, "refutes", "Podatek od wypieków", own_conclusion=True)),
+    )
+    assert j.verdict is Verdict.MISLEADING
+
+
+def test_a_rating_of_another_claim_decides_nothing():
+    review = rated("Fałsz")
+    j = run(
+        [review, GOV],
+        answering(
+            label(review, "context", "Podatek od wypieków"),
+            label(GOV, "supports", "Podatek od wypieków obowiązuje od 2025 roku."),
+        ),
+    )
+    assert j.verdict is Verdict.CONFIRMED

@@ -72,13 +72,14 @@ Back on the server, clone `prod` and write the configuration:
 sudo install -d -o ubuntu -g ubuntu /opt/faktczyfejk
 git clone --branch prod git@github.com:00200200/HackNation2026.git /opt/faktczyfejk
 cd /opt/faktczyfejk
-printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nTAVILY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
+printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nPERPLEXITY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
 chmod 600 .env
-nano .env      # paste the keys after ANTHROPIC_API_KEY=, TAVILY_API_KEY= and the others you have
+nano .env      # paste the keys after ANTHROPIC_API_KEY=, PERPLEXITY_API_KEY= and the others you have
 ```
 
-The evidence keys matter as much as the model key: without `TAVILY_API_KEY` (web search, the only
-search provider), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` every source lookup fails,
+The evidence keys matter as much as the model key: without `PERPLEXITY_API_KEY` (web search; the
+default provider since 2026-11-22, `PRAWDOWID_SEARCH_PROVIDER=tavily` with `TAVILY_API_KEY` is the
+alternative), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` every source lookup fails,
 `/health` still answers, and every checkable claim ends as "nie sprawdzono". `compose.yaml`
 forwards all three to the backend.
 

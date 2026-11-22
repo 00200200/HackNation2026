@@ -7,8 +7,10 @@ models.ALLOW_MODEL_REQUESTS = False
 
 @pytest.fixture(autouse=True)
 def offline_sources(monkeypatch):
-    """No test reaches the web, Tavily, Google or a database: search fails fast unless a test fakes it."""
+    """No test reaches the web, Perplexity, Tavily, OpenAI, Google or a database: search fails fast unless a test fakes it."""
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_FACTCHECK_API_KEY", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("EUVSDISINFO_API_KEY", raising=False)

@@ -18,6 +18,7 @@ time goes to the log; the reranker and judge calls are priced like the extractio
 """
 
 import asyncio
+import itertools
 import logging
 import os
 import time
@@ -26,7 +27,16 @@ from pydantic import BaseModel
 from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
-from prawdowid import euvsdisinfo, factcheck, govpl, judge, legal, rerank, websearch
+from prawdowid import (
+    euvsdisinfo,
+    factcheck,
+    govpl,
+    injection,
+    judge,
+    legal,
+    rerank,
+    websearch,
+)
 from prawdowid.contract import ModelCall, Source, Verdict
 
 log = logging.getLogger("prawdowid")
@@ -73,11 +83,13 @@ async def check_claim(
     exclude_url: str | None = None,
     govpl_queries: list[str] = (),
     legal_queries: list[str] = (),
+    factcheck_queries: list[str] = (),
 ) -> ClaimCheck:
     """Verdict for one claim. `deadline` is `loop.time()` when the whole check must end.
 
     `queries` go to web search, `govpl_queries` to the gov.pl site search (to the web when it is
-    switched off), `legal_queries` to the registers of law (nothing when empty).
+    switched off), `legal_queries` to the registers of law (nothing when empty),
+    `factcheck_queries` to Google Fact Check next to the claim itself.
     """
     steps: dict[str, int] = {}
     # Messages of each reranker and judge run, priced and logged in `_done`.
@@ -96,7 +108,9 @@ async def check_claim(
         return _done(claim, _time_limit(found), runs, steps)
     try:
         async with asyncio.timeout_at(deadline):
-            await _retrieve(claim, searched, gov, steps, found, laws)
+            await _retrieve(
+                claim, searched, gov, steps, found, laws, list(factcheck_queries)
+            )
             candidates = _candidates(found)
             judgement = await _judge(claim, candidates, exclude_url, steps, runs)
     except TimeoutError:
@@ -156,6 +170,7 @@ async def _retrieve(
     steps: dict[str, int],
     found: dict,
     laws: list[str] = (),
+    fc_queries: list[str] = (),
 ) -> None:
     """Steps 2a, EUvsDisinfo, gov.pl (when `gov` is set), law registers (when `laws` is set) and 2b at once, each answer stored in `found` as it arrives.
 
@@ -176,7 +191,10 @@ async def _retrieve(
                 tg.create_task(web(query))
 
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(keep("factcheck", _search_claims))
+        # The prompt asks for 1 or 2 keyword queries; never more Fact Check calls than that.
+        tg.create_task(
+            keep("factcheck", lambda c: _search_claims([c, *fc_queries[:2]]))
+        )
         tg.create_task(keep("euvsdisinfo", _search_cases))
         tg.create_task(_timed(steps, "web", all_web))
         if gov is not None:
@@ -268,12 +286,29 @@ async def _search_legal(queries: list[str], claim: str) -> websearch.WebSearch:
         return websearch.WebSearch(limitation=legal.LOOKUP_UNAVAILABLE)
 
 
-async def _search_claims(claim: str) -> factcheck.FactCheckLookup:
-    try:
-        return await factcheck.search_claims(claim)
-    except Exception:
-        log.exception("factcheck failed")
+async def _search_claims(queries: list[str]) -> factcheck.FactCheckLookup:
+    """Every query at once, reviews merged by URL taking turns between queries (the claim's own
+    first) and capped at one page: keyword queries match broadly, and rerank keeps the first
+    documents, so more reviews would push web, gov.pl and law sources out. Unavailable only when
+    every lookup failed."""
+    queries = list(dict.fromkeys(q.strip() for q in queries if q.strip()))
+    lookups = await asyncio.gather(
+        *map(factcheck.search_claims, queries), return_exceptions=True
+    )
+    for lookup in lookups:
+        if isinstance(lookup, Exception):
+            log.error("factcheck failed: %r", lookup)
+    answered = [lookup.hits for lookup in lookups if not isinstance(lookup, Exception)]
+    hits: dict[str, factcheck.FactCheckHit] = {}
+    for turn in itertools.zip_longest(*answered):
+        for h in turn:
+            if h:
+                hits.setdefault(str(h.source.url), h)
+    if not hits and all(
+        isinstance(lookup, Exception) or lookup.limitation for lookup in lookups
+    ):
         return factcheck.FactCheckLookup(limitation=factcheck.LOOKUP_UNAVAILABLE)
+    return factcheck.FactCheckLookup(hits=list(hits.values())[: factcheck.PAGE_SIZE])
 
 
 async def _search_cases(claim: str) -> euvsdisinfo.EuvsdisinfoLookup:
@@ -295,6 +330,16 @@ async def _judge(
     prefix: str = "",
 ) -> judge.Judgement:
     """Steps 3 to 5. The linked page is never evidence for its own claims."""
+    # Report-only screen of every retrieved page in code, next to the judge's own flag.
+    # CPU-bound (tens of ms per long page), so off the event loop; timed like the other steps.
+    events = await _timed(
+        steps,
+        prefix + "screen",
+        asyncio.to_thread,
+        injection.screen_sources,
+        candidates,
+        exclude_url,
+    )
     ranking = await _priced(
         runs,
         _timed(
@@ -315,9 +360,11 @@ async def _judge(
             update={
                 "limitations": list(
                     dict.fromkeys([judge.JUDGE_UNAVAILABLE, *judgement.limitations])
-                )
+                ),
+                "security_events": events,
             }
         )
+    judgement.security_events = [*events, *judgement.security_events]
     return judgement
 
 

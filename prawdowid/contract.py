@@ -127,8 +127,9 @@ class SecurityEvent(BaseModel):
     # Where they were found: "input" (the user's text), "page" (the page a link points to) or
     # "source" (a retrieved evidence page).
     location: Literal["input", "page", "source"]
-    # "patterns": the fixed pre-check in code; "model": a model's own flag (extraction or judge).
-    detector: Literal["patterns", "model"]
+    # "patterns": our fixed phrase list in code; "defender": StackOne Defender's pattern tier on a
+    # retrieved page (`prawdowid/injection.py`); "model": a model's own flag (extraction or judge).
+    detector: Literal["patterns", "defender", "model"]
 
 
 class CheckResult(BaseModel):
