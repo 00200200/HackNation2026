@@ -171,3 +171,24 @@ def test_citation_correctness_matches_a_url_written_another_way():
         "potwierdzone", [{"url": "http://a.pl/x", "quote": "przystąpiła do NATO"}]
     )
     assert metrics.citation_correctness([good], corpus) == 1.0
+
+
+def test_citation_correctness_keeps_every_text_of_one_canonical_url():
+    # Two corpus records, one canonical URL, different text: a quote from either is correct, and
+    # the order of the records does not matter.
+    records = [
+        ("https://www.a.pl/x/", "Polska przystąpiła do NATO w 1999 roku."),
+        ("http://a.pl/x", "Polska przystąpiła do UE w 2004 roku."),
+    ]
+    evidence = [
+        {"url": "https://a.pl/x", "quote": "przystąpiła do NATO"},
+        {"url": "https://a.pl/x", "quote": "przystąpiła do UE"},
+    ]
+    wrong = [{"url": "https://a.pl/x", "quote": "w 2010 roku"}]
+    for corpus in (dict(records), dict(reversed(records))):
+        assert (
+            metrics.citation_correctness([resp("potwierdzone", evidence)], corpus)
+            == 1.0
+        )
+        both = [resp("potwierdzone", evidence), resp("potwierdzone", wrong)]
+        assert metrics.citation_correctness(both, corpus) == pytest.approx(2 / 3)
