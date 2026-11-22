@@ -69,6 +69,65 @@ Details: [how a check runs](docs/reference.md#how-a-check-runs),
 [architecture](docs/submission/architecture.md), [privacy](docs/privacy.md),
 [sources](docs/sources.md).
 
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph channels["Channels"]
+        web["Web page<br/>text or link, in Polish"]
+        czat["Messenger demo<br/>/czat"]
+        discord["Discord<br/>/sprawdz"]
+    end
+
+    subgraph backend["Backend"]
+        api["FastAPI<br/>POST /api/checks<br/>limits, timeout, errors"]
+        verify["verify()"]
+        log[("Check log<br/>masked, 30 days")]
+        cases[("Moderator queue<br/>GET /api/cases")]
+    end
+
+    web -- "via nginx" --> api
+    czat --> api
+    discord -- "same call" --> api
+    api --> verify
+    api -.-> log
+    api -.-> cases
+
+    subgraph check["Inside verify(): one check, in order"]
+        link["0. Link: guarded fetch<br/>public IPs only, trafilatura / pypdf<br/>blocked: ask for text"]
+        extract["1. Claims + queries<br/>Claude via PydanticAI"]
+
+        subgraph sources["2. Each claim in parallel"]
+            fc["Google Fact Check"]
+            gov["www.gov.pl search"]
+            ws["Web search, allowlisted<br/>Perplexity, Tavily fallback"]
+            corpus[("Evidence corpus<br/>BM25")]
+            eu["EUvsDisinfo<br/>context only"]
+        end
+
+        rerank["3. Dedupe + rerank fragments"]
+        judge["4. Judge labels quotes<br/>quotes checked against fragments"]
+        decide{"5. judge.decide()<br/>rules in code"}
+        verdict(["Verdict + quotes"])
+        insufficient(["brak wystarczających dowodów"])
+        notchecked(["nie sprawdzono<br/>source down or deadline"])
+    end
+
+    verify --> link
+    link -- "page text" --> extract
+    verify -- "text" --> extract
+    extract --> fc & gov & ws & corpus & eu
+    fc & gov & ws & corpus & eu --> rerank
+    rerank --> judge --> decide
+    decide -- "enough evidence" --> verdict
+    decide -- "sources answered, not enough" --> insufficient
+    decide -- "outage or timeout" --> notchecked
+```
+
+One shared `CheckResult` goes back to every channel. Every claim shares one time budget, and a
+linked page is never evidence for its own claims. Details:
+[architecture](docs/submission/architecture.md).
+
 ## Results
 
 Full run of the 75 cases that need no public address, on commit `df74cef`
@@ -135,8 +194,7 @@ Most setups need only these keys. Every variable, its default and what it change
 ## Docs
 
 - [Reference](docs/reference.md): configuration, API, repository layout
-- [Architecture](docs/submission/architecture.md) and the
-  [architecture board](https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs)
+- [Architecture](docs/submission/architecture.md)
 - [Compliance with the brief](docs/submission/compliance.md) and
   [unsupported cases](docs/unsupported.md) (Polish)
 - [Privacy](docs/privacy.md), [sources](docs/sources.md), [corpus](docs/corpus.md),
