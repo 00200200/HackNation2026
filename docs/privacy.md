@@ -166,10 +166,12 @@ a plan from documentation, not a result.
    and the two other model variables. Mistral on its EU endpoint needs a provider object built in
    code (its base URL is not an environment variable), not only a model string, and PydanticAI
    2.71.0 raises an error for native structured output on Mistral models, whose profile does not
-   enable it, so those agents would need tool or prompted output. IONOS speaks the OpenAI
-   protocol, and PydanticAI's OpenAI provider reads its base URL from `OPENAI_BASE_URL`, so it may
-   need no code. That was not checked, and whether IONOS accepts the JSON-schema output our agents
-   use is UNCONFIRMED. No page we read gives Polish quality figures for these models. Switch a
+   enable it, so those agents would need tool or prompted output. IONOS lists an OpenAI-compatible
+   API (UNCONFIRMED: its documentation was not read for this page). If so, PydanticAI's OpenAI
+   provider reads the base URL from `OPENAI_BASE_URL`, so `openai-chat:<model>` may need no code (a
+   bare `openai:` string selects the Responses API, which such an endpoint may not offer). Whether
+   IONOS accepts the JSON-schema output our agents use is also UNCONFIRMED, and none of this was
+   run. No page we read gives Polish quality figures for these models. Switch a
    step only after `uv run python -m evals.run` shows parity on Polish, and that run does not
    exist (#16).
 5. What stays outside the EEA after step 2: web search (Tavily, US), Fact Check (Google, location
