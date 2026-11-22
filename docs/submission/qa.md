@@ -23,9 +23,14 @@ zgadzać co do znaku. Na ekranie pokazujemy tekst źródła, nie parafrazę mode
 wylicza `decide()` według tabeli reguł. Strona podana do sprawdzenia nie może być dowodem samej
 siebie. Gdy dowodów brak, odpowiedź brzmi „brak wystarczających dowodów”.
 
-Czego nie wiemy: dosłowny cytat w źródle nie dowodzi, że źródło potwierdza twierdzenie. Poprawności
-cytatów jeszcze nie zmierzyliśmy (#62). Ręcznej kontroli co najmniej 10 cytatów, której wymagamy
-przed zgłoszeniem końcowym, w repozytorium jeszcze nie ma.
+Czego nie wiemy: dosłowny cytat w źródle nie dowodzi, że źródło potwierdza twierdzenie. Eval mierzy
+tylko, czy cytat występuje w źródle; czy go wspiera, nie mierzy (#62). Próbkę 12 z 251 cytatów z
+pełnego przebiegu na `df74cef`, wylosowaną ze stałym ziarnem, sprawdził agent, nie człowiek
+([citation_spotcheck.md](../../evals/results/citation_spotcheck.md)): cytat albo ocena są na stronie
+w 11 z 12 (strony PAP przy A01 nie dało się odczytać), do werdyktu pasuje 10 z 12 (FC-I03 tylko
+częściowo). Przy I03 i A02 produkt pokazuje inną datę niż data publikacji strony, a źródło FC-A04
+dotyczy innego miesiąca niż twierdzenie. Przed zgłoszeniem kilka z tych stron ma jeszcze otworzyć
+osoba z zespołu.
 
 Źródła: [prawdowid/judge.py](../../prawdowid/judge.py),
 [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md), [risks.md](risks.md),
@@ -164,7 +169,8 @@ Wyniki z [HISTORY.md](../../evals/results/HISTORY.md): odporność na injection 
 przebiegu na `95e6177`, 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jest zniekształcony) i
 1,000 w pełnych przebiegach od `ca48b84` do `df74cef` (75 przypadków, E05-E15 pominięte), przy progu
 0,90. Przebieg na `df74cef` ma macro-F1 0,888, ale `end_to_end` 0,973 nie spełnia progu, więc
-całość nadal nie przechodzi. Wzorce pisaliśmy, znając pierwsze trzy przypadki E, więc potrzebujemy nowych.
+całość nadal nie przechodzi. Wzorce pisaliśmy, znając pierwsze trzy przypadki E (E01-E03), a
+przypadki FC-E01-FC-E03 `prawdowid/verifier.py` dopasowuje fraza po frazie, więc potrzebujemy nowych.
 Przypadki z poleceniem ukrytym w stronie mają fixtures w `integration/r4` (#94), ale nie
 uruchamialiśmy na nich evalu. Pełny przebieg na `df74cef` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu
 strony z fixture (`PRAWDOWID_FIXTURE_BASE`), więc wynik 1,000 dotyczy 7 przypadków E. Sprawdzanie pobranych źródeł (PR #72) też
@@ -258,8 +264,10 @@ wyszukiwań przyszła z pamięci zapytań Tavily, a przebieg z pustą pamięcią
 zgodność kanałów 1,000, pętla moderatora 1,000, koszt 3,54 USD za 100 sprawdzeń. Poniżej progu:
 `end_to_end` 0,973 (wymagane 1,000; J01 i A15). Wynik ogólny: nie przechodzi. `citation_correctness`
 sprawdza tylko, czy cytat występuje w źródle, a nie czy dobrze wspiera werdykt. Zmierzyliśmy ją na
-1,000, ale to tylko warunek konieczny: nie wiemy jeszcze, czy cytat wspiera tezę ani czy korpus
-poprawia odpowiedzi. Zgodność kanałów 1,000 pokazuje, że wspólna pamięć wyników (#59, 30 minut) oddaje
+1,000, ale to tylko warunek konieczny. Czy cytat wspiera tezę, sprawdził tylko agent na próbce 12
+cytatów (10 pasuje do werdyktu, [citation_spotcheck.md](../../evals/results/citation_spotcheck.md)),
+a czy korpus poprawia odpowiedzi, nie wiemy. Zgodność kanałów 1,000 pokazuje, że wspólna pamięć
+wyników (#59, 30 minut) oddaje
 drugiemu kanałowi zapisaną odpowiedź (te odpowiedzi trwały 0,13-0,47 s), a nie że dwa niezależne
 sprawdzenia się zgadzają. Przebiegi tego samego kodu różnią się o kilka punktów: cztery pełne
 przebiegi rundy 4, z poprawkami sędziego i odczytu ocen fact-checkerów między nimi, dały macro-F1 od
@@ -287,13 +295,16 @@ Krótko: dane maskujemy, zanim tekst trafi do modelu, zapis trzymamy 30 dni, a u
 usunąć jednym przyciskiem. Analizy RODO z inspektorem ochrony danych MSZ jeszcze nie ma.
 
 Szczegóły: maskujemy e-maile, numery kont IBAN/NRB (suma kontrolna mod 97), karty (algorytm Luhna),
-PESEL (suma kontrolna) i telefony, przed modelem i w każdym logu. Dziennik trzyma zamaskowany wpis
+PESEL (suma kontrolna), numery dowodów (cyfra kontrolna) i paszportów oraz telefony, przed modelem i
+w każdym logu. Dziennik trzyma zamaskowany wpis
 30 dni (`RETENTION_DAYS`). Przycisk „Usuń moje sprawdzenia” wywołuje `DELETE /api/sessions/{id}`.
 Tekstu stron z linków nie zapisujemy, a strona spod linku widzi adres naszego serwera, nie
 użytkownika. Pod polem tekstowym piszemy: „Nie wklejaj danych osobowych, sprawdzenia trzymamy do 30
 dni”. Serwer stoi w Niemczech.
 
-Luki: nie maskujemy imion i adresów, numerów dowodów, paszportów i części formatów telefonu (#82).
+Luki: nie maskujemy imion i adresów, a numer karty po etykiecie produktu („nr 4111 1111 1111 1111”)
+idzie do modelu bez maski (#113). Na `main` maskowanie pomija też numery dowodów, paszportów i część
+formatów telefonu (#82).
 Discord nie ma polecenia usuwania, a odpowiedzi bota są widoczne na kanale. Logi `stdout` Dockera są
 poza retencją. Gdzie dane przetwarzają dostawcy, jest UNCONFIRMED (#85). Nie ma DPIA ani umów
 powierzenia, to etap 3 pilotażu.
@@ -412,8 +423,10 @@ który czyta kolejkę spraw. Zatwierdzania publikacji jeszcze nie ma, a w pilota
 Szczegóły: brief chce, żeby przy sprawach wysokiego ryzyka i powtarzających się pytaniach bez źródeł
 system powiadamiał osobę wskazaną przez administratora. Kolejkę spraw zbudowaliśmy w #79
 ([prawdowid/cases.py](../../prawdowid/cases.py)): sprawę zakłada sprawdzenie, w którym twierdzenie
-kończy się „brak wystarczających dowodów”, które zapisało zdarzenie bezpieczeństwa albo dotyczy tematu
-wysokiego ryzyka z krótkiej listy w kodzie. Działa tylko przy ustawionym `PRAWDOWID_ADMIN_TOKEN`:
+kończy się „brak wystarczających dowodów”, które zapisało zdarzenie bezpieczeństwa albo w którym
+niepotwierdzone twierdzenie dotyczy tematu wysokiego ryzyka z krótkiej listy w kodzie (wynik
+„fałszywe”, „wprowadzające w błąd” albo „brak wystarczających dowodów”). Działa tylko przy
+ustawionym `PRAWDOWID_ADMIN_TOKEN`:
 bez niego sprawy nie powstają i żadna odpowiedź nie mówi o moderatorze. Odpowiedź mówi, że sprawa
 trafiła do kolejki, dopiero po jej zapisaniu. Moderator czyta kolejkę jako listę JSON, bez ekranu i
 bez powiadomień. Eval ma dwa przypadki H: w pełnym przebiegu na `df74cef`
@@ -448,8 +461,10 @@ Szczegóły: klucze wpisuje się do ignorowanego pliku `.env`. Wymagany jest tyl
 Bez kluczy do Google Fact Check, Tavily i EUvsDisinfo te źródła są zgłaszane jako niedostępne. Bez
 klucza do modelu strona się otwiera, ale każde sprawdzenie kończy się komunikatem technicznym. Samo
 API: `make dev`. Eval: `PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick`.
-Wdrożenie produkcyjne opisuje [docs/deploy.md](../deploy.md). Dokumentacja API pod `/docs` działa
-lokalnie, ale na publicznym demo zwraca 404 (#87). Publiczna wersja: https://faktczyfejk.pl.
+Wdrożenie produkcyjne opisuje [docs/deploy.md](../deploy.md). W `integration/r4` dokumentacja API
+jest pod `/api/docs`, a specyfikacja OpenAPI pod `/api/openapi.json` (#87); na `main` dokumentacja
+leży pod `/docs` i według #87 na publicznym demo zwraca 404 (tego nie sprawdzaliśmy). Publiczna
+wersja: https://faktczyfejk.pl.
 
 Źródła: [README](../../README.md#run), [docs/deploy.md](../deploy.md),
 [.claude/skills/prawdowid-eval/SKILL.md](../../.claude/skills/prawdowid-eval/SKILL.md),

@@ -7,7 +7,7 @@ The only monetary and measured latency inputs below come from
 `2026-11-22T05:40:07+00:00`, commit `f4c9aa81dc50df163cff7ceb33f28de6d3b40a53` (`df74cef` on
 `integration/r4`, the round-4 release candidate, plus eval results only), `mode: "full"`,
 `n_cases: 75`, `concurrency: 4`, `dirty: false`. The commit is the eval harness's; the server was
-the VPS staging container built from `df74cef`, checked by the md5 of `prawdowid/judge.py` (see
+the VPS staging container running `df74cef`, checked by the md5 of `prawdowid/judge.py` (see
 [architecture.md](architecture.md#saved-test-results-and-reproduction)). At that commit the code
 default extracts claims with Claude Sonnet (#88) and searches in one pass, with no retry (#106).
 The run has `overall_pass: false`; it is not evidence of production quality or capacity.
@@ -74,7 +74,8 @@ or an ongoing operator subsidy. A free-to-user deployment budget remains UNCONFI
 Saved `metrics.median_latency_s.value`: exactly `16.00594466700568` seconds
 ([latest.json](../../evals/results/latest.json)), over the first answer of each of the 75 cases,
 with up to four cases in flight. Part of the web searches came from the Tavily query cache of the
-earlier runs that day (#110); the cold-cache full run on `af7ec13` saved `15.072229500001413`
+earlier runs that day (#110, per the commit message of `fb13425`); the cold-cache full run on
+`af7ec13` saved `15.072229500001413`
 seconds (`evals/results/history/20261122T043246.052204Z-af7ec13-full.json`). By default the eval starts requests at least 6.5 s apart and
 excludes that wait from latency ([adapter.py](../../evals/adapter.py)); this is not a concurrency benchmark.
 No simultaneous-user capacity, tail latency, saturation point or cost under load is measured:
@@ -180,7 +181,7 @@ Tavily, kredyt płatny        = 4,875 × 0,008 = 0,0390 USD
 jedno sprawdzenie (po wyczerpaniu darmowych kredytów) = 0,0744 USD, czyli 0,30 zł
 
 1000 sprawdzeń:
-  modele                     = 35,40 USD
+  modele                     = 35,40 USD (ze stawki zaokrąglonej do 0,0354; bez zaokrąglenia 35,42)
   kredyty Tavily             = 4875, z czego 1000 darmowych, 3875 × 0,008 = 31,00 USD
   razem                      = 66,40 USD, czyli 270 zł
   bez darmowych kredytów     = 74,40 USD, czyli 302 zł (gdy darmowe 1000 zużyją testy)
@@ -242,7 +243,9 @@ koszt VPS przypisany faktczyfejk.pl to więc górna granica.
 
 Ruchu produkcyjnego nie mierzyliśmy. Za punkt wyjścia bierzemy umowne 1000 sprawdzeń miesięcznie i
 to jest założenie do rachunku, nie prognoza. Tavily liczymy tak, jak konto jest rozliczane: po 0,008 USD za kredyt, po odjęciu 1000
-darmowych kredytów. Modele liczymy po 0,0354 USD za sprawdzenie (pełny przebieg na `df74cef`). Wiersze 1000, 10 000 i
+darmowych kredytów. Modele liczymy po 0,0354 USD za sprawdzenie (pełny przebieg na `df74cef`:
+3,5416 USD za 100, zaokrąglone; bez zaokrąglenia 1000 sprawdzeń to 35,42 USD, jak w części
+angielskiej). Wiersze 1000, 10 000 i
 100 000 to szacunki: ten jeden pomiar razy liczba sprawdzeń.
 
 | Sprawdzeń w miesiącu | Modele | Tavily | Stałe | Razem | Udział kosztów stałych |

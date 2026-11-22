@@ -38,8 +38,9 @@ Część tego działa już dziś:
 
 Brakuje samego kroku zatwierdzania. Kolejka spraw dla moderatora już jest (#79,
 [prawdowid/cases.py](../../prawdowid/cases.py)): sprawę zakłada sprawdzenie, w którym twierdzenie
-kończy się „brak wystarczających dowodów”, które zapisało zdarzenie bezpieczeństwa albo dotyczy tematu
-wysokiego ryzyka z krótkiej listy w kodzie, a podobne pytania łączą się w jedną sprawę. Sprawy
+kończy się „brak wystarczających dowodów”, które zapisało zdarzenie bezpieczeństwa albo w którym
+niepotwierdzone twierdzenie dotyczy tematu wysokiego ryzyka z krótkiej listy w kodzie, a podobne
+pytania łączą się w jedną sprawę. Sprawy
 zakładamy tylko przy ustawionym `PRAWDOWID_ADMIN_TOKEN`, a moderator czyta je jako listę JSON, bez
 ekranu i bez powiadomień. W pełnym przebiegu evalu na `df74cef` (staging z tokenem) powtórzone pytania
 H01 i H02 trafiły do tej samej sprawy (`moderator_loop` 1,0). Proponujemy rozszerzenie: odpowiedź przeznaczona do publikacji trafia do
@@ -157,19 +158,24 @@ Co już jest:
 Czego brakuje:
 
 - Zewnętrznego red teamu. Mamy tylko własne przypadki, a wzorce wykrywania pisaliśmy, znając
-  pierwsze trzy przypadki E ([WORKLOG](../../WORKLOG.md), wpis do #15). Potrzebne są przypadki,
+  pierwsze trzy przypadki E, E01-E03 ([WORKLOG](../../WORKLOG.md), wpis do #15), a przypadki
+  FC-E01-FC-E03 `prawdowid/verifier.py` dopasowuje fraza po frazie
+  ([docs/eval-notes.md](../eval-notes.md)). Potrzebne są przypadki,
   których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures w
   `integration/r4` (#94), ale eval z nimi jeszcze nie był uruchomiony: pełny przebieg na `df74cef` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
   `integration/r4`, nie w `main`.
 - Oceny skutków dla ochrony danych (DPIA) z inspektorem ochrony danych MSZ i umów powierzenia z
-  dostawcami. Maskowanie nie łapie numerów dowodów, paszportów i części formatów telefonu (#82).
+  dostawcami. Maskowanie nie wykrywa imion i adresów, a numer karty po etykiecie
+  produktu („nr 4111 1111 1111 1111”) przepuszcza do modelu (#113); na `main` nie łapie też numerów
+  dowodów, paszportów i części formatów telefonu (#82).
   Discord nie ma polecenia usuwania, a logi `stdout` Dockera są poza 30-dniową retencją
   ([docs/privacy.md](../privacy.md)).
 - Audytu WCAG przez zewnętrznego audytora i testów z osobami, które korzystają z czytnika ekranu.
 - Konsultacji z użytkownikami. W repozytorium nie ma żadnego badania z użytkownikami.
 
-Szacunek: 6-8 osobodni po stronie zespołu (nowe przypadki red team i poprawki: 3-5, #82: 1, usuwanie
-w Discordzie: 1, poprawki po audycie WCAG: 1). DPIA, audyt i konsultacje to kalendarz MSZ, w naszej
+Szacunek: 5-7 osobodni po stronie zespołu (nowe przypadki red team i poprawki: 3-5, usuwanie
+w Discordzie: 1, poprawki po audycie WCAG: 1; maskowanie z #82 jest już w `integration/r4`).
+DPIA, audyt i konsultacje to kalendarz MSZ, w naszej
 ocenie od 2 do 4 tygodni.
 
 ## Etap 4. Ograniczone wdrożenie publiczne
@@ -230,7 +236,7 @@ Szacunek: 2-4 osobodni na kanał, bez czasu weryfikacji konta biznesowego u oper
 
 ## Razem
 
-Około 22-32 osobodni pracy zespołu przy jednym nowym kanale (WhatsApp albo SMS), 24-36 przy obu
+Około 21-31 osobodni pracy zespołu przy jednym nowym kanale (WhatsApp albo SMS), 23-35 przy obu
 (szacunek). Do tego czas po stronie MSZ: przegląd bezpieczeństwa, DPIA, audyt dostępności,
 konsultacje i sam pilotaż.
 
@@ -249,5 +255,5 @@ Tytuł slajdu: Pilotaż z MSZ w pięciu etapach
 Pod tabelą: „Tryb wsparcia decyzji: odpowiedź do publikacji zatwierdza człowiek. Start: bezpieczeństwo
 podróży, 239 profili krajów z Odyseusza.”
 
-Przypis: „Praca zespołu: około 22-32 osobodni przy jednym nowym kanale (szacunek). Szczegóły:
+Przypis: „Praca zespołu: około 21-31 osobodni przy jednym nowym kanale (szacunek). Szczegóły:
 docs/submission/pilot.md”

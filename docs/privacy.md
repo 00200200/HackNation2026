@@ -3,8 +3,9 @@
 What we keep about a check, for how long, where text goes, and how to delete it (issue #17,
 brief section 5).
 
-This page describes `integration/r4` (22.11.2026), the demo build. `main` (`1aa173f`) is its ancestor and lacks
-these changes, so for `main` read the lines below as follows: masking does not cover ID card and passport
+This page describes `integration/r4` (22.11.2026), the demo build. Statements on `main` describe `1aa173f`, its
+ancestor, which lacks these changes (since #130, `379fa8c`, `main` also has changes that `integration/r4` lacks and
+this page does not describe), so for `main` read the lines below as follows: masking does not cover ID card and passport
 numbers and masks fewer phone formats
 ([#82](https://github.com/00200200/HackNation2026/issues/82)); the check log is not on the `checklog` volume
 (`/var/lib/prawdowid/checks.jsonl`, meant to survive a deploy, not verified on the server,
