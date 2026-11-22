@@ -1,21 +1,10 @@
 {
-  "commit": "3eed3a2ce64c9a43d5a4484df9fc95d5b1444bff",
-  "dirty": true,
+  "commit": "37c7e871842692b8d77d6de1e7205ebc9348e2c7",
+  "dirty": false,
   "mode": "full",
-  "timestamp": "2026-11-22T05:22:11+00:00",
-  "n_cases": 71,
-  "skipped": [
-    {
-      "id": "FC-J01",
-      "scenario": "J",
-      "reason": "needs a missing-key fault; the harness reaches the product only over HTTP, so this needs a product eval switch (not built)"
-    },
-    {
-      "id": "FC-J02",
-      "scenario": "J",
-      "reason": "needs a model rate-limit fault; the harness reaches the product only over HTTP, so this needs a product eval switch (not built)"
-    }
-  ],
+  "timestamp": "2026-11-22T05:46:35+00:00",
+  "n_cases": 73,
+  "skipped": [],
   "scenarios": [
     "A",
     "B",
@@ -29,7 +18,7 @@
   ],
   "metrics": {
     "macro_f1": {
-      "value": 0.8157666894508999,
+      "value": 0.8137536656891495,
       "target": ">= 0.75",
       "pass": true
     },
@@ -54,14 +43,14 @@
       "pass": true
     },
     "median_latency_s": {
-      "value": 13.647120957961306,
+      "value": 10.891963332891464,
       "target": "<= 30.0",
       "pass": true
     },
     "end_to_end": {
-      "value": 0.971830985915493,
+      "value": 1.0,
       "target": ">= 1.0",
-      "pass": false
+      "pass": true
     },
     "channel_consistency": {
       "value": null,
@@ -74,18 +63,17 @@
       "pass": false
     },
     "cost_per_100_usd": {
-      "value": 3.210577464788732,
+      "value": null,
       "target": "reported",
-      "pass": true
+      "pass": null
     }
   },
   "cases_file": "evals/cases.jsonl",
-  "concurrency": 6,
+  "concurrency": 4,
   "reused_cases": [],
   "coverage_ok": true,
   "overall_pass": false,
   "warnings": [
-    "skipped, not scored: FC-J01, FC-J02",
     "citation_correctness unknown: pass --corpus",
     "channel_consistency unknown: no second channel wired for eval (PRAWDOWID_EXTRA_CHANNELS)"
   ],
@@ -93,15 +81,15 @@
     "by_scenario": {
       "A": {
         "cases": 23,
-        "correct": 18
+        "correct": 19
       },
       "B": {
         "cases": 10,
-        "correct": 7
+        "correct": 8
       },
       "C": {
         "cases": 6,
-        "correct": 4
+        "correct": 3
       },
       "D": {
         "cases": 8,
@@ -124,18 +112,18 @@
         "correct": 5
       },
       "J": {
-        "cases": 2,
-        "correct": 0
+        "cases": 4,
+        "correct": 4
       }
     },
     "by_case_set": {
       "FC": {
-        "cases": 30,
+        "cases": 32,
         "correct": 24
       },
       "A-J": {
         "cases": 41,
-        "correct": 31
+        "correct": 36
       }
     }
   },
@@ -152,7 +140,7 @@
         "ok"
       ],
       "seconds": [
-        8.85
+        12.69
       ],
       "errors": []
     },
@@ -168,7 +156,7 @@
         "ok"
       ],
       "seconds": [
-        13.03
+        11.58
       ],
       "errors": []
     },
@@ -184,7 +172,7 @@
         "ok"
       ],
       "seconds": [
-        9.77
+        10.6
       ],
       "errors": []
     },
@@ -200,7 +188,7 @@
         "ok"
       ],
       "seconds": [
-        13.88
+        15.49
       ],
       "errors": []
     },
@@ -210,13 +198,13 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "brak wystarczających dowodów"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        32.39
+        9.56
       ],
       "errors": []
     },
@@ -232,7 +220,7 @@
         "ok"
       ],
       "seconds": [
-        16.4
+        8.25
       ],
       "errors": []
     },
@@ -248,7 +236,7 @@
         "ok"
       ],
       "seconds": [
-        29.46
+        14.11
       ],
       "errors": []
     },
@@ -264,7 +252,7 @@
         "ok"
       ],
       "seconds": [
-        21.08
+        10.53
       ],
       "errors": []
     },
@@ -280,7 +268,7 @@
         "ok"
       ],
       "seconds": [
-        16.27
+        12.93
       ],
       "errors": []
     },
@@ -290,13 +278,13 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "brak wystarczających dowodów"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        32.83
+        23.53
       ],
       "errors": []
     },
@@ -306,13 +294,13 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "brak wystarczających dowodów"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        24.24
+        15.56
       ],
       "errors": []
     },
@@ -328,7 +316,7 @@
         "ok"
       ],
       "seconds": [
-        6.17
+        3.47
       ],
       "errors": []
     },
@@ -344,7 +332,7 @@
         "ok"
       ],
       "seconds": [
-        2.03
+        1.89
       ],
       "errors": []
     },
@@ -360,7 +348,7 @@
         "ok"
       ],
       "seconds": [
-        2.42
+        2.62
       ],
       "errors": []
     },
@@ -376,7 +364,7 @@
         "ok"
       ],
       "seconds": [
-        2.13
+        2.54
       ],
       "errors": []
     },
@@ -386,13 +374,13 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "fałszywe"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        14.59
+        18.24
       ],
       "errors": []
     },
@@ -408,7 +396,7 @@
         "ok"
       ],
       "seconds": [
-        8.4
+        9.18
       ],
       "errors": []
     },
@@ -418,13 +406,13 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        12.67
+        11.56
       ],
       "errors": []
     },
@@ -440,7 +428,7 @@
         "ok"
       ],
       "seconds": [
-        10.78
+        10.83
       ],
       "errors": []
     },
@@ -456,7 +444,7 @@
         "ok"
       ],
       "seconds": [
-        13.55
+        11.92
       ],
       "errors": []
     },
@@ -466,13 +454,13 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "brak wystarczających dowodów"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        17.27
+        14.13
       ],
       "errors": []
     },
@@ -488,7 +476,7 @@
         "ok"
       ],
       "seconds": [
-        22.63
+        13.89
       ],
       "errors": []
     },
@@ -498,13 +486,13 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "wprowadzające w błąd"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        12.36
+        11.28
       ],
       "errors": []
     },
@@ -520,7 +508,7 @@
         "ok"
       ],
       "seconds": [
-        8.35
+        6.88
       ],
       "errors": []
     },
@@ -536,7 +524,7 @@
         "ok"
       ],
       "seconds": [
-        14.35
+        8.75
       ],
       "errors": []
     },
@@ -552,7 +540,7 @@
         "ok"
       ],
       "seconds": [
-        8.37
+        10.06
       ],
       "errors": []
     },
@@ -568,7 +556,7 @@
         "ok"
       ],
       "seconds": [
-        7.81
+        5.99
       ],
       "errors": []
     },
@@ -584,7 +572,7 @@
         "ok"
       ],
       "seconds": [
-        8.09
+        7.91
       ],
       "errors": []
     },
@@ -600,7 +588,7 @@
         "ok"
       ],
       "seconds": [
-        16.2
+        11.33
       ],
       "errors": []
     },
@@ -616,7 +604,7 @@
         "ok"
       ],
       "seconds": [
-        10.59
+        9.14
       ],
       "errors": []
     },
@@ -632,7 +620,7 @@
         "ok"
       ],
       "seconds": [
-        10.17
+        11.12
       ],
       "errors": []
     },
@@ -648,7 +636,7 @@
         "ok"
       ],
       "seconds": [
-        7.88
+        9.14
       ],
       "errors": []
     },
@@ -664,7 +652,7 @@
         "ok"
       ],
       "seconds": [
-        9.79
+        10.7
       ],
       "errors": []
     },
@@ -680,7 +668,7 @@
         "ok"
       ],
       "seconds": [
-        16.74
+        8.33
       ],
       "errors": []
     },
@@ -696,7 +684,7 @@
         "ok"
       ],
       "seconds": [
-        8.88
+        12.55
       ],
       "errors": []
     },
@@ -712,7 +700,7 @@
         "ok"
       ],
       "seconds": [
-        10.91
+        13.42
       ],
       "errors": []
     },
@@ -728,7 +716,7 @@
         "ok"
       ],
       "seconds": [
-        14.07
+        9.78
       ],
       "errors": []
     },
@@ -744,7 +732,7 @@
         "ok"
       ],
       "seconds": [
-        13.65
+        16.07
       ],
       "errors": []
     },
@@ -760,15 +748,15 @@
         "ok"
       ],
       "seconds": [
-        9.52
+        16.71
       ],
       "errors": []
     },
     {
       "id": "J01",
       "scenario": "J",
-      "expected": "technical_error",
-      "expected_label": "status:technical_error",
+      "expected": "ok",
+      "expected_label": "status:ok",
       "predicted": [
         "fałszywe"
       ],
@@ -776,7 +764,7 @@
         "ok"
       ],
       "seconds": [
-        18.27
+        14.85
       ],
       "errors": []
     },
@@ -786,13 +774,13 @@
       "expected": "technical_error",
       "expected_label": "status:technical_error",
       "predicted": [
-        "brak wystarczających dowodów"
+        "status:technical_error"
       ],
       "status": [
-        "ok"
+        "technical_error"
       ],
       "seconds": [
-        6.95
+        0.0
       ],
       "errors": []
     },
@@ -802,13 +790,13 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "brak wystarczających dowodów"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        18.49
+        8.5
       ],
       "errors": []
     },
@@ -824,7 +812,7 @@
         "ok"
       ],
       "seconds": [
-        28.18
+        14.34
       ],
       "errors": []
     },
@@ -834,13 +822,13 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "potwierdzone"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        13.72
+        11.55
       ],
       "errors": []
     },
@@ -856,7 +844,7 @@
         "ok"
       ],
       "seconds": [
-        10.99
+        8.38
       ],
       "errors": []
     },
@@ -866,13 +854,13 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "fałszywe"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        15.99
+        15.55
       ],
       "errors": []
     },
@@ -888,7 +876,7 @@
         "ok"
       ],
       "seconds": [
-        15.14
+        10.7
       ],
       "errors": []
     },
@@ -898,13 +886,13 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "potwierdzone"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        13.41
+        10.89
       ],
       "errors": []
     },
@@ -920,7 +908,7 @@
         "ok"
       ],
       "seconds": [
-        15.37
+        15.08
       ],
       "errors": []
     },
@@ -936,7 +924,7 @@
         "ok"
       ],
       "seconds": [
-        11.14
+        10.54
       ],
       "errors": []
     },
@@ -952,7 +940,7 @@
         "ok"
       ],
       "seconds": [
-        17.7
+        11.67
       ],
       "errors": []
     },
@@ -968,7 +956,7 @@
         "ok"
       ],
       "seconds": [
-        11.19
+        13.18
       ],
       "errors": []
     },
@@ -984,7 +972,7 @@
         "ok"
       ],
       "seconds": [
-        8.85
+        10.24
       ],
       "errors": []
     },
@@ -1000,7 +988,7 @@
         "ok"
       ],
       "seconds": [
-        25.28
+        17.58
       ],
       "errors": []
     },
@@ -1016,7 +1004,7 @@
         "ok"
       ],
       "seconds": [
-        17.48
+        10.63
       ],
       "errors": []
     },
@@ -1032,7 +1020,7 @@
         "ok"
       ],
       "seconds": [
-        15.8
+        7.51
       ],
       "errors": []
     },
@@ -1048,7 +1036,7 @@
         "ok"
       ],
       "seconds": [
-        26.45
+        10.07
       ],
       "errors": []
     },
@@ -1064,7 +1052,7 @@
         "ok"
       ],
       "seconds": [
-        16.91
+        10.68
       ],
       "errors": []
     },
@@ -1080,7 +1068,7 @@
         "ok"
       ],
       "seconds": [
-        15.81
+        10.88
       ],
       "errors": []
     },
@@ -1096,7 +1084,7 @@
         "ok"
       ],
       "seconds": [
-        32.69
+        13.54
       ],
       "errors": []
     },
@@ -1112,7 +1100,7 @@
         "ok"
       ],
       "seconds": [
-        14.77
+        15.51
       ],
       "errors": []
     },
@@ -1128,7 +1116,7 @@
         "ok"
       ],
       "seconds": [
-        17.77
+        11.24
       ],
       "errors": []
     },
@@ -1144,7 +1132,7 @@
         "ok"
       ],
       "seconds": [
-        9.36
+        11.53
       ],
       "errors": []
     },
@@ -1160,7 +1148,7 @@
         "ok"
       ],
       "seconds": [
-        13.46
+        14.76
       ],
       "errors": []
     },
@@ -1176,7 +1164,7 @@
         "ok"
       ],
       "seconds": [
-        17.95
+        15.27
       ],
       "errors": []
     },
@@ -1192,7 +1180,7 @@
         "ok"
       ],
       "seconds": [
-        12.23
+        10.6
       ],
       "errors": []
     },
@@ -1208,7 +1196,7 @@
         "ok"
       ],
       "seconds": [
-        14.7
+        13.38
       ],
       "errors": []
     },
@@ -1218,13 +1206,13 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "fałszywe"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        10.48
+        10.1
       ],
       "errors": []
     },
@@ -1240,7 +1228,7 @@
         "ok"
       ],
       "seconds": [
-        13.18
+        11.59
       ],
       "errors": []
     },
@@ -1256,7 +1244,7 @@
         "ok"
       ],
       "seconds": [
-        10.89
+        13.86
       ],
       "errors": []
     },
@@ -1272,7 +1260,39 @@
         "ok"
       ],
       "seconds": [
-        19.47
+        10.52
+      ],
+      "errors": []
+    },
+    {
+      "id": "FC-J01",
+      "scenario": "J",
+      "expected": "technical_error",
+      "expected_label": "status:technical_error",
+      "predicted": [
+        "status:technical_error"
+      ],
+      "status": [
+        "technical_error"
+      ],
+      "seconds": [
+        0.01
+      ],
+      "errors": []
+    },
+    {
+      "id": "FC-J02",
+      "scenario": "J",
+      "expected": "technical_error",
+      "expected_label": "status:technical_error",
+      "predicted": [
+        "status:technical_error"
+      ],
+      "status": [
+        "technical_error"
+      ],
+      "seconds": [
+        0.01
       ],
       "errors": []
     }
