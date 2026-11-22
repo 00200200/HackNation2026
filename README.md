@@ -30,10 +30,11 @@ się potwierdzić") with the reasons listed, not a guess.
 
 Answers follow the organiser's sample format: the first words come from the verdict, then the
 sources by name. "Skopiuj odpowiedź na czat" copies the same text. A technical failure or a
-request to clarify is a grey notice, never a verdict. When Fact Check, the whole web search (or
-gov.pl for a government claim) was down and the evidence is not enough, the claim is `nie sprawdzono`
-with the outage as the reason, and when no claim got a verdict for that reason the whole answer is a
-technical error ("Nie mogę teraz sprawdzić ..."). A source that answered with nothing is no outage.
+request to clarify is a grey notice, never a verdict. When Fact Check (its query for the claim
+itself, or all of its queries), the whole web search (or gov.pl for a government claim) was down
+and the evidence is not enough, the claim is `nie sprawdzono` with the outage as the reason, and
+when no claim got a verdict for that reason the whole answer is a technical error ("Nie mogę teraz
+sprawdzić ..."). A source that answered with nothing is no outage.
 
 ## How it works
 
@@ -195,11 +196,16 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
   channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function
   that turns the model's claims into verdicts.
-- `prawdowid/factcheck.py`: `search_claims(claim)`, the known-claim lookup in Google Fact Check
-  Tools (`claims:search`). Each review becomes a `Source` (`source_type="fact_check"`) with the
-  fact-checker's rating and the reviewed claim kept beside it, not in `fragment`: the rating is a
-  signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
-  message and no hits. Called per claim from `prawdowid/pipeline.py` (#11).
+- `prawdowid/factcheck.py`: `search_keys(claim, keys)`, the known-claim lookup in Google Fact
+  Check Tools (`claims:search`). `keys_for` gives each claim several short keys (the claim, the
+  names in it, quoted spans of the claim or its source sentence, its search queries; masked again,
+  at most `PRAWDOWID_FACTCHECK_MAX_KEYS`, 8), sent at once and merged by review URL, at most 10
+  reviews. Each review becomes a `Source` (`source_type="fact_check"`) whose fragment carries the
+  fact-checker's rating and the reviewed claim as data for the judge. A rating sets the verdict
+  only for a review of the checked claim itself (`judge.RATINGS`, ADR 0001); a review of another
+  claim is context. One retry on a network error or 5xx, 15 s deadline per key. A missing key,
+  4xx (bad key, quota) or outage of a key is a `limitation`; Fact Check counts as down when the
+  claim's own key or every key failed. Called per claim from `prawdowid/pipeline.py` (#11, #100).
 - `prawdowid/corpus_bm25.py`: `search_evidence(queries)`, the corpus lookup of every check, in step 2
   next to Fact Check, EUvsDisinfo, gov.pl and web search. BM25 in memory over
   `corpus/evidence.jsonl` (`bm25s`, numpy only): no database, no embedding model, no network. The

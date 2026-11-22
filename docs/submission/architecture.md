@@ -48,7 +48,9 @@ The checked page is excluded as evidence for its own claims. Sources:
 Extraction ranks self-contained claims, separates reported speech from its attribution, marks
 checkability and writes search queries. Claims run with `asyncio.gather`; retrieval within a claim
 uses `asyncio.TaskGroup`, cancelling and awaiting unfinished lookup tasks at the deadline.
-Provider threads can finish in the background. Failed providers add limitations. When Fact Check, every web query or (for a government claim)
+Provider threads can finish in the background. Failed providers add limitations. Fact Check sends
+several short keys per claim: it counts as failed when the claim's own key or every key failed, and
+a failed short key is a limitation only, like one failed web query among several. When Fact Check, every web query or (for a government claim)
 the gov.pl search failed and the evidence found is not enough, when all providers failed, or when
 the claim deadline expires, the claim is `not_checked`; if every checkable claim ended that way
 because of an outage, the answer is a technical error. A provider that answered with no matching
@@ -68,6 +70,8 @@ truth. EUvsDisinfo matches are context only, including those returned through Go
 pipeline normalises their type to `disinfo_database`, which cannot decide a verdict on its own.
 Fact Check returns
 review metadata with no full review passage; the title may be the only quoted text available.
+A fact-checker's rating of the checked claim itself, with its rating line verified, maps to a
+verdict (`judge.RATINGS`, ADR 0001); a review of another claim is context only.
 Sources: [rerank.py](../../prawdowid/rerank.py), [judge.py](../../prawdowid/judge.py),
 [factcheck.py](../../prawdowid/factcheck.py), [EUvsDisinfo](../../prawdowid/euvsdisinfo.py).
 

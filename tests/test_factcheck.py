@@ -5,7 +5,7 @@ import httpx2
 import pytest
 
 from prawdowid import factcheck
-from prawdowid.factcheck import KEY_ENV, LOOKUP_UNAVAILABLE, search_claims
+from prawdowid.factcheck import KEY_ENV, LOOKUP_PARTIAL, search_claims, unavailable
 
 REVIEWED = {
     "claims": [
@@ -68,6 +68,7 @@ def test_known_claim_returns_its_review_as_a_source():
     [request] = calls
     assert request.url.params["query"] == "Szczepionki mają mikroczipy"
     assert request.url.params["languageCode"] == "pl"
+    assert request.url.params["pageSize"] == str(factcheck.MAX_HITS)
     assert request.headers["x-goog-api-key"] == "test-key"
     assert "key" not in request.url.params
 
@@ -86,14 +87,14 @@ def test_missing_key_skips_the_call(monkeypatch):
     monkeypatch.delenv(KEY_ENV)
     lookup, calls = run(lambda r: pytest.fail("no request without a key"))
     assert calls == []
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 @pytest.mark.parametrize("status", [400, 403, 429])
 def test_client_errors_are_a_limit_without_retry(status):
     lookup, calls = run(lambda r: httpx2.Response(status, json={"error": {}}))
     assert len(calls) == 1
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 def test_outage_retries_once_then_is_a_limit():
@@ -102,7 +103,7 @@ def test_outage_retries_once_then_is_a_limit():
 
     lookup, calls = run(down)
     assert len(calls) == factcheck.ATTEMPTS == 2
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 def test_retry_recovers_after_a_server_error():
@@ -123,7 +124,7 @@ def test_retry_recovers_after_a_server_error():
 )
 def test_malformed_body_is_a_limit(body):
     lookup, _ = run(lambda r: httpx2.Response(200, content=body))
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 def test_null_lists_are_no_hits():
@@ -137,7 +138,7 @@ def test_broken_encoding_retries_then_is_a_limit():
 
     lookup, calls = run(broken)
     assert len(calls) == 2
-    assert lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 def test_review_without_title_never_uses_the_claim_as_title():
@@ -173,7 +174,7 @@ def test_trickling_response_hits_the_overall_deadline(monkeypatch):
             return lookup, loop.time() - start
 
     lookup, elapsed = asyncio.run(go())
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
     assert elapsed < 1
 
 
@@ -190,3 +191,280 @@ def test_review_without_a_rating_has_no_fragment():
     }
     lookup, _ = run(lambda r: httpx2.Response(200, json=body))
     assert lookup.hits[0].source.fragment is None
+
+
+def test_rating_line_is_one_line_with_one_full_stop():
+    assert factcheck.review_fragment("Fałsz.\n  Zdjęcie jest z 2015 r..", None) == (
+        "Ocena fact-checkera: Fałsz. Zdjęcie jest z 2015 r."
+    )
+    assert factcheck.review_fragment(" ... ", "Twierdzenie.") is None
+
+
+# --- #100: several short keys per claim, merged by review URL ---
+
+B01_CLAIM = (
+    "Poseł Konrad Berkowicz udostępnił film z podpisem „Ten filmik z Francji przeraża chyba "
+    "najbardziej…” jako obraz obecnych protestów we Francji."
+)
+
+
+def test_keys_are_the_claim_its_names_quoted_spans_and_every_query():
+    sentence = "Berkowicz pisze: „Ten filmik z Francji przeraża chyba najbardziej…”. A może „tak”?"
+    queries = ["Berkowicz film Francja", "berkowicz  FILM francja", "MSWiA protesty"]
+    assert (
+        factcheck.keys_for(B01_CLAIM, queries, [B01_CLAIM, sentence])
+        == [
+            B01_CLAIM,
+            "Konrad Berkowicz Francji",  # the sentence's first word and the quote's are no names
+            "Ten filmik z Francji przeraża chyba najbardziej",  # once, the ellipsis dropped
+            "Berkowicz film Francja",  # the same query in other case and spacing goes once
+            "MSWiA protesty",
+        ]
+    )
+
+
+def test_keys_are_capped():
+    queries = [f"zapytanie {i}" for i in range(20)]
+    keys = factcheck.keys_for("Twierdzenie.", queries)
+    assert len(keys) == factcheck.MAX_KEYS and keys[0] == "Twierdzenie."
+
+
+def test_keys_are_masked_again_like_web_queries():
+    sentence = "Wpis: „pisz na jan.kowalski@example.com albo dzwoń”."
+    keys = factcheck.keys_for("Twierdzenie.", ["kontakt 600 123 456"], [sentence])
+    assert keys == ["Twierdzenie.", "pisz na [e-mail] albo dzwoń", "kontakt [telefon]"]
+
+
+@pytest.mark.parametrize(
+    "text, names",
+    [
+        ("Kibice Legii Warszawa poszli pod Trybunał.", "Legii Warszawa Trybunał"),
+        ("Najwięcej uchodźców z Ukrainy przeniosło się do Rosji.", "Ukrainy Rosji"),
+        ("Polska jest członkiem NATO od 1999 roku.", ""),  # one name matches too much
+        ("Rząd podał dane. Według GUS i NBP inflacja spadła.", "GUS NBP"),
+    ],
+)
+def test_names_are_capitalised_words_inside_a_sentence(text, names):
+    assert factcheck.names(text) == names
+
+
+# The reviews behind eval cases B01, C01 and I01 as Fact Check Explorer returned them on
+# 2026-11-22, plus a review of a related but different claim (Braun, I01's topic).
+INDEX = [
+    (
+        "Ten filmik z Francji przeraża chyba najbardziej…",
+        "Konrad Berkowicz",
+        "Protesty we Francji. Berkowicz udostępnia stare nagranie",
+        "Manipulacja",
+        "https://demagog.org.pl/wypowiedzi/protesty-we-francji-berkowicz-udostepnia-stare-nagranie/",
+    ),
+    (
+        "Pracownik na etacie ma średnio dwa i pół dnia wolne.",
+        "Marek Jakubiak",
+        "Ile jest dni wolnych w roku? Jankowski kontra Jakubiak",
+        "Częściowa prawda",
+        "https://demagog.org.pl/wypowiedzi/ile-jest-dni-wolnych-w-roku-jankowski-kontra-jakubiak/",
+    ),
+    (
+        (
+            "Najwięcej uchodźców z Ukrainy, ponad 5 milionów, od początku pełnoskalowej "
+            "inwazji przeniosło się do Rosji."
+        ),
+        "Wiele źródeł",
+        "Pięć milionów ukraińskich uchodźców trafiło do Rosji? To propaganda Kremla",
+        "Fałsz",
+        "https://demagog.org.pl/fake_news/piec-milionow-ukrainskich-uchodzcow-trafilo-do-rosji-to-propaganda-kremla/",
+    ),
+    (
+        (
+            "Największa liczba [osób – przyp. Demagog] to do Rosji ratowała się, salwowała "
+            "się ucieczką z Ukrainy."
+        ),
+        "Grzegorz Braun",
+        "Ukraińscy uchodźcy. Czy Rosja była pierwszym kierunkiem?",
+        "Fałsz",
+        "https://demagog.org.pl/wypowiedzi/ukrainscy-uchodzcy-czy-rosja-byla-pierwszym-kierunkiem/",
+    ),
+]
+
+
+def words(text):
+    return set(factcheck.WORD.findall(text.casefold()))
+
+
+def claim_json(text, claimant, title, rating, url):
+    review = {
+        "publisher": {"name": "Demagog", "site": "demagog.org.pl"},
+        "url": url,
+        "title": title,
+        "reviewDate": "2026-10-19T00:00:00Z",
+        "textualRating": rating,
+        "languageCode": "pl",
+    }
+    return {"text": text, "claimant": claimant, "claimReview": [review]}
+
+
+def fake_index(request):
+    """A review matches only when every word of the query is in its claim, title or claimant."""
+    query = words(request.url.params["query"])
+    found = [claim_json(*row) for row in INDEX if query <= words(" ".join(row[:3]))]
+    return httpx2.Response(
+        200, json={"claims": found[: int(request.url.params["pageSize"])]}
+    )
+
+
+def search(handler, claim, keys):
+    calls = []
+
+    def record(request):
+        calls.append(request)
+        return handler(request)
+
+    async def go():
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(record)) as client:
+            return await factcheck.search_keys(claim, keys, client=client)
+
+    return asyncio.run(go()), calls
+
+
+@pytest.mark.parametrize(
+    "claim, queries, url",
+    [
+        # The names and the caption find the review; the sentence with its verbs does not.
+        (B01_CLAIM, ["Berkowicz udostępnił stary film"], INDEX[0][4]),
+        # A web query shares the review's words; the restated sentence does not.
+        (
+            "Pracownik na etacie średnio co dwa i pół dnia ma dzień wolny.",
+            ["ile dni wolnych ma pracownik na etacie", "dni wolne od pracy w Polsce"],
+            INDEX[1][4],
+        ),
+    ],
+)
+def test_short_keys_find_a_review_the_sentence_misses(claim, queries, url):
+    alone, _ = search(fake_index, claim, [claim])
+    assert alone.hits == [] and alone.limitation is None
+
+    keys = factcheck.keys_for(claim, queries, [claim])
+    lookup, calls = search(fake_index, claim, keys)
+    assert [str(h.source.url) for h in lookup.hits] == [
+        url
+    ]  # once, though several keys found it
+    assert lookup.limitation is None
+    assert [r.url.params["query"] for r in calls] == keys
+    assert {r.url.params["pageSize"] for r in calls} == {str(factcheck.PAGE_SIZE)}
+    assert {r.url.params["languageCode"] for r in calls} == {"pl"}
+
+
+def test_a_name_key_also_brings_reviews_of_other_claims():
+    claim = "Najwięcej uchodźców z Ukrainy, ponad 5 milionów, przeniosło się do Rosji."
+    lookup, _ = search(fake_index, claim, factcheck.keys_for(claim))
+    # Both reach the judge, which tells the review of this claim from Braun's (judge.decide).
+    assert {str(h.source.url) for h in lookup.hits} == {INDEX[2][4], INDEX[3][4]}
+
+
+C01_CLAIM = "Pracownik na etacie średnio co dwa i pół dnia ma dzień wolny."
+
+
+def test_a_short_key_that_failed_is_named_and_the_others_stand():
+    def flaky(request):
+        if request.url.params["query"] == "Jakubiak dni wolne":
+            return httpx2.Response(429, json={"error": {}})
+        return fake_index(request)
+
+    keys = [C01_CLAIM, "Jakubiak dni wolne", "dni wolnych w roku"]
+    lookup, calls = search(flaky, C01_CLAIM, keys)
+    assert len(calls) == 3
+    assert [str(h.source.url) for h in lookup.hits] == [INDEX[1][4]]
+    # Never silent, but no outage: the claim's own key answered, as it did before #100.
+    assert lookup.limitation == LOOKUP_PARTIAL.format(failed=1, total=3)
+    assert not lookup.failed
+
+
+@pytest.mark.parametrize("failure", ["quota", "server error twice", "deadline"])
+def test_the_claims_own_key_failing_is_down_though_short_keys_answered(
+    monkeypatch, failure
+):
+    # The claim sentence is the request the lookup made before #100, when its failure was an
+    # outage: it still is, and what the short keys found still stands.
+    monkeypatch.setattr(factcheck, "DEADLINE_S", 0.2)
+
+    async def handler(request):
+        if request.url.params["query"] != C01_CLAIM:
+            return fake_index(request)
+        if failure == "deadline":
+            await asyncio.sleep(1)
+        return httpx2.Response(429 if failure == "quota" else 503, json={})
+
+    lookup, _ = search(handler, C01_CLAIM, [C01_CLAIM, "dni wolnych w roku"])
+    assert lookup.failed
+    assert lookup.limitation == LOOKUP_PARTIAL.format(failed=1, total=2)
+    assert [str(h.source.url) for h in lookup.hits] == [INDEX[1][4]]
+
+
+def test_lookup_is_unavailable_when_every_key_failed():
+    lookup, calls = search(lambda r: httpx2.Response(403, json={}), "x", ["a b", "c d"])
+    assert len(calls) == 2
+    assert lookup == unavailable()
+
+
+def test_a_key_alone_gets_the_page_size_of_the_lookup_before_100():
+    _, calls = search(lambda r: httpx2.Response(200, json={}), "x", ["x"])
+    assert [r.url.params["pageSize"] for r in calls] == [str(factcheck.MAX_HITS)]
+
+
+def test_keys_run_at_once_inside_the_deadline(monkeypatch):
+    monkeypatch.setattr(factcheck, "DEADLINE_S", 0.3)
+
+    async def slow(request):
+        await asyncio.sleep(0.2)
+        return httpx2.Response(200, json={})
+
+    async def go():
+        transport = httpx2.MockTransport(slow)
+        async with httpx2.AsyncClient(transport=transport) as client:
+            loop = asyncio.get_running_loop()
+            start = loop.time()
+            lookup = await factcheck.search_keys(
+                "x", ["a", "b", "c", "d"], client=client
+            )
+            return lookup, loop.time() - start
+
+    lookup, elapsed = asyncio.run(go())
+    assert lookup.limitation is None
+    assert elapsed < 0.6  # four requests of 0.2 s each, not one after another
+
+
+def test_one_review_page_rating_two_claims_keeps_the_closer_one():
+    url = INDEX[1][4]
+    other = claim_json("W roku jest 115 dni wolnych.", "Jankowski", "T", "Prawda", url)
+    ours = claim_json(*INDEX[1])
+    lookup, _ = search(
+        lambda r: httpx2.Response(200, json={"claims": [other, ours]}),
+        "Pracownik na etacie średnio co dwa i pół dnia ma dzień wolny.",
+        ["dni wolnych w roku"],
+    )
+    [hit] = lookup.hits
+    assert hit.rating == "Częściowa prawda"
+
+
+def test_merged_hits_take_each_keys_best_first_and_are_capped():
+    def per_key(request):
+        key = request.url.params["query"]
+        found = [
+            claim_json(
+                f"{key} {i}", "", f"{key} {i}", "Fałsz", f"https://x.pl/{key}/{i}"
+            )
+            for i in range(factcheck.PAGE_SIZE)
+        ]
+        return httpx2.Response(200, json={"claims": found})
+
+    keys = list("abcdefgh")  # as many as MAX_KEYS allows by default
+    lookup, _ = search(per_key, "x", keys)
+    urls = [str(h.source.url) for h in lookup.hits]
+    # The cap does not follow the key count: every key's best review, then the second ones in
+    # key order until MAX_HITS.
+    assert factcheck.MAX_HITS == 10
+    assert urls == [f"https://x.pl/{k}/0" for k in keys] + [
+        "https://x.pl/a/1",
+        "https://x.pl/b/1",
+    ]

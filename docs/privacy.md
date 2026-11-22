@@ -70,7 +70,7 @@ Where masking runs:
 | Call site | Masked? | Why |
 |---|---|---|
 | Text sent to Claude for claim extraction (`verifier.verify_text`), pasted text and the text of a linked page | yes | A placeholder keeps the sentence, so claims still split. A claim about the personal data itself (for example "this account belongs to the charity") can no longer be checked from the number, which is the point. The claim and source sentence shown to the user carry the placeholder. |
-| Everything after extraction (`prawdowid/pipeline.py`, #11): web search, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`) and database queries (`cache.build_tsquery`) are masked again. |
+| Everything after extraction (`prawdowid/pipeline.py`, #11): web search, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`), Fact Check keys (`factcheck.keys_for`) and database queries (`cache.build_tsquery`) are masked again. |
 | Check log record (`checklog.record`) | yes | The question, the claims, the unchecked claims and the source URLs are masked again when the record is written, so a call site that forgets to mask cannot leak into the log. |
 | Evidence corpus (`corpus/evidence.jsonl`, `prawdowid/corpus_bm25.py`) | yes, at build time | `corpus.sources.base.make_doc` masks title, text, claim and rating (`corpus.schema.mask_personal`) before a record exists, and `make corpus-check` fails on anything `mask_personal_data` would still change. Public switchboard numbers are masked too. Git history keeps the pre-22.11 record with a named person's mobile number (#112/#113: history decision open). |
 | stdout log lines | yes | No raw user text: session id, channel, status, lengths, token counts, and the claims and search queries of each check (written by the model from the masked text, so a name can still appear). Link URLs are masked (an e-mail in a query string), fetch errors are logged by type only. On top of that, every line of the `prawdowid` and `prawdowid.discord` loggers, tracebacks included, goes through `privacy.MaskingFilter` (set in `prawdowid/app.py` and `prawdowid/discord_bot.py`; uvicorn's own error log is not covered), so an unexpected exception that carries raw input is masked too. |
@@ -147,7 +147,7 @@ call with the id from the log.
 | Service | What it receives | When |
 |---|---|---|
 | Anthropic API (Claude) | Masked text to check; claims and evidence fragments (rerank, judge) | Every check. |
-| Google Fact Check Tools API | Claim text | Every checkable claim, when `GOOGLE_FACTCHECK_API_KEY` is set. |
+| Google Fact Check Tools API | Short keys for each claim: the claim, the names in it, quoted spans of the claim or its source sentence and its search queries, all from the masked text and masked again (`factcheck.keys_for`) | Every checkable claim, when `GOOGLE_FACTCHECK_API_KEY` is set. |
 | Tavily (`/search`, `tavily-python`) | Masked search queries | Every checkable claim, when `TAVILY_API_KEY` is set, and the corpus builder. |
 | EUvsDisinfo MCP server (`mcp.euvsd.info`) | Claim text | Every checkable claim, when `EUVSDISINFO_API_KEY` is set. |
 | The incident base (`prawdowid/incidents.py`) | The raw input and the final URL | Every check; local file, nothing leaves the server. |

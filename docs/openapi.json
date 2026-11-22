@@ -983,6 +983,17 @@
               }
             ],
             "title": "Snippet Only"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
           }
         },
         "type": "object",

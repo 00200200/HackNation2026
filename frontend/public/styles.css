@@ -191,6 +191,7 @@ body.checked .results { flex: 1 0 auto; }
 .sources { margin: 0; padding: 0; list-style: none; display: grid; gap: .75rem; }
 .source { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem 1.15rem; background: #fff; }
 .quote { margin: 0 0 .6rem; padding-left: .85rem; border-left: 3px solid var(--red); font-size: 1.02rem; }
+.rating { margin: 0 0 .6rem; font-size: 1.02rem; }
 .source-head { margin: 0 0 .25rem; font-size: .92rem; }
 .source-head a { color: var(--navy); font-weight: 700; }
 .ref { color: var(--red); font-weight: 800; }
