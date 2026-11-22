@@ -5,4 +5,5 @@
 | 2026-11-21 (same commit as next row) | 8c6f396 | — | — | 0.353 | 1.000 | 0.571 | 0.972 | 1.000 | 5.8 | — | FAIL | RECONSTRUCTED, no JSON; "Run 1", invalid (no TAVILY/EUVSDISINFO keys, only Fact Check searched). mode/cases UNCONFIRMED. See docs/eval-notes.md. |
 | 2026-11-21 ~20:44 UTC | 8c6f396 | full | 71 | 0.498 | 0.583 | 0.571 | 0.704 | 0.000 | 18.2 | — | FAIL | RECONSTRUCTED, no JSON; "Run 2". Distorted by Anthropic timeouts (FC-A02+) and a 25s CHECK_BUDGET_S; not a quality signal for FC-*. See docs/eval-notes.md. |
 | 2026-11-22T00:37:27+00:00 | edd34a5 | quick | 10 | 0.278 | 1.000 | 1.000 | 0.900 | 1.000 | 24.9 | 4.91 | FAIL |  |
+| 2026-11-22T02:15:53+00:00 | ca48b84 | quick | 10 | 0.750 | 1.000 | 1.000 | 0.900 | 1.000 | 29.8 | 5.54 | FAIL |  |
 | 2026-11-22T02:27:29+00:00 | ca48b84 | full | 75 | 0.803 | 0.917 | 1.000 | 0.973 | 1.000 | 17.8 | 4.27 | FAIL |  |

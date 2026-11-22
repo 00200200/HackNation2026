@@ -21,4 +21,4 @@ Poniżej: co mówi każdy slajd i skąd to wiadomo.
 | 11 | Co dalej: pętla moderatora (zbudowana, #79; działa po ustawieniu tokenu moderatora), trafniejsze oceny (najczęstsza pomyłka testu: „wprowadzające w błąd” zamiast „fałszywe”), baza incydentów MSZ | plan, nie stan; pomyłki z pełnego przebiegu |
 | 12 | Podziękowanie, kod QR do https://faktczyfejk.pl, link do repozytorium | repozytorium było prywatne 22.11.2026: przed wysłaniem zob. punkt #18 w „Next” w [WORKLOG](../../WORKLOG.md) |
 
-Koszt 1000 sprawdzeń i założenia: [cost.md](cost.md). Film nie jest częścią tego pliku.
+Koszt 1000 sprawdzeń i założenia: [cost.md](cost.md). Plan pilotażu dla MSZ: [pilot.md](pilot.md); tekst do filmu: [pitch.md](pitch.md); pytania i odpowiedzi: [qa.md](qa.md). Film nie jest częścią tego pliku.
