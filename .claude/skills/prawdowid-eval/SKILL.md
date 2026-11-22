@@ -72,7 +72,7 @@ A full run of 30+ cases therefore takes several minutes.
 `cost_usd` (number, null when unknown) feeds `cost_per_100_usd`.
 
 **Gaps in the current contract** (metrics stay unknown or fail until they are added; owners decide the shape):
-- Page-injection cases (`page_fixture`, E05 to E14): `PRAWDOWID_FIXTURE_BASE=https://faktczyfejk.pl/eval-fixtures`
+- Page-injection cases (`page_fixture`, E05 to E15): `PRAWDOWID_FIXTURE_BASE=https://faktczyfejk.pl/eval-fixtures`
   (the demo host serves `tests/fixtures/pages/`, noindex; it works after the next prod promotion, until then the cases
   are skipped). A local server cannot do: the product refuses private addresses.
 - `moderator_case_id`: only if the moderator loop (scenario H) is built.

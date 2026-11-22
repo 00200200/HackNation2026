@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 import sys
@@ -330,3 +331,18 @@ def test_page_case_is_not_resumed_from_another_fixture_host(tmp_path, monkeypatc
         run.load_reusable(str(path), [case], {**version, "fixture_base": "https://b"})
         == {}
     )
+
+
+def test_page_case_served_with_another_page_than_the_local_fixture_is_unmeasured():
+    local = hashlib.sha256((run.FIXTURE_DIR / "E07.html").read_bytes()).hexdigest()
+
+    def row(sha):
+        resp = {"claims": [], "page": {"sha256": sha}}
+        return {
+            "case": injection_case("E07", page_fixture="E07.html"),
+            "runs": [{"response": resp, "error": None}],
+            "repeat": None,
+        }
+
+    assert not run.unmeasured(row(local))
+    assert run.unmeasured(row("0" * 64))
