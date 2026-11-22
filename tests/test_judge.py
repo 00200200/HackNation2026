@@ -14,6 +14,7 @@ from prawdowid.judge import (
     NO_FRAGMENTS,
     NOT_ENOUGH,
     SELF_CONTRADICTION,
+    SNIPPET_ONLY,
     Labels,
     agent,
     find_quote,
@@ -666,3 +667,61 @@ def test_a_quote_cannot_span_two_joined_passages():
     joined = "Pierwszy fragment kończy się tutaj.\n\nDrugi fragment zaczyna się potem."
     assert find_quote("kończy się tutaj. Drugi fragment zaczyna", joined) is None
     assert find_quote("Drugi fragment zaczyna się potem", joined)
+
+
+BLOCKED = "strona nie pozwala na pobranie"
+NO_PROPOSAL = "Komisja nie proponuje podatku od wypieków."
+FC = fragment(
+    "https://konkret24.tvn24.pl/a",
+    f"Nieprawda. {NO_PROPOSAL}",
+    "Konkret24",
+    "fact_check",
+)
+
+
+def snippet(f):
+    return f.model_copy(
+        update={"source": f.source.model_copy(update={"snippet_only": BLOCKED})}
+    )
+
+
+def test_a_fact_check_known_only_from_its_search_snippet_refutes_on_its_own():
+    fc = snippet(FC)
+    j = run([fc], answering(label(fc, "refutes", NO_PROPOSAL, own_conclusion=True)))
+    assert j.verdict is Verdict.FALSE
+    assert j.strength.startswith("umiarkowana: 1 niezależnych")
+    [cited] = j.sources
+    assert (cited.fragment, cited.snippet_only) == (NO_PROPOSAL, BLOCKED)
+    assert SNIPPET_ONLY.format(reason=BLOCKED, publisher="Konkret24") in j.limitations
+    assert "fragment z wyników wyszukiwarki" in j.premises[0]
+    assert "Konkret24, 21.11.2026, fragment z wyników wyszukiwarki" in j.justification
+
+
+def test_snippets_are_never_stronger_than_the_pages_we_read():
+    labels = (
+        label(EC, "refutes", EC.source.fragment),
+        label(FC, "refutes", NO_PROPOSAL, own_conclusion=True),
+    )
+    read = run([EC, FC], answering(*labels))
+    assert read.verdict is Verdict.FALSE and read.strength.startswith("silna")
+    found = run([snippet(EC), snippet(FC)], answering(*labels))
+    assert found.verdict is Verdict.FALSE
+    assert found.strength.startswith("umiarkowana: 2 niezależnych")
+
+
+def test_an_undated_official_page_counts_but_never_makes_the_evidence_strong():
+    def refuting(official):
+        return answering(
+            label(official, "refutes", EC.source.fragment),
+            label(B, "refutes", "takiego podatku nie ma w UE"),
+        )
+
+    dated = run([EC, B], refuting(EC))
+    assert dated.verdict is Verdict.FALSE and dated.strength.startswith("silna")
+    undated = fragment(
+        "https://ec.europa.eu/q", EC.source.fragment, "KE", "official", published=None
+    )
+    j = run([undated, B], refuting(undated))
+    assert j.verdict is Verdict.FALSE
+    assert j.strength.startswith("umiarkowana: 2 niezależnych")
+    assert "Źródło bez daty publikacji: KE." in j.limitations

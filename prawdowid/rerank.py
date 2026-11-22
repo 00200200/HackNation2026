@@ -129,7 +129,9 @@ def split_all(candidates: list[Source], exclude_url: str | None) -> list[Fragmen
     The first candidate for a URL keeps its metadata; if it has no text (a fact-check hit is
     title only), it takes the text of a later candidate for the same URL, so the page text step
     2b fetched is never hidden behind a bare title. A fact-check hit's rating fragment keeps the
-    fetched text after it.
+    fetched text after it. A search snippet (`snippet_only`) only stands in for a page nobody
+    read: a later candidate we read replaces it whole, metadata included, and a snippet is never
+    joined to another candidate's text.
     """
     excluded = canonical_url(exclude_url) if exclude_url else None
     docs: dict[str, Source] = {}
@@ -137,12 +139,21 @@ def split_all(candidates: list[Source], exclude_url: str | None) -> list[Fragmen
         doc_id = canonical_url(str(source.url))
         if doc_id == excluded:
             continue
-        if doc_id not in docs:
+        if doc_id not in docs or (
+            docs[doc_id].snippet_only and _has_text(source) and not source.snippet_only
+        ):
             docs[doc_id] = source
         elif _has_text(source) and not _has_text(docs[doc_id]):
-            docs[doc_id] = docs[doc_id].model_copy(update={"fragment": source.fragment})
+            # The text keeps its label: a snippet stays marked under the hit's metadata.
+            docs[doc_id] = docs[doc_id].model_copy(
+                update={
+                    "fragment": source.fragment,
+                    "snippet_only": source.snippet_only,
+                }
+            )
         elif (
             _has_text(source)
+            and not source.snippet_only
             and _rating(docs[doc_id])
             and not _rating(source)
             and source.fragment not in docs[doc_id].fragment
@@ -194,7 +205,8 @@ def dedupe(fragments: list[Fragment]) -> list[Fragment]:
 
     Case, punctuation and spacing are ignored; any changed word, number, sign, decimal or thousands
     separator, or date keeps both. Of two copies the one from a reliable source type stays, in the
-    place of the first, so a copy never hides an official source.
+    place of the first, so a copy never hides an official source; between equals, a page we read
+    beats a search snippet.
     """
     seen: dict[tuple[str, ...], int] = {}
     kept = []
@@ -203,13 +215,16 @@ def dedupe(fragments: list[Fragment]) -> list[Fragment]:
         if words not in seen:
             seen[words] = len(kept)
             kept.append(fragment)
-        elif _reliable(fragment) and not _reliable(kept[seen[words]]):
+        elif _rank(fragment) > _rank(kept[seen[words]]):
             kept[seen[words]] = fragment
     return kept
 
 
-def _reliable(fragment: Fragment) -> bool:
-    return fragment.source.source_type in RELIABLE_TYPES
+def _rank(fragment: Fragment) -> tuple[bool, bool]:
+    return (
+        fragment.source.source_type in RELIABLE_TYPES,
+        not fragment.source.snippet_only,
+    )
 
 
 TRACKING = re.compile(r"^(utm_|fbclid$|gclid$|mc_)")

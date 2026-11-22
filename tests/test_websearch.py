@@ -1,4 +1,5 @@
 import asyncio
+import io
 import os
 import time
 from datetime import UTC, date, datetime, timedelta
@@ -16,8 +17,13 @@ from prawdowid import cache, safefetch, websearch
 from prawdowid.privacy import mask_personal_data
 from prawdowid.websearch import (
     ALLOWLIST,
+    BLOCKED,
+    NO_ANSWER,
     NOTHING_FETCHED,
     SEARCH_UNAVAILABLE,
+    TOO_BIG,
+    TOO_SLOW,
+    UNREADABLE,
     SearchHit,
     SearchUnavailable,
     allowed,
@@ -193,44 +199,218 @@ def test_no_allowlisted_hit_is_found_nothing_not_a_failure():
     assert result.limitation is None and not result.failed and not result.documents
 
 
+def typed(content: bytes, ctype: str):
+    return httpx2.Response(200, content=content, headers={"content-type": ctype})
+
+
+def pdf(text: str, title: str | None = None) -> bytes:
+    """A one-page PDF drawing `text` (ASCII) with a standard font; `title` in its metadata."""
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    content = DecodedStreamObject()
+    content.set_data(f"BT /F1 12 Tf 10 700 Td ({text}) Tj ET".encode())
+    page = writer.add_blank_page(612, 792)
+    page[NameObject("/Contents")] = writer._add_object(content)
+    font = {
+        NameObject("/Type"): NameObject("/Font"),
+        NameObject("/Subtype"): NameObject("/Type1"),
+        NameObject("/BaseFont"): NameObject("/Helvetica"),
+    }
+    page[NameObject("/Resources")] = DictionaryObject(
+        {
+            NameObject("/Font"): DictionaryObject(
+                {NameObject("/F1"): DictionaryObject(font)}
+            )
+        }
+    )
+    if title:
+        writer.add_metadata({"/Title": title})
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("routes", "reason"),
+    [
+        ({"www.gov.pl/p": httpx2.Response(403)}, BLOCKED),
+        ({"www.gov.pl/p": httpx2.Response(429)}, BLOCKED),
+        ({"www.gov.pl/p": httpx2.Response(503)}, NO_ANSWER),
+        ({"www.gov.pl/p": httpx2.Response(302)}, UNREADABLE),  # no Location
+        ({"www.gov.pl/p": typed(b"GIF89a", "image/gif")}, UNREADABLE),
+        ({"www.gov.pl/p": typed(b"%PDF-1.7\n garbage", "application/pdf")}, UNREADABLE),
+        ({"www.gov.pl/p": html("<html><body></body></html>")}, UNREADABLE),
+        (
+            {"www.gov.pl/p": httpx2.Response(302, headers={"location": "/p"})},
+            UNREADABLE,
+        ),
+        (
+            {
+                "www.gov.pl/p": httpx2.Response(
+                    302, headers={"location": "https://www.gov.pl:8443/p"}
+                )
+            },
+            UNREADABLE,
+        ),
+    ],
+    ids=[
+        "403",
+        "429",
+        "5xx",
+        "redirect-without-location",
+        "image",
+        "broken-pdf",
+        "no-text",
+        "redirect-loop",
+        "other-port",
+    ],
+)
+def test_a_page_we_cannot_read_stands_as_its_search_snippet(routes, reason, isolated):
+    provider = provider_returning_with_dates(
+        ("https://www.gov.pl/p", date(2026, 11, 3))
+    )
+    result = run(provider, routes)
+    [doc] = result.documents
+    assert doc.snippet_only == reason
+    # Only what the search provider returned; type and publisher from the allowlist.
+    assert (doc.url, doc.title, doc.text) == ("https://www.gov.pl/p", "t", "s")
+    assert doc.published_at == date(2026, 11, 3)
+    assert (doc.source_type, doc.publisher) == ("official", "www.gov.pl")
+    assert doc.to_source(fragment=doc.text).snippet_only == reason
+    assert result.limitation is None
+    assert not isolated.exists()  # never saved
+
+
+def test_a_site_that_blocks_us_is_asked_once_and_never_fetched_around():
+    """Konkret24, AFP and Demagog answer 403 to the server IP, robots.txt included."""
+    requests_seen = []
+
+    def blocking(request):
+        requests_seen.append((str(request.url), request.headers["user-agent"]))
+        return httpx2.Response(403)
+
+    async def go():
+        return await search_web(
+            "sankcje",
+            provider=provider_returning("https://konkret24.tvn24.pl/a"),
+            transport=httpx2.MockTransport(blocking),
+        )
+
+    [doc] = asyncio.run(go()).documents
+    assert doc.snippet_only == BLOCKED
+    assert (doc.publisher, doc.source_type) == ("Konkret24", "fact_check")
+    # robots.txt, then the page once: no retry, no other user agent.
+    assert requests_seen == [
+        ("https://konkret24.tvn24.pl/robots.txt", safefetch.USER_AGENT),
+        ("https://konkret24.tvn24.pl/a", safefetch.USER_AGENT),
+    ]
+
+
 @pytest.mark.parametrize(
     "routes",
     [
-        {"www.gov.pl/p": httpx2.Response(403)},
-        {"www.gov.pl/p": httpx2.Response(302)},  # redirect without Location
-        {
-            "www.gov.pl/p": httpx2.Response(
-                200, content=b"%PDF", headers={"content-type": "application/pdf"}
-            )
-        },
-        {"www.gov.pl/p": html(UNDATED)},  # no publication date
-        {
-            "www.gov.pl/p": html(),
-            "www.gov.pl/robots.txt": httpx2.Response(
-                200, text="User-agent: *\nDisallow: /"
-            ),
-        },
+        {"www.gov.pl/p": httpx2.Response(404)},
+        {"www.gov.pl/p": httpx2.Response(410)},
+        {"www.gov.pl/p": httpx2.Response(401)},  # login wall: not public
+        {"www.gov.pl/p": httpx2.Response(402)},  # payment wall
         {
             "www.gov.pl/p": httpx2.Response(
                 302, headers={"location": "https://example.com/p"}
             ),
             "example.com/p": html(),
         },
+        {
+            "www.gov.pl/p": httpx2.Response(
+                302, headers={"location": "https://example.com:8443/p"}
+            )
+        },
+        {  # the site's opt-out: no copy from a search engine either
+            "www.gov.pl/p": html(),
+            "www.gov.pl/robots.txt": httpx2.Response(
+                200, text="User-agent: *\nDisallow: /"
+            ),
+        },
+        {
+            "www.gov.pl/p": html(),
+            "www.gov.pl/robots.txt": httpx2.Response(
+                200, text="User-agent: *\nDisallow: /*p$"
+            ),
+        },
     ],
     ids=[
-        "blocked",
-        "redirect-without-location",
-        "not-html",
-        "undated",
-        "robots",
+        "404",
+        "410",
+        "401",
+        "402",
         "redirect-off-allowlist",
+        "redirect-off-allowlist-other-port",
+        "robots",
+        "robots-wildcard",
     ],
 )
-def test_unusable_pages_are_skipped(routes, isolated):
+def test_a_page_disallowed_gone_walled_or_off_the_allowlist_has_no_snippet(
+    routes, isolated
+):
     result = run(provider_returning("https://www.gov.pl/p"), routes)
     assert result.documents == []
     assert result.limitation == NOTHING_FETCHED
     assert not isolated.exists()
+
+
+def test_a_snippet_without_text_is_no_source():
+    def provider(query, *, domains, limit):
+        return [SearchHit(url="https://www.gov.pl/p", title="t", snippet="  ")]
+
+    result = run(provider, {"www.gov.pl/p": httpx2.Response(403)})
+    assert result.documents == [] and result.limitation == NOTHING_FETCHED
+
+
+def test_a_page_without_any_date_is_kept_undated(isolated):
+    result = run(
+        provider_returning("https://www.gov.pl/p"), {"www.gov.pl/p": html(UNDATED)}
+    )
+    [doc] = result.documents
+    assert doc.published_at is None and doc.snippet_only is None
+    assert "Rada UE przyjęła kolejny pakiet" in doc.text
+    [stored] = cache.load_documents(isolated)
+    assert stored.url == doc.url and stored.published_at is None
+
+
+def test_a_pdf_hit_is_read_by_the_pypdf_worker(isolated):
+    text = "Raport z kontroli wydatkow na obrone cywilna w latach 2023-2025. " * 5
+    url = "https://www.nik.gov.pl/raport.pdf"
+    routes = {"www.nik.gov.pl/raport.pdf": typed(pdf(text), "application/pdf")}
+    provider = provider_returning_with_dates((url, date(2026, 5, 4)))
+    [doc] = run(provider, routes).documents
+    assert doc.snippet_only is None
+    assert "Raport z kontroli wydatkow na obrone cywilna" in doc.text
+    # The file has no title or date of its own: the search hit's.
+    assert (doc.title, doc.published_at) == ("t", date(2026, 5, 4))
+    assert (doc.source_type, doc.domain) == ("official", "www.nik.gov.pl")
+
+
+def test_a_pdf_shows_the_search_title_over_its_file_name():
+    text = "Raport z kontroli wydatkow na obrone cywilna w latach 2023-2025. " * 5
+    body = pdf(text, title="Microsoft Word - raport_final_v3.docx")
+    routes = {"www.gov.pl/raport.pdf": typed(body, "application/pdf")}
+    [doc] = run(provider_returning("https://www.gov.pl/raport.pdf"), routes).documents
+    assert doc.title == "t"
+
+
+def test_a_pdf_over_the_page_cap_stands_as_its_snippet(monkeypatch):
+    monkeypatch.setattr(websearch, "MAX_PAGE_BYTES", 100)
+    routes = {"www.gov.pl/p": typed(pdf("x " * 200), "application/pdf")}
+    [doc] = run(provider_returning("https://www.gov.pl/p"), routes).documents
+    assert doc.snippet_only == TOO_BIG
+
+
+def test_a_page_we_read_wins_over_a_snippet_of_the_same_url():
+    read = fetched_doc()
+    snippet = read.model_copy(update={"text": "s", "snippet_only": BLOCKED})
+    for found in ([read, snippet], [snippet, None, read]):
+        assert websearch._one_per_url(found) == [read]
 
 
 def fetched_doc():
@@ -357,8 +537,9 @@ def test_search_hit_date_fills_in_a_page_without_one(isolated):
     assert doc.published_at == date(2025, 1, 1)
 
 
-def test_source_list_documents_every_allowlisted_domain():
-    sources = Path("docs/sources.md").read_text(encoding="utf-8")
+@pytest.mark.parametrize("path", ["docs/sources.md", "docs/submission/sources.md"])
+def test_source_list_documents_every_allowlisted_domain(path):
+    sources = Path(path).read_text(encoding="utf-8")
     assert [d for d in ALLOWLIST if f"`{d}`" not in sources] == []
 
 
@@ -398,37 +579,60 @@ def test_slow_page_is_cut_off(monkeypatch):
             transport=httpx2.MockTransport(slow),
         )
 
-    assert asyncio.run(go()).limitation == NOTHING_FETCHED
+    [doc] = asyncio.run(go()).documents
+    assert doc.snippet_only == TOO_SLOW
 
 
 DISALLOW_PRIVATE = httpx2.Response(200, text="User-agent: *\nDisallow: /private")
 
 
 @pytest.mark.parametrize(
-    "routes",
+    ("routes", "checked"),
     [
-        {  # same host, redirect to a disallowed path
-            "www.gov.pl/robots.txt": DISALLOW_PRIVATE,
-            "www.gov.pl/p": httpx2.Response(302, headers={"location": "/private"}),
-            "www.gov.pl/private": html(),
-        },
-        {  # another allowlisted host whose robots.txt disallows everything
-            "www.gov.pl/p": httpx2.Response(
-                302, headers={"location": "https://www.sejm.gov.pl/x"}
-            ),
-            "www.sejm.gov.pl/robots.txt": httpx2.Response(
-                200, text="User-agent: *\nDisallow: /"
-            ),
-            "www.sejm.gov.pl/x": html(),
-        },
+        (  # same host, redirect to a disallowed path
+            {
+                "www.gov.pl/robots.txt": DISALLOW_PRIVATE,
+                "www.gov.pl/p": httpx2.Response(302, headers={"location": "/private"}),
+                "www.gov.pl/private": html(),
+            },
+            "https://www.gov.pl/robots.txt",
+        ),
+        (  # another allowlisted host whose robots.txt disallows everything
+            {
+                "www.gov.pl/p": httpx2.Response(
+                    302, headers={"location": "https://www.sejm.gov.pl/x"}
+                ),
+                "www.sejm.gov.pl/robots.txt": httpx2.Response(
+                    200, text="User-agent: *\nDisallow: /"
+                ),
+                "www.sejm.gov.pl/x": html(),
+            },
+            "https://www.sejm.gov.pl/robots.txt",
+        ),
     ],
     ids=["same-host", "other-host"],
 )
-def test_robots_txt_is_checked_on_every_redirect_hop(routes):
+def test_robots_txt_is_checked_on_every_redirect_hop(routes, checked):
     seen = []
     result = run(provider_returning("https://www.gov.pl/p"), routes, seen=seen)
-    assert result.documents == []
+    assert result.documents == []  # disallowed: no snippet either
+    assert checked in seen
     assert not [u for u in seen if u.endswith(("/private", "/x"))]
+
+
+def test_a_malformed_redirect_loses_that_hit_only():
+    routes = {
+        "www.gov.pl/p": httpx2.Response(
+            302, headers={"location": "https://[www.gov.pl/x"}
+        ),
+        "www.sejm.gov.pl/q": html(),
+    }
+    provider = provider_returning("https://www.gov.pl/p", "https://www.sejm.gov.pl/q")
+    docs = {d.url: d.snippet_only for d in run(provider, routes).documents}
+    assert docs == {
+        "https://www.gov.pl/p": UNREADABLE,
+        "https://www.sejm.gov.pl/q": None,
+    }
 
 
 @pytest.mark.parametrize("status", [429, 500, 503])
@@ -436,9 +640,20 @@ def test_unreadable_robots_txt_means_no_fetch(status):
     seen = []
     routes = {"www.gov.pl/robots.txt": httpx2.Response(status), "www.gov.pl/p": html()}
     result = run(provider_returning("https://www.gov.pl/p"), routes, seen=seen)
-    assert result.documents == []
+    # The site never said no: the label must not say it blocks us.
+    assert [d.snippet_only for d in result.documents] == [NO_ANSWER]
     assert "https://www.gov.pl/p" not in seen
     assert "https://www.gov.pl" not in safefetch._robots  # retried later, not cached
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 410])
+def test_robots_txt_answering_4xx_sets_no_rules(status):
+    """RFC 9309 2.3.1.3; Python's RobotFileParser would read 401 and 403 as disallow-all."""
+    seen = []
+    routes = {"www.gov.pl/robots.txt": httpx2.Response(status), "www.gov.pl/p": html()}
+    [doc] = run(provider_returning("https://www.gov.pl/p"), routes, seen=seen).documents
+    assert doc.snippet_only is None and "https://www.gov.pl/p" in seen
+    assert "https://www.gov.pl" in safefetch._robots  # cached like a parsed file
 
 
 def test_oversized_robots_txt_and_page_are_refused(monkeypatch):
@@ -448,11 +663,13 @@ def test_oversized_robots_txt_and_page_are_refused(monkeypatch):
         ),
         "www.gov.pl/p": html(),
     }
-    assert run(provider_returning("https://www.gov.pl/p"), big_robots).documents == []
+    [doc] = run(provider_returning("https://www.gov.pl/p"), big_robots).documents
+    assert doc.snippet_only == NO_ANSWER
 
     monkeypatch.setattr(websearch, "MAX_PAGE_BYTES", 100)
     page_routes = {"www.gov.pl/p": html()}
-    assert run(provider_returning("https://www.gov.pl/p"), page_routes).documents == []
+    [doc] = run(provider_returning("https://www.gov.pl/p"), page_routes).documents
+    assert doc.snippet_only == TOO_BIG
 
 
 class RecordingBackend(httpcore2.AsyncNetworkBackend):
@@ -545,3 +762,15 @@ def test_a_hanging_provider_is_cut_by_the_search_budget(monkeypatch):
     result, elapsed = asyncio.run(go())
     assert elapsed < 0.8
     assert result.limitation == websearch.SEARCH_UNAVAILABLE
+
+
+def test_robots_txt_section_for_our_bot_applies():
+    seen = []
+    rules = "User-agent: PrawdowidBot\nDisallow: /\n\nUser-agent: *\nAllow: /\n"
+    routes = {
+        "www.gov.pl/robots.txt": httpx2.Response(200, text=rules),
+        "www.gov.pl/p": html(),
+    }
+    result = run(provider_returning("https://www.gov.pl/p"), routes, seen=seen)
+    assert result.documents == []
+    assert "https://www.gov.pl/p" not in seen

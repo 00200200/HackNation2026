@@ -9,6 +9,7 @@ licence, retention, access control and deletion):
 - Metadata of every page: URL, title, publisher, dates, source type, domain, licence.
 - Full text only when the domain's licence is confirmed (`Domain.licence` in websearch.py).
   Today none is, so `text` is stored empty. The pipeline still uses the live text in memory.
+- Never a search snippet of a page we could not read (`Document.snippet_only`), in either store.
 - Retention: records older than `RETENTION_DAYS` (by `fetched_at`) are dropped on every save;
   `delete_document(url)` removes one record, deleting the file removes everything.
 - Access: owner read/write only (0600), ignored by git. A URL keeps one record (latest fetch).
@@ -108,12 +109,15 @@ class Document(BaseModel):
     url: str
     title: str
     publisher: str
-    published_at: date
+    # None: neither the page nor the search provider gives a date; the judge adds a limitation.
+    published_at: date | None
     fetched_at: datetime
     source_type: str
     domain: str
     licence: str | None = None
     text: str
+    # `Source.snippet_only`: `text` is the search provider's extract, never stored.
+    snippet_only: str | None = None
 
     def to_source(self, fragment: str | None = None) -> Source:
         return Source(
@@ -124,6 +128,7 @@ class Document(BaseModel):
             url=self.url,
             source_type=self.source_type,
             fragment=fragment,
+            snippet_only=self.snippet_only,
         )
 
 
@@ -185,8 +190,12 @@ def stored_documents() -> list[Document]:
 def store_document(doc: Document) -> bool:
     """Insert the document and its chunks unless its doc id is stored. True when it was added.
 
-    A database failure is logged and returns False: losing one page never stops the seed.
+    A database failure is logged and returns False: losing one page never stops the seed. A search
+    snippet is never stored (it is not our copy of the page), nor is a page without a date (the
+    table needs one).
     """
+    if doc.snippet_only or doc.published_at is None:
+        return False
     try:
         return _insert(doc)
     except psycopg.Error as exc:

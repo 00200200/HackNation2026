@@ -61,6 +61,9 @@ class Source(BaseModel):
     url: HttpUrl
     source_type: str
     fragment: str | None = None
+    # Set when we could not read the page ourselves: the text is the search provider's extract of
+    # it, and `fetched_at` is when we searched. Says why, in Polish ("strona nie pozwala na pobranie").
+    snippet_only: str | None = None
 
 
 class ModelCall(BaseModel):

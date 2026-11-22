@@ -26,6 +26,7 @@ const SOURCE_TYPES = {
   incident_base: "baza incydentów dezinformacji",
   disinfo_database: "baza znanych narracji dezinformacyjnych",
   news: "serwis informacyjny",
+  media: "portal informacyjny",
 };
 // First words of the answer, in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić…"),
 // picked from the verdict set in code. The reasons stay in the sources and limitations.
@@ -101,10 +102,13 @@ function sourceItem(s, i) {
   const year = s.published_at ? Number(String(s.published_at).slice(0, 4)) : null;
   const age = s.published_at ? (Date.now() - Date.parse(`${s.published_at}T00:00:00Z`)) / DAY_MS : NaN;
   const archival = Boolean(year) && age > ARCHIVAL_DAYS;
+  // snippet_only: we could not read the page, so the quote is the search engine's extract of it
+  // and fetched_at is when we searched. It holds the reason, e.g. "strona nie pozwala na pobranie".
+  const snippet = Boolean(s.snippet_only);
   const meta = [
     host,
     s.published_at ? `opublikowano ${plDate(s.published_at)}` : "bez daty publikacji",
-    s.fetched_at ? `pobrano ${plDate(s.fetched_at)}` : null,
+    s.fetched_at ? `${snippet ? "wyszukano" : "pobrano"} ${plDate(s.fetched_at)}` : null,
     SOURCE_TYPES[s.source_type] ?? s.source_type,
   ].filter(Boolean).join(", ");
   return el("li", { className: "source" },
@@ -113,7 +117,9 @@ function sourceItem(s, i) {
       s.publisher ? el("b", { textContent: s.publisher }) : null, s.publisher ? ", " : null, title),
     el("p", { className: "source-meta" },
       archival ? el("span", { className: "archival", textContent: `materiał archiwalny, ${year}` }) : null,
-      archival ? " " : null, meta));
+      archival ? " " : null,
+      snippet ? el("span", { className: "snippet", textContent: `fragment z wyników wyszukiwarki; ${s.snippet_only}` }) : null,
+      snippet ? " " : null, meta));
 }
 
 // Claims from a quote: who said it, and what was said. Plain statements get no tag.

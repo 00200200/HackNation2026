@@ -98,6 +98,8 @@ def _one(s: Source, quote: bool) -> str:
     who = s.publisher or str(s.url.host)
     when = f", {_date(s)}" if s.published_at else ", bez daty"
     text = f"{who}{when}"
+    if s.snippet_only:
+        text += ", fragment z wyników wyszukiwarki"
     if quote and s.fragment:
         text += f": „{_short(s.fragment)}”"
     return text

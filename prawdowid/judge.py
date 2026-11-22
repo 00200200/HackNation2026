@@ -91,6 +91,9 @@ ARCHIVAL = (
     "Materiał archiwalny z {date}: {publisher}. Sprawdź, czy nadal jest aktualny."
 )
 UNDATED = "Źródło bez daty publikacji: {publisher}."
+SNIPPET_ONLY = (
+    "{publisher}: źródło znamy tylko z fragmentu w wynikach wyszukiwarki, bo {reason}."
+)
 
 CLAIM = register_tag("claim")
 FRAGMENT = register_tag("fragment")
@@ -330,7 +333,9 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
 
     "Enough" (`_enough`): one reliable source type, or two independent origins. For the conflict
     row, an allowlisted news agency's own finding (PAP, `own_conclusion`) against a reliable source
-    type counts too; its report of what someone said does not.
+    type counts too; its report of what someone said does not. A search snippet of a page we could
+    not read (`Source.snippet_only`) or an undated page counts like any fragment, with a
+    limitation, but never makes the strength "silna" (`_strength`).
     Missing context counts only from a "context" or "refutes" label with a `context_quote` found
     verbatim in the same document (`_grounded`). A "gap" label (the data cannot settle the claim)
     never decides: it adds a limitation, and a publisher whose own conclusion is a gap counts for
@@ -360,7 +365,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         ]
     )
     context = [e for e in counted if _grounded(e)]
-    limitations = limitations + _date_limits(evidence, today)
+    limitations = limitations + _source_limits(evidence, today)
     if gaps := [e for e in evidence if e.label.stance is Stance.GAP]:
         names = {e.source.publisher or str(e.source.url.host) for e in gaps}
         limitations.append(DATA_GAP.format(publishers=", ".join(sorted(names))))
@@ -500,14 +505,21 @@ def _count(evidence: list[Evidence]) -> str:
 
 def _strength(evidence: list[Evidence]) -> str:
     body = [e for e in evidence if not e.title_only]
-    reliable = any(_reliable(e) for e in body)
-    level = "silna" if reliable and len(_origins(body)) >= 2 else "umiarkowana"
+    # A search snippet or an undated page counts like any fragment, but strong evidence needs a
+    # reliable source we read ourselves and that carries a date.
+    firm = any(
+        _reliable(e) and not e.source.snippet_only and e.source.published_at
+        for e in body
+    )
+    level = "silna" if firm and len(_origins(body)) >= 2 else "umiarkowana"
     return f"{level}: {_count(evidence)}"
 
 
 def _premise(e: Evidence) -> str:
     s = e.source
     when = s.published_at.isoformat() if s.published_at else "bez daty"
+    if s.snippet_only:
+        when += ", fragment z wyników wyszukiwarki"
     verb = {
         Stance.SUPPORTS: "potwierdza",
         Stance.REFUTES: "przeczy",
@@ -522,10 +534,14 @@ def _premise(e: Evidence) -> str:
     return premise
 
 
-def _date_limits(evidence: list[Evidence], today: date) -> list[str]:
+def _source_limits(evidence: list[Evidence], today: date) -> list[str]:
     limits = []
     for s in {e.label.doc_id: e.source for e in evidence}.values():
         publisher = s.publisher or str(s.url.host)
+        if s.snippet_only:
+            limits.append(
+                SNIPPET_ONLY.format(reason=s.snippet_only, publisher=publisher)
+            )
         if s.published_at is None:
             limits.append(UNDATED.format(publisher=publisher))
         elif (today - s.published_at).days > ARCHIVE_DAYS:

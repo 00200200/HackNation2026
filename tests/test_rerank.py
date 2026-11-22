@@ -321,3 +321,50 @@ def test_the_same_page_text_is_appended_once():
     ranking = run([hit, page, page.model_copy()], answering([0]))
     [fragment] = ranking.fragments
     assert fragment.source.fragment.count("Pełny tekst analizy.") == 1
+
+
+BLOCKED = "strona nie pozwala na pobranie"
+
+
+def snippet(url, text):
+    return source(url, text).model_copy(update={"snippet_only": BLOCKED})
+
+
+@pytest.mark.parametrize("snippet_first", [True, False])
+def test_a_page_we_read_replaces_a_search_snippet_of_it(snippet_first):
+    found = snippet("https://konkret24.tvn24.pl/x", "Krótki fragment z wyszukiwarki.")
+    page = source("https://konkret24.tvn24.pl/x", "Pełny tekst analizy.")
+    candidates = [found, page] if snippet_first else [page, found]
+    [fragment] = run(candidates, answering([0])).fragments
+    assert fragment.source.fragment == page.fragment
+    assert fragment.source.snippet_only is None
+
+
+def test_a_snippet_is_never_joined_to_a_fact_check_rating():
+    hit = source(
+        "https://demagog.org.pl/x/",
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Polska wyszła z UE.",
+    ).model_copy(update={"source_type": "fact_check"})
+    found = snippet("https://demagog.org.pl/x", "Fragment z wyszukiwarki.")
+    [fragment] = run([hit, found], answering([0])).fragments
+    assert fragment.source.fragment == hit.fragment
+    assert fragment.source.snippet_only is None
+
+
+def test_a_snippet_filling_a_title_only_hit_keeps_its_label():
+    hit = source("https://demagog.org.pl/x/", title="Polska w UE od 2004? Prawda")
+    found = snippet("https://demagog.org.pl/x", "Fragment z wyszukiwarki.")
+    [fragment] = run([hit, found], answering([0])).fragments
+    assert fragment.source.fragment == found.fragment
+    assert fragment.source.snippet_only == BLOCKED
+    assert fragment.source.title == hit.title  # the first candidate's metadata
+
+
+@pytest.mark.parametrize("snippet_first", [True, False])
+def test_a_snippet_copy_never_hides_a_page_we_read(snippet_first):
+    text = "Polska jest członkiem UE od 1 maja 2004 roku."
+    copies = [snippet("https://a.pl/x", text), source("https://b.pl/y", text)]
+    if not snippet_first:
+        copies.reverse()
+    [fragment] = run(copies, answering([0])).fragments
+    assert fragment.source.snippet_only is None

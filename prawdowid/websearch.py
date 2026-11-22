@@ -6,6 +6,14 @@ restricted server-side to `ALLOWLIST` via `include_domains`. A Brave or Exa wrap
 signature replaces it in one place.
 
 A failed or empty search is a technical limit returned in `WebSearch.limitation`, never a verdict.
+
+Every hit is fetched by us (HTML through trafilatura, PDF through the link input's pypdf worker).
+When our fetch cannot use an allowlisted page (the site answers 403 or 429, does not answer in
+time, the page is too big or unreadable) the hit stays as the search provider's own title and
+extract, marked `snippet_only` with the reason: we never fetch around a block, and such a snippet
+is never saved. A page that robots.txt disallows (the site's opt-out), that is gone (404, 410),
+sits behind a login or payment wall (401, 402) or redirects off the allowlist is dropped. A page without any publication date is kept with `published_at=None`; the judge adds a
+limitation and never counts it as strong evidence.
 """
 
 import asyncio
@@ -20,7 +28,7 @@ from urllib.parse import urlsplit
 import httpx2
 import requests
 import trafilatura
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl, ValidationError
 from tavily import (
     BadRequestError,
     InvalidAPIKeyError,
@@ -30,7 +38,7 @@ from tavily import (
 from tavily.errors import ForbiddenError
 from tavily.errors import TimeoutError as TavilyTimeoutError
 
-from prawdowid import safefetch
+from prawdowid import link, safefetch
 from prawdowid.cache import Document, save_document
 from prawdowid.privacy import mask_personal_data
 from prawdowid.search_cache import cached_tavily_search
@@ -39,7 +47,8 @@ log = logging.getLogger("prawdowid")
 
 
 class Domain(NamedTuple):
-    # "official" (primary) or "fact_check" / "news" (reliable secondary); "disinfo_database": a
+    # "official" (primary) or "fact_check" / "news" (reliable secondary, "news" a news agency);
+    # "media": a newspaper or portal, one publisher like any other; "disinfo_database": a
     # known-narrative match, context that never decides on its own.
     source_type: str
     # None: take the site name from the page (blanket entries such as gov.pl).
@@ -67,6 +76,15 @@ ALLOWLIST = {
     "konkret24.tvn24.pl": Domain("fact_check", "Konkret24"),
     "fakenews.pl": Domain("fact_check", "FakeNews.pl"),
     "sprawdzam.afp.com": Domain("fact_check", "AFP Sprawdzam"),
+    # Answers 403 to our server, so in practice only its search snippets reach the judge (#76).
+    # Publisher names match the other lookups (Fact Check's "Demagog", the corpus's Pravda), so
+    # one fact-checker found twice is still one origin in judge.decide.
+    "demagog.org.pl": Domain("fact_check", "Demagog"),
+    "pravda.org.pl": Domain("fact_check", "Stowarzyszenie Pravda"),
+    # Its fact-checks (/kategoria/prawda-czy-falsz) have flat URLs like every other article, so
+    # no URL pattern tells them apart: the whole site is media. Not "news": that type is for a
+    # news agency, whose own finding can stand against a reliable source (judge._conflicting).
+    "oko.press": Domain("media", "OKO.press"),
     "pap.pl": Domain("news", "Polska Agencja Prasowa"),
 }
 
@@ -227,14 +245,21 @@ async def search_web(
     by_url = dict(list(by_url.items())[:limit])
 
     async with safefetch.client(FETCH_TIMEOUT_S, transport) as http:
-        docs = await asyncio.gather(
-            *(_fetch_bounded(u, http, h.published_date) for u, h in by_url.items())
+        docs = _one_per_url(
+            await asyncio.gather(*(_document(h, http) for h in by_url.values()))
         )
-    # Two hits may redirect to the same page.
-    docs = list({d.url: d for d in docs if d}.values())
-    if save:
-        await _save_all(docs)
+    if save:  # a search snippet is not our copy of a page: never saved
+        await _save_all([d for d in docs if not d.snippet_only])
     return WebSearch(documents=docs, limitation=None if docs else NOTHING_FETCHED)
+
+
+def _one_per_url(found: list[Document | None]) -> list[Document]:
+    """Two hits may redirect to the same page: a page we read wins over a snippet of it."""
+    docs: dict[str, Document] = {}
+    for d in found:
+        if d and (d.url not in docs or docs[d.url].snippet_only):
+            docs[d.url] = d
+    return list(docs.values())
 
 
 async def _save_all(docs: list[Document]) -> None:
@@ -275,29 +300,130 @@ def _allowed(url: str) -> bool:
     return allowed(url) is not None
 
 
-async def _fetch_bounded(
-    url: str, client: httpx2.AsyncClient, fallback_published: date | None = None
-) -> Document | None:
-    """The client timeout bounds each read, not a page trickled in slowly: cap the whole page."""
+# Why our own fetch could not use a page search found; shown with its snippet as
+# "fragment z wyników wyszukiwarki; <reason>".
+BLOCKED = "strona nie pozwala na pobranie"
+NO_ANSWER = "strona nie odpowiedziała"
+TOO_SLOW = "strona nie odpowiedziała na czas"
+TOO_BIG = "strona jest za duża do pobrania"
+UNREADABLE = "nie udało się odczytać treści strony"
+
+
+class Unread(Exception):
+    """Our fetch cannot use the page. `reason` (Polish) labels the hit's search snippet instead;
+    None when the snippet may not stand in either: robots.txt disallows the page, it is gone,
+    behind a login or payment wall, or leaves the allowlist."""
+
+    def __init__(self, problem: str, reason: str | None):
+        super().__init__(problem)
+        self.reason = reason
+
+
+async def _document(hit: SearchHit, client: httpx2.AsyncClient) -> Document | None:
+    """The hit's page as we read it, else its search snippet (`_snippet`).
+
+    The client timeout bounds each read, not a page trickled in slowly: PAGE_BUDGET_S caps the
+    whole page.
+    """
     try:
         async with asyncio.timeout(PAGE_BUDGET_S):
-            return await fetch_document(url, client, fallback_published)
+            return await _read(hit.url, client, hit.published_date, hit.title)
     except TimeoutError:
-        log.warning("fetch skipped %s: over %g s", url, PAGE_BUDGET_S)
+        problem, reason = f"over {PAGE_BUDGET_S:g} s", TOO_SLOW
+    except Unread as exc:
+        problem, reason = str(exc), exc.reason
+    doc = _snippet(hit, reason) if reason else None
+    log.info(
+        "fetch skipped %s: %s%s", hit.url, problem, "; snippet kept" if doc else ""
+    )
+    return doc
+
+
+def _snippet(hit: SearchHit, reason: str) -> Document | None:
+    """The search provider's own title and extract of a page we could not read. Nothing is
+    fetched for it, and it is never saved. Type and publisher come from the allowlist."""
+    entry = allowed(hit.url)
+    title, text = hit.title.strip(), hit.snippet.strip()
+    if not entry or not title or not text:
         return None
+    try:
+        HttpUrl(hit.url)  # what Source.url will require
+    except ValidationError:
+        return None
+    host = urlsplit(hit.url).hostname or ""
+    return Document(
+        url=hit.url,
+        title=title,
+        publisher=entry.publisher or host,
+        published_at=hit.published_date,
+        fetched_at=datetime.now(UTC),
+        source_type=entry.source_type,
+        domain=host,
+        licence=entry.licence,
+        text=text,
+        snippet_only=reason,
+    )
 
 
 async def fetch_document(
     url: str, client: httpx2.AsyncClient, fallback_published: date | None = None
 ) -> Document | None:
-    """Fetch an allowlisted HTML page and extract it. None when it cannot be used.
+    """Fetch an allowlisted HTML page or PDF and extract it. None when it cannot be used.
 
     `fallback_published`: the search provider's own publication date, used only when the page
-    itself carries none (common on Polish gov/news pages without date metadata).
+    itself carries none (common on Polish gov/news pages without date metadata). A page with no
+    date anywhere is kept with `published_at=None`.
     """
-    page = await _get_html(url, client)
-    if page is None or not (entry := allowed(page.url)):
+    try:
+        return await _read(url, client, fallback_published)
+    except Unread as exc:
+        log.info("fetch skipped %s: %s", url, exc)
         return None
+
+
+async def _read(
+    url: str,
+    client: httpx2.AsyncClient,
+    fallback_published: date | None,
+    fallback_title: str = "",
+) -> Document:
+    """Fetch and extract. The page's own title and date first, the search hit's as fallback;
+    for a PDF the hit's title first, since a file's own is often its name ("Microsoft Word - …")."""
+    page = await _get_page(url, client)
+    if not (entry := allowed(page.url)):
+        raise Unread(f"{page.url} is not allowlisted", None)
+    text, title, sitename, published = await _extract(page)
+    if _media_type(page) == link.PDF_TYPE:
+        title = fallback_title.strip() or title
+    else:
+        title = title or fallback_title.strip()
+    if not text or not title:
+        raise Unread("no text or title", UNREADABLE)
+    host = urlsplit(page.url).hostname or ""
+    return Document(
+        url=page.url,
+        title=title,
+        publisher=entry.publisher or sitename or host,
+        published_at=published or fallback_published,
+        fetched_at=datetime.now(UTC),
+        source_type=entry.source_type,
+        domain=host,
+        licence=entry.licence,
+        text=text,
+    )
+
+
+async def _extract(
+    page: safefetch.Page,
+) -> tuple[str | None, str | None, str | None, date | None]:
+    """Text, title, site name and publication date of an HTML page or a PDF."""
+    if _media_type(page) == link.PDF_TYPE:
+        # The link input's pypdf path: a child process with its own page and memory ceilings.
+        try:
+            pdf = await link.extract(page.body, link.PDF_TYPE, page.url)
+        except link.Refusal:
+            return None, None, None, None
+        return pdf.text, pdf.title, pdf.publisher, pdf.published_at
     extracted = await asyncio.to_thread(
         trafilatura.bare_extraction,
         page.text(),
@@ -307,49 +433,60 @@ async def fetch_document(
         # page without metadata. ponytail: accepted; a stricter metadata-only check if it misleads.
         date_extraction_params={"original_date": True, "extensive_search": False},
     )
-    published = (_date(extracted.date) if extracted else None) or fallback_published
-    if not extracted or not extracted.text or not extracted.title or not published:
-        # No publication date: the brief requires one on every source.
-        log.info("fetch skipped %s: no text, title or publication date", url)
-        return None
-    host = urlsplit(page.url).hostname or ""
-    return Document(
-        url=page.url,
-        title=extracted.title,
-        publisher=entry.publisher or extracted.sitename or host,
-        published_at=published,
-        fetched_at=datetime.now(UTC),
-        source_type=entry.source_type,
-        domain=host,
-        licence=entry.licence,
-        text=extracted.text,
-    )
+    if not extracted:
+        return None, None, None, None
+    return extracted.text, extracted.title, extracted.sitename, _date(extracted.date)
 
 
-async def _get_html(url: str, client: httpx2.AsyncClient) -> safefetch.Page | None:
-    """safefetch.get with one retry on a network error or 5xx. A 200 HTML page or None."""
+async def _get_page(url: str, client: httpx2.AsyncClient) -> safefetch.Page:
+    """safefetch.get with one retry on a network error or 5xx: a 200 HTML page or PDF, else
+    Unread."""
+    problem = "no answer"
     for attempt in range(1, ATTEMPTS + 1):
         try:
             page = await safefetch.get(
                 url, client, allow=_allowed, max_bytes=MAX_PAGE_BYTES
             )
         except (safefetch.Blocked, httpx2.InvalidURL) as exc:
-            log.info("fetch skipped %s: %s", url, exc)
-            return None
+            # Too many redirects, a malformed URL or another port: unreadable.
+            raise Unread(str(exc), _REFUSALS.get(type(exc), UNREADABLE)) from exc
         except httpx2.HTTPError as exc:  # network, timeout, non-public address
             log.warning("fetch attempt %d %s failed: %r", attempt, url, exc)
+            problem = repr(exc)
             continue
         if page.status >= 500:
             log.warning("fetch attempt %d %s: HTTP %d", attempt, url, page.status)
+            problem = f"HTTP {page.status}"
             continue
-        # 401, 403, 429, paywalls: we never get around a block.
-        if page.status != 200 or "html" not in page.content_type:
-            log.info(
-                "fetch skipped %s: HTTP %d %s", url, page.status, page.content_type
-            )
-            return None
+        # 401, 402, 403, 429: we never get around a block.
+        if page.status != 200:
+            raise Unread(f"HTTP {page.status}", _status_reason(page.status))
+        if "html" not in _media_type(page) and _media_type(page) != link.PDF_TYPE:
+            raise Unread(f"type {page.content_type!r}", UNREADABLE)
         return page
-    return None
+    raise Unread(problem, NO_ANSWER)
+
+
+# What a safefetch refusal means for the snippet. None, no snippet: the page leaves the allowlist,
+# or robots.txt disallows it (the site opted out of crawlers: no copy from a search engine either).
+_REFUSALS = {
+    safefetch.NotAllowed: None,
+    safefetch.Disallowed: None,
+    safefetch.RobotsUnreachable: NO_ANSWER,
+    safefetch.TooLarge: TOO_BIG,
+}
+
+
+def _status_reason(status: int) -> str | None:
+    """Why a non-200 answer cannot be read. None, so no snippet either: a page that is gone (its
+    snippet is stale) or behind a login or payment wall (its content is not public)."""
+    if status in (401, 402, 404, 410):
+        return None
+    return BLOCKED if 400 <= status < 500 else UNREADABLE
+
+
+def _media_type(page: safefetch.Page) -> str:
+    return page.content_type.split(";")[0].strip().lower()
 
 
 def _date(value: str | None) -> date | None:

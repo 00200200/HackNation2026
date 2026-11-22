@@ -59,6 +59,8 @@ WRAP_WIDTH = 900
 URL_LIMIT = MESSAGE_LIMIT - 4
 URL_TOO_LONG = "  (link za długi na wiadomość Discorda; jest w załączniku)"
 CONNECTION_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę."
+# A source we know only from the search provider's result (`Source.snippet_only` says why).
+SNIPPET_LABEL = "fragment z wyników wyszukiwarki"
 
 
 def _escape(text: str) -> str:
@@ -87,8 +89,15 @@ def _bullets(items: list[str]) -> list[str]:
 
 
 def _source(s: Source, url_limit: int | None) -> list[str]:
+    # The same labels as the web form: an undated source and a search snippet say so.
     meta = ", ".join(
-        part for part in (s.publisher, s.published_at and str(s.published_at)) if part
+        part
+        for part in (
+            s.publisher,
+            str(s.published_at) if s.published_at else "bez daty publikacji",
+            s.snippet_only and f"{SNIPPET_LABEL}; {s.snippet_only}",
+        )
+        if part
     )
     lines = _field("- ", f"{s.title}, {meta}" if meta else s.title, "  ")
     # Own line, <url> stops Discord from unfurling a preview of an untrusted page.

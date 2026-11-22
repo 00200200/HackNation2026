@@ -637,6 +637,17 @@
               }
             ],
             "title": "Fragment"
+          },
+          "snippet_only": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet Only"
           }
         },
         "type": "object",

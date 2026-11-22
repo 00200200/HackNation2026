@@ -12,6 +12,7 @@ dependencies = [
     "httpcore2>=2.16.2",
     "httpx2>=2.16.2",
     "pgvector>=0.5.1",
+    "protego>=0.7.0",
     "psycopg[binary]>=3.3.9",
     "pydantic-ai-slim[anthropic,mcp]>=2.71.0",
     "pypdf>=7.1.1",
@@ -24,12 +25,12 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    # Also the corpus build (`make corpus`): fastmcp, feedparser, lxml, protego, pyyaml,
-    # tldextract. Kept here so the API image (UV_NO_DEV) stays small.
+    # Also the corpus build (`make corpus`): fastmcp, feedparser, lxml, pyyaml, tldextract.
+    # Kept here so the API image (UV_NO_DEV) stays small. protego is a runtime dependency
+    # (safefetch reads robots.txt with it), which the corpus build uses too.
     "fastmcp-slim[server]>=4.2.4",
     "feedparser>=6.0.14",
     "lxml>=6.1.3",
-    "protego>=0.7.0",
     "pytest>=9.2.0",
     "pyyaml>=6.0.4",
     "ruff>=0.17.6",
