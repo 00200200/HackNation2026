@@ -15,10 +15,10 @@ Poniżej: co mówi każdy slajd i skąd to wiadomo.
 | 5 | Pięć ocen; „nie sprawdzono”, błąd techniczny, strona nie do sprawdzenia i prośba o doprecyzowanie osobno | [contract.py](../../prawdowid/contract.py), [pipeline.py](../../prawdowid/pipeline.py) |
 | 6 | Przepływ: tekst albo link, twierdzenia, źródła równolegle, cytat sprawdzany w kodzie, werdykt z reguł | [architecture.md](architecture.md), [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md) |
 | 7 | Sześć ryzyk z zadania: zabezpieczenie i to, co zostaje | [risks.md](risks.md) |
-| 8 | Kanały: WWW działa, bot Discord nieuruchomiony, adapter w przygotowaniu; zrzut strony głównej z kodu `integration/r2` | [deploy.md](../deploy.md), sekcja 7; [WORKLOG](../../WORKLOG.md) |
-| 9 | Szybki test na 10 przypadkach, commit edd34a5, ekstrakcja Claude Opus; przy abstencji, wstrzyknięciach i zgodności kanałów liczba przypadków | [latest.json](../../evals/results/latest.json), [architecture.md](architecture.md#saved-test-results-and-reproduction) |
-| 10 | Wdrożenie: serwer w Niemczech, co trafia poza EOG, model w zmiennej środowiskowej, korpus 1158 dokumentów | [deploy.md](../deploy.md), [corpus.md](../corpus.md), tabela dostawców w `docs/privacy.md` z [PR #124](https://github.com/00200200/HackNation2026/pull/124) (jeszcze nie scalony) |
-| 11 | Co dalej: trafniejsze oceny, baza incydentów MSZ, panel analityka | plan, nie stan |
-| 12 | Podziękowanie, kod QR do https://faktczyfejk.pl, link do repozytorium | repozytorium było prywatne 22.11.2026: przed wysłaniem zob. [description.md](description.md) |
+| 8 | Kanały: WWW działa, adapter demonstracyjny `/czat` gotowy, kod bota Discord gotowy, wdrożenie czeka; zrzut strony głównej z kodu `integration/r2` | [deploy.md](../deploy.md), sekcja 7; `frontend/public/czat.html` (#116); [WORKLOG](../../WORKLOG.md) |
+| 9 | Pełny przebieg, 75 przypadków, commit ca48b84; przy abstencji, poprawności cytatów, wstrzyknięciach i zgodności kanałów liczba przypadków; 11 przypadków z poleceniem na stronie pominiętych | pełny przebieg z 22.11.2026, 02:27 UTC; jego JSON nie jest jeszcze w `evals/results/` (stan na tę zmianę) |
+| 10 | Wdrożenie: serwer w Niemczech, co trafia poza EOG, model w zmiennej środowiskowej, korpus 1158 dokumentów, lista źródeł `/zrodla` | [deploy.md](../deploy.md), [corpus.md](../corpus.md), `frontend/public/zrodla.html` (#83), tabela dostawców w `docs/privacy.md` z [PR #124](https://github.com/00200200/HackNation2026/pull/124) (jeszcze nie scalony) |
+| 11 | Co dalej: pętla moderatora (w budowie), trafniejsze oceny (najczęstsza pomyłka testu: „wprowadzające w błąd” zamiast „fałszywe”), baza incydentów MSZ | plan, nie stan; pomyłki z pełnego przebiegu |
+| 12 | Podziękowanie, kod QR do https://faktczyfejk.pl, link do repozytorium | repozytorium było prywatne 22.11.2026: przed wysłaniem zob. punkt #18 w „Next” w [WORKLOG](../../WORKLOG.md) |
 
 Koszt 1000 sprawdzeń i założenia: [cost.md](cost.md). Film nie jest częścią tego pliku.

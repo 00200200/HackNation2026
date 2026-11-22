@@ -152,7 +152,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <h2 style="position:absolute; top:170px; left:110px">Dla kogo.</h2>
   <div class="users" style="position:absolute; top:380px; left:110px; right:110px; display:grid; grid-template-columns: 1fr 1fr; gap:40px">
     <div class="card"><div class="k">Obywatel, także o niskich kompetencjach cyfrowych</div><h3>Nie wie, czy podać wiadomość dalej</h3><p>Nie musi znać się na technologii: wkleja tekst albo link, bez konta i za darmo. Odpowiedź zaczyna się od „Tak.”, „Nie.” albo „Nie udało mi się potwierdzić tej informacji.”, a pod nią są źródła z cytatem, jeśli je znaleźliśmy, i to, czego nie ustaliliśmy. Ostatnie słowo ma czytelnik.</p></div>
-    <div class="card"><div class="k">Analityk lub moderator MSZ</div><h3>Chce wiedzieć, skąd wzięła się ocena</h3><p>Każde sprawdzenie trafia do dziennika: pytanie, źródła, wynik, czas, koszt i zdarzenia bezpieczeństwa. Powiadomień o powtarzających się pytaniach bez odpowiedzi jeszcze nie mamy.</p></div>
+    <div class="card"><div class="k">Analityk lub moderator MSZ</div><h3>Chce wiedzieć, skąd wzięła się ocena</h3><p>Każde sprawdzenie trafia do dziennika: pytanie, źródła, wynik, czas, koszt i zdarzenia bezpieczeństwa. Pętlę moderatora dla powtarzających się pytań bez odpowiedzi dopiero budujemy.</p></div>
   </div>
   <div class="ft"><span>Odbiorcy według zadania MSZ (punkt 3) · badań z użytkownikami nie prowadziliśmy</span><span class="n">03 / 12</span></div>
 </section>
@@ -205,7 +205,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="card"><h3>Halucynacje</h3><p>Cytat jest dowodem tylko wtedy, gdy kod znajdzie go w źródle słowo w słowo.</p><p class="rest">Zostaje: cytat może być w źródle i mimo to nie wspierać twierdzenia.</p></div>
     <div class="card"><h3>Stronniczość źródeł</h3><p>Teksty jednego wydawcy, z tym samym cytatem albo od tej samej agencji liczymy jako jedno potwierdzenie.</p><p class="rest">Zostaje: listę domen wybrał zespół, bez niezależnego audytu.</p></div>
     <div class="card"><h3>Prywatność</h3><p>PESEL, dowód, paszport, telefon, e-mail, konta i karty maskujemy, zanim tekst trafi do modelu i do logów.</p><p class="rest">Zostaje: imion i adresów nie maskujemy.</p></div>
-    <div class="card"><h3>Prompt injection</h3><p>Wzorce w kodzie i flaga modelu wyłapują ukryte polecenia. Traktujemy je jak dane i zapisujemy zdarzenie.</p><p class="rest">Zostaje: wzorce znają tylko typowe sformułowania, a w teście był jeden przypadek.</p></div>
+    <div class="card"><h3>Prompt injection</h3><p>Wzorce w kodzie i flaga modelu wyłapują ukryte polecenia. Traktujemy je jak dane i zapisujemy zdarzenie.</p><p class="rest">Zostaje: wzorce znają tylko typowe sformułowania, a we wszystkich 7 przypadkach testu polecenie było we wklejonym tekście.</p></div>
     <div class="card"><h3>Dostępność</h3><p>Gdy dowodów brak, bo padło źródło zdolne rozstrzygnąć albo czas minął przed odpowiedzią, pokazujemy <span class="nw">„nie sprawdzono”</span> albo błąd techniczny.</p><p class="rest">Zostaje: nie ma zapasowego dostawcy ani zmierzonej przepustowości.</p></div>
     <div class="card"><h3>Nadużycia</h3><p>Jeden adres IP może wysłać najwyżej 10 sprawdzeń na minutę.</p><p class="rest">Zostaje: limit na adres IP nie zatrzyma wielu klientów naraz ani nie ogranicza wydatków.</p></div>
   </div>
@@ -218,8 +218,8 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <h2 style="position:absolute; top:170px; left:110px; width:640px">Strona działa dziś.</h2>
   <div class="status" style="position:absolute; top:400px; left:110px; width:620px">
     <p><span class="tag t-on">działa</span><br><b>Strona WWW</b>: faktczyfejk.pl, bez konta, za darmo.</p>
-    <p><span class="tag t-off">nieuruchomiony</span><br><b>Discord /sprawdz</b>: to samo API. Bot nie działa jeszcze na serwerze i nie był uruchomiony na prawdziwym Discordzie.</p>
-    <p><span class="tag t-off">w przygotowaniu</span><br><b>Adapter w stylu komunikatora</b>: drugi kanał na tym samym API.</p>
+    <p><span class="tag t-on">gotowy</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, ta sama logika i to samo API co strona.</p>
+    <p><span class="tag t-off">kod gotowy</span><br><b>Discord /sprawdz</b>: to samo API. Wdrożenie czeka, a bot nie był jeszcze uruchomiony na prawdziwym Discordzie.</p>
   </div>
   <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; box-shadow:0 30px 80px rgba(29,18,21,.25); border:1px solid var(--line)">
   <div class="ft"><span>Zrzut strony głównej z kodu integration/r2, uruchomionej lokalnie 22.11.2026 · stan kanałów na 22.11.2026</span><span class="n">08 / 12</span></div>
@@ -230,20 +230,20 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px">Mierzymy tak jak jury.</h2>
   <div style="position:absolute; top:330px; left:110px; right:110px; display:grid; grid-template-columns: repeat(4, 1fr); gap:48px">
-    <div class="metric"><div class="big">1,00</div><p>Abstencja na 2 przypadkach: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
-    <div class="metric"><div class="big">24,9 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
-    <div class="metric"><div class="big">4,91 $</div><p>Koszt modelu za 100 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
-    <div class="metric"><div class="big" style="color:var(--red)">0,28</div><p>Trafność ocen (macro-F1, cel&nbsp;≥&nbsp;0,75): za często mówimy „brak dowodów”</p></div>
+    <div class="metric"><div class="big">0,80</div><p>Trafność ocen, macro-F1 (cel&nbsp;≥&nbsp;0,75)</p></div>
+    <div class="metric"><div class="big">17,8 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
+    <div class="metric"><div class="big">0,92</div><p>Abstencja na 12 przypadkach: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
+    <div class="metric"><div class="big">4,27 $</div><p>Koszt modeli za 100 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
   </div>
   <div class="small" style="position:absolute; top:700px; left:110px; right:110px">
-    <div><b>1,00</b><span>Pokrycie cytatami, tylko przy ocenach merytorycznych (cel&nbsp;≥&nbsp;0,95)</span></div>
-    <div><b>1,00</b><span>Odporność na wstrzyknięcia, jeden przypadek (cel&nbsp;≥&nbsp;0,90)</span></div>
-    <div><b>0,90</b><span>Scenariusze end-to-end (cel 1,00)</span></div>
-    <div><b>1,00</b><span>Zgodność kanałów, jeden przypadek: klient API bota, bez prawdziwego Discorda</span></div>
-    <div><b>0</b><span>Pętla moderatora: jeszcze jej nie zbudowaliśmy</span></div>
-    <div><b>b.d.</b><span>Poprawność cytatów: jeszcze niezmierzona</span></div>
+    <div><b>1,00</b><span>Pokrycie cytatami, przy ocenach merytorycznych (cel&nbsp;≥&nbsp;0,95)</span></div>
+    <div><b>1,00</b><span>Poprawność cytatów: 13&nbsp;cytatów z&nbsp;korpusu, sprawdzonych dosłownie (cel&nbsp;≥&nbsp;0,85)</span></div>
+    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7&nbsp;przypadków, wszystkie we wklejonym tekście (cel&nbsp;≥&nbsp;0,90)</span></div>
+    <div><b>1,00</b><span>Zgodność kanałów: 6&nbsp;przypadków, strona i&nbsp;klient API bota (cel 1,00)</span></div>
+    <div><b style="color:var(--red)">0,97</b><span>End-to-end (cel 1,00): nie przeszły J01 (awaria Fact Check) i A15</span></div>
+    <div><b style="color:var(--red)">0</b><span>Pętla moderatora (cel 1,00): dopiero ją budujemy</span></div>
   </div>
-  <div class="ft"><span>evals/results/latest.json · szybki test, 10 przypadków · commit edd34a5, ekstrakcja Claude Opus · 22.11.2026 · następny krok: pełny test</span><span class="n">09 / 12</span></div>
+  <div class="ft"><span>Pełny przebieg, 75 przypadków · commit ca48b84 · 22.11.2026 · pominięte: 11 przypadków z poleceniem ukrytym na stronie (brak publicznego adresu)</span><span class="n">09 / 12</span></div>
 </section>
 
 <!-- 10. Deployment -->
@@ -253,7 +253,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="grid3" style="position:absolute; top:430px; left:110px; right:110px">
     <div class="card"><h3>Gdzie są dane</h3><p>Serwer w Niemczech (OVHcloud), HTTPS. Poza EOG: model (Anthropic) i wyszukiwarka (Tavily).</p></div>
     <div class="card"><h3>Bez uzależnienia</h3><p>Model każdego kroku wybiera się zmienną środowiskową (PydanticAI). Inny dostawca wymaga jeszcze swojego pakietu i klucza. Każde źródło ma własny limit czasu.</p></div>
-    <div class="card"><h3>Źródła urzędowe</h3><p>Korpus 1158 dokumentów: gov.pl, CERT Polska, Policja, Sejm, IMGW, Odyseusz, GUS. Oceny <span class="nw">fact-checkerów</span> przez Google Fact Check Tools.</p></div>
+    <div class="card"><h3>Źródła urzędowe</h3><p>Korpus 1158 dokumentów: gov.pl, CERT Polska, Policja, Sejm, IMGW, Odyseusz, GUS. Oceny <span class="nw">fact-checkerów</span> przez Google Fact Check Tools. Lista źródeł z&nbsp;licencjami jest na stronie&nbsp;/zrodla.</p></div>
   </div>
   <div class="ft"><span>docs/deploy.md, docs/corpus.md · miejsca przetwarzania: tabela dostawców w PR #124 · stan na 22.11.2026</span><span class="n">10 / 12</span></div>
 </section>
@@ -263,11 +263,11 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px">Co dalej.</h2>
   <div class="grid3" style="position:absolute; top:400px; left:110px; right:110px">
-    <div class="card"><h3>Trafniejsze oceny</h3><p>Lepsze wyszukiwanie ocen <span class="nw">fact-checkerów</span> i korpus odświeżany według harmonogramu.</p></div>
+    <div class="card"><h3>Pętla moderatora</h3><p>Budujemy ją teraz: powtarzające się pytania bez odpowiedzi trafią jako jedna sprawa do człowieka.</p></div>
+    <div class="card"><h3>Trafniejsze oceny</h3><p>W teście najczęściej myliliśmy „fałszywe” z „wprowadzającymi w&nbsp;błąd”. Do tego korpus odświeżany według harmonogramu.</p></div>
     <div class="card"><h3>Baza incydentów MSZ</h3><p>Dopasowanie do znanych narracji, zawsze jako kontekst, nigdy jako werdykt.</p></div>
-    <div class="card"><h3>Panel analityka</h3><p>Powtarzające się zgłoszenia w jednej sprawie, do oceny przez człowieka.</p></div>
   </div>
-  <div class="ft"><span>Plan po hackathonie</span><span class="n">11 / 12</span></div>
+  <div class="ft"><span>Plan na teraz i na czas po hackathonie</span><span class="n">11 / 12</span></div>
 </section>
 
 <!-- 12. Close -->
