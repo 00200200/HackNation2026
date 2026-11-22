@@ -13,6 +13,8 @@ Paste a message or a link you were sent. faktczyfejk splits it into claims and a
 in plain Polish, with the sources behind the answer: a quote, the publisher, the date and a link.
 When the evidence is not there, it says so instead of guessing.
 
+Run it yourself: [Run](#run) (English) · [Uruchomienie](#uruchomienie) (po polsku).
+
 | One box for text or a link | The answer, claim by claim |
 |---|---|
 | <img src="docs/readme/home.png" alt="faktczyfejk.pl home page: the name, one box for text or a link" width="100%"> | <img src="docs/readme/answer.png" alt="An answer from the live API: two claims, each with its verdict, the answer's first words and what could not be established" width="100%"> |
@@ -125,35 +127,72 @@ candidates existed.
 
 ## Run
 
-Needs Docker with Compose and an Anthropic key in ignored `.env` for live model calls.
-The model IDs listed above and in [architecture](docs/submission/architecture.md) are literal code
-defaults; availability of those IDs on your account is UNCONFIRMED. Without working model
-credentials, the UI opens but verification returns a technical notice.
+Polska wersja: [Uruchomienie](#uruchomienie).
+
+You need git and Docker with a recent Compose v2 (the frontend build uses `additional_contexts`). Only an Anthropic API key is required; every other key
+switches on one more source, and a source without its key is reported as unavailable, never as a
+verdict.
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/00200200/HackNation2026.git && cd HackNation2026
+   ```
+
+2. Create `.env` in the repository root. The file is git-ignored and never copied into the image:
+
+   ```bash
+   ANTHROPIC_API_KEY=sk-ant-...
+   # optional, one more source each:
+   TAVILY_API_KEY=
+   GOOGLE_FACTCHECK_API_KEY=
+   EUVSDISINFO_API_KEY=
+   ```
+
+   All variables are listed in [Configuration](#configuration). Every check calls three models by
+   default: `claude-sonnet-5-5` for extraction and the judge, `claude-haiku-5-5` for rerank
+   (`PRAWDOWID_MODEL`, `PRAWDOWID_JUDGE_MODEL`, `PRAWDOWID_RERANK_MODEL`); whether your account can
+   use them is UNCONFIRMED. Without a working key the page
+   opens, but every check returns a technical notice.
+
+3. Build and start the stack (web page, API):
+
+   ```bash
+   make up
+   ```
+
+   Open http://localhost:8080. The API docs are at http://localhost:8080/api/docs and
+   `curl http://localhost:8080/health` returns `{"status":"ok"}`. Another port: `make up PORT=9000`.
+   Without `make`: `docker compose up --build -d`.
+
+4. Stop it with `make down`. Logs: `make logs`.
+
+The check log is kept on the `checklog` volume (`/var/lib/prawdowid/checks.jsonl`), so it
+survives a redeploy; the source cache sits in `/tmp/prawdowid` inside the container.
+
+**Discord bot.** Set `DISCORD_BOT_TOKEN` in `.env`, install the application in your Discord
+server with slash-command access, then run `make up DISCORD=1` and use `/sprawdz tekst:`. Live
+Discord transport has not been verified in the saved eval; a token alone does not prove the bot
+is installed.
+
+**API without Docker.** Install [uv](https://docs.astral.sh/uv/getting-started/installation/),
+then run `make install` and `make dev`. The API listens on http://127.0.0.1:8000 (docs at
+`/api/docs`); `make dev` loads `.env`, plain `uvicorn` does not. This path serves no web page; send a check with:
 
 ```bash
-make up
+curl -s -X POST http://127.0.0.1:8000/api/checks -H 'Content-Type: application/json' -d '{"input": "Tekst do sprawdzenia"}'
 ```
 
-Open http://localhost:8080. Stop with `make down`. Use another port with `make up PORT=9000`.
+In another terminal `make discord` runs the bot against this API. PostgreSQL is optional and
+not used by checks; do not seed it until source permissions are confirmed.
 
-Without `make`: `docker compose up --build -d`.
+**Tests and eval.** `make check` runs ruff and pytest. With `make dev` running,
+`PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick` runs one eval case per
+scenario (needs the keys). The eval does not read `.env`: export `PRAWDOWID_EVAL_TOKEN` (also set
+in `.env` for `make dev`) and `PRAWDOWID_FIXTURE_BASE` in its shell, or the fault and page-fixture
+cases are skipped with a warning. See [Pre-push gate](#pre-push-gate).
 
-The base stack forwards `GOOGLE_FACTCHECK_API_KEY`, `TAVILY_API_KEY` and `EUVSDISINFO_API_KEY`,
-keeps the check log on the `checklog` volume (`/var/lib/prawdowid/checks.jsonl`, so it survives a
-redeploy) and the source cache at a writable `/tmp/prawdowid` path.
-
-Add `--profile discord` before `up`
-to start the bot too. Set `DISCORD_BOT_TOKEN` in `.env`, install the application in your Discord
-server with slash-command access, then use `/sprawdz tekst:`. Live Discord transport has not
-been verified in the saved eval; a token alone does not prove the bot is installed.
-
-For the local API, install [uv](https://docs.astral.sh/uv/getting-started/installation/), run
-`make install`, then `make dev`; `.env` is loaded by that target. Open the API docs at
-http://127.0.0.1:8000/api/docs. In another terminal, `make discord` loads the same `.env` and calls
-the local API. This path does not serve the web frontend. PostgreSQL is optional and disabled
-in checks; do not seed it until source permissions are confirmed.
-
-Public deployment with HTTPS on a server: [docs/deploy.md](docs/deploy.md).
+**Public deployment** with HTTPS on a server: [docs/deploy.md](docs/deploy.md).
 
 Run `make help` to list every target. The ones used most:
 
@@ -167,6 +206,88 @@ Run `make help` to list every target. The ones used most:
 | `make openapi` | Regenerate `docs/openapi.json` from the app |
 | `make corpus` / `make corpus-check` | Rebuild the evidence corpus from its source catalogue / check it against the brief's thresholds |
 | `make index` | Load `corpus/evidence.jsonl` into Postgres for search (needs `DATABASE_URL`) |
+
+## Uruchomienie
+
+English version: [Run](#run).
+
+Potrzebujesz gita i Dockera z aktualnym Compose v2 (budowanie strony używa `additional_contexts`). Wymagany jest tylko klucz API Anthropic. Każdy kolejny
+klucz włącza jedno źródło więcej; źródło bez klucza jest zgłaszane jako niedostępne, nigdy jako
+werdykt.
+
+1. Sklonuj repozytorium:
+
+   ```bash
+   git clone https://github.com/00200200/HackNation2026.git && cd HackNation2026
+   ```
+
+2. Utwórz plik `.env` w katalogu głównym repozytorium. Plik jest ignorowany przez gita i nie trafia do obrazu:
+
+   ```bash
+   ANTHROPIC_API_KEY=sk-ant-...
+   # opcjonalne klucze, każdy włącza jedno źródło:
+   TAVILY_API_KEY=
+   GOOGLE_FACTCHECK_API_KEY=
+   EUVSDISINFO_API_KEY=
+   ```
+
+   Wszystkie zmienne są w sekcji [Configuration](#configuration). Każde sprawdzenie domyślnie
+   korzysta z trzech modeli: `claude-sonnet-5-5` do wydzielania twierdzeń i oceny, `claude-haiku-5-5`
+   do rerankingu (`PRAWDOWID_MODEL`, `PRAWDOWID_JUDGE_MODEL`, `PRAWDOWID_RERANK_MODEL`); dostęp
+   Twojego konta do nich jest NIEPOTWIERDZONY. Bez działającego
+   klucza strona się otworzy, ale każde sprawdzenie skończy się komunikatem o błędzie technicznym.
+
+3. Zbuduj i uruchom kontenery (strona i API):
+
+   ```bash
+   make up
+   ```
+
+   Otwórz http://localhost:8080. Dokumentacja API jest pod http://localhost:8080/api/docs, a
+   `curl http://localhost:8080/health` zwraca `{"status":"ok"}`. Inny port: `make up PORT=9000`.
+   Bez `make`: `docker compose up --build -d`.
+
+4. Zatrzymaj go poleceniem `make down`. Logi: `make logs`.
+
+Dziennik sprawdzeń leży na wolumenie `checklog` (`/var/lib/prawdowid/checks.jsonl`), więc
+przetrwa ponowne wdrożenie; pamięć podręczna źródeł jest w `/tmp/prawdowid` w kontenerze.
+
+**Bot na Discordzie.** Ustaw `DISCORD_BOT_TOKEN` w `.env`, dodaj aplikację do swojego serwera
+Discord z uprawnieniem do poleceń z ukośnikiem, uruchom `make up DISCORD=1` i użyj
+`/sprawdz tekst:`. Zapisany eval nie obejmuje działania bota na prawdziwym Discordzie; sam token
+nie dowodzi, że bot jest zainstalowany.
+
+**API bez Dockera.** Zainstaluj [uv](https://docs.astral.sh/uv/getting-started/installation/),
+potem uruchom `make install` i `make dev`. API działa pod http://127.0.0.1:8000 (dokumentacja pod
+`/api/docs`); `make dev` wczytuje `.env`, samo `uvicorn` już nie. Ta ścieżka nie serwuje strony; sprawdzenie wyślesz tak:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/checks -H 'Content-Type: application/json' -d '{"input": "Tekst do sprawdzenia"}'
+```
+
+W drugim terminalu `make discord` uruchamia bota podłączonego do tego API. PostgreSQL jest opcjonalny i
+sprawdzenia z niego nie korzystają; nie zasilaj go danymi, dopóki nie mamy potwierdzonych zgód źródeł.
+
+**Testy i eval.** `make check` uruchamia ruff i pytest. Przy działającym `make dev`
+`PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick` uruchamia po jednym
+przypadku testowym na scenariusz (potrzebne klucze). Eval nie czyta `.env`: wyeksportuj w jego
+powłoce `PRAWDOWID_EVAL_TOKEN` (ustawiony też w `.env` dla `make dev`) i `PRAWDOWID_FIXTURE_BASE`,
+inaczej przypadki awarii i stron testowych zostaną pominięte z ostrzeżeniem. Zob. [Pre-push gate](#pre-push-gate).
+
+**Wdrożenie publiczne** z HTTPS na serwerze: [docs/deploy.md](docs/deploy.md).
+
+`make help` wypisuje wszystkie cele. Najczęściej używane:
+
+| Cel | Co robi |
+|---|---|
+| `make up` / `make down` / `make logs` | Kontenery w Dockerze: strona na porcie `PORT` (domyślnie 8080), backend tylko wewnątrz |
+| `make dev` | Samo API pod http://127.0.0.1:8000 z przeładowaniem (dokumentacja pod `/api/docs`) |
+| `make discord` | Bot na Discordzie podłączony do API z `make dev`; `make up DISCORD=1` uruchamia go w Dockerze |
+| `make check` | `ruff format --check`, `ruff check`, `pytest` |
+| `make format` | Formatowanie i automatyczne poprawki |
+| `make openapi` | Generuje na nowo `docs/openapi.json` z aplikacji |
+| `make corpus` / `make corpus-check` | Buduje korpus dowodów z katalogu źródeł / sprawdza go względem progów z briefu |
+| `make index` | Ładuje `corpus/evidence.jsonl` do Postgresa do wyszukiwania (wymaga `DATABASE_URL`) |
 
 ## Architecture board
 
