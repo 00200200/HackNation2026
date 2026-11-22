@@ -9,9 +9,9 @@ fits the verdict.
 [`history/20261122T053047.203200Z-f4c9aa8-full.json`](history/20261122T053047.203200Z-f4c9aa8-full.json). The
 answers are in the run's partial file.
 
-This is an earlier run than the one the submission quotes (the full run on `a14b93c`, see
+**This is an earlier run than the one the submission quotes** (the full run on `a14b93c`, see
 [eval-notes.md](../../docs/eval-notes.md)); no spot check was made on that run. Taken from branch
-`claude/docs-main-run` (commit 19e2266, PR #135, closed unmerged) on 22.11.2026.
+`claude/docs-main-run` (commit 521300d, PR #135, closed unmerged) on 22.11.2026.
 
 **Sample:** 12 of the 251 quotes shown with a URL, drawn with Python `random.Random(20261122)` and stratified by the
 verdict of the claim: 3 `potwierdzone`, 4 `fałszywe`, 3 `wprowadzające w błąd`, 2 `brak wystarczających dowodów`.

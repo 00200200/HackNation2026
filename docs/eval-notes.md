@@ -96,7 +96,8 @@ submission description and slide 9 quote it. It was run from a local worktree at
   finding the rating, not independent evidence (WORKLOG Decisions, 2026-11-22, #100). The step from
   0.278 (quick run on `edd34a5`, 10 cases) spans #100 and a different case mix.
 - `citation_correctness` 1.0 checks that each quote citing a corpus document appears in it
-  verbatim, not that it supports the claim; no manual spot check is committed. The JSON keeps only
+  verbatim, not that it supports the claim; the spot check in
+  [`evals/results/citation_spotcheck.md`](../evals/results/citation_spotcheck.md) covers the earlier `f4c9aa8` run, not this one. The JSON keeps only
   the share. The number of such quotes, 13, was counted from the run's progress file
   `evals/results/run-20261122T021757.182695Z.partial.jsonl`, which is git-ignored and exists only in
   the worktree that ran the eval; from there:
