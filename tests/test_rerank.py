@@ -321,3 +321,14 @@ def test_the_same_page_text_is_appended_once():
     ranking = run([hit, page, page.model_copy()], answering([0]))
     [fragment] = ranking.fragments
     assert fragment.source.fragment.count("Pełny tekst analizy.") == 1
+
+
+def test_two_fact_checkers_rating_one_claim_alike_are_both_kept():
+    # Two reviews of one claim with the same rating get the same rating line (our wording,
+    # `factcheck.review_fragment`): two findings, not a copy.
+    text = "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Polska wyszła z UE."
+    reviews = [
+        source(url, text).model_copy(update={"source_type": "fact_check"})
+        for url in ("https://demagog.org.pl/a", "https://konkret24.tvn24.pl/b")
+    ]
+    assert len(run(reviews, answering([0, 1])).fragments) == 2

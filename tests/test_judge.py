@@ -615,7 +615,7 @@ def test_review_with_its_rating_in_the_fragment_refutes():
         ),
     )
     assert j.verdict is Verdict.FALSE
-    assert "ocena fact-checkera: Fałsz (z danych ClaimReview)" in j.premises[0]
+    assert "ocena fact-checkera: Fałsz" in j.premises[0]
 
 
 def test_two_labels_on_one_page_list_its_url_once():
@@ -707,8 +707,7 @@ def test_false_rating_beats_a_missing_context_its_title_names():
     )
     assert j.verdict is Verdict.FALSE
     assert j.justification == (
-        "Przeczy temu: Demagog, 19.10.2026, ocena fact-checkera: Fałsz "
-        "(z danych ClaimReview)."
+        "Przeczy temu: Demagog, 19.10.2026, ocena fact-checkera: Fałsz."
     )
     # The rating line is ours: the answer carries the rating, never „Ocena fact-checkera: …”.
     [source] = j.sources
@@ -726,7 +725,7 @@ def test_partial_truth_rating_is_misleading_whatever_stance_the_model_gives(stan
     assert j.verdict is Verdict.MISLEADING
     assert j.justification == (
         "Fact-checker ocenił to twierdzenie jako mylące albo niepełne: Demagog, "
-        "19.10.2026, ocena fact-checkera: Częściowa prawda (z danych ClaimReview)."
+        "19.10.2026, ocena fact-checkera: Częściowa prawda."
     )
 
 
@@ -827,6 +826,33 @@ def test_unmapped_rating_keeps_the_judges_reading():
     j = run([rated], answering(rating_label(rated, "context")))
     assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
     assert j.sources[0].rating == "Satyra"
+
+
+def test_missing_context_next_to_an_unmapped_rating_is_ours_not_the_fact_checkers():
+    rated = claim_review(
+        "Satyra", CLAIM, title="Wpis z 2019 roku krąży znowu jako nowy"
+    )
+    j = run(
+        [rated],
+        answering(
+            rating_label(
+                rated,
+                "context",
+                missing_context="Wpis jest z 2019 roku.",
+                context_quote="Wpis z 2019 roku krąży znowu",
+            )
+        ),
+    )
+    assert j.verdict is Verdict.MISLEADING
+    # The context we found decided, so it is what the answer cites; "Satyra" is no "misleading".
+    assert j.justification == (
+        "Twierdzenie pomija ważny kontekst: Wpis jest z 2019 roku "
+        "(Demagog, 19.10.2026: „Wpis z 2019 roku krąży znowu”)."
+    )
+    assert j.premises[0].endswith(
+        "ocena fact-checkera: Satyra. Brakujący kontekst: Wpis jest z 2019 roku. "
+        "(źródło: „Wpis z 2019 roku krąży znowu”)"
+    )
 
 
 def test_title_quote_of_the_same_claim_maps_no_rating():

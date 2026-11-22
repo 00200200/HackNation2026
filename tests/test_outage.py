@@ -32,13 +32,14 @@ def models():
         yield
 
 
-def fact_check(monkeypatch, *, down: bool):
-    """Fact Check either fails (key, quota, timeout) or answers with no hits."""
+def fact_check(monkeypatch, *, down: bool | str):
+    """Fact Check either fails (key, quota, timeout) or answers with no hits; `down` set to a
+    key fails only that key."""
 
-    async def search_claims(claim, **kwargs):
-        return pipeline.factcheck.FactCheckLookup(
-            limitation=pipeline.factcheck.LOOKUP_UNAVAILABLE if down else None
-        )
+    async def search_claims(key, **kwargs):
+        if down is True or down == key:
+            return pipeline.factcheck.unavailable()
+        return pipeline.factcheck.FactCheckLookup()
 
     monkeypatch.setattr(pipeline.factcheck, "search_claims", search_claims)
 
@@ -77,6 +78,33 @@ def test_fact_check_down_and_nothing_found_is_an_outage_not_an_abstention(monkey
     assert Verdict.INSUFFICIENT_EVIDENCE.label not in " ".join(
         result.judgement.limitations
     )
+
+
+def test_fact_check_claim_key_failing_is_an_outage_though_short_keys_answered(
+    monkeypatch,
+):
+    # #100: the claim's own key is the request Fact Check made before; the short keys ("a", "b")
+    # answering with nothing must not turn its failure into "brak wystarczających dowodów".
+    fact_check(monkeypatch, down=CLAIM)
+    web(monkeypatch, lambda q: websearch.WebSearch())
+    result = check()
+    assert result.judgement.verdict is Verdict.NOT_CHECKED and result.outage
+    assert (
+        "Nie mogę teraz sprawdzić bazy Google Fact Check"
+        in result.judgement.limitations[0]
+    )
+    partial = pipeline.factcheck.LOOKUP_PARTIAL.format(failed=1, total=3)
+    assert partial in result.judgement.limitations
+
+
+def test_a_failed_short_fact_check_key_is_named_but_no_outage(monkeypatch):
+    fact_check(monkeypatch, down="a")
+    web(monkeypatch, lambda q: websearch.WebSearch())
+    result = check()
+    assert result.judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert not result.outage
+    partial = pipeline.factcheck.LOOKUP_PARTIAL.format(failed=1, total=3)
+    assert partial in result.judgement.limitations
 
 
 def test_every_web_query_failing_is_an_outage(monkeypatch):

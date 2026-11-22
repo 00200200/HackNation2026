@@ -522,5 +522,5 @@ def test_fact_checkers_rating_is_shown_as_the_rating_not_as_a_quote():
     )
     claim = CHECK.claims[0].model_copy(update={"sources": [rated]})
     text = render(CHECK.model_copy(update={"claims": [claim]}))
-    assert "  Ocena fact-checkera: Fałsz (z danych ClaimReview)" in text.splitlines()
+    assert "  Ocena fact-checkera: Fałsz" in text.splitlines()
     assert "> „Fałsz”" not in text

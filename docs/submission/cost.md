@@ -77,10 +77,14 @@ from the linked code, not from a cost assumption:
   ([websearch.py](../../prawdowid/websearch.py)). Cancellation of a thread-backed search does not
   stop its underlying synchronous work immediately. Slow providers can consume resources after
   the request stops waiting.
+- Fact Check sends up to `8` keys per checkable claim at once (`PRAWDOWID_FACTCHECK_MAX_KEYS`),
+  each with one retry and a `15` second deadline ([factcheck.py](../../prawdowid/factcheck.py)).
+  The claims:search quota is UNCONFIRMED; a key refused for quota is a failed key.
 - A timeout makes the claim `not_checked` with limitations and the answer stays `ok`. A failed
-  Fact Check, web search or (for a government claim) gov.pl search does the same when the other
-  evidence is not enough; only when every checkable claim ends that way is the answer a technical
-  notice. A provider that returns successfully without evidence can lead to
+  Fact Check (its key for the claim itself, or every key), web search (every query) or (for a
+  government claim) gov.pl search does the same when the other evidence is not enough; only when
+  every checkable claim ends that way is the answer a technical notice. A failed key or query
+  among others that answered is only named in a limitation. A provider that returns successfully without evidence can lead to
   `insufficient_evidence`. Missing extraction credentials or API failure also produce a technical
   notice, not a factual verdict ([pipeline.py](../../prawdowid/pipeline.py),
   [verifier.py](../../prawdowid/verifier.py)).

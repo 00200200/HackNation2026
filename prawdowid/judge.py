@@ -658,15 +658,16 @@ def _premise(e: Evidence) -> str:
         return f"{who} ocenia inne twierdzenie" + (
             f": „{s.fragment}”" if s.fragment else "."
         )
-    if s.rating:
-        return f"{who}, {justification.RATING.format(rating=s.rating)}"
     verb = {
         Stance.SUPPORTS: "potwierdza",
         Stance.REFUTES: "przeczy",
         Stance.CONTEXT: "dodaje kontekst",
         Stance.GAP: "wskazuje brak danych",
     }[e.label.stance]
-    premise = f"{who} {verb}: „{s.fragment}”"
+    if s.rating:
+        premise = f"{who}, {justification.RATING.format(rating=s.rating)}."
+    else:
+        premise = f"{who} {verb}: „{s.fragment}”"
     if _grounded(e):
         premise += f" Brakujący kontekst: {e.label.missing_context} (źródło: „{e.context_span}”)"
     return premise
@@ -714,12 +715,15 @@ def _cited_for(verdict: Verdict, side: list[Evidence]):
         stance = "supports" if verdict is Verdict.CONFIRMED else "refutes"
         return _cited(side, stance)
     # The verified words that name the missing context, not the model's paraphrase alone; a
-    # fact-checker's rating of the claim as the rating.
+    # fact-checker's rating of the claim as the rating. A rating that did not decide (unmapped,
+    # next to a missing context we found) is not cited as if the fact-checker had given this one.
     return [
         (
             e.source
             if _rated(e)
-            else e.source.model_copy(update={"fragment": e.context_span}),
+            else e.source.model_copy(
+                update={"fragment": e.context_span, "rating": None}
+            ),
             "context",
             e.label.missing_context,
         )

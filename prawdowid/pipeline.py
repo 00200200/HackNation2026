@@ -16,9 +16,11 @@ A source that fails adds a limitation. The sources that can decide a verdict (Fa
 search) are the ones whose outage matters: when one of them failed and the evidence is not enough,
 when every source failed, or when the judge did not answer, the claim is not checked and the
 outage is the reason, never "brak wystarczających dowodów" (`ClaimCheck.outage`, which turns an
-all-outage answer into a technical error). The corpus is a file on our own disk, so it never counts
-as a source that answered: when every outside source failed, corpus hits count only if they settle
-the claim, otherwise it is not checked. A claim that runs out of time is not checked either, and
+all-outage answer into a technical error). Fact Check failed when the claim's own key or every key
+failed (`FactCheckLookup.failed`), web search when every query failed (`WebSearch.failed`); a
+failed key or query among others that answered is a limitation only. The corpus is a file on our
+own disk, so it never counts as a source that answered: when every outside source failed, corpus
+hits count only if they settle the claim, otherwise it is not checked. A claim that runs out of time is not checked either, and
 keeps the limitations of the sources that had already failed. Every step's time goes to the log;
 the reranker and judge calls are priced like the extraction call.
 
@@ -323,7 +325,8 @@ def _deciders_down(found: dict, govpl_decides: bool) -> list[str]:
     search decides only for a claim about the Polish government (the model gave it gov.pl queries);
     web search leaves www.gov.pl to it."""
     down = []
-    if "factcheck" in found and found["factcheck"].limitation:
+    # The claim's own key or every key failed: a failed name or query key alone is a limitation.
+    if "factcheck" in found and found["factcheck"].failed:
         down.append(FACTCHECK_DOWN)
     # Every query failed at the provider: one query that found nothing is an answer.
     if found["web"] and all(w.failed for w in found["web"]):
@@ -362,12 +365,12 @@ async def _search_govpl(queries: list[str]) -> websearch.WebSearch:
 async def _search_claims(claim: str, keys: list[str]) -> factcheck.FactCheckLookup:
     # Eval traffic only (see faults.py): every key fails, so none is sent.
     if faults.active(faults.FACTCHECK_UNAVAILABLE):
-        return factcheck.FactCheckLookup(limitation=factcheck.LOOKUP_UNAVAILABLE)
+        return factcheck.unavailable()
     try:
         return await factcheck.search_keys(claim, keys)
     except Exception:
         log.exception("factcheck failed")
-        return factcheck.FactCheckLookup(limitation=factcheck.LOOKUP_UNAVAILABLE)
+        return factcheck.unavailable()
 
 
 async def _search_cases(claim: str) -> euvsdisinfo.EuvsdisinfoLookup:

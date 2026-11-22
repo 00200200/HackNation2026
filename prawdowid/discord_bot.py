@@ -97,7 +97,7 @@ def _source(s: Source, url_limit: int | None) -> list[str]:
     lines.append(f"  <{url}>" if fits else URL_TOO_LONG)
     # A fact-checker's rating comes from its ClaimReview record: never shown as a page quote.
     if s.rating:
-        lines += _field(RATING_LABEL, s.rating, "  ", RATING_NOTE)
+        lines += _field(RATING_LABEL, s.rating, "  ")
     elif s.fragment:
         lines += _field("> „", s.fragment, "> ", "”")
     return lines
@@ -135,7 +135,6 @@ SOURCE_SECURITY_NOTE = (
 )
 PAGE_NOTE = "Ta strona nie jest źródłem dowodów dla własnych twierdzeń."
 RATING_LABEL = "  Ocena fact-checkera: "
-RATING_NOTE = " (z danych ClaimReview)"
 UNCHECKED_NOTE = (
     "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
     "Tych nie oceniliśmy. Możesz wkleić je osobno."

@@ -194,12 +194,16 @@ def dedupe(fragments: list[Fragment]) -> list[Fragment]:
 
     Case, punctuation and spacing are ignored; any changed word, number, sign, decimal or thousands
     separator, or date keeps both. Of two copies the one from a reliable source type stays, in the
-    place of the first, so a copy never hides an official source.
+    place of the first, so a copy never hides an official source. Two reviews' rating lines are
+    our wording around each record's rating: the same words from two review pages are two
+    fact-checkers' findings, never copies.
     """
     seen: dict[tuple[str, ...], int] = {}
     kept = []
     for fragment in fragments:
         words = tuple(NUMBER_OR_WORD.findall(_text(fragment).casefold()))
+        if _rating(fragment.source):
+            words = (fragment.doc_id, *words)
         if words not in seen:
             seen[words] = len(kept)
             kept.append(fragment)

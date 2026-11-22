@@ -94,8 +94,7 @@ function notice(title, text, note) {
 // A fact-checker's rating comes from its ClaimReview record: shown as the rating, never as a quote.
 function sourceText(s) {
   if (s.rating) {
-    return el("p", { className: "rating" }, el("b", { textContent: "Ocena fact-checkera: " }), s.rating,
-      el("span", { className: "rating-note", textContent: " (z danych ClaimReview)" }));
+    return el("p", { className: "rating" }, el("b", { textContent: "Ocena fact-checkera: " }), s.rating);
   }
   return s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null;
 }

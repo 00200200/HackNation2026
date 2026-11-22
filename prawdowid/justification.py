@@ -32,7 +32,7 @@ RATED_MISLEADING = (
     "Fact-checker ocenił to twierdzenie jako mylące albo niepełne: {cited}."
 )
 # A rating from a ClaimReview record (`Source.rating`): named as the rating, never quoted as text.
-RATING = "ocena fact-checkera: {rating} (z danych ClaimReview)"
+RATING = "ocena fact-checkera: {rating}"
 SEE_SOURCES = "Ocena wynika ze źródeł wymienionych poniżej."
 SUPPORTED = "Potwierdza to: {cited}."
 REFUTED = "Przeczy temu: {cited}."

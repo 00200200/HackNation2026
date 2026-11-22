@@ -821,7 +821,7 @@ def test_fact_checkers_rating_of_this_claim_reaches_the_answer_as_its_rating(
     assert source.rating == "Manipulacja" and source.fragment == "Manipulacja"
     assert claim.reasoning == (
         "Fact-checker ocenił to twierdzenie jako mylące albo niepełne: Demagog, 6.10.2026, "
-        "ocena fact-checkera: Manipulacja (z danych ClaimReview)."
+        "ocena fact-checkera: Manipulacja."
     )
     # Our rating line never reaches the answer as if it were the review page's words.
     assert "Ocena fact-checkera: Manipulacja." not in result.model_dump_json()

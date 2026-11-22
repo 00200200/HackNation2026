@@ -5,7 +5,7 @@ import httpx2
 import pytest
 
 from prawdowid import factcheck
-from prawdowid.factcheck import KEY_ENV, LOOKUP_UNAVAILABLE, search_claims
+from prawdowid.factcheck import KEY_ENV, LOOKUP_PARTIAL, search_claims, unavailable
 
 REVIEWED = {
     "claims": [
@@ -68,6 +68,7 @@ def test_known_claim_returns_its_review_as_a_source():
     [request] = calls
     assert request.url.params["query"] == "Szczepionki mają mikroczipy"
     assert request.url.params["languageCode"] == "pl"
+    assert request.url.params["pageSize"] == str(factcheck.MAX_HITS)
     assert request.headers["x-goog-api-key"] == "test-key"
     assert "key" not in request.url.params
 
@@ -86,14 +87,14 @@ def test_missing_key_skips_the_call(monkeypatch):
     monkeypatch.delenv(KEY_ENV)
     lookup, calls = run(lambda r: pytest.fail("no request without a key"))
     assert calls == []
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 @pytest.mark.parametrize("status", [400, 403, 429])
 def test_client_errors_are_a_limit_without_retry(status):
     lookup, calls = run(lambda r: httpx2.Response(status, json={"error": {}}))
     assert len(calls) == 1
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 def test_outage_retries_once_then_is_a_limit():
@@ -102,7 +103,7 @@ def test_outage_retries_once_then_is_a_limit():
 
     lookup, calls = run(down)
     assert len(calls) == factcheck.ATTEMPTS == 2
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 def test_retry_recovers_after_a_server_error():
@@ -123,7 +124,7 @@ def test_retry_recovers_after_a_server_error():
 )
 def test_malformed_body_is_a_limit(body):
     lookup, _ = run(lambda r: httpx2.Response(200, content=body))
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 def test_null_lists_are_no_hits():
@@ -137,7 +138,7 @@ def test_broken_encoding_retries_then_is_a_limit():
 
     lookup, calls = run(broken)
     assert len(calls) == 2
-    assert lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
 
 
 def test_review_without_title_never_uses_the_claim_as_title():
@@ -173,7 +174,7 @@ def test_trickling_response_hits_the_overall_deadline(monkeypatch):
             return lookup, loop.time() - start
 
     lookup, elapsed = asyncio.run(go())
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
     assert elapsed < 1
 
 
@@ -226,6 +227,12 @@ def test_keys_are_capped():
     queries = [f"zapytanie {i}" for i in range(20)]
     keys = factcheck.keys_for("Twierdzenie.", queries)
     assert len(keys) == factcheck.MAX_KEYS and keys[0] == "Twierdzenie."
+
+
+def test_keys_are_masked_again_like_web_queries():
+    sentence = "Wpis: „pisz na jan.kowalski@example.com albo dzwoń”."
+    keys = factcheck.keys_for("Twierdzenie.", ["kontakt 600 123 456"], [sentence])
+    assert keys == ["Twierdzenie.", "pisz na [e-mail] albo dzwoń", "kontakt [telefon]"]
 
 
 @pytest.mark.parametrize(
@@ -355,22 +362,54 @@ def test_a_name_key_also_brings_reviews_of_other_claims():
     assert {str(h.source.url) for h in lookup.hits} == {INDEX[2][4], INDEX[3][4]}
 
 
-def test_keys_that_answer_stand_when_others_fail():
+C01_CLAIM = "Pracownik na etacie średnio co dwa i pół dnia ma dzień wolny."
+
+
+def test_a_short_key_that_failed_is_named_and_the_others_stand():
     def flaky(request):
         if request.url.params["query"] == "Jakubiak dni wolne":
             return httpx2.Response(429, json={"error": {}})
         return fake_index(request)
 
-    lookup, calls = search(flaky, "x", ["Jakubiak dni wolne", "dni wolnych w roku"])
-    assert len(calls) == 2
+    keys = [C01_CLAIM, "Jakubiak dni wolne", "dni wolnych w roku"]
+    lookup, calls = search(flaky, C01_CLAIM, keys)
+    assert len(calls) == 3
     assert [str(h.source.url) for h in lookup.hits] == [INDEX[1][4]]
-    assert lookup.limitation is None
+    # Never silent, but no outage: the claim's own key answered, as it did before #100.
+    assert lookup.limitation == LOOKUP_PARTIAL.format(failed=1, total=3)
+    assert not lookup.failed
 
 
-def test_lookup_is_unavailable_only_when_every_key_failed():
+@pytest.mark.parametrize("failure", ["quota", "server error twice", "deadline"])
+def test_the_claims_own_key_failing_is_down_though_short_keys_answered(
+    monkeypatch, failure
+):
+    # The claim sentence is the request the lookup made before #100, when its failure was an
+    # outage: it still is, and what the short keys found still stands.
+    monkeypatch.setattr(factcheck, "DEADLINE_S", 0.2)
+
+    async def handler(request):
+        if request.url.params["query"] != C01_CLAIM:
+            return fake_index(request)
+        if failure == "deadline":
+            await asyncio.sleep(1)
+        return httpx2.Response(429 if failure == "quota" else 503, json={})
+
+    lookup, _ = search(handler, C01_CLAIM, [C01_CLAIM, "dni wolnych w roku"])
+    assert lookup.failed
+    assert lookup.limitation == LOOKUP_PARTIAL.format(failed=1, total=2)
+    assert [str(h.source.url) for h in lookup.hits] == [INDEX[1][4]]
+
+
+def test_lookup_is_unavailable_when_every_key_failed():
     lookup, calls = search(lambda r: httpx2.Response(403, json={}), "x", ["a b", "c d"])
     assert len(calls) == 2
-    assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
+    assert lookup == unavailable()
+
+
+def test_a_key_alone_gets_the_page_size_of_the_lookup_before_100():
+    _, calls = search(lambda r: httpx2.Response(200, json={}), "x", ["x"])
+    assert [r.url.params["pageSize"] for r in calls] == [str(factcheck.MAX_HITS)]
 
 
 def test_keys_run_at_once_inside_the_deadline(monkeypatch):
@@ -419,7 +458,13 @@ def test_merged_hits_take_each_keys_best_first_and_are_capped():
         ]
         return httpx2.Response(200, json={"claims": found})
 
-    lookup, _ = search(per_key, "x", ["a", "b", "c"])
+    keys = list("abcdefgh")  # as many as MAX_KEYS allows by default
+    lookup, _ = search(per_key, "x", keys)
     urls = [str(h.source.url) for h in lookup.hits]
-    assert len(urls) == factcheck.MAX_HITS
-    assert urls[:3] == ["https://x.pl/a/0", "https://x.pl/b/0", "https://x.pl/c/0"]
+    # The cap does not follow the key count: every key's best review, then the second ones in
+    # key order until MAX_HITS.
+    assert factcheck.MAX_HITS == 10
+    assert urls == [f"https://x.pl/{k}/0" for k in keys] + [
+        "https://x.pl/a/1",
+        "https://x.pl/b/1",
+    ]

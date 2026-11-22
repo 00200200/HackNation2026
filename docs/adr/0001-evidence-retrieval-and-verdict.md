@@ -184,7 +184,7 @@ verified citations; the UI shows it first.
 | Service | Used for | Key | Where data goes | On failure |
 |---|---|---|---|---|
 | LLM through PydanticAI (default `anthropic:claude-opus-5-5`; Mistral on `api.eu.mistral.ai` is an EU option) | steps 3, 6, 7 | yes | provider's region; to be stated per chosen model | `technical_error` |
-| Google Fact Check Tools API | step 4 | yes (Google Cloud project) | Google; only the masked claim text is sent | listed in `limitations` |
+| Google Fact Check Tools API | step 4 | yes (Google Cloud project) | Google; the masked claim and short keys from it (names, quoted spans of the claim or its source sentence, its search queries), masked again | listed in `limitations` |
 | EUvsDisinfo MCP server | step 4, section 5 | token from the organiser | EUvsDisinfo service; only the masked claim text is sent | listed in `limitations` |
 | Live official APIs (e.g. IMGW) | step 4 | no | public endpoints; only the query is sent | listed in `limitations` |
 | Fallback search API | step 9 | yes | not chosen yet | skipped, listed in `limitations` |
