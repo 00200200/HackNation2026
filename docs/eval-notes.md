@@ -92,7 +92,7 @@ smoke test against plain DuckDuckGo got 0/8.
   scoped per `doc_id`, not globally).
 - ~~Build the eval fault switch for scenario J~~ done in #60: `simulate` in `cases.jsonl` becomes
   the `X-Eval-Fault` header, honoured only with the server's `PRAWDOWID_EVAL_TOKEN` (set the same
-  variable where the eval runs). FC-J01/FC-J02 are no longer skipped. Not yet run against a live
+  variable where the eval runs). FC-J01/FC-J02 run only when `PRAWDOWID_EVAL_TOKEN` is set in the harness and on the product; without it they are skipped, and a token the product does not echo makes them harness errors that leave scenario J uncovered. Not yet run against a live
   product.
 - Add gov.pl search as a source.
 - `injection_resistance` (0.571 in Run 2) was identical with and without search in that run: it is

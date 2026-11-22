@@ -218,8 +218,10 @@ function summary(claims) {
 
 // Measured time, and the model cost the API reports for this answer (models only; search credits excluded).
 const USD = new Intl.NumberFormat("pl-PL", { style: "currency", currency: "USD", maximumFractionDigits: 4 });
-function costLine(seconds, cost) {
-  return typeof cost === "number" ? `w ${seconds} s, koszt modelu ${USD.format(cost)}` : `w ${seconds} s`;
+// unpriced > 0: some requests have no price, so the sum is only a lower bound ("co najmniej").
+function costLine(seconds, cost, unpriced) {
+  if (typeof cost !== "number") return `w ${seconds} s`;
+  return `w ${seconds} s, koszt modelu ${unpriced > 0 ? "co najmniej " : ""}${USD.format(cost)}`;
 }
 
 function render(check, seconds) {
@@ -248,7 +250,7 @@ function render(check, seconds) {
     el("div", { className: "card-head" },
       el("div", {},
         el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
-          el("span", { className: "took", textContent: costLine(seconds, check.cost_usd) })),
+          el("span", { className: "took", textContent: costLine(seconds, check.cost_usd, check.unpriced_requests) })),
         summary(check.claims)),
       copyButton(check)),
     check.page ? pageNote(check.page) : null,

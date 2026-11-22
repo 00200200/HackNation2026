@@ -399,6 +399,8 @@ async def verify_text(
     if isinstance(
         result, CheckResult
     ):  # the model failed: a notice, kept in the check log
+        # Responses answered before the failure were billed: price them, count the rest unpriced.
+        result.cost_usd, result.unpriced_requests = pipeline._cost(messages)
         result.steps_ms = {"extract": extract_ms}
         result.model_calls = calls
         return result

@@ -146,8 +146,16 @@ class CheckResult(BaseModel):
     # Priced sum of the model requests answered for this answer (tokens only: search credits are
     # not priced), always a number. `unpriced_requests` counts requests that may be billed but
     # have no price (cut, failed, unpriced model); above 0, cost_usd is a lower bound.
-    cost_usd: float = 0.0
-    unpriced_requests: int = 0
+    cost_usd: float = Field(
+        0.0,
+        description="Priced sum of the model requests answered for this answer, in USD (search "
+        "credits excluded). A lower bound when unpriced_requests is above 0.",
+    )
+    unpriced_requests: int = Field(
+        0,
+        description="Model requests that may be billed but have no price (cut, failed or refused, "
+        "or an unpriced model). Above 0, cost_usd is a lower bound.",
+    )
     # Shown next to the claims, also on a notice (a refused link): never sets or changes a verdict.
     incident_matches: list[IncidentMatch] = []
     # Check log only (prawdowid/checklog.py): never sent to a channel.

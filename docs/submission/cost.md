@@ -12,8 +12,9 @@ user decision (`HN_SKIP_EVAL=1`) — a fresh eval on the merged commit is pendin
 ## Estimate for 1,000 checks
 
 The recorded `metrics.cost_per_100_usd.value` is exactly `1.8220444444444441` USD.
-The eval computes a mean of per-answer `cost_usd` and multiplies it by the reporting unit
-([evals/run.py:157-158](../../evals/run.py#L157-L158)). Applying that measured rate:
+The eval computes a mean of per-answer `cost_usd` over the answers that ran a check (cache hits and
+simulated outages are left out) and multiplies it by the reporting unit (`cost_per_100` in
+[evals/run.py](../../evals/run.py)). Applying that measured rate:
 
 ```text
 Estimated USD/check = 1.8220444444444441 / 100 = 0.018220444444444441
@@ -23,8 +24,9 @@ Rounded display estimate = USD 18.22 for 1,000 checks
 ```
 
 This assumes the same request mix and retrieval conditions as the saved run. It prices model
-usage, including extraction, rerank and judge, through PydanticAI/genai-prices. Missing usage or
-an unpriced/interrupted request can produce `cost_usd: null`; failed calls may still be billed
+usage, including extraction, rerank and judge, through PydanticAI/genai-prices. `cost_usd` is always a number: the priced sum of the answered requests. A request that was cut,
+failed, refused or sent to an unpriced model is counted in `unpriced_requests`, and above 0 the figure
+is a lower bound; failed calls may still be billed
 ([verifier.py](../../prawdowid/verifier.py), [pipeline.py](../../prawdowid/pipeline.py)).
 It excludes hosting, network, search/MCP fees, Discord operation and tax; those amounts are
 UNCONFIRMED. No price for those services is inferred from a missing API key or a code comment.

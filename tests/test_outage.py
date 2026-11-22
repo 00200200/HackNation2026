@@ -201,7 +201,9 @@ def test_every_claim_hitting_an_outage_is_a_technical_error(monkeypatch):
     assert result.status is Status.TECHNICAL_ERROR
     assert result.claims == [] and result.unchecked_claims == []
     assert "Nie mogę teraz sprawdzić bazy Google Fact Check" in result.message
-    assert result.cost_usd is not None  # the extraction call is still priced
+    assert (
+        result.cost_usd > 0 and result.unpriced_requests == 0
+    )  # the extraction call is priced
 
 
 def test_a_claim_without_outage_keeps_the_answer_ok(monkeypatch):

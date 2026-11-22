@@ -285,11 +285,13 @@
           "cost_usd": {
             "type": "number",
             "title": "Cost Usd",
+            "description": "Priced sum of the model requests answered for this answer, in USD (search credits excluded). A lower bound when unpriced_requests is above 0.",
             "default": 0.0
           },
           "unpriced_requests": {
             "type": "integer",
             "title": "Unpriced Requests",
+            "description": "Model requests that may be billed but have no price (cut, failed or refused, or an unpriced model). Above 0, cost_usd is a lower bound.",
             "default": 0
           },
           "incident_matches": {

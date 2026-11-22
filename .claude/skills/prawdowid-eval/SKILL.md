@@ -100,8 +100,8 @@ matching echo is a harness error (`harness_error` in the case row, a warning in 
 metric, never counted as a product miss. **Expected shape of a fault case** (brief scenario J: disclose the technical
 limit without a made-up result): it passes when no factual verdict is given and the limit is disclosed, either as status
 `technical_error`, or (a `factcheck_api_unavailable` case only) as status `ok` where every claim is `nie sprawdzono` and
-a claim's limitations carry the failed source's reason. Any verdict, `brak wystarczających dowodów` caused by the outage,
-or a `nie sprawdzono` that blames only the clock fails. `llm_unavailable` has no claim-level form (`technical_error` only).
+a claim's first limitation is the failed source's reason. Any verdict, `brak wystarczających dowodów` caused by the outage,
+or a `nie sprawdzono` where a claim was cut by the clock fails. `llm_unavailable` has no claim-level form (`technical_error` only).
 
 Building the set: ≥ 30 cases, every scenario A–E, G, I, J at least twice, labels taken from the organiser's incident
 base and fact-checking sources (write the source in `source`). Never copy eval cases or answers into prompts or code:

@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from evals import adapter, metrics
-from prawdowid import factcheck
+from prawdowid import factcheck, pipeline
 
 REQUIRED_SCENARIOS = ("A", "B", "C", "D", "E", "G", "I", "J")
 NON_PRODUCT = (
@@ -45,6 +45,7 @@ FIXTURE_BASE_ENV = "PRAWDOWID_FIXTURE_BASE"
 # status discloses it.
 FAULT_REASONS = {"factcheck_api_unavailable": factcheck.LOOKUP_UNAVAILABLE}
 NOT_CHECKED = "nie sprawdzono"
+TIME_LIMIT_PREFIX = pipeline.TIME_LIMIT.split("{")[0]
 RETRY_BACKOFF_S = 20.0  # one retry per call; slowapi's 10/minute window needs a pause
 
 
@@ -107,7 +108,13 @@ def disclosed_outage(case: dict, response: dict) -> bool:
         and response.get("status", "ok") == "ok"
         and claims
         and all(c.get("verdict") == NOT_CHECKED for c in claims)
-        and any(reason in (c.get("limitations") or []) for c in claims)
+        # The outage must come first: a claim cut by the clock lists TIME_LIMIT before it, and
+        # that is a missed deadline the outage only accompanies, not a disclosed outage.
+        and any((c.get("limitations") or [])[:1] == [reason] for c in claims)
+        and not any(
+            (c.get("limitations") or [""])[0].startswith(TIME_LIMIT_PREFIX)
+            for c in claims
+        )
     )
 
 
@@ -305,12 +312,17 @@ def unmeasured(row: dict) -> bool:
 
 
 def cost_per_100(rows: list[dict]) -> dict:
-    """Mean cost of 100 checks over the answers that ran a check (not the product's result cache,
+    """Mean cost of 100 checks over the answers that ran a check (not simulated outages, which send no model request, nor the product's result cache,
     whose stored cost belongs to an earlier request). `cost_usd` is the priced sum of the answered
     model requests, so an answer with `unpriced_requests` > 0 still counts, and the figure is
     labelled a lower bound. Unknown only when no answer has a cost."""
-    first = [r["runs"][0] for r in rows]
-    ran = [run for run in first if not run.get("cached")]
+    # A simulated outage answers at once with cost 0.0 and no model request: not a check.
+    simulated = [r for r in rows if r["case"].get("simulate")]
+    ran = [
+        r["runs"][0]
+        for r in rows
+        if not r["runs"][0].get("cached") and not r["case"].get("simulate")
+    ]
     priced = [
         run["response"]
         for run in ran
@@ -326,7 +338,8 @@ def cost_per_100(rows: list[dict]) -> dict:
         "n_incomplete": incomplete,
         "n_no_cost": len(ran)
         - len(priced),  # errors and other answers without cost_usd
-        "n_cached_excluded": len(first) - len(ran),
+        "n_cached_excluded": sum(bool(r["runs"][0].get("cached")) for r in rows),
+        "n_simulated_excluded": len(simulated),
         "lower_bound": incomplete > 0,
     }
 
@@ -601,10 +614,12 @@ def main() -> int:
             *(["moderator_loop"] if "moderator_loop" in results else []),
         ]
     ]
-    scenarios = sorted({c["scenario"] for c in cases})
+    # A fault case that never ran faulted was not scored, so like a skipped case it covers nothing.
+    scored = [r["case"] for r in rows if not harness_error(r)]
+    scenarios = sorted({c["scenario"] for c in scored})
     warnings = []
-    if not args.quick and len(cases) < 30:
-        warnings.append(f"only {len(cases)} cases; the jury uses at least 30")
+    if not args.quick and len(scored) < 30:
+        warnings.append(f"only {len(scored)} cases; the jury uses at least 30")
     missing = [s for s in REQUIRED_SCENARIOS if s not in scenarios]
     if missing:
         warnings.append(f"no cases for scenarios {', '.join(missing)}")
@@ -634,6 +649,9 @@ def main() -> int:
         f"{cost['n_cached_excluded']} served from the cache left out"
         if cost["n_cached_excluded"]
         else "",
+        f"{cost['n_simulated_excluded']} simulated outages left out"
+        if cost["n_simulated_excluded"]
+        else "",
     ]
     if notes := [n for n in notes if n]:
         warnings.append(
@@ -647,7 +665,7 @@ def main() -> int:
         )
     # A full run counts as the jury's test only on the real set: >= 30 cases, every required scenario.
     example_file = "example" in Path(args.cases).name
-    coverage_ok = args.quick or (len(cases) >= 30 and not missing and not example_file)
+    coverage_ok = args.quick or (len(scored) >= 30 and not missing and not example_file)
     if example_file:
         warnings.append("example cases file: results do not count for submission")
 
@@ -656,7 +674,7 @@ def main() -> int:
         "dirty": bool(dirty),
         "mode": "quick" if args.quick else "full",
         "timestamp": datetime.now(UTC).isoformat(timespec="seconds"),
-        "n_cases": len(cases),
+        "n_cases": len(scored),
         "skipped": skipped,
         "scenarios": scenarios,
         "metrics": results,
@@ -666,7 +684,7 @@ def main() -> int:
         "coverage_ok": coverage_ok,
         "overall_pass": all(p is True for p in required) and coverage_ok,
         "warnings": warnings,
-        "summary": summarize(per_case),
+        "summary": summarize([c for c in per_case if not c["harness_error"]]),
         "cases": per_case,
     }
     text = json.dumps(report, ensure_ascii=False, indent=2)

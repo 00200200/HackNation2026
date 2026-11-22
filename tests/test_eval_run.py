@@ -497,6 +497,9 @@ def test_an_unconfirmed_fault_is_a_harness_error_left_out_of_every_metric(
     report, _ = run_eval(tmp_path, monkeypatch, cases=[CASES[1], FAULT_CASE], ask=ask)
 
     assert report["metrics"]["end_to_end"]["value"] == 1.0  # J1 is not a product miss
+    # Like a skipped case, it covers nothing: J is missing and a full run cannot pass on it.
+    assert "J" not in report["scenarios"] and report["n_cases"] == 1
+    assert report["coverage_ok"] is False
     j1 = next(c for c in report["cases"] if c["id"] == "J1")
     assert j1["harness_error"] and not j1["correct"]
     assert any("fault not applied" in w and "J1" in w for w in report["warnings"])
@@ -514,6 +517,9 @@ def test_a_simulated_outage_is_met_by_a_status_or_a_claim_level_disclosure():
         {"status": "ok", "claims": [{"verdict": "brak wystarczających dowodów"}]}
     )
     assert not ok(not_checked("Czas sprawdzania minął."))
+    # What the product emits for a claim cut by the clock while Fact Check is down: not a disclosed outage.
+    cut = run.pipeline.TIME_LIMIT.format(budget=run.pipeline.CHECK_BUDGET_S)
+    assert not ok(not_checked(cut, reason))
     assert not ok(
         {
             "status": "ok",
@@ -559,6 +565,14 @@ def test_cost_is_a_lower_bound_over_incomplete_answers_and_leaves_out_cache_hits
     assert cost["value"] == pytest.approx(2.0)  # (0.02 + 0.04 + 0.0) / 3 * 100
     assert (cost["n_priced"], cost["n_incomplete"], cost["n_no_cost"]) == (3, 2, 1)
     assert cost["n_cached_excluded"] == 1 and cost["lower_bound"] and cost["pass"]
+
+
+def test_cost_leaves_out_simulated_outages_that_sent_no_request():
+    outage = cost_row("J", 0.0)
+    outage["case"]["simulate"] = "llm_unavailable"
+    cost = run.cost_per_100([cost_row("A", 0.02), outage])
+    assert cost["value"] == pytest.approx(2.0)  # not (0.02 + 0.0) / 2
+    assert cost["n_priced"] == 1 and cost["n_simulated_excluded"] == 1
 
 
 def test_cost_is_unknown_only_when_no_answer_has_one():

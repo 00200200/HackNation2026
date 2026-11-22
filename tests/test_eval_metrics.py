@@ -217,6 +217,40 @@ def test_a_fault_case_is_scored_only_when_the_product_echoes_the_fault(
             adapter.ask(payload, "web")
 
 
+@pytest.mark.parametrize(
+    ("status", "echo", "scored"),
+    [(200, "factcheck_api_unavailable", True), (200, None, False), (429, None, False)],
+)
+def test_the_discord_path_reads_the_fault_echo_of_the_response_behind_the_answer(
+    monkeypatch, status, echo, scored
+):
+    seen = {}
+
+    def handler(request):
+        seen["fault"] = request.headers.get("X-Eval-Fault")
+        headers = {"X-Eval-Fault-Applied": echo} if echo else {}
+        body = {"status": "ok", "claims": []} if status == 200 else {"detail": "slow"}
+        return adapter.httpx2.Response(status, json=body, headers=headers)
+
+    real = adapter.httpx2.AsyncClient
+    monkeypatch.setattr(
+        adapter.httpx2,
+        "AsyncClient",
+        lambda **kw: real(transport=adapter.httpx2.MockTransport(handler), **kw),
+    )
+    monkeypatch.setenv("PRAWDOWID_URL", "http://product.test")
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    payload = {"text": "x", "simulate": "factcheck_api_unavailable"}
+    if scored:
+        assert adapter.ask(payload, "discord")["claims"] == []
+    else:
+        with pytest.raises(adapter.FaultNotApplied, match="not applied"):
+            adapter.ask(payload, "discord")
+    assert (
+        seen["fault"] == "factcheck_api_unavailable"
+    )  # the headers reach the API call
+
+
 def test_a_fault_case_without_the_eval_token_is_not_sent(monkeypatch):
     monkeypatch.delenv("PRAWDOWID_EVAL_TOKEN", raising=False)
     with pytest.raises(adapter.FaultNotApplied, match="PRAWDOWID_EVAL_TOKEN"):
