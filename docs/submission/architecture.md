@@ -181,8 +181,9 @@ do kolejki moderatora (sprawa N)" only then, so a failed write never reads as a 
 section 5). The moderator or analyst who holds `PRAWDOWID_ADMIN_TOKEN` reads the queue at
 `GET /api/cases`. Without that variable nobody could read it, so no check is filed and no answer
 mentions a moderator. There is no push notification and no moderator screen beyond that JSON list.
-It has not run on the live server yet; the server's `.env` needs the variable first
-([deploy.md](../deploy.md)).
+It has not run on the live server yet: faktczyfejk.pl serves the `prod` branch (`24e92d4`), which,
+like `main`, does not have #79, and after the merge and the promotion the server's `.env` also
+needs the variable ([deploy.md](../deploy.md)).
 
 ## Default limits, not performance measurements
 
@@ -219,11 +220,13 @@ timestamp `2026-11-22T05:40:07+00:00`, commit `f4c9aa81dc50df163cff7ceb33f28de6d
 skipped (no public URL for the fixture pages). `f4c9aa8` is `df74cef` (`integration/r4`, the round-4
 release candidate) plus eval results only: `git diff --stat df74cef f4c9aa8` touches
 `evals/results/` alone. The commit field is the harness's checkout. The server was the VPS staging
-container built from `df74cef` and warmed up before the run; that it ran this code was checked by
-comparing the md5 of `prawdowid/judge.py` in the container with the commit's (commit message of
-`fb13425`). The J cases ran with their fault applied (`PRAWDOWID_EVAL_TOKEN`) and the H cases filed
-moderator cases (`PRAWDOWID_ADMIN_TOKEN`). Part of the web searches came from the Tavily query cache
-of the earlier runs that day (#110), so the cold-cache full run on `af7ec13` is quoted next to the
+container, warmed up before the run. That it ran the `df74cef` code was checked by comparing the md5
+of `prawdowid/judge.py`, the only product-code file `df74cef` changes after `9983127`, in the container with
+the commit's (commit message of `fb13425`). The J cases ran with their fault applied
+(`PRAWDOWID_EVAL_TOKEN`) and the H cases filed
+moderator cases (`PRAWDOWID_ADMIN_TOKEN`). According to the same commit message the Tavily query
+cache (#110) was kept from the earlier runs that day, so part of the web searches came from it (the
+run file does not record cache hits); the cold-cache full run on `af7ec13` is quoted next to the
 latency. The cases are our own set, not the jury's, and the values and targets below are copied
 exactly from the file; the last column says what each value rests on:
 
@@ -251,7 +254,12 @@ Demagog's "Fałsz", while scenario B expects `wprowadzające w błąd`, and the 
 that label policy yet), C01 and C04 (`brak wystarczających dowodów` where `wprowadzające w błąd` is
 expected), FC-A08 (`wprowadzające w błąd` where `fałszywe` is expected) and FC-I03 (`brak
 wystarczających dowodów` where `fałszywe` is expected). Citation coverage counts evidence URL/quote
-presence for factual verdicts, not evidence correctness; no manual citation spot-check is committed.
+presence for factual verdicts, not evidence correctness. Whether a quote fits the verdict was
+checked by an agent, not a person, on 12 of the 251 quotes the run showed with a URL, drawn with a
+fixed seed ([citation_spotcheck.md](../../evals/results/citation_spotcheck.md)): the quote or
+rating is on the page in 11 of 12 (A01's PAP page could not be read), 10 of 12 fit the verdict
+shown (FC-I03 only partly), I03 and A02 show a date other than the page's publication date, and
+FC-A04's source covers a different month than the claim.
 Verdict accuracy scores the main claim alone; citation metrics examine all returned claims. The JSON
 does not record per-provider retrieval outcomes or model overrides; the code default at `df74cef`
 extracts claims with Sonnet (#88) and searches in one pass (#106).

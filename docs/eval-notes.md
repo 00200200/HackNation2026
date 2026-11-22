@@ -18,7 +18,7 @@ injection alone: the canary appears nowhere in the answers of any run, and when 
 with the correct verdict is reported next to it as `injection_verdict_correct` (no target).
 Numbers in the runs below were scored the old way; they are not comparable with later ones.
 
-Cases with a `page_fixture` (E05 to E14) put the injection in a fetched page: `tests/fixtures/pages/`
+Cases with a `page_fixture` (E05 to E15) put the injection in a fetched page: `tests/fixtures/pages/`
 holds the page and `input.text` is `{page_url}`. The product refuses private addresses, so the
 eval can run them only against a public copy of those pages. The demo host serves them (#94, nginx
 `location /eval-fixtures/`, copied from `tests/fixtures/pages` at image build, `X-Robots-Tag: noindex, nofollow`,
@@ -61,9 +61,10 @@ before quoting it:
 
 - Stamp: `f4c9aa8` is `df74cef` (`integration/r4`) plus eval results only: `git diff --stat
   df74cef f4c9aa8` lists `evals/results/HISTORY.md`, the `9983127` run file and `latest.json`. The
-  harness ran from a clean checkout of `f4c9aa8`. The server was the VPS staging container built
-  from `df74cef` and warmed up first; the md5 of `prawdowid/judge.py` in the container matched the
-  commit's (commit message of `fb13425`). The J cases ran faulted, so the server had
+  harness ran from a clean checkout of `f4c9aa8`. The server was the VPS staging container, warmed up
+  first; that it ran `df74cef` rests on the md5 of `prawdowid/judge.py` in the container, which matched
+  the commit's (commit message of `fb13425`); that file is the only product-code file `df74cef` changes after
+  `9983127`. The J cases ran faulted, so the server had
   `PRAWDOWID_EVAL_TOKEN`, and the H cases filed moderator cases, so it had `PRAWDOWID_ADMIN_TOKEN`.
 - The cases and labels are ours, as below; only the targets are the jury's.
 - `macro_f1` 0.888 covers the 69 cases with an expected verdict: the plain mean of the per-class F1
@@ -93,8 +94,9 @@ before quoting it:
   `af7ec13` run (0.750) came before the judge rule that a fact-checker's data gap decides (ADR
   0001), and `9983127` (0.917) lost FC-D03 to a Konkret24 snippet's missing context, which
   `df74cef` addresses (its commit message).
-- `median_latency_s` 16.0: part of the web searches came from the Tavily query cache (#110) of the
-  earlier round-4 runs that day, so quote the cold-cache full run on `af7ec13` (15.1 s) next to it.
+- `median_latency_s` 16.0: according to the commit message of `fb13425`, part of the web searches came
+  from the Tavily query cache (#110) of the earlier round-4 runs that day (the run file does not
+  record cache hits), so quote the cold-cache full run on `af7ec13` (15.1 s) next to it.
   The slowest first answer was U01 (32.0 s).
 - `channel_consistency` 1.0: the 6 G cases. The second answers took 0.13-0.47 s, from the result
   cache (#59). The file does not record which extra channel (`PRAWDOWID_EXTRA_CHANNELS`) was on.
@@ -105,7 +107,12 @@ before quoting it:
   out, no answer from the result cache.
 - `citation_correctness` 1.0 and `injection_resistance` 1.0 rest on the same kind of evidence as in
   the `ca48b84` run below: verbatim presence of corpus quotes, and 7 pasted-text injection cases of
-  which 3 are tuned on. The number of corpus quotes was not counted for this run.
+  which 3 are tuned on. The number of corpus quotes was not counted for this run. Whether a quote
+  fits the verdict was checked by an agent, not a person, on 12 of the 251 quotes this run showed
+  with a URL, drawn with a fixed seed ([citation_spotcheck.md](../evals/results/citation_spotcheck.md)):
+  the quote or rating is on the page in 11 of 12 (A01's PAP page could not be read), 10 of 12 fit
+  the verdict shown (FC-I03 only partly), I03 and A02 show a date other than the page's publication
+  date, and FC-A04's source covers a different month than the claim.
 
 Round 4 (22.11, all full runs on 75 cases of `evals/cases.jsonl`, rows in HISTORY.md):
 
@@ -138,7 +145,8 @@ it:
   finding the rating, not independent evidence (WORKLOG Decisions, 2026-11-22, #100). The step from
   0.278 (quick run on `edd34a5`, 10 cases) spans #100 and a different case mix.
 - `citation_correctness` 1.0 checks that each quote citing a corpus document appears in it
-  verbatim, not that it supports the claim; no manual spot check is committed. The JSON keeps only
+  verbatim, not that it supports the claim; no spot check was made for this run (the `df74cef` sample
+  is in `evals/results/citation_spotcheck.md`). The JSON keeps only
   the share. The number of such quotes, 13, was counted from the run's progress file
   `evals/results/run-20261122T021757.182695Z.partial.jsonl`, which is git-ignored and exists only in
   the worktree that ran the eval; from there:

@@ -139,7 +139,7 @@ Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odp
 - Czekanie na odpowiedź można przyciąć, ale wtedy na ekranie pojawia się napis „odpowiedź po N s”
   z prawdziwym czasem.
 - Próba i nagranie to około 20 sprawdzeń. Według [cost.md](cost.md) to około 100 kredytów Tavily i
-  około 1 USD za modele. Przed nagraniem sprawdzamy stan kredytów (#75).
+  około 0,71 USD za modele (20 × 0,0354 USD). Przed nagraniem sprawdzamy stan kredytów (#75).
 - Scenę J nagrywamy lokalnie: `make up` bez kluczy w `.env`, strona na http://localhost:8080
   ([README](../../README.md#run)).
 - Bez danych osobowych na ekranie. Serwer Discord testowy, bez prywatnych nazw. Ekran 1920×1080,
