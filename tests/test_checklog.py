@@ -32,6 +32,7 @@ FIELDS = {
     "unpriced_requests",
     "security_events",
     "incidents",
+    "moderator_case",
     "limitations",
     "claims",
     "unchecked_claims",

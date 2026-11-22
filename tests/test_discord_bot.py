@@ -324,7 +324,14 @@ def test_same_input_same_result_on_web_and_discord():
         )
         discord = asyncio.run(via_discord())
     assert discord.status is Status.OK
-    assert discord == web
+    # The same answer, but the Discord question is the second one in the same moderator case.
+    assert (web.moderator_case.status, discord.moderator_case.status) == (
+        "created",
+        "updated",
+    )
+    assert discord.moderator_case.id == web.moderator_case.id
+    unfiled = {"moderator_case": None}
+    assert discord.model_copy(update=unfiled) == web.model_copy(update=unfiled)
 
 
 def test_bot_refuses_to_start_without_token(monkeypatch):

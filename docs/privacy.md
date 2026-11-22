@@ -88,12 +88,43 @@ time of each step (`fetch`, `extract`, and per claim `factcheck`, `euvsdisinfo`,
 `judge`, `retry_*`), every model answer (model name, input and output tokens), `cost_usd`, security
 events (kind, location and detector, never the wording), ids of matched incidents, check-level
 limitations, each claim with its
-verdict, sources (masked URL and source type) and limitations (search errors, time limit), and the
-claims left unchecked. Page text from a link is not stored. `GET /api/sessions/{id}` returns the
+verdict, sources (masked URL and source type) and limitations (search errors, time limit), the
+claims left unchecked, and the moderator case the check joined (`moderator_case`, see below). Page
+text from a link is not stored. `GET /api/sessions/{id}` returns the
 records of one session as stored. A check cut by the API's 60 s limit (the pipeline's own 40 s budget
 normally ends it first), or one where verify raised, keeps its total latency, `error`, the notice
 and the pattern-only screening: the steps and model calls it had made are lost with the cancelled
 task.
+
+## Moderator cases
+
+Brief section 2 asks that questions the sources cannot settle reach a person the administrator
+names. `prawdowid/cases.py` keeps them as moderator cases (#79, scenario H). The API files a check
+when a checked claim ends `brak wystarczających dowodów`, when the check logged a security event,
+or when a claim about evacuation or an RCB alert, a health emergency, elections or mobilisation (a
+short list in code) ended false, misleading or without enough evidence. A question with a similar
+claim joins the open case and raises its count (shared word stems, `PRAWDOWID_CASE_MIN_SIMILARITY`,
+default 0.5).
+
+Each case (`PRAWDOWID_CASES`, default `cases.jsonl` next to the check log, so in Docker
+`/var/lib/prawdowid/cases.jsonl` on the `checklog` volume) stores its number and opening time and,
+for each question in it, the session id, time, channel, why it was filed, the masked claims (for a
+check without claims, the first 300 characters of the masked question), the masked page URL of a
+link, the lookups that ran and the URLs they found. Claims are masked again right before the
+write. The last case number sits in `cases.seq`, so no number is given twice.
+
+The administrator decides who reads the cases: they give `PRAWDOWID_ADMIN_TOKEN` to a moderator or
+an analyst, who calls `GET /api/cases` with `Authorization: Bearer <token>`. Without the variable
+the route does not exist (404). The list shows the open cases, the most asked first, with counts,
+the first and last question time, the claims, channels, lookups and URLs. It never shows session
+ids. Nobody is told when a case opens: there is no e-mail or webhook, so the moderator has to read
+the list.
+
+The person who asked gets `moderator_case` in the answer (number, `created` or `updated`, count).
+The web page, `/czat` and Discord say "Zgłoszenie trafiło do kolejki moderatora (sprawa N)" only
+after the case was written. When the write fails, the API logs the failure and the answer says
+nothing about a moderator. The count also tells the asker how many similar questions the case
+holds, which reveals that someone else asked something similar in the last 30 days.
 
 Web search in a check also adds the public pages it fetched to the source cache
 (`corpus/docs.jsonl`). Those carry no user text and no session id. A check never writes the
@@ -105,6 +136,9 @@ One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:
 
 - Check log: records older than that are dropped when the next check is written (so with no new
   checks they stay until one comes). Damaged lines are dropped the same way.
+- Moderator cases: each question in a case is dropped that long after it was asked, when the next
+  question is filed or a session is deleted (the admin view hides it at once); a case left without
+  questions goes with it.
 - Source cache `corpus/docs.jsonl`: pages fetched more than that ago are dropped on the next save.
 - Search cache `corpus/search_cache.jsonl` (`prawdowid/search_cache.py`, #110): the hits Tavily
   returned for a query (URL, title, snippet, publication date), under a SHA-256 of the normalised
@@ -135,7 +169,8 @@ text: claims, queries and link URLs, all from masked text.
 The API gives every check a session id in the `X-Session-Id` response header. A client that sends
 the header back keeps the same session. The web page keeps it in `sessionStorage` (until the tab
 closes) and shows "Usuń moje sprawdzenia", which calls `DELETE /api/sessions/{id}` and removes every
-check log record of that session. The answer is `{"deleted": <number of records>}`.
+check log record of that session and its questions in the moderator cases (a case left without
+questions goes too). The answer is `{"deleted": <number of check log records>}`.
 The session id is a bearer token: anyone who has it can read (`GET /api/sessions/{id}`) and
 delete that session's records; there is no other login.
 

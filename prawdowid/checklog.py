@@ -2,11 +2,13 @@
 
 A record holds the masked question, channel, start and end time, total and per-step latency, status
 (with why a technical error happened), claims with verdicts, sources and limitations (search errors
-and abstentions show up there), model calls with tokens, cost, security events and incident ids.
+and abstentions show up there), model calls with tokens, cost, security events, incident ids and the
+moderator case the check joined.
 
 The question is stored masked (prawdowid/privacy.py), records older than `RETENTION_DAYS` are
-dropped on every write, and `delete_session` removes every record of one session. This file is the
-only place a check is kept: the source cache and the database are never written by a check.
+dropped on every write, and `delete_session` removes every record of one session. Besides this
+file, only the moderator cases (prawdowid/cases.py) keep anything of a check: the masked claims of
+the ones a person should look at. The source cache and the database are never written by a check.
 """
 
 import fcntl
@@ -60,6 +62,7 @@ def record(
         "unpriced_requests": result.unpriced_requests,
         "security_events": [e.model_dump() for e in result.security_events],
         "incidents": [m.incident_id for m in result.incident_matches],
+        "moderator_case": result.moderator_case and result.moderator_case.model_dump(),
         # Check-level limits, e.g. "patterns only" when the model did not answer.
         "limitations": [mask_personal_data(x) for x in result.limitations],
         "claims": [

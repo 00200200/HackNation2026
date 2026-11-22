@@ -40,6 +40,16 @@ def check_log(monkeypatch, tmp_path):
     return path
 
 
+@pytest.fixture(autouse=True)
+def moderator_cases(monkeypatch, tmp_path):
+    """Every test keeps its moderator cases in a temporary file, never in the repo."""
+    from prawdowid import cases
+
+    path = tmp_path / "cases.jsonl"
+    monkeypatch.setattr(cases, "CASES", path)
+    return path
+
+
 @pytest.fixture
 def quiet_sources(monkeypatch):
     """Every source answers and finds nothing (no outage): a check ends in a verdict, not a

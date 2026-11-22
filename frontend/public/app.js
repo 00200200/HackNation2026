@@ -214,24 +214,33 @@ function costLine(seconds, cost, unpriced) {
   return `w ${seconds} s, koszt modelu ${unpriced > 0 ? "co najmniej " : ""}${USD.format(cost)}`;
 }
 
+// Scenario H: the API sets moderator_case only once the case is stored, so this is never said about
+// a hand-off that did not happen. Same words as the Discord bot (prawdowid/discord_bot.py).
+const MODERATOR_NOTE = "Zgłoszenie trafiło do kolejki moderatora";
+
+function moderatorNote(c) {
+  return c ? el("p", { className: "note moderator", textContent: `${MODERATOR_NOTE} (sprawa ${c.id}).` }) : null;
+}
+
 function render(check, seconds) {
   const warning = incidentWarning(check.incident_matches);
+  const moderator = moderatorNote(check.moderator_case);
   // Statuses other than "ok" are notices, never verdicts.
   if (check.status !== "ok") {
     const main = notice(NOTICE_TITLES[check.status] ?? "Brak oceny", check.message, NOT_A_VERDICT);
     const limits = check.limitations?.length
       ? el("ul", {}, ...check.limitations.map((l) => el("li", { textContent: l })))
       : null;
-    if (!check.security_events?.length && !limits && !warning) return main;
+    if (!check.security_events?.length && !limits && !warning && !moderator) return main;
     return el("div", {},
       check.security_events?.length ? notice("Polecenia dla modelu", SECURITY_NOTE_ONLY) : null,
-      main, limits, warning);
+      main, limits, warning, moderator);
   }
   const unchecked = check.unchecked_claims ?? [];
   if (!check.claims.length && !unchecked.length) {
     const empty = notice("Nie znaleźliśmy zdania do sprawdzenia",
       "Wklej fragment z konkretnym faktem, na przykład datą, liczbą albo nazwą instytucji.");
-    return warning ? el("div", {}, empty, warning) : empty;
+    return warning || moderator ? el("div", {}, empty, warning, moderator) : empty;
   }
   const events = check.security_events ?? [];
   return el("article", { className: "card" },
@@ -246,7 +255,8 @@ function render(check, seconds) {
     check.page ? pageNote(check.page) : null,
     warning,
     ...check.claims.map(claimBlock),
-    unchecked.length ? uncheckedList(unchecked) : null);
+    unchecked.length ? uncheckedList(unchecked) : null,
+    moderator);
 }
 
 // The page behind a link: what was read, not evidence for its own claims.

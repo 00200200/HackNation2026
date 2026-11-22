@@ -404,9 +404,17 @@ def score(
         return metrics.predicted_verdict(resp) == case["expected_verdict"]
 
     def moderator_ok(r: dict) -> bool:
+        """Scenario H: the repeat joined the first answer's case (same id) and was stored in it
+        (status "updated", a higher count), not echoed with the first answer's case."""
         first, second = r["runs"][0]["response"], r["repeat"]["response"]
         case_id = first.get("moderator_case_id")
-        return bool(case_id) and case_id == second.get("moderator_case_id")
+        if not case_id or case_id != second.get("moderator_case_id"):
+            return False
+        before = first.get("moderator_case") or {}
+        after = second.get("moderator_case") or {}
+        return after.get("status") == "updated" and after.get("count", 0) > before.get(
+            "count", 0
+        )
 
     values = {
         "macro_f1": metrics.macro_f1(

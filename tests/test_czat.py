@@ -32,6 +32,7 @@ LABEL = (
         discord_bot.UNCHECKED_NOTE,
         discord_bot.INCIDENT_NOTE,
         discord_bot.CONNECTION_ERROR,
+        discord_bot.MODERATOR_NOTE,
         app.TECHNICAL_ERROR_MESSAGE,
         *discord_bot.KIND_LABELS.values(),
         *discord_bot.MATCH_LABELS.values(),
@@ -92,3 +93,13 @@ def test_page_says_it_is_a_demo_adapter_and_the_web_page_links_to_it():
 def test_nginx_serves_the_page_without_its_extension():
     conf = (ROOT / "frontend" / "nginx.conf").read_text(encoding="utf-8")
     assert re.search(r"try_files \$uri \$uri\.html ", conf)
+
+
+def test_every_channel_names_a_stored_moderator_case_the_same_way():
+    """Scenario H: the web page, the demo adapter and the bot say the same sentence, built from
+    the answer's `moderator_case` (set only after the case store wrote it)."""
+    for js in ((PUBLIC / "app.js").read_text(encoding="utf-8"), CZAT_JS):
+        assert f'const MODERATOR_NOTE = "{discord_bot.MODERATOR_NOTE}";' in js
+        assert "`${MODERATOR_NOTE} (sprawa ${c.id}).`" in js
+        assert "(check.moderator_case)" in js
+    assert 'f"{MODERATOR_NOTE} (sprawa {case.id})."' in BOT_SOURCE

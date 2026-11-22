@@ -24,6 +24,8 @@ const PAGE_NOTE = "Ta strona nie jest źródłem dowodów dla własnych twierdze
 const UNCHECKED_NOTE = "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. Tych nie oceniliśmy. Możesz wkleić je osobno.";
 const INCIDENT_NOTE = "Ta treść przypomina incydenty z bazy organizatora. To tylko kontekst: nie zmienia oceny twierdzeń.";
 const CONNECTION_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
+// Scenario H: the API sets moderator_case only once the case is stored.
+const MODERATOR_NOTE = "Zgłoszenie trafiło do kolejki moderatora";
 const TECHNICAL_ERROR_MESSAGE = "Wystąpił błąd techniczny i nie udało się sprawdzić tej treści. Spróbuj ponownie za chwilę.";
 const KIND_LABELS = { attribution: "Kto co powiedział", quoted: "Treść cytatu" };
 const MATCH_LABELS = { url: "ten sam adres", domain: "domena z bazy", text: "podobny tekst" };
@@ -164,21 +166,26 @@ function securityBubble(note) {
   return bubble("msg-notice", named("Polecenia dla modelu.", note));
 }
 
+function moderatorBubbles(c) {
+  return c ? [bubble("msg-notice", el("p", { textContent: `${MODERATOR_NOTE} (sprawa ${c.id}).` }))] : [];
+}
+
 // prawdowid/discord_bot.render(): one message per section, in the bot's order.
 function replyBubbles(check) {
   const warning = check.incident_matches?.length ? [incidentsBubble(check.incident_matches)] : [];
+  const moderator = moderatorBubbles(check.moderator_case);
   // Statuses other than "ok" are notices, never verdicts.
   if (check.status !== "ok") {
     return [bubble("msg-notice",
       check.security_events?.length ? named("Polecenia dla modelu.", SECURITY_NOTE_ONLY) : null,
       named("Brak oceny.", check.message),
       // A label, not a heading: this message has no claim heading to sit under.
-      check.limitations?.length ? [named("Ograniczenia:"), list(check.limitations)] : null), ...warning];
+      check.limitations?.length ? [named("Ograniczenia:"), list(check.limitations)] : null), ...warning, ...moderator];
   }
   const claims = check.claims ?? [];
   const unchecked = check.unchecked_claims ?? [];
   if (!claims.length && !unchecked.length) {
-    return [bubble("msg-notice", named("Brak twierdzeń.", "Usługa nie zwróciła żadnego twierdzenia.")), ...warning];
+    return [bubble("msg-notice", named("Brak twierdzeń.", "Usługa nie zwróciła żadnego twierdzenia.")), ...warning, ...moderator];
   }
   const locations = new Set((check.security_events ?? []).map((e) => e.location));
   return [
@@ -191,6 +198,7 @@ function replyBubbles(check) {
       ? bubble("msg-notice", el("h2", { className: "m-title", textContent: "Niesprawdzone twierdzenia" }),
           el("p", { textContent: UNCHECKED_NOTE }), list(unchecked))
       : null,
+    ...moderator,
   ].filter(Boolean);
 }
 

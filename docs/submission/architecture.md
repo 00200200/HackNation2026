@@ -134,6 +134,21 @@ Browser traffic, fetched evidence, the host and Discord also process data. Exact
 processing locations and retention agreements are UNCONFIRMED. See [risks.md](risks.md) for code
 references and [sources.md](sources.md) for storage limits.
 
+Moderator cases (scenario H, [cases.py](../../prawdowid/cases.py), #79): after the verdicts,
+`POST /api/checks` files a check that needs a person. That means a claim that ended `brak
+wystarczających dowodów`, a logged security event, or a claim on a high-risk topic (evacuation or
+RCB alert, health emergency, elections, mobilisation; a short list in code) that ended false,
+misleading or without enough evidence. A question joins an open case when its claim and one of the
+case's claims share enough word stems (Jaccard of at least `PRAWDOWID_CASE_MIN_SIMILARITY`, 0.5,
+over the corpus search's stems), and the case count goes up; otherwise it opens a new case. The
+store is a JSONL file next to the check log, on the same volume, under a file lock. It holds masked
+claims, keeps each question 30 days and drops a session's questions when the session is deleted.
+The answer carries `moderator_case` only after the write, and the channels say "Zgłoszenie trafiło
+do kolejki moderatora (sprawa N)" only then, so a failed write never reads as a hand-off (brief
+section 5). The moderator or analyst who holds `PRAWDOWID_ADMIN_TOKEN` reads the queue at
+`GET /api/cases`. There is no push notification and no moderator screen beyond that JSON list. It
+has not run on the live server yet.
+
 ## Default limits, not performance measurements
 
 | Limit | Default | Source |
@@ -153,7 +168,7 @@ unfinished claims return `not_checked`. A judge outage also maps to `not_checked
 failure can preserve the first-pass assessment with a limitation when first-pass candidates existed.
 Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
-There is no moderator queue, OCR or reverse image search. The demo corpus and live Discord run
+There is no OCR or reverse image search. The demo corpus and live Discord run
 remain open in [WORKLOG](../../WORKLOG.md). URL inputs are not exercised by the saved eval set
 ([cases](../../evals/cases.jsonl)); do not present its latency as a URL benchmark.
 

@@ -373,6 +373,9 @@ def test_hit_keeps_security_events_and_logs_no_second_cost(client, monkeypatch):
     first = client.post("/api/checks", json={"input": "Tekst"}).json()
     second = client.post("/api/checks", json={"input": "Tekst"}).json()
     assert len(calls) == 1
+    # The same answer but for the moderator case: a hit is one more question in it.
+    assert first.pop("moderator_case") == {"id": 1, "status": "created", "count": 1}
+    assert second.pop("moderator_case") == {"id": 1, "status": "updated", "count": 2}
     assert first == second and second["security_events"][0]["detector"] == "patterns"
     assert [r.cost_usd for r in logged] == [0.05, 0.0]
 
