@@ -46,9 +46,12 @@ letters and 7 digits are masked, an invoice code such as `FV1234567` too. A bare
 phone but starts with a mobile prefix and has no currency or count next to it is masked (`512 345 678
 użytkowników`). Not detected: a landline without a country code, brackets or a label, a bare mobile
 number ending in `000` or followed by a count (`600 123 456 osoby starsze`), a number with `48` but no
-`+`, an ID card number in lower case or one with a space and a unit behind it (`ABC 412345 osób`), and a
-bare number directly followed by more digits, labelled or not (`600 123 456 601 234 567`, `tel. 600 123
-456 2024`; with a country code, or dashed, every number is masked).
+`+`, an ID card number in lower case or one with a space and a unit behind it (`ABC 412345 osób`), and an
+unlabelled bare number directly followed by more digits (`600 123 456 601 234 567`). A label masks the
+first nine digits only (`tel. 600 123 456 2024` → `tel. [telefon] 2024`; `tel. 600 123 456 601 234 567`
+→ `tel. [telefon] 601 234 567`), and a currency or a count behind a longer run of digit groups still
+makes an amount (`telefonów 226 000 000 000 sztuk` stays). With a country code, or dashed, every number
+is masked.
 
 No library fits (checked 2026-11-22). Presidio (presidio-analyzer 2.2.366): its only Polish recognizer
 is PESEL, which this module already covers (an ID card recognizer is an open pull request, #2444), and

@@ -513,6 +513,8 @@ def test_a_count_word_does_not_hide_a_labelled_phone_or_a_glued_id_card(text, ma
         "www.example.pl/a/600123456",
         "gus-532015686e",  # a mobile prefix, but a letter behind the digits: an id
         "Liczba telefonów 226 000 000 sztuk",  # a label word, but a round number and a count
+        "liczba telefonów 226 000 000 000 sztuk",  # the count is behind more digit groups
+        "sprzedaż telefonów 120 000 000 000 zł",  # the currency is behind more digit groups
         "Regon 363190367",  # nine digits, no mobile prefix
         "REGON 730123456",  # a mobile prefix, but a REGON label
         "REGON: 730 123 456",

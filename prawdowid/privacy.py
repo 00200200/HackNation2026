@@ -51,6 +51,8 @@ PHONE = re.compile(rf"(?<!\w)(?<!\d{_SEP})(?P<number>{_NUMBER})(?!\w|[.,]\d)")
 # it is a phone ("tel. 600123456 44051401359"). Checked in `_mask_phone`, not in PHONE, so that a
 # labelled phone is recognised whatever stands behind it.
 MORE_DIGITS = re.compile(rf"{_SEP}\d{{3}}")
+# The run of three-digit groups a labelled number may continue with ("226 000 000 000 sztuk").
+DIGIT_GROUPS = re.compile(rf"(?:{_SEP}\d{{3}})+")
 # 600-100-200 is a phone wherever it stands, next to other numbers too (the one bare format that was
 # masked before).
 DASHED_PHONE = re.compile(r"\b\d{3}-\d{3}-\d{3}\b")
@@ -158,14 +160,20 @@ def _mask_phone(m: re.Match) -> str:
     # A URL is judged by its whole token: its scheme can be further back than `before` reaches.
     head = m.string[: m.start()]
     token = "" if not head or head[-1].isspace() else head.rsplit(None, 1)[-1]
-    count = COUNT_UNIT.match(m.string, m.end())
-    round_number = digits.endswith("000")
+    # A unit after more three-digit groups still makes an amount or a count ("telefonów 226 000 000
+    # 000 sztuk"), so look for it behind the whole run, not right after the nine matched digits.
+    groups = DIGIT_GROUPS.match(m.string, m.end())
+    end = groups.end() if groups else m.end()
+    count = COUNT_UNIT.match(m.string, end)
+    round_number = digits.endswith("000") or bool(
+        groups and groups.group().endswith("000")
+    )
     mobile = (
         MOBILE.fullmatch(digits)
         and not (round_number or count)
         and not (REGON_LABEL.search(before) or URL_TAIL.search(token))
     )
-    money = CURRENCY_BEFORE.search(before) or MONEY_UNIT.match(m.string, m.end())
+    money = CURRENCY_BEFORE.search(before) or MONEY_UNIT.match(m.string, end)
     if (PHONE_LABEL.search(before) or mobile) and not (
         money or (round_number and count)
     ):
