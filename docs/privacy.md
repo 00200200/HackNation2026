@@ -52,6 +52,14 @@ normally ends it first), or one where verify raised, keeps its total latency, `e
 and the pattern-only screening: the steps and model calls it had made are lost with the cancelled
 task.
 
+A moderator case (scenario H, `prawdowid/moderation.py`): when the main claim ends in "brak
+wystarczających dowodów" and the moderator panel is on (`PRAWDOWID_MODERATOR_TOKEN` set), the masked
+question is stored in the moderation store (`PRAWDOWID_MODERATION_DB`, default
+`logs/moderation.sqlite3`, in Docker `/tmp/prawdowid/moderation.sqlite3`) with how many times it was
+asked, first and last time, and the moderator's answer. It carries no session id and no channel. The
+case is shared by everyone who asks the same question, so "Usuń moje sprawdzenia" does not delete it.
+A human moderator with the token reads these masked questions in the panel (`/moderator.html`).
+
 Web search in a check also adds the public pages it fetched to the source cache
 (`corpus/docs.jsonl`). Those carry no user text and no session id. A check never writes the
 PostgreSQL source store (written only by the seed script; step 2c is off in the pipeline).
@@ -63,6 +71,8 @@ One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:
 - Check log: records older than that are dropped when the next check is written (so with no new
   checks they stay until one comes). Damaged lines are dropped the same way.
 - Source cache `corpus/docs.jsonl`: pages fetched more than that ago are dropped on the next save.
+- Moderator cases: a case not asked for that long is dropped whenever the store is next used,
+  its answer with it.
 - Source store: each page gets `delete_after = now() + RETENTION_DAYS` on insert. Search and
   `stored_documents()` skip expired pages at once, but the rows are only deleted when
   `delete_expired_documents()` runs, and only the seed script runs it (before it writes). The seed

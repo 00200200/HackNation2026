@@ -1,22 +1,32 @@
 """HTTP API. Channels (the web frontend now) call it; it calls verify and returns CheckResult."""
 
 import asyncio
+import hmac
 import logging
+import os
 import re
 import time
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import FastAPI, Path, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Path, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, HttpUrl, TypeAdapter, ValidationError, field_validator
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import (
+    BaseModel,
+    HttpUrl,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+)
 from pydantic_core import PydanticCustomError
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from prawdowid import checklog, faults
-from prawdowid.contract import CheckResult, Status
+from prawdowid import checklog, faults, moderation
+from prawdowid.contract import CheckResult, ModeratorAnswer, Status, Verdict
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
 from prawdowid.verifier import failed, is_link, verify
@@ -38,6 +48,11 @@ TECHNICAL_ERROR_MESSAGE = (
     "Wystąpił błąd techniczny i nie udało się sprawdzić tej treści. "
     "Spróbuj ponownie za chwilę."
 )
+# The moderator panel is off (404) unless the server has a token; the panel sends it as a Bearer.
+MODERATOR_TOKEN = os.getenv("PRAWDOWID_MODERATOR_TOKEN") or ""
+CASE_ID = r"[0-9A-F]{16}"
+BEARER = HTTPBearer(auto_error=False)
+Auth = Annotated[HTTPAuthorizationCredentials | None, Depends(BEARER)]
 RATE_LIMIT_MESSAGE = (
     "Wysłano za dużo zapytań w krótkim czasie. Odczekaj minutę i spróbuj ponownie."
 )
@@ -121,6 +136,10 @@ async def create_check(
         result.incident_matches = match_incidents(f"{body.input} {final_url}")
     except Exception:
         log.exception("incident matching failed")
+    try:
+        await asyncio.to_thread(_moderate, body.input, result)
+    except Exception:
+        log.exception("moderator case failed")
     channel = request.headers.get("x-channel", "web")
     channel = channel if channel in CHANNELS else "other"
     latency_ms = round((time.perf_counter() - started) * 1000)
@@ -160,7 +179,70 @@ async def read_session(
 async def delete_session(
     request: Request, session: str = Path(pattern=f"^{SESSION_ID}$")
 ) -> dict:
-    """Delete every check record of a demo session (the check log is all a check stores)."""
+    """Delete every check record of a demo session. Moderator cases carry no session and stay
+    (docs/privacy.md)."""
     deleted = checklog.delete_session(session)
     log.info("session deleted session=%s records=%d", session, deleted)
     return {"deleted": deleted}
+
+
+def _moderator(auth: Auth) -> None:
+    """404 while the panel is off, 401 without the right token. A route dependency, so it runs
+    before the body is validated."""
+    if not MODERATOR_TOKEN:
+        raise HTTPException(404, "Panel moderatora jest wyłączony.")
+    given = auth.credentials if auth else ""
+    if not hmac.compare_digest(given.encode(), MODERATOR_TOKEN.encode()):
+        raise HTTPException(401, "Nieprawidłowy token.")
+
+
+class AnswerRequest(BaseModel):
+    answer: str
+
+    @field_validator("answer")
+    @classmethod
+    def _valid_answer(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise PydanticCustomError("empty", "Wpisz odpowiedź.")
+        if len(value) > moderation.MAX_ANSWER_CHARS:
+            raise PydanticCustomError(
+                "too_long",
+                f"Odpowiedź jest za długa. Limit to {moderation.MAX_ANSWER_CHARS} znaków.",
+            )
+        return value
+
+
+@app.get("/api/moderator/cases", dependencies=[Depends(_moderator)])
+@limiter.limit(RATE_LIMIT)
+async def moderator_cases(request: Request) -> list[moderation.Case]:
+    return await asyncio.to_thread(moderation.list_cases)
+
+
+@app.post("/api/moderator/cases/{case}/answer", dependencies=[Depends(_moderator)])
+@limiter.limit(RATE_LIMIT)
+async def moderator_answer(
+    request: Request, body: AnswerRequest, case: str = Path(pattern=f"^{CASE_ID}$")
+) -> moderation.Case:
+    answered = await asyncio.to_thread(moderation.answer, case, body.answer)
+    if answered is None:
+        raise HTTPException(404, "Nie ma takiej sprawy.")
+    log.info("moderator answered case=%s", case)
+    return answered
+
+
+def _moderate(question: str, result: CheckResult) -> None:
+    """Scenario H: the main claim without evidence opens (or counts) the question's case, and a
+    moderator's answer to it is shown next to the result."""
+    main = result.claims[0] if result.claims else None
+    # With the panel off nobody can answer, so no case and no "passed to a moderator" note.
+    if not MODERATOR_TOKEN or result.status is not Status.OK or not main:
+        return
+    if main.verdict is not Verdict.INSUFFICIENT_EVIDENCE:
+        return
+    case = moderation.open_case(question)
+    result.moderator_case_id = case.id
+    if case.answer:
+        result.moderator_answer = ModeratorAnswer(
+            text=case.answer, answered_at=case.answered_at
+        )

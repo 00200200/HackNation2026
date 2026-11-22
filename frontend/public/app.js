@@ -222,6 +222,20 @@ function costLine(seconds, cost) {
   return typeof cost === "number" ? `w ${seconds} s, koszt modelu ${USD.format(cost)}` : `w ${seconds} s`;
 }
 
+// Human note from the moderator, shown next to the automatic result. Text only, never a verdict.
+function moderatorBlock(check) {
+  const answer = check.moderator_answer;
+  if (answer) {
+    return el("div", { className: "moderator-answer" },
+      el("h2", { textContent: "Odpowiedź moderatora" }),
+      el("p", { className: "moderator-text", textContent: answer.text }),
+      el("p", { className: "note", textContent: `Notatka napisana przez moderatora, ${plDate(answer.answered_at)}. To nie jest automatyczna ocena.` }));
+  }
+  if (!check.moderator_case_id) return null;
+  return el("p", { className: "moderator-note", textContent: `Nie znaleźliśmy dowodów, więc przekazaliśmy pytanie moderatorowi (sprawa numer ${check.moderator_case_id}). `
+    + "Zapytaj ponownie później. Jeśli moderator odpowie, zobaczysz tu jego odpowiedź." });
+}
+
 function render(check, seconds) {
   const warning = incidentWarning(check.incident_matches);
   // Statuses other than "ok" are notices, never verdicts.
@@ -254,6 +268,7 @@ function render(check, seconds) {
     check.page ? pageNote(check.page) : null,
     warning,
     ...check.claims.map(claimBlock),
+    moderatorBlock(check),
     unchecked.length ? uncheckedList(unchecked) : null);
 }
 

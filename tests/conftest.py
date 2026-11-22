@@ -29,3 +29,13 @@ def check_log(monkeypatch, tmp_path):
     monkeypatch.setattr(checklog, "CHECK_LOG", path)
     monkeypatch.setattr(checklog, "DELETED", {})
     return path
+
+
+@pytest.fixture(autouse=True)
+def moderation_db(monkeypatch, tmp_path):
+    """Every test keeps moderator cases in a temporary database, never in the repo."""
+    from prawdowid import moderation
+
+    path = tmp_path / "moderation.sqlite3"
+    monkeypatch.setattr(moderation, "DB", path)
+    return path

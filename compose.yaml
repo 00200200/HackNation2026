@@ -21,6 +21,9 @@ services:
       # The image runs as nobody and /app is read-only to it; the check log and source cache live in /tmp.
       PRAWDOWID_CHECK_LOG: /tmp/prawdowid/checks.jsonl
       PRAWDOWID_CACHE: /tmp/prawdowid/docs.jsonl
+      PRAWDOWID_MODERATION_DB: /tmp/prawdowid/moderation.sqlite3
+      # Moderator panel (/moderator.html) is off unless this is set in .env.
+      PRAWDOWID_MODERATOR_TOKEN: ${PRAWDOWID_MODERATOR_TOKEN:-}
     volumes:
       - ./incidents:/app/incidents:ro
     healthcheck:

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Panel moderatora – faktczyfejk.pl</title>
+  <meta name="theme-color" content="#8A1C2F">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/moderator.js" defer></script>
+</head>
+<body>
+  <section class="hero hero-slim">
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="/" aria-label="faktczyfejk.pl, strona główna">
+          <svg class="brand-mark" viewBox="0 0 200 200" aria-hidden="true">
+            <rect width="200" height="200" rx="44" fill="#FFFFFF"/>
+            <path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#8A1C2F" stroke-width="27" stroke-linejoin="round"/>
+            <rect x="86.5" y="154" width="27" height="28" fill="#8A1C2F"/>
+            <g transform="translate(98 60) rotate(-12) scale(0.95)">
+              <path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#1D1215"/>
+              <path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#1D1215"/>
+              <path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#1D1215"/>
+              <path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#1D1215"/>
+            </g>
+          </svg>
+          <span class="brand-name" aria-hidden="true" translate="no">faktczyfejk</span>
+        </a>
+      </header>
+    </div>
+  </section>
+
+  <main class="mod">
+    <div class="wrap narrow">
+      <h1>Panel moderatora</h1>
+      <form id="token-form" class="mod-bar">
+        <label>Token moderatora
+          <input id="token" type="password" autocomplete="off" required>
+        </label>
+        <button type="submit">Odśwież</button>
+      </form>
+      <p id="status" class="mod-status" role="status"></p>
+      <ul id="cases" class="mod-cases"></ul>
+    </div>
+  </main>
+</body>
+</html>

@@ -132,6 +132,11 @@ class SecurityEvent(BaseModel):
     detector: Literal["patterns", "defender", "model"]
 
 
+class ModeratorAnswer(BaseModel):
+    text: str
+    answered_at: datetime
+
+
 class CheckResult(BaseModel):
     status: Status
     message: str | None = None
@@ -147,6 +152,11 @@ class CheckResult(BaseModel):
     cost_usd: float | None = None
     # Shown next to the claims, also on a notice (a refused link): never sets or changes a verdict.
     incident_matches: list[IncidentMatch] = []
+    # Scenario H: the main claim had no evidence, so the question went to a moderator. The same
+    # question asked again gets the same case (prawdowid/moderation.py).
+    moderator_case_id: str | None = None
+    # A moderator's note on that case, shown next to the result: never sets or changes a verdict.
+    moderator_answer: ModeratorAnswer | None = None
     # Check log only (prawdowid/checklog.py): never sent to a channel.
     steps_ms: dict[str, int] = Field(default={}, exclude=True)
     model_calls: list[ModelCall] = Field(default=[], exclude=True)

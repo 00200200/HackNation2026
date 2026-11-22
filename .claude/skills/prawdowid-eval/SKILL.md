@@ -72,7 +72,8 @@ A full run of 30+ cases therefore takes several minutes.
 `cost_usd` (number, null when unknown) feeds `cost_per_100_usd`.
 
 **Gaps in the current contract** (metrics stay unknown or fail until they are added; owners decide the shape):
-- `moderator_case_id`: only if the moderator loop (scenario H) is built.
+- `moderator_case_id`: built (`prawdowid/moderation.py`); the eval server needs `PRAWDOWID_MODERATOR_TOKEN` set, or
+  no case opens and `moderator_loop` reads 0.
 - A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord`. The adapter then runs the bot's own API client (`discord_bot.ask_api`, `X-Channel: discord`), so only the Discord connection itself is not exercised
   (formatting is covered by `tests/test_discord_bot.py`); without it `channel_consistency` is unknown.
 

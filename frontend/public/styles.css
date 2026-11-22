@@ -237,3 +237,31 @@ body.checked .results { flex: 1 0 auto; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+
+/* Moderator: a human note next to the automatic result, never styled as a verdict */
+.moderator-answer, .moderator-note { margin: 1.25rem 0 0; padding: 1rem 1.15rem; border-radius: 1rem; background: var(--soft); border: 1px solid var(--line); border-left: 4px solid var(--navy); }
+.moderator-answer h2 { margin: 0 0 .4rem; font-size: 1.05rem; }
+.moderator-text { margin: 0 0 .5rem; white-space: pre-wrap; }
+.moderator-note { color: var(--muted); font-size: .95rem; }
+
+/* Moderator panel (moderator.html) */
+.mod { padding: 2rem 0 3rem; }
+.mod h1 { margin: 0 0 1rem; font-size: 1.6rem; }
+.mod-bar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; margin-bottom: 1rem; }
+.mod-bar label { display: grid; gap: .25rem; font-weight: 700; flex: 1 1 16rem; }
+.mod input, .mod textarea { font: inherit; padding: .6rem .75rem; border: 1.5px solid #8a7f82; border-radius: .6rem; background: #fff; color: var(--navy); width: 100%; }
+.mod textarea { min-height: 6rem; resize: vertical; }
+.mod button { font: inherit; font-weight: 700; min-height: 2.75rem; padding: .5rem 1.1rem; border: 0; border-radius: .75rem; background: var(--red); color: #fff; cursor: pointer; }
+.mod button:hover { background: var(--red-deep); }
+.mod button[aria-disabled="true"] { opacity: .6; cursor: progress; }
+.mod-status { min-height: 1.5rem; margin: 0 0 1rem; font-weight: 700; }
+.mod-status.error { color: var(--red-deep); }
+.mod-cases { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+.mod-case { border: 1px solid var(--line); border-radius: 1rem; padding: 1rem 1.15rem; overflow-wrap: anywhere; }
+.mod-case h2 { margin: 0 0 .4rem; font-size: 1.05rem; }
+.mod-meta { margin: 0 0 .75rem; font-size: .9rem; color: var(--muted); }
+.mod-case label { display: block; margin-bottom: .25rem; font-weight: 700; }
+.mod-case button { margin-top: .5rem; }
+.mod-case .mod-msg { margin: .5rem 0 0; font-weight: 700; }
+.mod-case .mod-msg.error { color: var(--red-deep); }
+.hero-slim { flex: 0 0 auto; padding-bottom: 1.5rem; }
