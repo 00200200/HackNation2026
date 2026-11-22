@@ -21,12 +21,12 @@ Część tego działa już dziś:
   funkcja `judge.decide()` z dowodów, których cytat znaleźliśmy dosłownie w źródle
   ([prawdowid/judge.py](../../prawdowid/judge.py), [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md)).
 - Gdy odpowiedź ma dowody, pokazuje przy nich tytuł źródła, wydawcę, link i cytat oraz daty
-  publikacji i pobrania, o ile je znamy: strona bez daty publikacji jest dopuszczona (#95), a
+  publikacji i pobrania, o ile je znamy: strona bez daty publikacji jest dopuszczona (#95, tylko w `integration/r3`; `main` takie strony odrzuca), a
   odpowiedź bez dowodów nie ma żadnego źródła do pokazania. Pokazuje też, czego nie udało się
   ustalić ([frontend/public/app.js](../../frontend/public/app.js)).
 - Bez dowodów odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji”. Gdy padną wszystkie
   źródła twierdzenia albo skończy się czas, twierdzenie dostaje „nie sprawdzono” z powodem, a
-  awaria modelu daje komunikat techniczny ([prawdowid/pipeline.py](../../prawdowid/pipeline.py#L14)).
+  awaria modelu daje komunikat techniczny ([prawdowid/pipeline.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/pipeline.py#L177-L193)).
   Dotyczy to także awarii samego źródła, które może rozstrzygnąć werdykt (Fact Check albo
   wyszukiwarka), gdy dowodów nie starcza (#60). Ta reguła jest w `integration/r3` (PR #109), a na
   `main` jeszcze jej nie ma: tam taki wynik brzmi „brak wystarczających dowodów” z dopiskiem, które
@@ -62,7 +62,7 @@ Co już jest:
   ([deploy/pull-deploy.sh](../../deploy/pull-deploy.sh)), a do `prod` trafia tylko kod z `main`.
 - Testy: `make check` uruchamia ruff i pytest. 22.11.2026 na `1aa173f` przechodzi 547 testów, 8 jest
   pominiętych.
-- Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 73 przypadkach
+- Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 73 przypadkach na `main` (86 w `integration/r3`)
   ([evals/cases.jsonl](../../evals/cases.jsonl)). Każdy przebieg ląduje w
   [evals/results/HISTORY.md](../../evals/results/HISTORY.md) z commitem i uwagami, a
   [docs/eval-notes.md](../eval-notes.md) mówi, którym przebiegom nie ufać.
@@ -74,7 +74,7 @@ Co już jest:
 - Bezpieczeństwo: rejestr ryzyk z odwołaniami do kodu ([risks.md](risks.md)). Pobieranie stron
   sprawdza adres IP przy każdym połączeniu i respektuje robots.txt
   ([prawdowid/safefetch.py](../../prawdowid/safefetch.py)). Jeden adres IP może wysłać 10 sprawdzeń
-  na minutę ([prawdowid/app.py](../../prawdowid/app.py#L30)). Hook przed `git push` blokuje sekrety,
+  na minutę ([prawdowid/app.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/app.py#L43)). Hook przed `git push` blokuje sekrety,
   śledzone pliki `.env`, pliki powyżej 10 MB, czerwone ruff albo pytest i commit bez akceptacji
   agenta-sędziego. Od pierwszego evalu w danym klonie przepuszcza zmianę kodu produktu tylko z evalem
   na tym samym stanie kodu ([.githooks/pre-push](../../.githooks/pre-push)).
@@ -108,9 +108,11 @@ Co już jest:
   licencję. Datę publikacji ma 899 z 1158; reszta stron jej nie podaje, w większości komunikaty
   CERT (241). Buduje go `make corpus` z listy [corpus/catalog.yaml](../../corpus/catalog.yaml),
   a `make corpus-check` sprawdza progi z briefu ([docs/corpus.md](../corpus.md)).
-- Wyszukiwanie w korpusie: pgvector plus wyszukiwanie pełnotekstowe, embeddingi liczone lokalnie
-  modelem e5-large. Tekst nie wychodzi z serwera i nie płacimy za zapytanie
-  ([prawdowid/corpus_search.py](../../prawdowid/corpus_search.py), [prawdowid/index.py](../../prawdowid/index.py)).
+- Wyszukiwanie w korpusie podczas sprawdzenia to BM25 w pamięci po `corpus/evidence.jsonl`, bez
+  embeddingów ([prawdowid/corpus_bm25.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/corpus_bm25.py), tylko w `integration/r3`). Osobny
+  indeks pgvector z wyszukiwaniem pełnotekstowym i embeddingami e5-large, liczonymi lokalnie
+  ([prawdowid/corpus_search.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/corpus_search.py), [prawdowid/index.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/index.py)),
+  jest przygotowany, ale sprawdzanie go nie używa. Tekst nie wychodzi z serwera i nie płacimy za zapytanie.
 - Dziennik sprawdzeń, który ekspert może przejrzeć ([prawdowid/checklog.py](../../prawdowid/checklog.py)),
   oraz odczyt sesji przez `GET /api/sessions/{id}`.
 - Ten sam zestaw pomiarów można puszczać co tydzień ([evals/run.py](../../evals/run.py)).
@@ -151,7 +153,7 @@ Czego brakuje:
 - Zewnętrznego red teamu. Mamy tylko własne przypadki, a wzorce wykrywania pisaliśmy, znając
   pierwsze trzy przypadki E ([WORKLOG](../../WORKLOG.md), wpis do #15). Potrzebne są przypadki,
   których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures w
-  `integration/r3` (#94), ale eval z nimi jeszcze nie był uruchomiony (brak kluczy w tym klonie). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
+  `integration/r3` (#94), ale eval z nimi jeszcze nie był uruchomiony: przebieg na `edd34a5` pominął E05 i E06, bo brakowało publicznego adresu strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
   `integration/r3`, nie w `main`.
 - Oceny skutków dla ochrony danych (DPIA) z inspektorem ochrony danych MSZ i umów powierzenia z
   dostawcami. Maskowanie nie łapie numerów dowodów, paszportów i części formatów telefonu (#82).

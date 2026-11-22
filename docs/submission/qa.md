@@ -66,13 +66,12 @@ Krótko: my, według spisanych reguł, i obie listy są jawne. To wciąż nasz w
 fact-checkerów dopiero potwierdzamy.
 
 Szczegóły: list są dwie. Wyszukiwarka zwraca tylko strony z domen na liście `ALLOWLIST`: polskie
-urzędy, instytucje UE, NATO i WHO, trzech fact-checkerów (Konkret24, FakeNews.pl, AFP Sprawdzam),
-agencję PAP i EUvsDisinfo jako bazę znanych narracji. Każda domena ma typ: urzędowe, fact-checking,
+urzędy, instytucje UE, NATO i WHO, trzech fact-checkerów (Konkret24, FakeNews.pl, AFP Sprawdzam) na `main`, agencję PAP i EUvsDisinfo jako bazę znanych narracji. Każda domena ma typ: urzędowe, fact-checking,
 agencja prasowa albo baza narracji. Status IFCN albo EFCSN tych trzech fact-checkerów jest do
 potwierdzenia na listach obu sieci ([docs/sources.md](../sources.md)). Do korpusu przyjmujemy urzędy
 polskie i unijne oraz fact-checkerów, których status odczytaliśmy na stronie sieci, z datą odczytu.
 21.11 odczytaliśmy dwa: Pravda jest zweryfikowanym członkiem EFCSN do 23.02.2028, a Demagog do
-25.05.2027. Demagoga bierzemy jednak tylko przez Google Fact Check (decyzja z 21.11). Dowody od tego
+25.05.2027. Decyzja z 21.11 brzmiała: Demagoga bierzemy tylko przez Google Fact Check. W `integration/r3` (#76) lista wyszukiwarki ma też demagog.org.pl, ale tylko jako fragmenty z wyszukiwarki, bo jego serwis odpowiada naszemu serwerowi 403, oraz pravda.org.pl i oko.press (media). Reszta tego pytania opisuje `main`. Dowody od tego
 samego wydawcy, z tym samym cytatem albo z tej samej agencji prasowej liczą się jako jedno źródło.
 EUvsDisinfo nigdy sam nie rozstrzyga.
 
@@ -80,7 +79,7 @@ Słabe strony: listy to decyzja zespołu i nikt z zewnątrz nie badał ich róż
 fact-checkingowa korpusu to 15 rekordów Pravdy. Dwóch z trzech fact-checkerów z listy wyszukiwarki,
 Konkret24 i AFP Sprawdzam, blokuje nasz serwer (pytanie 6).
 
-Źródła: [prawdowid/websearch.py](../../prawdowid/websearch.py#L52), [docs/sources.md](../sources.md),
+Źródła: [prawdowid/websearch.py na main](https://github.com/00200200/HackNation2026/blob/1aa173f/prawdowid/websearch.py#L52), [na integration/r3](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/websearch.py#L62-L90), [docs/sources.md](../sources.md),
 [corpus/catalog.yaml](../../corpus/catalog.yaml), [docs/corpus.md](../corpus.md), [risks.md](risks.md).
 
 ### 5. Jak dodajecie i wykluczacie źródła?
@@ -140,10 +139,10 @@ Szczegóły: brief zabrania rozstrzygania prawdziwości na podstawie statusu źr
 ADR 0001 proponuje notatkę z aktem prawnym i datą sprawdzenia, braną tylko z urzędowego źródła UE.
 Notatka nie zmienia werdyktu ani jego siły (#81). Media objęte sankcjami nie mogą dziś być dowodem,
 bo lista domen wyszukiwarki zawiera tylko urzędy, instytucje UE i międzynarodowe, fact-checkerów,
-PAP i EUvsDisinfo.
+PAP i EUvsDisinfo (w `integration/r3` także OKO.press jako media).
 
 Źródła: [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md), sekcje 5 i 6,
-[prawdowid/websearch.py](../../prawdowid/websearch.py#L52),
+[prawdowid/websearch.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/websearch.py#L62-L90),
 [#81](https://github.com/00200200/HackNation2026/issues/81).
 
 ### 8. Co, jeśli tekst albo strona źródłowa zawiera polecenia dla modelu?
@@ -162,10 +161,12 @@ sędzia znajdzie w pobranej stronie, też trafia do zdarzeń, z miejscem `source
 treści ataku, `detector=model`). Na `main`, bez PR #72, działa tylko to drugie.
 
 Wyniki z [HISTORY.md](../../evals/results/HISTORY.md): odporność na injection 0,000 w szybkim
-przebiegu na `95e6177` i 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jest zniekształcony),
-przy progu 0,90. Wzorce pisaliśmy, znając pierwsze trzy przypadki E, więc potrzebujemy nowych.
+przebiegu na `95e6177`, 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jest zniekształcony) i
+1,000 w szybkim przebiegu na `edd34a5` (10 przypadków, E05 i E06 pominięte), przy progu 0,90. Na
+`edd34a5` macro-F1 to 0,278, więc ten przebieg nie spełnia progów. Wzorce pisaliśmy, znając pierwsze trzy przypadki E, więc potrzebujemy nowych.
 Przypadki z poleceniem ukrytym w stronie mają fixtures w `integration/r3` (#94), ale nie
-uruchamialiśmy na nich evalu (brak kluczy w tym klonie). Sprawdzanie pobranych źródeł (PR #72) też
+uruchamialiśmy na nich evalu. Przebieg na `edd34a5` pominął E05 i E06, bo brakowało publicznego adresu
+strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł (PR #72) też
 jest tylko w `integration/r3`.
 
 Źródła: [risks.md](risks.md), [prawdowid/verifier.py](../../prawdowid/verifier.py),
@@ -185,8 +186,9 @@ jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 4
 którego wszystkie źródła padły, dostaje „nie sprawdzono” z powodem. Tak samo, gdy skończy się czas
 albo nie odpowie model-sędzia. Brak klucza do modelu albo jego błąd przy wyodrębnianiu twierdzeń daje
 komunikat techniczny. Jedenaste zapytanie w ciągu minuty dostaje komunikat „Wysłano za dużo zapytań w
-krótkim czasie”. Eval ma 4 przypadki J. Dwa (FC-J01, FC-J02) pomijamy, a dwa pozostałe (J01, J02)
-liczymy bez zasymulowanej awarii, bo przełącznika awarii jeszcze nie ma (#60).
+krótkim czasie”. Eval ma 4 przypadki J. Na `main` dwa (FC-J01, FC-J02) pomijamy, a dwa pozostałe (J01, J02)
+liczymy bez zasymulowanej awarii, bo przełącznika awarii jeszcze nie ma (#60). W `integration/r3` jest
+przełącznik ([prawdowid/faults.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/faults.py)) i FC-J01 oraz FC-J02 działają z `simulate`.
 
 Luka (#60), zamknięta w buildzie `integration/r3` (PR #109), na `main` jeszcze otwarta: gdy
 padnie tylko część źródeł, a reszta nic nie znajdzie, `main` zwraca „brak wystarczających dowodów”.
@@ -197,8 +199,8 @@ znalazł. W `integration/r3`, gdy padnie źródło, które może rozstrzygnąć 
 wyszukiwarka, dla twierdzeń rządowych także wyszukiwarka gov.pl), a dowodów nie starcza,
 twierdzenie dostaje „nie sprawdzono”. Korpus nie liczy się jako źródło, które odpowiedziało.
 
-Źródła: [prawdowid/pipeline.py](../../prawdowid/pipeline.py#L14),
-[prawdowid/websearch.py](../../prawdowid/websearch.py#L190),
+Źródła: [prawdowid/pipeline.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/pipeline.py#L177-L193),
+[prawdowid/websearch.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/websearch.py#L163),
 [prawdowid/factcheck.py](../../prawdowid/factcheck.py), [prawdowid/app.py](../../prawdowid/app.py),
 [README](../../README.md#configuration), [#60](https://github.com/00200200/HackNation2026/issues/60),
 [#75](https://github.com/00200200/HackNation2026/issues/75),
@@ -228,7 +230,7 @@ sprawdzania (#74), ale tego też nie zmierzyliśmy.
 Krótko: żaden zapisany przebieg nie spełnia wszystkich progów i tego nie ukrywamy. Każdy przebieg
 jest w repozytorium razem z commitem.
 
-Szczegóły: nasz zestaw to 73 przypadki, 41 w zestawie A-J i 32 w zestawie FC. Rozkład scenariuszy:
+Szczegóły: nasz zestaw to na `main` 73 przypadki (w `integration/r3` 86), 41 w zestawie A-J i 32 w zestawie FC. Rozkład scenariuszy:
 A 23, B 10, C 6, D 8, E 7, G 6, H 2, I 7, J 4. Etykiety pochodzą z ocen Demagoga, Konkret24,
 EUvsDisinfo i stron urzędowych, a przy każdym przypadku zapisaliśmy, skąd jest etykieta. Wyjątek to
 przypadki D01-D04 oraz H01 i H02: plotki wymyślone przez zespół, o których nikt nie pisał, więc
@@ -270,7 +272,7 @@ Discord nie ma polecenia usuwania, a odpowiedzi bota są widoczne na kanale. Log
 poza retencją. Gdzie dane przetwarzają dostawcy, jest UNCONFIRMED (#85). Nie ma DPIA ani umów
 powierzenia, to etap 3 pilotażu.
 
-Źródła: [prawdowid/privacy.py](../../prawdowid/privacy.py#L20), [docs/privacy.md](../privacy.md),
+Źródła: [prawdowid/privacy.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/privacy.py#L28), [docs/privacy.md](../privacy.md),
 [risks.md](risks.md), [frontend/public/index.html](../../frontend/public/index.html),
 [#82](https://github.com/00200200/HackNation2026/issues/82),
 [#85](https://github.com/00200200/HackNation2026/issues/85).
@@ -280,17 +282,19 @@ powierzenia, to etap 3 pilotażu.
 Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje według pomiarów z 21 i 22.11, zrobionych
 na starszym kodzie, około 36 groszy, a serwer z domeną około 43 zł miesięcznie.
 
-Szczegóły: modele to 0,0491 USD za sprawdzenie (szybki przebieg pełnego potoku na 10 przypadkach,
-`edd34a5`, wiersz w HISTORY.md na `integration/r3`). To górna granica, bo od #88 wyodrębnianie idzie
-na tańszym Sonnecie 5.5, czego nie mierzyliśmy. Tavily dokłada około 4,9 kredytu (wpis z 21.11 w
+Szczegóły: modele to 0,0491 USD za sprawdzenie: pomiar na `edd34a5` (Opus, przed #95; szybki przebieg pełnego
+potoku na 10 przypadkach, wiersz w HISTORY.md na `integration/r3`). Obecny kod (#95 podnosi koszt, #88 go
+obniża, bo wyodrębnianie idzie na Sonnecie 5.5) może kosztować więcej albo mniej. Przebieg ze stagingu na
+Sonnecie (3,96 USD za 100) nie ma wiersza w HISTORY.md ani pliku JSON. Tavily dokłada około 4,9 kredytu (wpis z 21.11 w
 WORKLOG). Konto jest na planie Researcher z opłatą za zużycie: 1000 kredytów miesięcznie za darmo,
 potem 0,008 USD za kredyt, limit konta podniesiony 22.11 do 4000 kredytów (czy z darmowymi:
 UNCONFIRMED). Na 1000 sprawdzeń wychodzi 80,10 USD, czyli 325 zł (88,10 USD, czyli 358 zł, gdy darmowe
-kredyty zużyją testy). Ten limit starcza na około 820 sprawdzeń, więc dla 1000 trzeba go podnieść.
+kredyty zużyją testy). Ten limit starcza na 820 do 1025 sprawdzeń, zależnie od tego, czy wlicza darmowe kredyty (UNCONFIRMED), więc
+1000 mieści się tylko przy górnej granicy. Kwoty dla 1000 sprawdzeń to szacunki z tego jednego pomiaru.
 Abonamentowe stawki Tavily (do 0,005 USD za kredyt w planie Growth za 500 USD miesięcznie) nie
 obniżają tego rachunku przy takim ruchu. Koszty stałe: VPS-2 od 37,85 zł brutto miesięcznie,
-domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów w
-HISTORY.md to 1,82 USD, ale z wersji sprzed Tavily i sędziego. Ostateczne liczby policzymy z pełnego
+domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 4,91 USD za modele
+(`edd34a5`) plus do 3,90 USD za Tavily. Ostateczne liczby policzymy z pełnego
 przebiegu (#16).
 
 Źródła: [cost.md](cost.md), [HISTORY.md](../../evals/results/HISTORY.md), [WORKLOG.md](../../WORKLOG.md).
@@ -326,17 +330,18 @@ swojego pakietu. Instalujemy tylko `pydantic-ai-slim[anthropic,mcp]` ([pyproject
 a bez pakietu dostawcy PydanticAI zgłasza ImportError i każde sprawdzenie kończy się komunikatem
 technicznym. Trzeba więc dodać extra i klucz dostawcy, a potem przebudować obraz backendu. Tej drogi
 nie testowaliśmy. Wyszukiwarka siedzi za kontraktem `SearchProvider`, a zamienniki (Exa, Brave)
-porównaliśmy przy wyborze dostawcy (decyzja do #7 w WORKLOG). Embeddingi liczy lokalny model e5-large
-(licencja MIT), baza to PostgreSQL z pgvector. Serwer: OVHcloud, Limburg, Niemcy.
+porównaliśmy przy wyborze dostawcy (decyzja do #7 w WORKLOG). W sprawdzeniu korpus przeszukuje BM25 w pamięci
+(`prawdowid/corpus_bm25.py`). Osobny indeks pgvector z embeddingami e5-large (licencja MIT) jest
+przygotowany, ale sprawdzanie go nie używa. Serwer: OVHcloud, Limburg, Niemcy.
 
 Czego jeszcze nie ma: nie pokazaliśmy działania na modelu przetwarzanym w UE. Gdzie przetwarzają
 dane Anthropic, Google, Tavily i EUvsDisinfo, jest UNCONFIRMED. W lutym 2026 Nebius ogłosił
 przejęcie Tavily; czy transakcja się zamknęła i gdzie Tavily przetwarza dane, też jest UNCONFIRMED.
 Ani Tavily, ani Exa, ani Brave nie opisuje przetwarzania w EOG (#85).
 
-Źródła: [prawdowid/verifier.py](../../prawdowid/verifier.py#L43), [pyproject.toml](../../pyproject.toml),
+Źródła: [prawdowid/verifier.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/verifier.py#L45), [pyproject.toml](../../pyproject.toml),
 [compose.yaml](../../compose.yaml),
-[prawdowid/rerank.py](../../prawdowid/rerank.py#L49), [prawdowid/judge.py](../../prawdowid/judge.py#L62),
+[prawdowid/rerank.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/rerank.py#L50), [prawdowid/judge.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/judge.py#L64),
 [prawdowid/websearch.py](../../prawdowid/websearch.py), [docs/deploy.md](../deploy.md),
 [docs/privacy.md](../privacy.md), [WORKLOG.md](../../WORKLOG.md),
 [#85](https://github.com/00200200/HackNation2026/issues/85).

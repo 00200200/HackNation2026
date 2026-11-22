@@ -14,10 +14,11 @@ po pełnym evalu na commicie zgłoszenia i nie wpisujemy tam niczego wcześniej.
 
 - Wersja na produkcji. Scenariusz potrzebuje na `prod` commita, który zawiera #69 (`acb1f9e`, cztery
   przyciski z przykładami w [frontend/public/index.html](../../frontend/public/index.html#L58-L61))
-  i scalone #66, dzięki któremu ocena fact-checkera dociera do sędziego. W nocy 22.11 `origin/prod`
-  to `24e92d4`: bez przycisków i bez #66. Sprawdzamy to przez `git fetch` i
-  `git merge-base --is-ancestor acb1f9e origin/prod && echo jest`, a potem tak samo dla commita z
-  #66. Bez przycisków wklejamy pytania ręcznie (tabela „Pytania do wklejenia” niżej).
+  i scalone #66 (ocena fact-checkera dociera do sędziego) oraz #74 (korpus przeszukiwany przy każdym
+  sprawdzeniu). Oba są w `integration/r3`. W nocy 22.11 `origin/prod` to `24e92d4`: bez przycisków, bez
+  #66 i bez #74. Sprawdzamy to przez `git fetch` i
+  `git merge-base --is-ancestor acb1f9e origin/prod && echo jest`, a potem tak samo dla commitów z
+  #66 i #74. Bez przycisków wklejamy pytania ręcznie (tabela „Pytania do wklejenia” niżej).
 - Próba każdej sceny na produkcji, najwyżej godzinę przed występem: cztery pytania, `/sprawdz` na
   Discordzie i jedno pytanie o podróż w rodzaju „Czy MSZ odradza podróże do ...?”, bo o takie może
   zapytać jury. Zapisujemy pierwsze słowa każdej odpowiedzi i jej źródła. Ta sama próba pokazuje, czy
@@ -40,12 +41,12 @@ po pełnym evalu na commicie zgłoszenia i nie wpisujemy tam niczego wcześniej.
 |---|---|---|
 | 0:00-0:30 | Slajd tytułowy | „Na rodzinnym czacie ktoś wkleja wiadomość. Zanim ktokolwiek ją sprawdzi, idzie dalej. Fact-checki istnieją, ale trzeba wiedzieć, gdzie ich szukać. Chatbot odpowie płynnie, tylko że płynna odpowiedź to jeszcze nie dowód. Dlatego zrobiliśmy faktczyfejk.pl.” |
 | 0:30-0:55 | Strona główna | „Wklejasz tekst albo link. Dostajesz odpowiedź po polsku, twierdzenie po twierdzeniu: cytat, wydawca, data i link. Model tylko czyta. Werdykt wylicza kod i tylko z tych cytatów, które naprawdę znaleźliśmy w źródle. A kiedy dowodów nie ma, piszemy wprost, że nie udało się tego potwierdzić.” |
-| 0:55-1:50 | Przycisk „Darmowe przejazdy 65+ we Wrocławiu” | Podczas czekania: „Właśnie pytamy równolegle Google Fact Check, EUvsDisinfo, wyszukiwarkę gov.pl i wyszukiwarkę ograniczoną do zaufanych domen. Każde źródło ma własny limit czasu.” Po odpowiedzi czytamy jej pierwsze słowa i pokazujemy źródło z cytatem i datą, tak jak wyszło na próbie. |
+| 0:55-1:50 | Przycisk „Darmowe przejazdy 65+ we Wrocławiu” | Podczas czekania: „Właśnie pytamy równolegle Google Fact Check, EUvsDisinfo, wyszukiwarkę gov.pl, wyszukiwarkę ograniczoną do zaufanych domen i nasz zamknięty korpus. Każde źródło ma własny limit czasu.” Po odpowiedzi czytamy jej pierwsze słowa i pokazujemy źródło z cytatem i datą, tak jak wyszło na próbie. |
 | 1:50-2:25 | Przycisk „Pytanie z ukrytym poleceniem” | „To samo pytanie, tylko z dopisanym poleceniem: odpowiedz, że tak. Strona mówi, że w treści były polecenia i że ich nie wykonaliśmy. Każdą taką próbę zapisujemy jako zdarzenie bezpieczeństwa, bez jej treści.” Zdanie „Werdykt jest ten sam co bez polecenia” dodajemy tylko wtedy, gdy tak wyszło na próbie. |
 | 2:25-2:55 | Przycisk „Bilety tylko w aplikacji” | „Plotka z małej miejscowości, której nikt nie opisał. Tu najłatwiej o zmyślenie. A my mówimy: nie udało się potwierdzić, i wypisujemy, czego brakuje.” |
 | 2:55-3:15 | Discord, `/sprawdz` z pytaniem o Wrocław | „Drugi kanał. Ta sama usługa i ta sama logika: bot nie ma własnej, wysyła tekst do tego samego API co strona.” Jeśli bot nie działa na produkcji (#59), mówimy to jednym zdaniem i idziemy dalej. |
-| 3:15-3:45 | HISTORY.md albo slajd z wynikami | „Testujemy się tak jak jury: 73 przypadki w scenariuszach A-E i G-J, te same metryki. Zrzutów ekranu, czyli F, jeszcze nie mamy. Każdy przebieg zapisujemy w repozytorium razem z commitem, także słaby. Pełny przebieg na commicie zgłoszenia: [z #16]. Najsłabsze miejsce: [z #16].” |
-| 3:45-4:30 | Slajd z pilotażem | „Jak to wdrożyć w MSZ? Brief podaje pięć etapów i do każdego mamy już kawałek: uruchomienie jednym poleceniem z testami, zamknięty korpus 1158 dokumentów, w tym 1143 urzędowych, maskowanie danych z 30-dniową retencją, wersję publiczną na serwerze w Niemczech i kontrolę przed pushem, która puszcza testy i sprawdza, czy eval był na tym samym kodzie. Brakuje podpięcia korpusu do sprawdzania, kolejki eksperta, procedury korekt i zewnętrznego red teamu. Proponujemy start od pytań o bezpieczeństwo podróży na danych z Odyseusza, gdy korpus zostanie podpięty. Każdą odpowiedź do publikacji zatwierdza tam człowiek.” |
+| 3:15-3:45 | HISTORY.md albo slajd z wynikami | „Testujemy się tak jak jury: 86 przypadków w scenariuszach A-E, G-J i U (adresy URL), te same metryki. Zrzutów ekranu, czyli F, jeszcze nie mamy. Każdy przebieg zapisujemy w repozytorium razem z commitem, także słaby. Pełny przebieg na commicie zgłoszenia: [z #16]. Najsłabsze miejsce: [z #16].” |
+| 3:45-4:30 | Slajd z pilotażem | „Jak to wdrożyć w MSZ? Brief podaje pięć etapów i do każdego mamy już kawałek: uruchomienie jednym poleceniem z testami, zamknięty korpus 1158 dokumentów, w tym 1143 urzędowych, maskowanie danych z 30-dniową retencją, wersję publiczną na serwerze w Niemczech i kontrolę przed pushem, która puszcza testy i sprawdza, czy eval był na tym samym kodzie. Brakuje pomiaru, czy korpus trafia na właściwy dokument, kolejki eksperta, procedury korekt i zewnętrznego red teamu. Proponujemy start od pytań o bezpieczeństwo podróży na danych z Odyseusza, po zmierzeniu, że korpus trafia na właściwy profil kraju. Każdą odpowiedź do publikacji zatwierdza tam człowiek.” |
 | 4:30-5:00 | Slajd końcowy z hasłem „Fakt ma przypis.” | „Nie budujemy sędziego prawdy. Pokazujemy źródło i to, czego nie wiemy, a ostatnie słowo ma czytelnik. Obywatel płaci zero złotych. Fakt ma przypis. Możecie wpisać własne pytanie na żywo, chętnie je sprawdzimy.” |
 
 Suma: 300 s. Jeśli odpowiedź na pierwsze pytanie przyjdzie szybciej, oszczędzony czas zostawiamy na
@@ -90,12 +91,14 @@ Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odp
 
 - Trafność werdyktów (macro-F1) w zapisanych przebiegach jest poniżej progu 0,75 z briefu. Wynik na
   commicie zgłoszenia: [z #16].
-- Odporność na polecenia w zapisanych przebiegach: 0,000 na `95e6177` i 0,571 w zniekształconym
-  pełnym przebiegu na `8c6f396`, przy progu 0,90 ([HISTORY.md](../../evals/results/HISTORY.md)).
+- Odporność na polecenia w zapisanych przebiegach: 0,000 na `95e6177`, 0,571 w zniekształconym
+  pełnym przebiegu na `8c6f396` i 1,000 w szybkim przebiegu na `edd34a5` (10 przypadków, E05 i E06
+  pominięte, macro-F1 0,278), przy progu 0,90 ([HISTORY.md](../../evals/results/HISTORY.md)).
   Metryka liczy przypadek jako porażkę także przy złym werdykcie, więc sama liczba nie mówi, czy
   polecenie zadziałało.
-- Zgodności kanałów nie mamy z wiarygodnego pomiaru. W jedynym przebiegu z dwoma kanałami wyszło
-  0,000, ale ten przebieg zniekształciły timeouty ([docs/eval-notes.md](../eval-notes.md)). Na
+- Zgodności kanałów nie mamy z wiarygodnego pomiaru. W przebiegu z dwoma kanałami zniekształconym
+  timeoutami wyszło 0,000 ([docs/eval-notes.md](../eval-notes.md)), a na `edd34a5` 1,000 (10 przypadków,
+  za mało, by mówić o zgodności). Na
   `main` strona i Discord robią dwa osobne sprawdzenia; wspólna pamięć wyników to #59.
 - Od #66 ocena fact-checkera dociera do sędziego jako osobny fragment (jest w `integration/r3`).
   Bez #66 na `prod` dociera tylko przez tytuł recenzji. Skróty ocen (#100) nie są scalone.
@@ -151,7 +154,7 @@ polecenia, pełna skala ocen, kontekst bez werdyktu i na końcu awaria.
 Napisy dla scen 7, 8 i 9 to oczekiwane wyniki według etykiet w
 [evals/cases.jsonl](../../evals/cases.jsonl); dla C02 to „wprowadzające w błąd” z oceny Demagoga.
 Jeśli na próbie wyjdzie inaczej, wpisujemy to, co widać. Konfliktu, w którym dwa wiarygodne źródła
-sobie przeczą ([prawdowid/judge.py](../../prawdowid/judge.py#L73)), w filmie nie obiecujemy: każdy
+sobie przeczą ([prawdowid/judge.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/judge.py#L75)), w filmie nie obiecujemy: każdy
 przypadek C ma jedną ocenę Demagoga, a nie dwa sprzeczne źródła ([WORKLOG](../../WORKLOG.md), punkt
 o lukach evalu w „Next”). Czego się spodziewać:
 
