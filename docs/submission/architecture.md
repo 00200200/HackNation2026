@@ -4,7 +4,7 @@ This is a submission draft for [issue #18](https://github.com/00200200/HackNatio
 The implementation inspected was originally the `LukiLenkiewicz/issue11-fanout` stack at `cacfb4e`;
 that stack (per-claim fan-out, judge, local source store, link input) is now merged into `main`
 (PRs #37, #30, #42, #28/#44). The implementation described below is `main`'s (`1aa173f`, 22.11.2026), after that merge, except where a row names PR #126 (branch `integration/r3`, head `ca48b84`, open; it contains PR #109 and supersedes it). Those are changes awaiting merge, listed in the README section "Zmiany czekające na scalenie". A later commit to PR #126 needs a recheck of the rows that name it.
-The measured product commits are identified below: `95e6177` (the run on `main`) predates that merge, and `edd34a5` (the run in PR #109 and PR #126) is not on `main`. This is not a claim of
+The measured product commits are identified below: `95e6177` (the run on `main`) predates that merge, and the cited full run on `ca48b84` (the head of PR #126) is not on `main` either (its file is in PR #128 and PR #123). This is not a claim of
 submission readiness.
 
 ## Request and evidence flow
@@ -168,60 +168,78 @@ Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
 There is no moderator queue, OCR or reverse image search. The live Discord run remains open in
 [WORKLOG](../../WORKLOG.md). The case set on `main` ([cases](../../evals/cases.jsonl)) has no URL input.
-PR #126 has 13 of 86 cases with a URL input (`U01`, `U02`, `E05` to `E15`) and the `edd34a5` run covers only `U01`, so its 37.4 s is
-one data point, not a URL benchmark.
+PR #126 has 13 of 86 cases with a URL input (`U01`, `U02`, `E05` to `E15`) and the full run on `ca48b84` covers only `U01` and `U02`
+(`E05` to `E15` were skipped), so their 28.5 s and 27.8 s are two data points, not a URL benchmark.
 
 ## Saved test results and reproduction
 
-Two tracked runs exist, and which one [evals/results/latest.json](../../evals/results/latest.json)
-holds depends on whether [PR #126](https://github.com/00200200/HackNation2026/pull/126), which contains PR #109, is merged.
+`evals/results/latest.json` is not a stable pointer: it holds one run on `main`, another in PR #109 and PR #126, and a third in PR #128.
+The runs below are therefore identified by product commit and linked by permalink to the file at a fixed commit.
 
-- On `main` it is the quick run of `2026-11-21T19:10:57+00:00` at product commit `95e6177`, 9 cases.
-  It predates the judge, the retrieval pipeline and the check log. At that commit (`prawdowid/` is
-  identical in `e9a7f86` on `main`) `verifier.to_check_result` returned a constant
-  `insufficient_evidence` for every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py`
-  did not exist. Its values describe that stub, not the pipeline: do not quote them
+The cited run is the full run on `ca48b84`, the head of [PR #126](https://github.com/00200200/HackNation2026/pull/126):
+[run file](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json), `2026-11-22T02:27:29+00:00`, product commit
+`ca48b84390d0df22881024155a37bfafba606ce2`, `mode: "full"`, `n_cases: 75`, `dirty: false`, `coverage_ok: true`, `overall_pass: false`, `concurrency: 4`.
+The file is in [PR #128](https://github.com/00200200/HackNation2026/pull/128) (`6126ac9`, where it is also `latest.json`) and in
+[PR #123](https://github.com/00200200/HackNation2026/pull/123) (`cd61db5`), not on `main` and not in PR #126.
+75 of the 86 cases of `evals/cases.jsonl` in PR #126 ran: `E05` to `E15` were skipped (no public URL for the fixture pages,
+[#94](https://github.com/00200200/HackNation2026/issues/94)), and no case had a harness error. The file records neither the
+extraction model, nor the machine, nor the flags of the run, so exact reproduction is UNCONFIRMED. A later commit in PR #126 needs a new run
+([#16](https://github.com/00200200/HackNation2026/issues/16)).
+
+Other saved runs, not cited as the measurement of the current build:
+
+- Quick run on `edd34a5`, `2026-11-22T00:37:27+00:00`, 10 cases, one per scenario ([file](https://github.com/00200200/HackNation2026/blob/ca48b84390d0df22881024155a37bfafba606ce2/evals/results/latest.json), which is `latest.json` in PR #109 and
+  PR #126): macro-F1 0.278, end-to-end 0.9, median 24.9 s, USD 4.91 per 100 (rounded from the file).
+  Extraction ran on Opus (per the message of `83d6c65`, not recorded in the JSON).
+- Quick run on `ca48b84`, `2026-11-22T02:15:53+00:00`, 10 cases, one per scenario ([file](https://github.com/00200200/HackNation2026/blob/cd61db592e81aa7b22a24690cb090d64116d17dd/evals/results/history/20261122T021403.618691Z-ca48b84-quick.json), in PR #123 only): macro-F1
+  0.75, median 29.8 s, USD 5.54 per 100 (rounded from the file). The full run on the same commit replaces it.
+- Quick run on `95e6177`, `2026-11-21T19:10:57+00:00`, 9 cases ([file](https://github.com/00200200/HackNation2026/blob/1aa173f6e651f7ff2bdacebb2d4384658efc2d48/evals/results/latest.json), which is `latest.json` on `main`). It predates the
+  judge, the retrieval pipeline and the check log. At that commit (`prawdowid/` is identical in `e9a7f86` on `main`)
+  `verifier.to_check_result` returned a constant `insufficient_evidence` for every checkable claim, and `judge.py`, `pipeline.py` and
+  `checklog.py` did not exist. Its values describe that stub, not the pipeline: do not quote them
   ([eval-notes.md](../eval-notes.md)).
-- In PR #109 and PR #126 it is the quick run of `2026-11-22T00:37:27+00:00` at product commit
-  `edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `dirty: false`, `mode: "quick"`, `n_cases: 10`,
-  `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J, U`, one case
-  each; `E05` and `E06` skipped (no public URL for the fixture page). It ran on the VPS staging with
-  extraction on Opus (per the message of `83d6c65`, not recorded in the JSON). This is a quick regression run, not
-  the full jury-sized evaluation, even though the saved `coverage_ok` flag is true. A full run is
-  pending ([#16](https://github.com/00200200/HackNation2026/issues/16)).
 
-The following values and targets are copied exactly from the second file:
+The following values and targets are copied exactly from the full-run file:
 
 | Metric | value | target | pass |
 |---|---|---|---|
-| macro_f1 | 0.2777777777777778 | >= 0.75 | false |
+| macro_f1 | 0.8026992266992267 | >= 0.75 | true |
 | citation_coverage | 1.0 | >= 0.95 | true |
-| citation_correctness | null | >= 0.85 | null |
-| abstention | 1.0 | >= 0.8 | true |
+| citation_correctness | 1.0 | >= 0.85 | true |
+| abstention | 0.9166666666666666 | >= 0.8 | true |
 | injection_resistance | 1.0 | >= 0.9 | true |
-| median_latency_s | 24.877917104000517 | <= 30.0 | true |
-| end_to_end | 0.9 | >= 1.0 | false |
+| median_latency_s | 17.842587917002675 | <= 30.0 | true |
+| end_to_end | 0.9733333333333334 | >= 1.0 | false |
 | channel_consistency | 1.0 | >= 1.0 | true |
 | moderator_loop | 0.0 | >= 1.0 | false |
 | injection_verdict_correct | 1.0 | reported | true |
-| cost_per_100_usd | 4.912332 | reported | true |
+| cost_per_100_usd | 4.272704084507042 | reported | true |
 
-Each ratio rests on a handful of cases: `citation_coverage` on every factual-verdict claim of the `ok` answers, a number the file does not record (it keeps only each case's first-claim verdict and only `E01` has a factual one, so at least one claim, the rest UNCONFIRMED), `abstention` on two
-(`D01`, `H01`), `injection_resistance` on one (`E01`, an injection in the input text; no page
-injection was scored), `channel_consistency` on one (`G01`, whose second answer took 0.22 s and most
-likely came from the result cache). The slowest case, `U01` (the only URL case, a long gov.pl page from #63), took 37.4 s, above the 30 s target. The
-cost covers model calls only (extraction on Opus, rerank, judge), not search, hosting or the channel.
-On the same ten cases with only `PRAWDOWID_MODEL` changed to Sonnet, the commit message of `83d6c65`
-reports macro-F1 0.375 and median 18.3 s, and the PR #126 description gives USD 3.96 per 100 checks (the
-commit message shows only ".96"); that run's file was not saved, so it is UNCONFIRMED. The PR #126
-description also reports a quick run on `ca48b84` (VPS staging, one case per scenario): macro-F1 0.750,
-citation coverage 1.0, abstention 1.0, injection resistance 1.0, median 29.8 s, end-to-end 0.90, channel
-consistency 1.0 and USD 5.54 per 100 checks. No run file is committed (`latest.json` in PR #126 still
-holds `edd34a5`), so those values are UNCONFIRMED and the table above stays the committed run.
+Bases of the ratios, counted from the same file. `macro_f1` is 55 correct of 69 cases that expect a verdict; the six cases that
+expect a status (J01, J02, FC-J01, FC-J02, U01, U02) are not in it. Counting all 75 cases, 25 of the 32 `FC-` cases and 35 of the other 43
+are correct.
+`citation_coverage` runs over every factual-verdict claim of the `ok` answers, a number the file does not record (it keeps only each
+case's first-claim verdict, and 52 `ok` answers have a factual one, so at least 52 claims). `citation_correctness` is not
+null, so the run had a corpus; it checks only that a quote occurs in the cited corpus document, for quotes from documents the corpus
+holds, and the file records no quote count. `abstention` is 11 of 12 cases that expect `brak wystarczających dowodów` (the
+miss is `FC-D02`). `injection_resistance` rests on 7 cases (`E01` to `E04`, `FC-E01` to `FC-E03`, all injections in the input text);
+no page injection was scored, so it says nothing about the 11 skipped page cases. `end_to_end` is 73 of 75: `A15` (a question of
+opinion that expects `nie podlega weryfikacji`) returned status `needs_clarification`, and `J01` (a simulated Fact Check outage whose
+answer must not end in a factual verdict) returned status `ok` with `potwierdzone` for its first claim. `channel_consistency` rests on
+6 cases (`G01`, `G02`, `FC-G01` to `FC-G04`) whose second answers took 0.09 to 0.21 s and most likely came from the result
+cache; it compares the answers, not their correctness (`G01` and `FC-G04` have a wrong verdict). `moderator_loop` is 0.0 on the two
+repeat cases (`H01`, `H02`): the loop is not built on `main` or in PR #126.
+
+`median_latency_s` is the median of the first answers of all 75 cases, with no cache hit among them: 8 of them took more than
+30 s, the slowest, `D03`, 38.6 s, and the two URL cases, `U01` (a long gov.pl page from #63) and `U02`, 28.5 s and 27.8 s.
+`cost_per_100_usd` is the mean `cost_usd` of 71 priced answers times 100; the four cases that set a simulated fault are left out,
+no answer had an unpriced request (`lower_bound: false`), and it covers model calls only (extraction, rerank, judge), not search, hosting
+or the channel. [cost.md](cost.md) turns it into USD 42.73 per 1,000 checks.
 
 `null` means not measured, not passed. Citation coverage counts evidence URL/quote presence for
-factual verdicts, not evidence correctness. Citation correctness needs a corpus and would only
-test text occurrence, not semantic support; no manual citation spot-check is committed.
+factual verdicts, not evidence correctness. Citation correctness only tests text occurrence, not semantic support, and no manual
+citation spot-check is committed: `evals/metrics.py` points to `evals/results/citation_spotcheck.md`, a file that does not exist in
+`main`, PR #126, PR #123 or PR #128.
 Verdict accuracy scores the main claim alone; citation metrics examine all returned claims.
 The JSON does not record per-provider retrieval outcomes or model overrides; those conditions are
 UNCONFIRMED for exact reproduction. Sources: [metrics](../../evals/metrics.py),
@@ -234,8 +252,9 @@ PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick
 ```
 
 This selects a quick subset of [evals/cases.jsonl](../../evals/cases.jsonl) and overwrites `latest.json`; calls may incur
-provider charges. A missing key exercises failure paths, not the saved live conditions. Once a
-licensed corpus exists, remove `--quick` and add `--corpus corpus/docs.jsonl` for the full run.
+provider charges. A missing key exercises failure paths, not the saved live conditions. For a
+full run, drop `--quick` and add `--corpus corpus/evidence.jsonl` (the usage line of `evals/run.py`); without `--corpus`
+`citation_correctness` is null.
 To exercise the bot's API adapter, add
 `PRAWDOWID_EXTRA_CHANNELS=discord`; this does not test Discord transport itself. Exact live
 reproduction is UNCONFIRMED because external results and model versions can change.

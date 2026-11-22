@@ -1,8 +1,8 @@
 # Konspekt prezentacji
 
 Tekst roboczy do PDF, zgodnie z [issue #18](https://github.com/00200200/HackNation2026/issues/18).
-Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą z
-[evals/results/latest.json](../../evals/results/latest.json); pełna tabela i opis pomiaru są w
+Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą z pełnego przebiegu na `ca48b84`
+([plik](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json)); pełna tabela i opis pomiaru są w
 [architecture.md](architecture.md). PDF i film nie są częścią tego pliku. [PR #126](https://github.com/00200200/HackNation2026/pull/126) dodaje `docs/pitch/faktczyfejk-pitch.pdf` (12 stron); konspektu nie porównywano z jej treścią, więc liczby i opisy mogą się różnić.
 
 ## Slajd 1. Prawdowid
@@ -46,59 +46,61 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 7. Zapisany test
 
-- Szybki test regresji, nie pełny test: `n_cases: 10`, `dirty: false`, `coverage_ok: true`,
-  `overall_pass: false`. Po jednym przypadku ze scenariuszy A, B, C, D, E, G, H, I, J i U; E05 i E06
-  pominięte (brak publicznego adresu stron testowych).
-- Commit produktu: `edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, w [PR #109](https://github.com/00200200/HackNation2026/pull/109) i [PR #126](https://github.com/00200200/HackNation2026/pull/126), jeszcze nie na `main`. Test objął
-  ekstrakcję, wyszukiwanie, reranking i sędziego; ekstrakcja działała na Opusie (według opisu commita
-  `83d6c65`, plik tego nie zapisuje).
-- Na `main` leży starszy test z commita `95e6177`, wykonany na szkielecie sprzed sędziego (weryfikator
-  zwracał stałe `brak wystarczających dowodów`). Jego wartości nie opisują produktu i nie są tu
+- Pełny test, 75 z 86 przypadków: `mode: full`, `n_cases: 75`, `dirty: false`, `coverage_ok: true`,
+  `overall_pass: false`. E05 do E15 pominięte (brak publicznego adresu stron testowych).
+- Commit produktu: `ca48b84390d0df22881024155a37bfafba606ce2`, głowa [PR #126](https://github.com/00200200/HackNation2026/pull/126), jeszcze nie na `main`. Plik wyniku
+  ([przebieg pełny](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json)) jest w [PR #128](https://github.com/00200200/HackNation2026/pull/128) i
+  [PR #123](https://github.com/00200200/HackNation2026/pull/123), nie w PR #126. Test objął ekstrakcję, wyszukiwanie, reranking i
+  sędziego; model ekstrakcji i miejsce uruchomienia nie są zapisane w pliku.
+- Znacznik czasu: `2026-11-22T02:27:29+00:00`.
+- Na `main` leży starszy test z commita `95e6177`, wykonany na szkielecie sprzed sędziego ([plik](https://github.com/00200200/HackNation2026/blob/1aa173f6e651f7ff2bdacebb2d4384658efc2d48/evals/results/latest.json)): weryfikator
+  zwracał stałe `brak wystarczających dowodów`. Jego wartości nie opisują produktu i nie są tu
   cytowane ([eval-notes](../eval-notes.md), [README, sekcja metryk](../../README.md#metryki-obowiązkowe-sekcja-6)).
-- Znacznik czasu: `2026-11-22T00:37:27+00:00`.
-- Opis PR #126 podaje nowszy szybki test na `ca48b84` (macro-F1 0.750, mediana 29.8 s, 5.54 USD za 100). Pliku tego
-  przebiegu nie ma w repozytorium: UNCONFIRMED, więc slajdy 8 do 10 zostają przy zapisanym teście.
-- Źródło wartości na slajdach 8 do 10: [latest.json](../../evals/results/latest.json) z PR #109 i PR #126.
+- Szybkie testy na 10 przypadkach (`edd34a5`, [plik](https://github.com/00200200/HackNation2026/blob/ca48b84390d0df22881024155a37bfafba606ce2/evals/results/latest.json); `ca48b84`, [plik](https://github.com/00200200/HackNation2026/blob/cd61db592e81aa7b22a24690cb090d64116d17dd/evals/results/history/20261122T021403.618691Z-ca48b84-quick.json)) zastąpił pełny test. Liczby na
+  slajdach 8 do 10 pochodzą tylko z niego.
 
 ## Slajd 8. Wyniki jakości
 
-- `macro_f1: 0.2777777777777778` (próg co najmniej 0.75, niespełniony): poprawny werdykt w 3 z 8 przypadków
-  z werdyktem wzorcowym (D01, E01, H01).
-- `citation_coverage: 1.0` (co najmniej jedno twierdzenie, E01; plik nie zapisuje mianownika); `abstention: 1.0` (dwa przypadki, D01 i H01).
-- `injection_resistance: 1.0` (jeden przypadek, E01: wstrzyknięcie w tekście; wstrzyknięć w stronach nie
-  liczono); `channel_consistency: 1.0` (jeden przypadek, G01).
-- `end_to_end: 0.9` (próg 1.0, niespełniony): przypadek J01 (symulowana awaria Fact Check) dał `nie sprawdzono`
-  w odpowiedzi `ok` zamiast `technical_error`; przyczyna niepotwierdzona ([#101](https://github.com/00200200/HackNation2026/issues/101)); według opisu PR #126 na `ca48b84` J01 nadal nie przechodzi, bo odpowiedź ujawnia awarię, ale daje werdykty z innych źródeł (decyzja zespołu). `moderator_loop: 0.0`: niezbudowany.
-  `citation_correctness: null`: niezmierzone.
-- Wynik całości nie spełnia wymagań, a każdy współczynnik opiera się na garstce przypadków (od jednego do dziesięciu), więc
-  żaden nie jest dowodem. Pokrycie cytatami nie dowodzi poprawności interpretacji.
+- `macro_f1: 0.8026992266992267` (próg co najmniej 0.75, spełniony): poprawny werdykt w 55 z 69 przypadków
+  z werdyktem wzorcowym.
+- `citation_coverage: 1.0` (próg 0.95; co najmniej 52 twierdzenia, plik nie zapisuje mianownika);
+  `citation_correctness: 1.0` (próg 0.85; cytaty z dokumentów korpusu występują dosłownie w ich tekście, bez ręcznej próbki);
+  `abstention: 0.9166666666666666` (próg 0.8; 11 z 12, pudło FC-D02).
+- `injection_resistance: 1.0` (7 przypadków z wstrzyknięciem w tekście wejściowym; wstrzyknięć w stronach, E05 do E15,
+  nie oceniano, więc to nie dowód odporności na nie); `channel_consistency: 1.0` (6 przypadków).
+- `end_to_end: 0.9733333333333334` (próg 1.0, niespełniony): J01 (symulowana awaria Fact Check) dał werdykt `potwierdzone`, a wzorzec nie
+  dopuszcza werdyktu faktograficznego; A15 (pytanie o opinię) dał `needs_clarification` zamiast odpowiedzi `ok`. Według opisu
+  PR #126 w J01 odpowiedź ujawnia awarię, ale daje werdykty z innych źródeł (decyzja zespołu,
+  [#101](https://github.com/00200200/HackNation2026/issues/101)). `moderator_loop: 0.0`: niezbudowany.
+- Wynik całości nie spełnia wymagań (`overall_pass: false`). Pokrycie cytatami i obecność cytatu w tekście nie dowodzą poprawności
+  interpretacji, a wartości liczą się na 75 przypadkach naszego zestawu.
   [Dokładne wyniki i definicje](architecture.md#saved-test-results-and-reproduction),
-  [plik pomiaru](../../evals/results/latest.json).
+  [plik pomiaru](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json).
 
 ## Slajd 9. Czas i koszt
 
-- `median_latency_s: 24.877917104000517` (próg najwyżej 30 s) obejmuje cały potok: ekstrakcję, wyszukiwanie,
-  reranking i sędziego. Najwolniejszy przypadek, U01 (jedyny z adresem URL), trwał 37.4 s. `cost_per_100_usd: 4.912332` (wywołania
-  modeli, ekstrakcja na Opusie).
-- Ekstrapolacja: `4.912332 / 100 * 1000 = 49.12332 USD`, czyli około `49.12 USD` za 1000 sprawdzeń, przy tej
-  samej mieszance zapytań. Z Sonnetem jako modelem ekstrakcji około 3.96 USD za 100 i mediana 18.3 s według
-  opisu PR #126 (komunikat commita `83d6c65` ma te liczby bez pierwszej cyfry kosztu), a dla `ca48b84` opis PR #126
-  podaje 5.54 USD za 100 i medianę 29.8 s; pliku żadnego z tych przebiegów nie zapisano: UNCONFIRMED.
-- Źródło: [latest.json](../../evals/results/latest.json) z PR #109 i PR #126. Hosting, opłaty kanałów, wyszukiwanie i
+- `median_latency_s: 17.842587917002675` (próg najwyżej 30 s) obejmuje cały potok: ekstrakcję, wyszukiwanie,
+  reranking i sędziego. 8 z 75 odpowiedzi trwało dłużej niż 30 s, najwolniejszy przypadek, D03, 38.6 s; dwa przypadki z adresem URL:
+  U01 28.5 s, U02 27.8 s. `cost_per_100_usd: 4.272704084507042` (wywołania modeli z 71 wycenionych odpowiedzi; 4 przypadki z symulowaną awarią pominięto).
+- Ekstrapolacja: `4.272704084507042 / 100 * 1000 = 42.72704084507042 USD`, czyli około `42.73 USD` za 1000 sprawdzeń, przy mieszance
+  przypadków naszego zestawu. Model ekstrakcji pełnego przebiegu nie jest zapisany w pliku: UNCONFIRMED. Starsze przebiegi na 10
+  przypadkach dały 4.91 USD za 100 (`edd34a5`, Opus) i 5.54 USD za 100 (`ca48b84`, szybki). Kwota 3.96 USD z Sonnetem pochodzi z opisu
+  PR #126 (komunikat commita `83d6c65` ma te liczby bez pierwszej cyfry kosztu), a pliku tego przebiegu nie zapisano: UNCONFIRMED.
+- Źródło: [plik pełnego przebiegu](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json). Hosting, opłaty kanałów, wyszukiwanie i
   zachowanie pod obciążeniem: UNCONFIRMED. [Założenia i rachunek](cost.md).
 
 ## Slajd 10. Bezpieczeństwo i prywatność
 
 - Kod oddziela dane od instrukcji, sprawdza obecność cytatów i ogranicza pobieranie podanych URL. W [PR #126](https://github.com/00200200/HackNation2026/pull/126)
   treść pobranych stron jest też sprawdzana w kodzie pod kątem wstrzykniętych instrukcji ([#61](https://github.com/00200200/HackNation2026/issues/61),
-  [#62](https://github.com/00200200/HackNation2026/issues/62)); na `main` źródła czytają reranker i model sędziego, wstrzyknięcie w źródle może zgłosić tylko sędzia, a kod ich nie przeszukuje.
+  [#62](https://github.com/00200200/HackNation2026/issues/62)); na `main` reranker i model sędziego czytają źródła, wstrzyknięcie w źródle może zgłosić tylko sędzia, a kod źródeł nie przeszukuje.
 - Maskowanie danych osobowych (e-mail, IBAN/NRB, karta, PESEL, telefon; w PR #126 także numer dowodu i
   paszportu, a numer karty po etykiecie produktu, na przykład `nr`, zostaje bez maski) działa przed modelem i w każdym logu; dziennik sprawdzeń trzyma maskowany zapis 30 dni, sesję
   można usunąć (`DELETE /api/sessions/{id}`, przycisk na stronie). Imiona i adresy nie są wykrywane.
   [Prywatność](../privacy.md).
-- Zapisany test z PR #109 i PR #126 ma `injection_resistance: 1.0` na jednym przypadku (E01, wstrzyknięcie w tekście
-  wejściowym); wstrzyknięć w stronach (E05 do E15) nie oceniano, więc to nie dowód odporności. Starszy test
-  na `main` (szkielet z commita `95e6177`) pokazuje 0.0 ([latest.json](../../evals/results/latest.json),
+- Zapisany pełny test (`ca48b84`) ma `injection_resistance: 1.0` na 7 przypadkach z wstrzyknięciem w tekście wejściowym
+  (E01 do E04, FC-E01 do FC-E03); wstrzyknięć w stronach (E05 do E15) nie oceniano, więc to nie dowód odporności. Starszy test
+  na `main` (szkielet z commita `95e6177`) pokazuje 0.0 ([plik](https://github.com/00200200/HackNation2026/blob/1aa173f6e651f7ff2bdacebb2d4384658efc2d48/evals/results/latest.json),
   [HISTORY.md](../../evals/results/HISTORY.md)). Discord nie ma jeszcze komendy usuwania.
   [Ryzyka z odwołaniami do kodu](risks.md).
 
@@ -116,6 +118,7 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 ## Slajd 12. Następne kroki i materiały do oddania
 
 - Uruchomić skuteczne wyszukiwanie na zatwierdzonych źródłach i poprawić błędy ujawnione w teście.
-- Zmierzyć poprawność cytatów i zgodność kanałów; sprawdzić ochronę danych oraz obciążenie.
+- Sprawdzić ręcznie próbkę cytatów (policzono tylko ich obecność w tekście dokumentu) i zgodność z żywym Discordem; sprawdzić ochronę
+  danych oraz obciążenie.
 - Uzupełnić TEAM_NAME. Człowiek przygotowuje PDF i film zgodnie z limitami w
   [issue #18](https://github.com/00200200/HackNation2026/issues/18); zgłoszenie wymaga akceptacji zespołu.
