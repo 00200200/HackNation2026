@@ -157,7 +157,8 @@ nothing about a moderator. The count also tells the asker how many similar quest
 holds, which reveals that someone else asked something similar in the last 30 days.
 
 Web search in a check also adds the public pages it fetched to the source cache
-(`corpus/docs.jsonl`). Those carry no user text and no session id. A check never writes the
+(`corpus/docs.jsonl`). Those are public pages with no session id, not the user's text, though a
+page found for a claim can contain the same words or personal data as the question. A check never writes the
 PostgreSQL source store (written only by the seed script; step 2c is off in the pipeline).
 
 ## Retention
@@ -175,7 +176,11 @@ One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:
   masked query, domains and limit. The query text is not stored. Entries live
   `PRAWDOWID_SEARCH_CACHE_TTL_S` seconds (default 86400, capped at `RETENTION_DAYS`; 0 turns the cache
   off) and are dropped from the file when it is next loaded. Failures and limit answers are not cached.
-  "Usuń moje sprawdzenia" does not reach it: it holds public search results, no user text.
+  The entries are public search results, not the user's text, but they can hold the same words or
+  personal data a user submitted: the claim sentence the model wrote from the masked text is itself
+  a query, and a snippet that matches it can repeat a name or a number from it. "Usuń moje
+  sprawdzenia" does not reach this cache, so such a snippet stays until its entry expires (24 h by
+  default) and leaves the file.
 - Source store: each page gets `delete_after = now() + RETENTION_DAYS` on insert. Search and
   `stored_documents()` skip expired pages at once, but the rows are only deleted when
   `delete_expired_documents()` runs, and only the seed script runs it (before it writes). The seed

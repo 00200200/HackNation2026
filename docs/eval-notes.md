@@ -53,11 +53,81 @@ from a web page outside the corpus is not measured (it used to count as wrong, w
 metric towards 0 on correct answers). It is `null` when no cited URL is in the corpus. Those
 quotes need the manual spot check in `evals/results/citation_spotcheck.md`.
 
-## Full run on `ca48b84` (2026-11-22 02:27 UTC, 75 cases): what each number rests on
+## Full run on `df74cef` (2026-11-22 05:40 UTC, 75 cases): the round-4 release candidate
 
-JSON: `evals/results/history/20261122T021757.182695Z-ca48b84-full.json`, also `latest.json`; the
-submission description and slide 9 quote it. It was run from a local worktree at `ca48b84`
-(`integration/r3`) and committed later, unchanged. Read this before quoting it:
+JSON: `evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json`, also `latest.json`; the
+submission description, slide 9, README and `docs/submission/architecture.md` quote it. Read this
+before quoting it:
+
+- Stamp: `f4c9aa8` is `df74cef` (`integration/r4`) plus eval results only: `git diff --stat
+  df74cef f4c9aa8` lists `evals/results/HISTORY.md`, the `9983127` run file and `latest.json`. The
+  harness ran from a clean checkout of `f4c9aa8`. The server was the VPS staging container built
+  from `df74cef` and warmed up first; the md5 of `prawdowid/judge.py` in the container matched the
+  commit's (commit message of `fb13425`). The J cases ran faulted, so the server had
+  `PRAWDOWID_EVAL_TOKEN`, and the H cases filed moderator cases, so it had `PRAWDOWID_ADMIN_TOKEN`.
+- The cases and labels are ours, as below; only the targets are the jury's.
+- `macro_f1` 0.888 covers the 69 cases with an expected verdict: the plain mean of the per-class F1
+  of the five verdict classes (potwierdzone 0.960, fałszywe 0.945, wprowadzające w błąd 0.818, brak
+  wystarczających dowodów 0.857, nie podlega weryfikacji 0.857). It is not accuracy: 62 of the 69
+  verdicts are right (0.899), and 67 of the 75 cases pass when the status cases are counted. 42 of
+  the 69 take their label from a Demagog rating, as in the `ca48b84` run below.
+- The eight misses. The file keeps each case's verdict and status, not the answer text, so the
+  causes below go only as far as that, plus what the team recorded:
+  - J01: `fałszywe`, status `ok`, under a simulated Fact Check outage where `technical_error` (or
+    every claim `nie sprawdzono` with the outage named) is expected. Per the team and the PR #126
+    description, the answer names the outage and gives verdicts from the other sources; the case
+    allows no verdict, and the team decided not to relabel it. Missed in all five full runs that
+    have a results file.
+  - A15: `needs_clarification` for an opinion question where `nie podlega weryfikacji` is expected.
+    Missed in the same five runs.
+  - B04: `brak wystarczających dowodów` where `fałszywe` is expected. The label follows Demagog's
+    "Fałsz", while scenario B of the brief expects `wprowadzające w błąd`; the team has not decided
+    that label policy. Under either label this run's answer is a miss.
+  - B01: `potwierdzone` where `wprowadzające w błąd` is expected (right in the `ca48b84`, `af163ec`
+    and `9983127` runs, wrong in `af7ec13` and here).
+  - C01 and C04: `brak wystarczających dowodów` where `wprowadzające w błąd` is expected.
+  - FC-A08: `wprowadzające w błąd` where `fałszywe` is expected.
+  - FC-I03: `brak wystarczających dowodów` where `fałszywe` is expected (an EUvsDisinfo stand-in,
+    see "How the cases were made").
+- `abstention` 1.0: all 12 cases (D01-D04, H01, H02, FC-C01, FC-C02, FC-D01-FC-D04) abstained. The
+  `af7ec13` run (0.750) came before the judge rule that a fact-checker's data gap decides (ADR
+  0001), and `9983127` (0.917) lost FC-D03 to a Konkret24 snippet's missing context, which
+  `df74cef` addresses (its commit message).
+- `median_latency_s` 16.0: part of the web searches came from the Tavily query cache (#110) of the
+  earlier round-4 runs that day, so quote the cold-cache full run on `af7ec13` (15.1 s) next to it.
+  The slowest first answer was U01 (32.0 s).
+- `channel_consistency` 1.0: the 6 G cases. The second answers took 0.13-0.47 s, from the result
+  cache (#59). The file does not record which extra channel (`PRAWDOWID_EXTRA_CHANNELS`) was on.
+- `moderator_loop` 1.0: H01 and H02. The repeat joined the first answer's case, with status
+  `updated` and a higher count. The eval reads `moderator_case` from the answers, not
+  `GET /api/cases`.
+- `cost_per_100_usd` 3.54: model tokens only, 71 priced first answers, the 4 simulated outages left
+  out, no answer from the result cache.
+- `citation_correctness` 1.0 and `injection_resistance` 1.0 rest on the same kind of evidence as in
+  the `ca48b84` run below: verbatim presence of corpus quotes, and 7 pasted-text injection cases of
+  which 3 are tuned on. The number of corpus quotes was not counted for this run.
+
+Round 4 (22.11, all full runs on 75 cases of `evals/cases.jsonl`, rows in HISTORY.md):
+
+| Code (stamp) | macro_f1 | abstention | end_to_end | median s | USD/100 | Notes |
+|---|---|---|---|---|---|---|
+| `af7ec13` | 0.823 | 0.750 | 0.973 | 15.1 | 3.48 | cold search cache; before the judge rule on stated ratings and data gaps |
+| `af163ec` | 0.899 | 1.000 | 0.973 | 14.9 | 3.43 | judge rule (a fact-checker's verdict sentence counts as its rating, its data gap decides) and the #127 review fix |
+| `9983127` | 0.846 | 0.917 | 0.933 | 13.9 | 3.61 | review fixes; A01-A03 lost to a closed connection right after the staging container was recreated (a transport error, not an answer) |
+| `df74cef` (`f4c9aa8`) | 0.888 | 1.000 | 0.973 | 16.0 | 3.54 | release candidate: any data-gap label of a fact-checker counts for the gap rule |
+
+Runs of the same code differ by a few points, because the models and the search results differ
+from run to run: repeats of one 8-case quick set on 21.11 ranged from 0.10 to 0.39 in macro_f1
+(WORKLOG, the #7/#8 Tavily entry). The judge and the reading of fact-checker ratings (#127 review
+fix) also changed between the four runs above, so their spread is not a clean measure of that
+noise. Quote one run with its commit, never as a fixed value.
+
+## Full run on `ca48b84` (2026-11-22 02:27 UTC, 75 cases): round 3, what each number rests on
+
+JSON: `evals/results/history/20261122T021757.182695Z-ca48b84-full.json`. The round-3 submission
+draft and slide 9 quoted it until the `df74cef` run above replaced it. It was run from a local
+worktree at `ca48b84` (`integration/r3`) and committed later, unchanged. Read this before quoting
+it:
 
 - The cases and labels are ours (see "How the cases were made" below); only the targets are the
   jury's. "Progi jury" on slide 9 means the jury's thresholds applied to our set.

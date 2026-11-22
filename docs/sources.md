@@ -97,8 +97,9 @@ rating, and a quote of the page text keeps the judge's label, as on a page witho
 and the markup adds nothing; a hit without a rating takes the markup's rating, shown under the
 hit's publisher and review date. The markup matters because Fact Check often returns no review for
 the claim sentence (#100). #127 reports that 52 of the 55 Demagog pages that answered in the full
-eval on `ca48b84` (2026-11-22) carried the markup; the run's results file keeps no per-page data,
-so that count is UNCONFIRMED here. Official pages and PDFs are not searched for markup.
+eval on `ca48b84` (2026-11-22, before #127) carried the markup; the run's results file keeps no
+per-page data, so that count is UNCONFIRMED here. The full eval on `df74cef`, the round-4 release
+candidate, reads the markup, and its results file keeps no per-page data either. Official pages and PDFs are not searched for markup.
 
 ### Search snippets of pages we cannot read (#95)
 
@@ -217,7 +218,8 @@ browser one): `konkret24.tvn24.pl`, `sprawdzam.afp.com` and `demagog.org.pl` (Cl
 403 to every request, robots.txt included, so only their search snippets reach the judge;
 `oko.press` and `pravda.org.pl` answer 200. For Demagog that may not always hold: #127 reports
 that the full eval on `ca48b84`, run on VPS staging later that night, fetched and read its review
-pages whole (UNCONFIRMED here: the run's results file keeps no per-page data). Either way, we read
+pages whole (UNCONFIRMED here: the run's results file keeps no per-page data, and neither does the
+later full run on `df74cef`). Either way, we read
 its rating markup when a page answers, and its snippet stands in when it does not. From a home IP konkret24's robots.txt allows bots on its articles (GPTBot is kept off the whole
 site; every bot only off `/_e/p/playlist/*` and `*?page=*`), so this is an IP-level block, not
 an opt-out. AFP's robots.txt answers 403 from a home IP too
