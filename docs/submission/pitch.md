@@ -169,7 +169,8 @@ o lukach evalu w „Next”). Czego się spodziewać:
 - Sceny 7 i 8 zależą od tego, czy wyszukiwarka dotrze do strony fact-checkera. Część z nich blokuje
   nasz serwer. W `integration/r3` taki wynik wchodzi jako fragment z wyników wyszukiwarki, oznaczony
   jako taki (#95). Jeśli mimo to odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”,
-  pokazujemy taką, z napisem „źródło zablokowało pobranie, #95”.
+  pokazujemy taką. Napis „źródło zablokowało pobranie, #95” dodajemy tylko wtedy, gdy nagranie albo logi
+  potwierdzają blokadę; w innym przypadku opisujemy sam wynik, bez podawania przyczyny.
 - W scenie 9 baza incydentów organizatora jest pusta (#64), więc notatka „Podobne znane incydenty”
   się nie pojawi. Kontekst może przyjść tylko z EUvsDisinfo. Jeśli nie przyjdzie, zostaje sam werdykt
   ze źródeł, a napis brzmi: „Bazy incydentów organizatora jeszcze nie mamy, #64”.

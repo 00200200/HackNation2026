@@ -69,7 +69,7 @@ PDF i film nie są częścią tego pliku.
   `cost_per_100_usd: 1.8220444444444441`. Ta wersja wołała model raz, tylko do wyodrębnienia
   twierdzeń, bez sędziego i bez Tavily. 1,82 USD za 100 to więc koszt samego wyodrębniania.
 - Pełny potok, szybki przebieg `edd34a5` na 10 przypadkach (Opus, przed #95): modele 0,0491 USD, a 100
-  testów to 4,91 USD plus do 3,90 USD za Tavily. Obecny kod może kosztować więcej albo mniej (#95 podnosi
+  testów to 4,91 USD plus około 3,90 USD za Tavily (szacunek). Obecny kod może kosztować więcej albo mniej (#95 podnosi
   koszt, #88 go obniża). Do tego około 4,9 kredytu Tavily na sprawdzenie (przebieg z 21.11). Konto
   Tavily: plan Researcher z opłatą za zużycie, 1000 kredytów za darmo (UNCONFIRMED), potem 0,008 USD.
   Szacunek: 1000 sprawdzeń kosztuje 80,10 USD, czyli 325 zł. Limit konta (4000 kredytów) starcza na

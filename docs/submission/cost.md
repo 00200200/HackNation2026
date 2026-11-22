@@ -94,8 +94,9 @@ K_1000   = 1000 × K_modele + max(0, 1000 × N_Tavily − 1000) × 0,008 USD
 ```
 
 Koszt 100 testów, o który pyta jury, to 4,91 USD za modele (`edd34a5`, wiersz w HISTORY.md na
-`integration/r3` z plikiem JSON `evals/results/history/20261122T003536.735064Z-edd34a5-quick.json`) plus do
-3,90 USD za Tavily (około 4,9 kredytu × 100 × 0,008 USD, bez darmowych kredytów). Wiersz `95e6177`
+`integration/r3` z plikiem JSON `evals/results/history/20261122T003536.735064Z-edd34a5-quick.json`) plus
+około 3,90 USD za Tavily (szacunek: średnio około 4,9 kredytu na sprawdzenie × 100 × 0,008 USD, bez darmowych kredytów;
+przy górnej granicy 12 kredytów na sprawdzenie byłoby to 9,60 USD). Wiersz `95e6177`
 (1,82 USD za 100) to wersja z jednym wywołaniem modelu, bez sędziego i bez Tavily.
 
 ## Koszt stały miesięcznie

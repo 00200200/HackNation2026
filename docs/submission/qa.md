@@ -230,8 +230,9 @@ sprawdzania (#74), ale tego też nie zmierzyliśmy.
 Krótko: żaden zapisany przebieg nie spełnia wszystkich progów i tego nie ukrywamy. Każdy przebieg
 jest w repozytorium razem z commitem.
 
-Szczegóły: nasz zestaw to na `main` 73 przypadki (w `integration/r3` 86), 41 w zestawie A-J i 32 w zestawie FC. Rozkład scenariuszy:
-A 23, B 10, C 6, D 8, E 7, G 6, H 2, I 7, J 4. Etykiety pochodzą z ocen Demagoga, Konkret24,
+Szczegóły: nasz zestaw to na `main` 73 przypadki (41 w zestawie A-J i 32 w zestawie FC), a w `integration/r3` 86 (54 w A-J i U oraz 32 w FC).
+Rozkład scenariuszy na `main`: A 23, B 10, C 6, D 8, E 7, G 6, H 2, I 7, J 4; w `integration/r3`: A 23, B 10, C 6, D 8,
+E 18, G 6, H 2, I 7, J 4, U 2. Etykiety pochodzą z ocen Demagoga, Konkret24,
 EUvsDisinfo i stron urzędowych, a przy każdym przypadku zapisaliśmy, skąd jest etykieta. Wyjątek to
 przypadki D01-D04 oraz H01 i H02: plotki wymyślone przez zespół, o których nikt nie pisał, więc
 poprawna odpowiedź to brak dowodów. Zapisane przebiegi: szybki na `95e6177` dał macro-F1 0,100, abstencję
@@ -294,7 +295,7 @@ kredyty zużyją testy). Ten limit starcza na 820 do 1025 sprawdzeń, zależnie 
 Abonamentowe stawki Tavily (do 0,005 USD za kredyt w planie Growth za 500 USD miesięcznie) nie
 obniżają tego rachunku przy takim ruchu. Koszty stałe: VPS-2 od 37,85 zł brutto miesięcznie,
 domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 4,91 USD za modele
-(`edd34a5`) plus do 3,90 USD za Tavily. Ostateczne liczby policzymy z pełnego
+(`edd34a5`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica). Ostateczne liczby policzymy z pełnego
 przebiegu (#16).
 
 Źródła: [cost.md](cost.md), [HISTORY.md](../../evals/results/HISTORY.md), [WORKLOG.md](../../WORKLOG.md).
