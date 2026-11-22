@@ -10,8 +10,9 @@ predates the judge, the retrieval pipeline and the check log. At that commit (`p
 identical in `e9a7f86` on `main`) `verifier.to_check_result` returned a constant
 `insufficient_evidence` for every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py`
 did not exist. The cost and latency below therefore cover claim extraction only, not the current
-pipeline. No eval has run on the merged commit (skipped with `HN_SKIP_EVAL=1`); a fresh one is
-pending ([#16](https://github.com/00200200/HackNation2026/issues/16)).
+pipeline. The repository holds no valid eval of the current pipeline (the eval gate was skipped
+with `HN_SKIP_EVAL=1` when PR #40 was pushed); a fresh full run is pending
+([#16](https://github.com/00200200/HackNation2026/issues/16)).
 
 ## Estimate for 1,000 checks
 
@@ -26,11 +27,11 @@ Estimated USD for 1,000 checks = 0.018220444444444441 * 1000
 Rounded display estimate = USD 18.22 for 1,000 checks
 ```
 
-This assumes the same request mix and retrieval conditions as the saved run. It prices model
-usage through PydanticAI/genai-prices. In the saved run that is claim extraction only: the rerank
-and judge calls were added later, are not in the figure, and the cost of the current pipeline is
-UNCONFIRMED. Missing usage or
-an unpriced/interrupted request can produce `cost_usd: null`; failed calls may still be billed
+This assumes the same request mix as the saved run. It prices model usage through
+PydanticAI/genai-prices. In the saved run that is claim extraction only: that run did no
+retrieval, and the rerank and judge calls were added later, so the cost of the current pipeline
+is UNCONFIRMED. Missing usage or an unpriced/interrupted request can produce `cost_usd: null`;
+failed calls may still be billed
 ([verifier.py](../../prawdowid/verifier.py), [pipeline.py](../../prawdowid/pipeline.py)).
 It excludes hosting, network, search/MCP fees, Discord operation and tax; those amounts are
 UNCONFIRMED. No price for those services is inferred from a missing API key or a code comment.

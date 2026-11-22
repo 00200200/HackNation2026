@@ -123,10 +123,10 @@ retention, training use and links to the terms, is in
 | Processor | Receives | Processes in |
 |---|---|---|
 | Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
-| Tavily (web search) | Masked search queries | United States. An EU endpoint exists for selected customers only |
+| Tavily (web search) | Masked search queries, or the masked claim when the model wrote none | United States. An EU endpoint exists for selected customers only |
 | Google Fact Check Tools | Masked claim text | Not stated for this API. Google's servers are worldwide |
 | EUvsDisinfo MCP | Claim text, cut to 200 characters | Not stated, UNCONFIRMED |
-| www.gov.pl search | Search queries | Not stated, UNCONFIRMED |
+| www.gov.pl search | Search queries, or the claim when the model wrote none | Not stated, UNCONFIRMED |
 | OVHcloud VPS | Everything the app stores | Limburg, Germany |
 | Discord (bot, not deployed yet) | The typed command and our reply | United States |
 
@@ -134,7 +134,8 @@ Migration path: the three model steps are chosen by `PRAWDOWID_MODEL`, `PRAWDOWI
 and `PRAWDOWID_JUDGE_MODEL` (PydanticAI model strings). The same Claude models can run in the EU
 through Amazon Bedrock EU inference profiles (for example `bedrock:eu.anthropic.claude-opus-5-5`).
 That takes the variables, the `bedrock` dependency extra and the `environment:` list in
-`compose.yaml`, and is expected to need no prompt or code change. It has not been run. After it,
+`compose.yaml`, and is expected to need no prompt or code change (Bedrock ignores the retry
+setting the agents pass, so botocore's default retries apply). It has not been run. After it,
 web search (Tavily), Fact Check (Google) and the Discord channel still leave the EEA, and
 EUvsDisinfo and www.gov.pl state no location. Steps and open points:
 [docs/privacy.md](../privacy.md#migration-path-to-an-eu-processed-model).
@@ -176,8 +177,9 @@ jury-sized evaluation, even though the saved `coverage_ok` flag is true. It also
 judge, the retrieval pipeline and the check log. At that commit (`prawdowid/` is identical in
 `e9a7f86` on `main`) `verifier.to_check_result` returned a constant `insufficient_evidence` for
 every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py` did not exist. Every value
-below describes that stub, not the current pipeline. No eval has been run on the merged commit
-(skipped with `HN_SKIP_EVAL=1`); a fresh one is pending ([#16](https://github.com/00200200/HackNation2026/issues/16)).
+below describes that stub, not the current pipeline. The repository holds no valid eval of the
+current pipeline (the eval gate was skipped with `HN_SKIP_EVAL=1` when PR #40 was pushed); a fresh
+full run is pending ([#16](https://github.com/00200200/HackNation2026/issues/16)).
 The following values and targets are copied exactly from that file:
 
 | Metric | value | target | pass |

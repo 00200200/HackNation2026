@@ -49,23 +49,29 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 - Szybki test regresji, nie pełny test: `n_cases: 9`, `dirty: false`, `coverage_ok: true`, `overall_pass: false`.
 - Commit produktu: `95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, sprzed scalenia #40 z `main`; świeży test po
   scaleniu jeszcze nie uruchomiony (decyzja: `HN_SKIP_EVAL=1`).
+- Ten test poprzedza sędziego, potok wyszukiwania i dziennik sprawdzeń: weryfikator zwracał dla każdego
+  sprawdzalnego twierdzenia stałe `brak wystarczających dowodów`. Wartości na slajdach 8 i 9 opisują ten
+  szkielet, nie obecny produkt ([README, sekcja metryk](../../README.md#metryki-obowiązkowe-sekcja-6)).
 - Znacznik czasu: `2026-11-21T19:10:57+00:00`.
 - Źródło wszystkich wartości: [latest.json](../../evals/results/latest.json).
 
 ## Slajd 8. Wyniki jakości
 
-- `macro_f1: 0.1`; `citation_coverage: null`; `abstention: 1.0`.
+- `macro_f1: 0.1`; `citation_coverage: null`; `abstention: 1.0` (wynik trywialny: stałe wstrzymanie się szkieletu).
 - `injection_resistance: 0.0`; `end_to_end: 0.8888888888888888`.
 - `citation_correctness: null`; `channel_consistency: null`: niezmierzone.
-- Wynik całości nie spełnia wymagań. Pokrycie cytatami nie dowodzi poprawności interpretacji.
+- Wynik całości nie spełnia wymagań, a liczby opisują szkielet sprzed sędziego (slajd 7). Pokrycie
+  cytatami nie dowodzi poprawności interpretacji.
   [Dokładne wyniki i definicje](architecture.md#saved-test-results-and-reproduction),
   [plik pomiaru](../../evals/results/latest.json).
 
 ## Slajd 9. Czas i koszt
 
-- `median_latency_s: 3.8964525419287384`; `cost_per_100_usd: 1.8220444444444441`.
+- `median_latency_s: 3.8964525419287384`; `cost_per_100_usd: 1.8220444444444441`. Obie wartości obejmują
+  tylko ekstrakcję twierdzeń, bez wyszukiwania, rerankingu i sędziego (slajd 7).
 - Ekstrapolacja: `1.8220444444444441 / 100 * 1000 = 18.220444444444441 USD`, czyli około
-  `18.22 USD` za 1000 sprawdzeń przy tej samej mieszance zapytań.
+  `18.22 USD` za 1000 sprawdzeń samej ekstrakcji, przy tej samej mieszance zapytań. Koszt obecnego
+  potoku: UNCONFIRMED.
 - Źródło: [latest.json](../../evals/results/latest.json). Hosting, opłaty kanału i zachowanie pod
   obciążeniem: UNCONFIRMED. [Założenia i rachunek](cost.md).
 
