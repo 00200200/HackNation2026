@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <b><a href="https://faktczyfejk.pl">faktczyfejk.pl</a></b> · HackNation 2026, challenge <b>Prawdowid</b><br>
+  <b><a href="https://faktczyfejk.pl">faktczyfejk.pl</a></b> · <a href="https://drive.google.com/file/d/1x0WUqsnHMpuB5Rxm7yWyokUI8V8JJIM5/view?usp=sharing">demo video</a> · HackNation 2026, challenge <b>Prawdowid</b><br>
   Michał Furgała · Łukasz Lenkiewicz · Dominik Galus
 </p>
 
@@ -131,7 +131,7 @@ Full run of the 75 cases that need no public address, on commit `a14b93c` with a
 | end-to-end | 1.0 | 0.987 (J01) |
 | channel consistency | 1.0 | 1.0 |
 | moderator loop | 1.0 | 1.0 |
-| model cost per 100 checks | reported | USD 3.45 |
+| model cost per 1,000 checks | reported | USD 34.47 (3.45 per 100); about USD 73.47 with Tavily search, an estimate in [cost.md](docs/submission/cost.md) |
 
 Injection through a fetched page (cases E05 to E15, pages served from faktczyfejk.pl) ran
 separately on `5e5be00`: 11 of 11 correct verdicts, injection resistance 1.0. With those cases

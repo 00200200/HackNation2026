@@ -18,14 +18,14 @@ Wzorce w kodzie i flaga modelu wyłapują polecenia ukryte w tekście, na stroni
 
 Kanały to strona WWW i adapter demonstracyjny komunikatora pod /czat, oba na tym samym API. Kod bota Discord (/sprawdz) czeka na wdrożenie. Serwer stoi w Niemczech (OVHcloud). Poza EOG trafia zamaskowany tekst do Anthropic i zapytania do wyszukiwarki (Perplexity albo Tavily), a Google, EUvsDisinfo i gov.pl nie podają, gdzie przetwarzają dane. Model każdego kroku ustawia zmienna środowiskowa.
 
-Pełny przebieg naszego testu (commit a14b93c, 75 przypadków, lokalne API, evals/results/HISTORY.md): macro-F1 0,92 przy celu 0,75 (69 przypadków z oceną; 42 etykiety to oceny Demagoga, które produkt może przejąć), pokrycie cytatami 1,0, poprawność cytatów 1,0 (tylko obecność cytatu z korpusu w źródle, nie wsparcie twierdzenia), poprawna abstencja 1,0 (12), odporność na wstrzyknięcia w tekście 1,0 (7, 3 z nich nasze wzorce znają dosłownie), mediana czasu 20,5 s, zgodność kanałów 1,0 (6, drugi kanał dostał wynik z pamięci podręcznej), pętla moderatora 1,0 (2), end-to-end 0,99. Koszt modeli: 3,45 USD za 100 sprawdzeń, bez opłat za wyszukiwarkę. 11 przypadków z poleceniem ukrytym na pobranej stronie przeszło osobno na commicie 5e5be00: 11 z 11 trafnych ocen, odporność 1,0. Razem 73 z 80 trafnych ocen, macro-F1 0,92 (dwa przebiegi, docs/eval-notes.md).
+Pełny przebieg naszego testu (commit a14b93c, 75 przypadków, lokalne API, evals/results/HISTORY.md): macro-F1 0,92 przy celu 0,75 (69 przypadków z oceną; 42 etykiety to oceny Demagoga, które produkt może przejąć), pokrycie cytatami 1,0, poprawność cytatów 1,0 (tylko obecność cytatu z korpusu w źródle, nie wsparcie twierdzenia), poprawna abstencja 1,0 (12), odporność na wstrzyknięcia w tekście 1,0 (7, 3 z nich nasze wzorce znają dosłownie), mediana czasu 20,5 s, zgodność kanałów 1,0 (6, drugi kanał dostał wynik z pamięci podręcznej), pętla moderatora 1,0 (2), end-to-end 0,99. Koszt 1000 sprawdzeń: 34,47 USD za modele, z Tavily szacunkowo 73,47 USD. 11 przypadków z poleceniem ukrytym na pobranej stronie przeszło osobno na commicie 5e5be00: 11 z 11 trafnych ocen, odporność 1,0. Razem 73 z 80 trafnych ocen, macro-F1 0,92 (dwa przebiegi, docs/eval-notes.md).
 
 End-to-end nie przeszedł J01: przy symulowanej awarii Fact Check produkt dał ocenę zamiast komunikatu technicznego. Spośród 7 pomyłek w ocenie 4 to „brak wystarczających dowodów” zamiast oceny. Baza incydentów jest pusta (brak pliku organizatora), 259 dokumentów korpusu nie ma daty, a fact-checkerów reprezentuje w nim 15 tekstów Pravdy. Nie obsługujemy zrzutów ekranu i nie maskujemy imion ani adresów.
 
 ## Przed wysłaniem (nie wklejać do formularza)
 
-Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka: 3869 znaków
-(`len()`, znaki nowej linii jako LF), 3883 z CRLF; limit 4000 znaków
+Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka: 3875 znaków
+(`len()`, znaki nowej linii jako LF), 3889 z CRLF; limit 4000 znaków
 ([issue #18](https://github.com/00200200/HackNation2026/issues/18)). Liczby z pełnego przebiegu:
 [evals/results/history/20261122T061635.151613Z-a14b93c-full.json](../../evals/results/history/20261122T061635.151613Z-a14b93c-full.json);
 przypadki E05-E15:
@@ -37,6 +37,9 @@ wstrzyknięć znane wzorcom: [eval-notes.md](../eval-notes.md). Szczegóły:
 [prywatność](../privacy.md), [korpus](../corpus.md).
 
 - Wkleić tekst do formularza i sprawdzić jego licznik.
+- Film demonstracyjny: https://drive.google.com/file/d/1x0WUqsnHMpuB5Rxm7yWyokUI8V8JJIM5/view?usp=sharing
+  (22.11 o 10:15 otwierał się bez logowania; na stronie projektu na hacktribe jest w polu na dodatkowe
+  materiały, bo pole filmu przyjmuje tylko YouTube). Prezentacja: `docs/pitch/faktczyfejk-pitch.pdf`.
 - Upublicznić repozytorium albo podać inny link (22.11 o 9:30 było prywatne).
 - Gdy bot Discord będzie na serwerze dostępnym dla jury, poprawić zdanie o nim w akapicie o
   kanałach i dodać link zaproszenia.
