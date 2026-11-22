@@ -55,7 +55,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
 .giant.ink .o2 { -webkit-text-stroke-color: rgba(138,28,47,.25); }
 
 /* white magnifier */
-.lens { position: absolute; right: 110px; bottom: 110px; width: 210px; color: #fff; filter: drop-shadow(0 14px 24px rgba(0,0,0,.3)); }
+.lens { position: absolute; right: 110px; bottom: 110px; width: 210px; color: #fff; }
 
 /* pills and chips */
 .pill { display: inline-block; padding: 12px 26px; border: 2px solid rgba(255,255,255,.75); border-radius: 999px; font-size: 26px; font-weight: 600; margin: 0 12px 12px 0; }
@@ -78,7 +78,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
 .users .card p { font-size: 28px; }
 .nw { white-space: nowrap; }
 
-.bubble { max-width: 980px; border-radius: 36px; padding: 34px 42px; font-size: 34px; line-height: 1.35; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
+.bubble { max-width: 980px; border-radius: 36px; padding: 34px 42px; font-size: 34px; line-height: 1.35; }
 .bubble .who { font-size: 22px; font-weight: 700; opacity: .75; margin-bottom: 8px; }
 .b-user { background: #fff; color: var(--ink); border-bottom-right-radius: 10px; margin-left: auto; }
 .b-bot { background: var(--ink); color: #fff; border-bottom-left-radius: 10px; }
@@ -108,13 +108,13 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
 /* Modern magnifier: a glass lens over the giant word that really enlarges it, thin white rim, capsule handle */
 .glass { position: absolute; border-radius: 50%; overflow: hidden;
   background-color: #9a2236; background-image: var(--weave);
-  box-shadow: inset 0 0 0 9px rgba(255,255,255,.96), inset 0 0 0 11px rgba(0,0,0,.12), inset 0 18px 40px rgba(0,0,0,.28), 0 30px 70px rgba(0,0,0,.38); }
+  box-shadow: inset 0 0 0 9px rgba(255,255,255,.96), inset 0 0 0 11px rgba(0,0,0,.12); }
 .glass .inner { position: absolute; color: #fff; }
 .glass::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
   background: radial-gradient(120% 80% at 30% 18%, rgba(255,255,255,.32), rgba(255,255,255,.06) 38%, transparent 55%),
               radial-gradient(60% 40% at 72% 85%, rgba(255,255,255,.12), transparent 70%); }
 .handle { position: absolute; width: 58px; height: 250px; border-radius: 29px; transform-origin: top center;
-  background: linear-gradient(90deg, #e9e2e2, #ffffff 45%, #d8cfd0); box-shadow: 0 24px 50px rgba(0,0,0,.35); }
+  background: linear-gradient(90deg, #e9e2e2, #ffffff 45%, #d8cfd0); }
 .handle::before { content: ""; position: absolute; left: 13px; top: -26px; width: 32px; height: 40px; border-radius: 10px; background: #f4efef; }
 </style>
 </head>
@@ -225,7 +225,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <p><span class="tag t-on">działa</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, to samo API i&nbsp;ta sama odpowiedź co na stronie.</p>
     <p><span class="tag t-on">działa</span><br><b>Discord /sprawdz</b>: bot na tym samym API.</p>
   </div>
-  <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; box-shadow:0 30px 80px rgba(29,18,21,.25); border:1px solid var(--line)">
+  <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; border:1px solid var(--line)">
   <div class="ft"><span>Zrzut strony głównej faktczyfejk.pl, 22.11.2026</span><span class="n">08 / 12</span></div>
 </section>
 
