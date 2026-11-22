@@ -5,7 +5,7 @@ The estimate uses the full run on `ca48b84`, the head of [PR #126](https://githu
 [run file](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json), timestamp `2026-11-22T02:27:29+00:00`, recorded commit
 `ca48b84390d0df22881024155a37bfafba606ce2`, `mode: "full"`, `n_cases: 75`, `dirty: false`, `overall_pass: false`. It ran extraction, retrieval, rerank and judge. The file is in
 PR #128 (`6126ac9`) and PR #123 (`cd61db5`), not on `main` and not in PR #126, so `evals/results/latest.json` in a checkout of
-`main` or of PR #126 is a different run. The file does not record the extraction model, the machine or the build of the server under test (its `commit` field is the checkout the harness ran from): UNCONFIRMED.
+`main` or of PR #126 is a different run. The file does not record the extraction model, the machine or the build of the server under test (its `commit` and `dirty` fields describe the checkout the harness ran from): UNCONFIRMED.
 ([architecture.md](architecture.md#saved-test-results-and-reproduction) lists every saved run with a permalink.)
 
 Older runs, not used for the estimate:

@@ -183,7 +183,7 @@ The file is in [PR #128](https://github.com/00200200/HackNation2026/pull/128) (`
 [PR #123](https://github.com/00200200/HackNation2026/pull/123) (`cd61db5`), not on `main` and not in PR #126.
 75 of the 86 cases of `evals/cases.jsonl` in PR #126 ran: `E05` to `E15` were skipped (no public URL for the fixture pages,
 [#94](https://github.com/00200200/HackNation2026/issues/94)), and no case had a harness error. The file records neither the
-extraction model, nor the machine, nor the flags of the run, so exact reproduction is UNCONFIRMED. The `commit` field is the checkout the harness ran from (`evals/run.py`), and the harness calls the server at `PRAWDOWID_URL` (`evals/adapter.py`), so whether that server was built from `ca48b84` is UNCONFIRMED as well. A later commit in PR #126 needs a new run
+extraction model, nor the machine, nor the flags of the run, so exact reproduction is UNCONFIRMED. The `commit` and `dirty` fields describe the checkout the harness ran from (`evals/run.py`), and the harness calls the server at `PRAWDOWID_URL` (`evals/adapter.py`), so whether that server was built from `ca48b84`, and whether it was clean, is UNCONFIRMED as well. A later commit in PR #126 needs a new run
 ([#16](https://github.com/00200200/HackNation2026/issues/16)).
 
 Other saved runs, not cited as the measurement of the current build:

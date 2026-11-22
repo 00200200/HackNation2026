@@ -89,6 +89,12 @@ One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:
 - Check log: records older than that are dropped when the next check is written (so with no new
   checks they stay until one comes). Damaged lines are dropped the same way.
 - Source cache `corpus/docs.jsonl`: pages fetched more than that ago are dropped on the next save.
+- Search cache `corpus/search_cache.jsonl` (PR #126, [#110](https://github.com/00200200/HackNation2026/issues/110), `prawdowid/search_cache.py`): the hits
+  Tavily returned for a query (URL, title, snippet, publication date), under a SHA-256 of the normalised masked
+  query, the domains and the limit. The query text is not stored. An entry lives `PRAWDOWID_SEARCH_CACHE_TTL_S`
+  seconds from when it was stored (default 86400, never above `RETENTION_DAYS`; 0 turns the cache off), and
+  expired lines are dropped from the file when it is next loaded. Failures and limit answers are not cached.
+  "Usuń moje sprawdzenia" does not reach it: it holds public search results, no user text.
 - Source store: each page gets `delete_after = now() + RETENTION_DAYS` on insert. Search and
   `stored_documents()` skip expired pages at once, but the rows are only deleted when
   `delete_expired_documents()` runs, and only the seed script runs it (before it writes). The seed

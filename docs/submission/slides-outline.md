@@ -51,13 +51,13 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 - Commit zapisany w pliku: `ca48b84390d0df22881024155a37bfafba606ce2`, głowa [PR #126](https://github.com/00200200/HackNation2026/pull/126), jeszcze nie na `main`. Plik wyniku
   ([przebieg pełny](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json)) jest w [PR #128](https://github.com/00200200/HackNation2026/pull/128) i
   [PR #123](https://github.com/00200200/HackNation2026/pull/123), nie w PR #126. Test objął ekstrakcję, wyszukiwanie, reranking i
-  sędziego; plik nie zapisuje modelu ekstrakcji, miejsca uruchomienia ani commitu serwera (pole `commit` to checkout, z którego uruchomiono harness).
+  sędziego; plik nie zapisuje modelu ekstrakcji, miejsca uruchomienia ani commitu serwera (pola `commit` i `dirty` opisują checkout, z którego uruchomiono harness).
 - Znacznik czasu: `2026-11-22T02:27:29+00:00`.
 - Na `main` leży starszy test z commita `95e6177`, wykonany na szkielecie sprzed sędziego ([plik](https://github.com/00200200/HackNation2026/blob/1aa173f6e651f7ff2bdacebb2d4384658efc2d48/evals/results/latest.json)): weryfikator
   zwracał stałe `brak wystarczających dowodów`. Jego wartości nie opisują produktu i nie są tu
   cytowane ([eval-notes](../eval-notes.md), [README, sekcja metryk](../../README.md#metryki-obowiązkowe-sekcja-6)).
 - Pełny test zastąpił szybkie testy na 10 przypadkach (`edd34a5`, [plik](https://github.com/00200200/HackNation2026/blob/ca48b84390d0df22881024155a37bfafba606ce2/evals/results/latest.json); `ca48b84`, [plik](https://github.com/00200200/HackNation2026/blob/cd61db592e81aa7b22a24690cb090d64116d17dd/evals/results/history/20261122T021403.618691Z-ca48b84-quick.json)). Liczby na
-  slajdach 8 do 10 pochodzą tylko z pełnego testu.
+  slajdach 8 do 10 pochodzą z pełnego testu; starsze liczby na slajdzie 9 są oznaczone jako starsze albo UNCONFIRMED.
 
 ## Slajd 8. Wyniki jakości
 
