@@ -38,11 +38,11 @@
             "required": false,
             "schema": {
               "type": "string",
-              "description": "The calling channel, logged with every check. Known values: discord, web. Any other value is logged as `other`.",
+              "description": "The calling channel, logged with every check. Known values: demo, discord, web. Any other value is logged as `other`.",
               "default": "web",
               "title": "X-Channel"
             },
-            "description": "The calling channel, logged with every check. Known values: discord, web. Any other value is logged as `other`."
+            "description": "The calling channel, logged with every check. Known values: demo, discord, web. Any other value is logged as `other`."
           },
           {
             "name": "X-Session-Id",

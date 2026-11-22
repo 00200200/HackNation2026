@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import unicodedata
 from datetime import UTC, datetime
 
@@ -217,6 +218,31 @@ def test_same_text_from_two_channels_runs_once_and_returns_the_same_result(
     )
     assert len(calls) == 1
     assert web.json() == discord.json()
+
+
+def test_demo_adapter_is_its_own_channel_and_gets_the_web_answer(
+    client, monkeypatch, caplog
+):
+    """The /czat demo adapter (#116) sends X-Channel demo: logged as `demo`, not `other`, with
+    its own session, and the same answer as the web form for the same text (scenario G)."""
+    calls = _counting_verify(
+        monkeypatch, CheckResult(status=Status.OK, claims=[_claim()], cost_usd=0.01)
+    )
+    web = client.post(
+        "/api/checks", json={"input": "Tekst"}, headers={"X-Channel": "web"}
+    )
+    with caplog.at_level(logging.INFO, logger="prawdowid"):
+        demo = client.post(
+            "/api/checks",
+            json={"input": "Tekst"},
+            headers={"X-Channel": "demo", "X-Session-Id": "czat-demo-0001"},
+        )
+    assert demo.status_code == 200
+    assert demo.headers["X-Session-Id"] == "czat-demo-0001"
+    assert demo.json() == web.json() and len(calls) == 1
+    assert "channel=demo" in caplog.text
+    [record] = client.get("/api/sessions/czat-demo-0001").json()
+    assert record["channel"] == "demo"
 
 
 def test_different_text_is_a_miss(client, monkeypatch):

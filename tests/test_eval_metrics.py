@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from evals import adapter, metrics
+from evals import adapter, metrics, run
 
 
 def resp(verdict, evidence=None, status="ok"):
@@ -151,6 +151,26 @@ def test_adapter_marks_an_answer_taken_from_the_result_cache(
         lambda request, timeout: FakeHttpResponse(headers),
     )
     assert adapter.ask({"text": "x"}, "web")["cached"] is cached
+
+
+def test_demo_channel_sends_the_request_of_the_czat_page(monkeypatch):
+    """PRAWDOWID_EXTRA_CHANNELS=demo (#116): a scenario G case also runs as the /czat demo
+    adapter, the web request with X-Channel: demo; Discord runs only when it is listed too."""
+    sent = []
+
+    def urlopen(request, timeout):
+        sent.append(request)
+        return FakeHttpResponse({})
+
+    monkeypatch.setenv("PRAWDOWID_URL", "http://product.test")
+    monkeypatch.setattr(adapter.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(adapter, "CHANNELS", {"web", "demo"})
+    monkeypatch.setattr(adapter, "wait_turn", lambda: None)
+    case = {"id": "G1", "input": {"text": "x"}, "channels": ["web", "discord", "demo"]}
+    row = run.run_case(case)
+    assert [r["channel"] for r in row["runs"]] == ["web", "demo"]
+    # urllib keeps header names capitalised this way.
+    assert [r.get_header("X-channel") for r in sent] == ["web", "demo"]
 
 
 @pytest.mark.parametrize(

@@ -75,6 +75,9 @@ A full run of 30+ cases therefore takes several minutes.
 - `moderator_case_id`: only if the moderator loop (scenario H) is built.
 - A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord`. The adapter then runs the bot's own API client (`discord_bot.ask_api`, `X-Channel: discord`), so only the Discord connection itself is not exercised
   (formatting is covered by `tests/test_discord_bot.py`); without it `channel_consistency` is unknown.
+  `PRAWDOWID_EXTRA_CHANNELS=demo` (or `discord,demo`) adds the /czat demo adapter (#116): the web request with
+  `X-Channel: demo`, as `frontend/public/czat.js` sends it. The scenario G cases list `web`, `discord` and `demo`; a
+  channel missing from the variable is skipped.
 
 ## Case format (`evals/cases.jsonl`, one JSON object per line)
 

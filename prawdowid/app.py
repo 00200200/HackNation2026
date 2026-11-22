@@ -42,8 +42,9 @@ log.addFilter(MaskingFilter())
 MAX_INPUT_CHARS = 5000
 RATE_LIMIT = "10/minute"
 VERIFY_TIMEOUT_S = 60
-# Channels send X-Channel; logged so checks can be compared across channels.
-CHANNELS = {"web", "discord"}
+# Channels send X-Channel; logged so checks can be compared across channels. "demo" is the
+# messenger demo adapter at /czat (frontend/public/czat.js).
+CHANNELS = {"web", "discord", "demo"}
 # Demo session: the client sends X-Session-Id back on later checks; a new one is issued otherwise.
 SESSION_HEADER = "X-Session-Id"
 SESSION_ID = r"[A-Za-z0-9-]{8,64}"

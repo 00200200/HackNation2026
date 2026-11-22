@@ -99,6 +99,7 @@ def test_a_successful_check_leaves_one_complete_record(api):
         ({}, "web"),
         ({"X-Channel": "discord"}, "discord"),
         ({"x-channel": "discord"}, "discord"),
+        ({"X-Channel": "demo"}, "demo"),
         ({"X-Channel": "slack"}, "other"),
     ],
 )
