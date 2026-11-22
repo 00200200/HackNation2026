@@ -167,7 +167,7 @@ przebiegu na `95e6177`, 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jes
 0,90. Przebieg na `c422f2d` ma macro-F1 0,918, ale `end_to_end` 0,987 nie spełnia progu, więc
 całość nadal nie przechodzi. Wzorce pisaliśmy, znając pierwsze trzy przypadki E (E01-E03), a
 przypadki FC-E01-FC-E03 `prawdowid/verifier.py` dopasowuje fraza po frazie, więc potrzebujemy nowych.
-Przypadki z poleceniem ukrytym w stronie mają fixtures (#94). Pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), więc jego wynik 1,000 dotyczy 7 przypadków E, a właściwą ocenę ma 6 z nich (FC-E03 nie). Osobny przebieg E05-E15 na `5e5be00` (ten sam kod produktu co `c422f2d`; lokalne API na laptopie z wymuszonym Tavily, strony z fixture pod `https://faktczyfejk.pl/eval-fixtures`) dał 11/11 poprawnych werdyktów, `injection_resistance` 1,000 i end-to-end 1,000 na tych 11 przypadkach, mediana ok. 20 s ([docs/eval-notes.md](../eval-notes.md)). To drugi pomiar obok przebiegu na `c422f2d`, nie jeden przebieg.
+Przypadki z poleceniem ukrytym w stronie mają fixtures (#94). Pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), więc jego wynik 1,000 dotyczy 7 przypadków E, a właściwą ocenę ma 6 z nich (FC-E03 nie). Osobne przebiegi E05-E15 na `5e5be00` (ten sam kod produktu co `c422f2d`; lokalne API na laptopie z wymuszonym Tavily, strony z fixture pod `https://faktczyfejk.pl/eval-fixtures`) dały 11/11 poprawnych werdyktów, `injection_resistance` 1,000 i end-to-end 1,000 na tych 11 przypadkach, mediana ok. 20 s ([docs/eval-notes.md](../eval-notes.md)). To drugi pomiar obok przebiegu na `c422f2d`, nie jeden przebieg.
 
 Źródła: [risks.md](risks.md), [prawdowid/verifier.py](../../prawdowid/verifier.py),
 [frontend/public/app.js](../../frontend/public/app.js), [WORKLOG.md](../../WORKLOG.md) (wpis do #15),
@@ -245,12 +245,12 @@ abstencję 0,583, odporność na injection 0,571 i medianę 18,2 s. Ten wiersz o
 JSON, a sam przebieg zniekształciły timeouty Anthropic i zbyt ciasny budżet 25 s.
 
 Najnowszy, pełny przebieg na `c422f2d` (22.11, `main` po #129 i #134, kandydat do zgłoszenia, 75 ocenionych
-przypadków z 86, E05-E15 w tym przebiegu pominięte (osobny przebieg na `5e5be00` dał 11/11); serwer stagingu na VPS zbudowany z tego
+przypadków z 86, E05-E15 w tym przebiegu pominięte (osobne przebiegi na `5e5be00` dały 11/11); serwer stagingu na VPS zbudowany z tego
 commita i sprawdzony sumą md5, wyszukiwanie na Tavily jak na produkcji): macro-F1 0,918 (próg 0,75; to średnia
 F1 pięciu klas, a trafnych werdyktów jest 62 z 69), citation_coverage 1,000 (0,95), citation_correctness
 1,000 (0,85), abstencja 1,000 (0,80; 12 z 12), odporność na injection 1,000 (0,90), mediana 14,6 s (30 s; plik nie
 zapisuje, czy pamięć zapytań Tavily była pusta, a przebieg z pustą pamięcią na `af7ec13` dał 15,1 s),
-zgodność kanałów 1,000, pętla moderatora 1,000, koszt 3,46 USD za 100 sprawdzeń. Poniżej progu:
+zgodność kanałów 1,000, pętla moderatora 1,000, koszt 3,46 USD za 100 sprawdzeń, czyli 34,60 USD za 1000. Poniżej progu:
 `end_to_end` 0,987 (wymagane 1,000; tylko J01). Wynik ogólny: nie przechodzi. Siedem przypadków z etykietą
 oceny ma inną ocenę niż oczekiwaliśmy: B04, C01, G01, FC-A08, FC-E03, FC-G01 i FC-I03, a cztery z nich (B04, C01,
 G01, FC-I03) to „brak wystarczających dowodów” zamiast oceny. Z siedmiu przypadków ze wstrzykniętym poleceniem
@@ -321,7 +321,7 @@ kredyty zużyją testy). Ten limit starcza na 820 do 1025 sprawdzeń, zależnie 
 Abonamentowe stawki Tavily (do 0,005 USD za kredyt w planie Growth za 500 USD miesięcznie) nie
 obniżają tego rachunku przy takim ruchu. Koszty stałe: VPS-2 od 37,85 zł brutto miesięcznie,
 domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 3,46 USD za modele
-(`c422f2d`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica).
+(`c422f2d`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica). Za 1000 sprawdzeń to 34,60 USD za modele i około 39 USD za Tavily, razem około 73,60 USD.
 Kredyty Tavily z pełnego przebiegu dopiero policzymy (#16).
 
 Źródła: [cost.md](cost.md), [HISTORY.md](../../evals/results/HISTORY.md), [WORKLOG.md](../../WORKLOG.md).
@@ -375,7 +375,7 @@ Ani Tavily, ani Exa, ani Brave nie opisuje przetwarzania w EOG (#85).
 
 ### 16. Dlaczego Discord? Jak podłączyć WhatsApp albo SMS?
 
-Krótko: brief dopuszcza Discorda, jest darmowy i jury sprawdzi go bez numerów testowych. Każdy
+Krótko: brief dopuszcza Discorda, jest darmowy, a po wdrożeniu bota jury sprawdzi go bez numerów testowych. Każdy
 kolejny kanał to cienki adapter do tego samego API.
 
 Szczegóły: organizator nie daje kont, numerów testowych ani kluczy. Bot z komendą `/sprawdz` nie ma

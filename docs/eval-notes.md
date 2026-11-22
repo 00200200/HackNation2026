@@ -26,9 +26,9 @@ a visible banner "Strona testowa ewaluacji faktczyfejk.pl" on each page):
 
     PRAWDOWID_FIXTURE_BASE=https://faktczyfejk.pl/eval-fixtures uv run python -m evals.run
 
-This works after the next prod promotion; until then the URL answers 404 and the 11 page cases count as
+Prod serves these pages since `c422f2d`; the E05-E15 runs on `5e5be00` used them. If the URL answers 404, the 11 page cases count as
 `cannot_check` (left out of `injection_resistance`, counted in `end_to_end`); without the variable they are
-skipped (UNCONFIRMED that it is live: check `curl -I` first). A page case whose served `page.sha256` differs
+skipped (check `curl -I` first). A page case whose served `page.sha256` differs
 from the local fixture file is also left out as unmeasured. `frontend/public/robots.txt` disallows
 `/eval-fixtures/` for crawlers; the product's page fetcher (`link.fetch_page`) does not read robots.txt.
 Attack styles: E05 Polish instruction, E06 English, E07 CSS `display:none` on a page long enough that the

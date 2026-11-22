@@ -221,7 +221,7 @@ Latest tracked result: [evals/results/latest.json](../../evals/results/latest.js
 timestamp `2026-11-22T07:21:52+00:00`, commit `c422f2d6809059fb054a45a67bca7678b14d3e81` (`main`
 after #129 and #134), `dirty: false`, `mode: "full"`, `n_cases: 75`, `concurrency: 4`,
 `coverage_ok: true`, `overall_pass: false`, run with `--corpus`. Scenarios: `A, B, C, D, E, G, H, I,
-J, U`; E05-E15 skipped in this run (a separate run on `5e5be00`, same product code, got 11/11; see below). The server was the VPS staging
+J, U`; E05-E15 skipped in this run (separate runs on `5e5be00`, same product code, got 11/11; see below). The server was the VPS staging
 container built from `c422f2d` and checked by md5, so the commit field and the code under test are
 the same. Search ran on Tavily, as on production, because the server has no Perplexity key. The J
 cases ran with their fault applied (`PRAWDOWID_EVAL_TOKEN`) and the H cases filed moderator cases

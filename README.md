@@ -113,9 +113,9 @@ staging built from that commit, with Tavily search as on prod. We wrote the case
 | End-to-end scenarios without the team | 1.0 | 0.987, below target: J01 fails |
 | Channel consistency | 1.0 | 1.0 |
 | Moderator loop | 1.0 | 1.0 |
-| Cost of 100 checks | reported | 3.46 USD, model calls only |
+| Cost of 1,000 checks (the metric is per 100) | reported | 34.60 USD for model calls (3.46 per 100); with Tavily search about 73.60 USD, an estimate ([cost.md](docs/submission/cost.md)) |
 
-75 cases. This run skipped E05 to E15 (injection in a fetched page). A separate run on `5e5be00`, which has the
+75 cases. This run skipped E05 to E15 (injection in a fetched page). Separate runs on `5e5be00`, which has the
 same product code, got all 11 right with injection resistance 1.0 ([eval notes](docs/eval-notes.md)). Every run with its commit: [HISTORY.md](evals/results/HISTORY.md). A spot check of 12 sampled citations
 found the quote or rating on the page for 11, and 9 fit the verdict shown. The sample is from the earlier `f4c9aa8` run,
 not from `c422f2d`, and an agent with automated tools checked it, not a person:
@@ -133,7 +133,7 @@ measurement. Partial means it works, with the gap named.
 | Abstention without evidence | Done: `judge.decide()` returns `brak wystarczających dowodów` without a verified quote from a strong enough source, 1.0 in the full run | [`tests/test_judge.py`](tests/test_judge.py) |
 | Two channels, or a channel and a demo adapter | Partial: the web page, the `/czat` demo adapter and the Discord bot `/sprawdz` call the same `POST /api/checks`. The bot runs from Compose ([docs/deploy.md](docs/deploy.md), [scenario G](docs/submission/scenario-g.md)); per [#59](https://github.com/00200200/HackNation2026/issues/59) it is not deployed on the demo server (we did not check) | [`czat.js`](frontend/public/czat.js), [`discord_bot.py`](prawdowid/discord_bot.py) |
 | Masking and retention | Partial: the personal data listed in step 1 is masked before the model and in every log. Names and addresses are not. The check log keeps 30 days, and "Usuń moje sprawdzenia" deletes a session | [docs/privacy.md](docs/privacy.md) |
-| Prompt injection | Partial: code screens the input, the linked page and the retrieved sources for injected instructions, and the prompts mark source text as data. 1.0 on injected input text (7 cases) and on the page cases E05 to E15 (11, separate run on the same product code) | [docs/submission/risks.md](docs/submission/risks.md) |
+| Prompt injection | Partial: code screens the input, the linked page and the retrieved sources for injected instructions, and the prompts mark source text as data. 1.0 on injected input text (7 cases) and on the page cases E05 to E15 (11, separate runs on the same product code) | [docs/submission/risks.md](docs/submission/risks.md) |
 | Outage not shown as a verdict | Partial: a missing model key, the rate limit or a timeout gives a notice, and a down source that could decide gives `nie sprawdzono`. J01 fails: under a simulated Fact Check outage the answer names it but gives verdicts from the other sources | [docs/unsupported.md](docs/unsupported.md#awarie-i-limity) |
 | Moderator loop | Partial: cases are filed and grouped only while `PRAWDOWID_ADMIN_TOKEN` is set. It is set on faktczyfejk.pl: `GET /api/cases` answers 401 without the token. 1.0 on H01 and H02 | [`prawdowid/cases.py`](prawdowid/cases.py) |
 

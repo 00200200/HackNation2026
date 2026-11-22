@@ -158,7 +158,7 @@ Czego brakuje:
   pierwsze trzy przypadki E, E01-E03 ([WORKLOG](../../WORKLOG.md), wpis do #15), a przypadki
   FC-E01-FC-E03 `prawdowid/verifier.py` dopasowuje fraza po frazie
   ([docs/eval-notes.md](../eval-notes.md)). Potrzebne są przypadki,
-  których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures (#94). Pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), a osobny przebieg na `5e5be00` (ten sam kod produktu, lokalne API na laptopie z wymuszonym Tavily, strony z fixture pod `https://faktczyfejk.pl/eval-fixtures`) dał 11/11 poprawnych werdyktów, `injection_resistance` 1,000 i end-to-end 1,000 na tych 11 przypadkach, mediana ok. 20 s ([docs/eval-notes.md](../eval-notes.md)). To osobny pomiar, nie część przebiegu na `c422f2d`. Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w tym kodzie.
+  których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures (#94). Pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), a osobne przebiegi na `5e5be00` (ten sam kod produktu, lokalne API na laptopie z wymuszonym Tavily, strony z fixture pod `https://faktczyfejk.pl/eval-fixtures`) dały 11/11 poprawnych werdyktów, `injection_resistance` 1,000 i end-to-end 1,000 na tych 11 przypadkach, mediana ok. 20 s ([docs/eval-notes.md](../eval-notes.md)). To osobny pomiar, nie część przebiegu na `c422f2d`. Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w tym kodzie.
 - Oceny skutków dla ochrony danych (DPIA) z inspektorem ochrony danych MSZ i umów powierzenia z
   dostawcami. Maskowanie nie wykrywa imion i adresów, a numer karty po etykiecie
   produktu („nr 4111 1111 1111 1111”) przepuszcza do modelu (#113); numery
