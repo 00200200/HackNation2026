@@ -46,11 +46,11 @@ którą sprawdził agent: [citation_spotcheck.md](../../evals/results/citation_s
 [prywatność](../privacy.md), [korpus](../corpus.md).
 
 - Wpisać nazwę zespołu w miejsce TEAM_NAME.
-- Scalić do `main` PR rundy 4 z gałęzi `integration/r4`; zastępuje on PR #126, #123, #124 i #128.
-  Na `main` jest już #130 (`379fa8c`, 22.11 06:48), którego `integration/r4` nie zawiera, więc
-  scalenie wymaga rozwiązania konfliktów. Liczby w opisie, na slajdzie 9 i w README opisują kod
-  `df74cef`: jeśli zgłaszany kod będzie inny, także po takim scaleniu, powtórzyć pełny eval i
-  poprawić liczby.
+- Runda 4 jest na `main` (#129, #134 z uzgodnieniem z #130, #133, #73). Liczby w opisie, na slajdzie 9 i w README
+  opisują kod `df74cef`, nie `main`: powtórzyć pełny eval na `main` i poprawić liczby, zanim zgłaszany kod
+  się od `df74cef` różni.
+- Wyszukiwanie: kod używa Perplexity, gdy ustawiono `PERPLEXITY_API_KEY`, a bez niego Tavily z pamięcią wyników.
+  Serwer nie ma klucza Perplexity, więc działa na Tavily, jak mówi opis.
 - Wypchnąć `main` na `prod` ([deploy.md](../deploy.md): `prod` bierze tylko commity z `main`).
   22.11 o 04:30 `/czat` i `/zrodla` zwracały na faktczyfejk.pl 404. Gałąź `prod` (`24e92d4`) nie
   ma też między innymi korpusu (#74), ocen fact-checkera ze stron recenzji i ze zdania

@@ -16,7 +16,7 @@ Discord /sprawdz -> HTTP, X-Channel: discord +
     -> text, or guarded URL fetch and extraction
     -> claim extraction and search queries (PydanticAI / Anthropic)
     -> each checkable claim in parallel:
-         Google Fact Check + EUvsDisinfo MCP + www.gov.pl search + Tavily / allowlisted pages
+         Google Fact Check + EUvsDisinfo MCP + www.gov.pl search + Perplexity (Tavily fallback) / allowlisted pages
          + evidence corpus (BM25 over corpus/evidence.jsonl)
          -> deduplicate and rerank fragments -> label and validate quotes
          -> judge.decide() -> shared CheckResult -> channel rendering
@@ -102,8 +102,11 @@ installed Anthropic provider. Another provider needs its PydanticAI extra (only
 `pydantic-ai-slim[anthropic,mcp]` is installed, [pyproject.toml](../../pyproject.toml)), its key
 and an image rebuild; none is demonstrated. The EU-processed option is described under "Deployment, storage and data processing" below. Compose forwards only `PRAWDOWID_MODEL`, so changing
 the rerank or judge model on the server also needs a line in [compose.yaml](../../compose.yaml).
-Web search (step 2b) is now **Tavily** (`tavily_search` in `prawdowid/websearch.py`), which
-replaced DuckDuckGo (#7, proposed as #20; wired as #45) because DuckDuckGo via `ddgs` returned no
+Web search (step 2b) is **Perplexity's Search API** (`perplexity_search` in `prawdowid/websearch.py`,
+`perplexityai` SDK, restricted to the allowlist with `search_domain_filter`, country PL, language pl)
+when `PERPLEXITY_API_KEY` is set. Without it, or with `PRAWDOWID_SEARCH_PROVIDER=tavily`, it is
+**Tavily** (`tavily_search`, behind the per-query cache), which is also what the eval numbers in this
+repo were measured with. Tavily replaced DuckDuckGo (#7, proposed as #20; wired as #45) because DuckDuckGo via `ddgs` returned no
 results from our machines and left retrieval empty. Retrieval providers and their terms are listed
 in [sources.md](sources.md).
 
@@ -114,7 +117,7 @@ in [sources.md](sources.md).
 [compose.yaml](../../compose.yaml) publishes only the frontend by default, with backend health
 checks. The Discord service and local PostgreSQL service are opt-in profiles. Compose now
 forwards the extraction model setting, Anthropic key, `GOOGLE_FACTCHECK_API_KEY`,
-`TAVILY_API_KEY`, `EUVSDISINFO_API_KEY`, `PRAWDOWID_GOVPL`, `PRAWDOWID_INCIDENTS_PATH` and the
+`PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `PRAWDOWID_SEARCH_PROVIDER`, `EUVSDISINFO_API_KEY`, `PRAWDOWID_GOVPL`, `PRAWDOWID_INCIDENTS_PATH` and the
 eval-only `PRAWDOWID_EVAL_TOKEN` (unset on the public demo). The check log sits on the `checklog`
 volume (`/var/lib/prawdowid`, kept across deploys) and the source cache at a writable `/tmp` path,
 both writable for the non-root `nobody` user.
@@ -137,7 +140,7 @@ reaches the extraction model and again in every log line, web search and own-sto
 Each check is kept 30 days as one masked record in the check log (`prawdowid/checklog.py`), which
 the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Input goes to
 Anthropic masked (a placeholder keeps the sentence shape so claims still split); masked claim text
-and queries go to Google, Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
+and queries go to Google, Perplexity or Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
 has no delete command, Docker stdout logs sit outside retention): [docs/privacy.md](../privacy.md).
 Who processes what, from each provider's own terms read on 22.11.2026. The full table, with
 retention, training use and links to the terms, is in
@@ -146,7 +149,8 @@ retention, training use and links to the terms, is in
 | Processor | Receives | Processes in |
 |---|---|---|
 | Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
-| Tavily (web search) | Masked search queries: the model's queries, the claim sentence and one search of it restricted to fact-checker domains (#106) | United States. An EU endpoint exists for selected customers only |
+| Perplexity (web search, when its key is set) | The same masked search queries as Tavily, plus the domain allowlist, country PL and language pl. Not cached | Perplexity AI, Inc. (USA); where the API processes data is not stated, UNCONFIRMED |
+| Tavily (web search, the fallback) | Masked search queries: the model's queries, the claim sentence and one search of it restricted to fact-checker domains (#106) | United States. An EU endpoint exists for selected customers only |
 | Google Fact Check Tools | Masked claim text and up to 8 short queries per claim, each masked (#100) | Not stated for this API, UNCONFIRMED. Google's privacy policy says its servers are worldwide |
 | EUvsDisinfo MCP | Claim text, cut to 200 characters | Not stated, UNCONFIRMED |
 | www.gov.pl search | Search queries, or the claim when the model wrote none | Not stated, UNCONFIRMED |
@@ -160,7 +164,7 @@ through Amazon Bedrock EU inference profiles (for example `bedrock:eu.anthropic.
 That takes the variables, the `bedrock` dependency extra and the `environment:` list in
 `compose.yaml`, and is expected to need no prompt or code change (Bedrock ignores the retry
 setting the agents pass, so botocore's default retries apply). It has not been run. After it,
-web search (Tavily) and the Discord channel still leave the EEA. Fact Check (Google), EUvsDisinfo
+web search (Perplexity, or Tavily as the fallback) and the Discord channel still leave the EEA. Fact Check (Google), EUvsDisinfo
 and www.gov.pl state no location, so they stay UNCONFIRMED. Steps and open points:
 [docs/privacy.md](../privacy.md#migration-path-to-an-eu-processed-model).
 

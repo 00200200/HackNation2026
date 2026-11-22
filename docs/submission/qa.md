@@ -209,7 +209,7 @@ twierdzenie dostaje „nie sprawdzono”. Korpus nie liczy się jako źródło, 
 Źródła: [prawdowid/pipeline.py](../../prawdowid/pipeline.py),
 [prawdowid/websearch.py](../../prawdowid/websearch.py),
 [prawdowid/factcheck.py](../../prawdowid/factcheck.py), [prawdowid/app.py](../../prawdowid/app.py),
-[README](../../README.md#configuration), [#60](https://github.com/00200200/HackNation2026/issues/60),
+[docs/reference.md](../reference.md#configuration), [#60](https://github.com/00200200/HackNation2026/issues/60),
 [#75](https://github.com/00200200/HackNation2026/issues/75),
 [PR #109](https://github.com/00200200/HackNation2026/pull/109).
 

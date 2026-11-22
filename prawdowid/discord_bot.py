@@ -358,9 +358,12 @@ class Bot(discord.Client):
                 await send(interaction, last, file=file)
             except discord.HTTPException:
                 log.exception("attachment refused")
-                # Two messages: last may already be near the limit, so the notice cannot join it.
+                # Separate messages: `last` alone can fill Discord's 2000 characters.
+                # ATTACHED points to the file that failed, so the notice replaces it and the
+                # 5-message cap holds; otherwise a five-part answer gets a sixth message.
                 try:
-                    await send(interaction, last)
+                    if last != ATTACHED:
+                        await send(interaction, last)
                     await send(interaction, ATTACHMENT_FAILED)
                 except discord.HTTPException:
                     log.exception("fallback message refused")

@@ -1,4 +1,5 @@
-"""Per-query cache in front of Tavily (#110, #75): reruns and repeated questions spend no credits.
+"""Per-query cache in front of Tavily (#110, #75): reruns and repeated questions spend no Tavily
+credits. Only the Tavily path uses it; Perplexity calls (`websearch.default_search`) are not cached.
 
 `cached_tavily_search` has the `SearchProvider` signature and wraps `websearch.tavily_search`.
 Key: sha256 of the casefolded, whitespace-folded query + sorted domains + limit (the query is

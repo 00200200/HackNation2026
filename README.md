@@ -25,8 +25,9 @@ rules in code set the verdict.
 2. Claude, through PydanticAI, splits the text into claims and marks which ones can be checked. Up to 3 get a full
    check (`PRAWDOWID_MAX_CHECKED_CLAIMS`) and the rest are listed without a verdict. An opinion or a forecast gets
    `nie podlega weryfikacji`.
-3. Each checked claim goes to five sources in parallel: Google Fact Check Tools, the www.gov.pl site search, Tavily
-   web search on allowlisted domains (`prawdowid/websearch.py`), our corpus of 1158 documents
+3. Each checked claim goes to five sources in parallel: Google Fact Check Tools, the www.gov.pl site search, web
+   search on allowlisted domains (Perplexity when `PERPLEXITY_API_KEY` is set, otherwise cached Tavily, which the demo
+   server uses; `prawdowid/websearch.py`, [docs/reference.md](docs/reference.md#configuration)), our corpus of 1158 documents
    (`corpus/evidence.jsonl`, BM25 in memory) and EUvsDisinfo, which is context only and never decides alone.
 4. A model ranks the fragments, and a judge model labels each one as supporting, refuting, adding context or showing
    a data gap, with an exact quote. The code drops every quote it cannot find verbatim in the cited document
@@ -70,7 +71,7 @@ measurement. Partial means it works, with the gap named.
 | End-to-end without help from the team | Partial: the code has no manual step, but the full run scores 0.973 (J01, A15) | [docs/eval-notes.md](docs/eval-notes.md) |
 | No fabricated sources | Done: the verdict rests on quotes the code found in the cited document, or on a fact-checker's rating of the same claim. The model only labels quotes | [`prawdowid/judge.py`](prawdowid/judge.py) |
 | Abstention without evidence | Done: `judge.decide()` returns `brak wystarczających dowodów` without a verified quote from a strong enough source, 1.0 in the full run | [`tests/test_judge.py`](tests/test_judge.py) |
-| Two channels, or a channel and a demo adapter | Partial: the web page, the `/czat` demo adapter and the Discord bot `/sprawdz` call the same `POST /api/checks`. Per [#59](https://github.com/00200200/HackNation2026/issues/59) the bot is not deployed (we did not check) | [`czat.js`](frontend/public/czat.js), [`discord_bot.py`](prawdowid/discord_bot.py) |
+| Two channels, or a channel and a demo adapter | Partial: the web page, the `/czat` demo adapter and the Discord bot `/sprawdz` call the same `POST /api/checks`. The bot runs from Compose ([docs/deploy.md](docs/deploy.md), [scenario G](docs/submission/scenario-g.md)); per [#59](https://github.com/00200200/HackNation2026/issues/59) it is not deployed on the demo server (we did not check) | [`czat.js`](frontend/public/czat.js), [`discord_bot.py`](prawdowid/discord_bot.py) |
 | Masking and retention | Partial: the personal data listed in step 1 is masked before the model and in every log. Names and addresses are not. The check log keeps 30 days, and "Usuń moje sprawdzenia" deletes a session | [docs/privacy.md](docs/privacy.md) |
 | Prompt injection | Partial: code screens the input, the linked page and the retrieved sources for injected instructions, and the prompts mark source text as data. 1.0 on injected input text, page cases E05 to E15 not run | [docs/submission/risks.md](docs/submission/risks.md) |
 | Outage not shown as a verdict | Partial: a missing model key, the rate limit or a timeout gives a notice, and a down source that could decide gives `nie sprawdzono`. J01 fails: under a simulated Fact Check outage the answer names it but gives verdicts from the other sources | [docs/unsupported.md](docs/unsupported.md#awarie-i-limity) |
@@ -89,7 +90,7 @@ does not include it.
 | Variable | What it is for |
 |---|---|
 | `ANTHROPIC_API_KEY` | Required. Without it every check returns `technical_error`. |
-| `GOOGLE_FACTCHECK_API_KEY`, `TAVILY_API_KEY` | Fact Check and web search. Without them these sources count as down, so a claim without enough other evidence is `nie sprawdzono`. |
+| `GOOGLE_FACTCHECK_API_KEY`, `PERPLEXITY_API_KEY`, `TAVILY_API_KEY` | Fact Check and web search (Perplexity if its key is set, else Tavily). Without them these sources count as down, so a claim without enough other evidence is `nie sprawdzono`. |
 | `EUVSDISINFO_API_KEY` | EUvsDisinfo context. Without it that lookup is skipped. |
 | `PRAWDOWID_ADMIN_TOKEN` | Bearer token for the moderator queue (`GET /api/cases`). Without it no case is filed and the route answers 404. |
 | `PRAWDOWID_MODEL` | Extraction model as PydanticAI `provider:model`, default `anthropic:claude-sonnet-5-5`. The rerank and judge models have their own variables, which Compose does not pass on. |

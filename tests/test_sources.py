@@ -94,6 +94,17 @@ def test_lookups_say_whether_they_run_in_this_deployment(monkeypatch):
     assert all(lookup["active"] for lookup in listing()["lookups"])
 
 
+def test_web_lookup_is_active_only_with_the_chosen_providers_key(monkeypatch):
+    def web():
+        return {lookup["id"]: lookup for lookup in listing()["lookups"]}["web"]
+
+    monkeypatch.setenv(websearch.PERPLEXITY_KEY_ENV, "pplx-test")
+    assert web()["active"] and web()["host"] == "api.perplexity.ai"
+    # Tavily forced without its key: the page must not claim a working web search.
+    monkeypatch.setenv(websearch.PROVIDER_ENV, " Tavily ")
+    assert not web()["active"] and web()["host"] == "api.tavily.com"
+
+
 def test_answer_never_carries_a_key(monkeypatch):
     monkeypatch.setenv(factcheck.KEY_ENV, "secret-value-123")
     assert "secret-value-123" not in TestClient(app).get("/api/sources").text

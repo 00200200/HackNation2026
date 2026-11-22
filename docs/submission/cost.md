@@ -42,7 +42,7 @@ $3.61 per 100: runs differ because
 the models and the search results are not the same each time.
 
 It excludes hosting, network, search fees, Discord operation and tax. Web search is the one fee
-with recorded inputs, both older than this run: about 4.9 Tavily credits per check in an 8-case
+with recorded inputs, both older than this run: about 4.9 Tavily credits per check (measured with Tavily; Perplexity pricing and usage are not measured here: UNCONFIRMED) in an 8-case
 run before the merge onto `main` (the "#7/#8 live proof" entry in [WORKLOG.md](../../WORKLOG.md)),
 and pay-as-you-go at $0.008 a credit (the #7 provider research in the same file). At that rate
 1,000 checks would take about 4,900 credits, roughly $39, or $31 after the 1,000 free monthly
@@ -62,7 +62,7 @@ counts, retries, different models or all providers succeeding are UNCONFIRMED.
 | Web | nginx and static assets call the shared backend; [compose.yaml](../../compose.yaml), [frontend](../../frontend/public/app.js) | Hosting, bandwidth and domain cost UNCONFIRMED |
 | Discord | Persistent discord.py bot calls the same API; [discord_bot.py](../../prawdowid/discord_bot.py). Not running on the server and never run against real Discord ([deploy.md](../deploy.md), section 7) | Platform fees, bot hosting and incremental channel cost UNCONFIRMED; no live channel cost measured |
 | Verification through either channel | Same API and models, no channel-specific model pipeline; [app.py](../../prawdowid/app.py) | Applying the measured rate to Discord is an assumption; no measured per-channel cost comparison |
-| Google / Tavily / EUvsDisinfo / www.gov.pl | [factcheck.py](../../prawdowid/factcheck.py), [websearch.py](../../prawdowid/websearch.py), [euvsdisinfo.py](../../prawdowid/euvsdisinfo.py), [govpl.py](../../prawdowid/govpl.py) | Tavily: estimate above, UNCONFIRMED. The others: charges and quotas UNCONFIRMED. None is a measured `cost_usd` line item |
+| Google / Perplexity or Tavily / EUvsDisinfo / www.gov.pl | [factcheck.py](../../prawdowid/factcheck.py), [websearch.py](../../prawdowid/websearch.py), [euvsdisinfo.py](../../prawdowid/euvsdisinfo.py), [govpl.py](../../prawdowid/govpl.py) | Tavily: estimate above, UNCONFIRMED. Perplexity: charges and quotas UNCONFIRMED, not measured. The others: charges and quotas UNCONFIRMED. None is a measured `cost_usd` line item |
 | Own store | Local opt-in PostgreSQL, disabled in checks; [compose.yaml](../../compose.yaml), [pipeline.py](../../prawdowid/pipeline.py) | Database operation cost UNCONFIRMED; Supabase is not deployed |
 
 The app has no checkout or user billing path ([frontend](../../frontend/public/index.html),
@@ -91,7 +91,7 @@ from the linked code, not from a cost assumption:
   most 500 answers), with no model or search calls, whichever channel asks
   ([app.py](../../prawdowid/app.py)).
 - Extraction checks at most `3` claims in full and asks for `2` model queries per checkable claim,
-  plus the claim sentence and one fact-checker-only search, so about `4` Tavily searches per claim
+  plus the claim sentence and one fact-checker-only search, so about `4` web searches per claim (Tavily credits when Tavily is the provider)
   ([verifier.py](../../prawdowid/verifier.py)). Claims and retrieval calls fan out with
   `asyncio.gather` and `asyncio.TaskGroup`; there is no global queue or daily spend cap, only
   per-process limits on page extraction and gov.pl requests ([pipeline.py](../../prawdowid/pipeline.py),

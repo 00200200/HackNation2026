@@ -21,7 +21,7 @@ there. No CI service is involved, and a failed deploy is retried on the next run
 | `caddy/Caddyfile` | HTTPS sites: `DOMAIN` and `www`, doc2json.pl and `www` |
 | `deploy/pull-deploy.sh` | deploys `origin/prod` when it moves |
 | `deploy/faktczyfejk-deploy.service`, `.timer` | run the script every minute as `ubuntu` |
-| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*`, `PRAWDOWID_ADMIN_TOKEN` (never committed; deploys leave it alone) |
+| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*`, `PRAWDOWID_ADMIN_TOKEN`, for the bot `COMPOSE_PROFILES`, `DISCORD_BOT_TOKEN` (never committed; deploys leave it alone) |
 
 ## What you need
 
@@ -72,18 +72,17 @@ Back on the server, clone `prod` and write the configuration:
 sudo install -d -o ubuntu -g ubuntu /opt/faktczyfejk
 git clone --branch prod git@github.com:00200200/HackNation2026.git /opt/faktczyfejk
 cd /opt/faktczyfejk
-printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nTAVILY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\nPRAWDOWID_ADMIN_TOKEN=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 32)" > .env
+printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nPERPLEXITY_API_KEY=\nTAVILY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\nPRAWDOWID_ADMIN_TOKEN=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 32)" > .env
 chmod 600 .env
-nano .env      # paste the keys after ANTHROPIC_API_KEY=, TAVILY_API_KEY= and the others you have
+nano .env      # paste the keys after ANTHROPIC_API_KEY=, PERPLEXITY_API_KEY= (or TAVILY_API_KEY=) and the others you have
 ```
 
-The evidence keys matter as much as the model key: without `TAVILY_API_KEY` (web search, the only
-search provider), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` the keyed lookups fail and
+The evidence keys matter as much as the model key: without both `PERPLEXITY_API_KEY` and `TAVILY_API_KEY` (web search; Tavily is only the fallback), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` the keyed lookups fail and
 `/health` still answers. The www.gov.pl site search (no key) and the local corpus still run, and a
 decisive verdict from either is kept; otherwise the claim is `nie sprawdzono` and an answer where every
 claim ended that way is a technical error ("Nie mogę teraz sprawdzić ..."). So a successful check does
 not show the keys are set: verify the provider configuration separately.
-`compose.yaml` forwards all three to the backend.
+`compose.yaml` forwards these keys to the backend.
 
 The database password is generated on the server and never leaves it; hex keeps it safe inside
 the `DATABASE_URL` that Compose builds for the backend. `COMPOSE_FILE` makes every
@@ -357,7 +356,7 @@ site block to `caddy/Caddyfile`, and point the domain's `A` records at the serve
 - Web server, API, database and logs: OVHcloud VPS in Limburg, Germany.
 - Corpus search embeddings: computed on the same server with a local model; no external service.
 - The text of each check goes to the Anthropic API for claim extraction. The other processors
-  (Tavily, Google, EUvsDisinfo, www.gov.pl, and Discord when the bot runs, which #59 says it does not yet), their locations and the migration path to
+  (Perplexity or Tavily, Google, EUvsDisinfo, www.gov.pl, and Discord when the bot runs, which #59 says it does not yet), their locations and the migration path to
   an EU-processed model: [privacy.md](privacy.md#where-data-is-processed).
 
 ## Try the production setup locally

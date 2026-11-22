@@ -79,7 +79,7 @@ before quoting it:
     description, the answer names the outage and gives verdicts from the other sources; the case
     allows no verdict, and the team decided not to relabel it. Missed in all five full runs that
     have a results file.
-  - A15: `needs_clarification` for an opinion question where `nie podlega weryfikacji` is expected.
+  - A15: `needs_clarification` for an opinion question where `nie podlega weryfikacji` is expected. Fixed on `main` since this run (#133): the extraction prompt now treats an opinion asked as a question as a claim, not as unclear. The run above does not include the fix (a14b93c on main, 75 cases, local API, scored e2e 0.987).
     Missed in the same five runs.
   - B04: `brak wystarczających dowodów` where `fałszywe` is expected. The label follows Demagog's
     "Fałsz", while scenario B of the brief expects `wprowadzające w błąd`; the team has not decided

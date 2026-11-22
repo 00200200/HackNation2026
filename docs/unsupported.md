@@ -2,8 +2,8 @@
 
 Opis zadania wymaga, żeby zespół ujawnił przypadki, których system nie obsługuje (sekcja 6). Ta lista mówi,
 co system robi w każdym z nich i co wtedy widzi użytkownik. Komunikaty są przepisane z kodu słowo w słowo.
-Stan na 22.11.2026: build demo, czyli gałąź `integration/r4`. Zdania o `main` opisują `1aa173f`, przodka tej gałęzi bez zmian
-z [listy w README](../README.md#zmiany-czekające-na-scalenie); od #130 (`379fa8c`) `main` ma też zmiany, których `integration/r4` nie zawiera i których ta lista nie opisuje. Po nowych commitach w `integration/r4` komunikaty trzeba
+Stan na 22.11.2026: kod rundy 4 z `main` (PR #129 i #134). Zdania o `main` sprzed tego scalenia opisują `1aa173f`
+(przodka `integration/r4`, bez zmian z [listy w README](../README.md#zmiany-czekające-na-scalenie)). Po nowych commitach komunikaty trzeba
 sprawdzić ponownie.
 Gdzie `main` zachowuje się inaczej, wiersz to mówi. Numery `#n` to zadania w [repozytorium](https://github.com/00200200/HackNation2026/issues).
 
@@ -92,7 +92,7 @@ niej, na przykład Reddita albo Mastodona, jest pobierany jak zwykła strona. Ni
   `PRAWDOWID_ADMIN_TOKEN` (czy jest ustawiony na serwerze demo: UNCONFIRMED); bez niego nic nie jest zgłaszane,
   a odpowiedź nie wspomina moderatora. W pełnym przebiegu evalu na `df74cef` (serwer stagingu z tokenem) powtórzone
   pytania H01 i H02 trafiły do tej samej sprawy (`moderator_loop` 1,0). Zdanie "Zgłoszenie trafiło do kolejki moderatora" pojawia się dopiero po
-  zapisaniu sprawy. Na `main` i na gałęzi `prod` (`24e92d4`) kolejki nie ma, a pytanie bez źródeł sprawdzamy tam od nowa za każdym razem. W `integration/r4` gotowa
+  zapisaniu sprawy. Na gałęzi `prod` (`24e92d4`) kolejki nie ma, a pytanie bez źródeł sprawdzamy tam od nowa za każdym razem. W `integration/r4` gotowa
   odpowiedź na ten sam tekst, także `brak wystarczających dowodów`, wraca z pamięci przez 30 minut
   ([#59](https://github.com/00200200/HackNation2026/issues/59); nagłówek `X-Cache: hit`), a interfejs
   tego nie oznacza ([#121](https://github.com/00200200/HackNation2026/issues/121)). Pamięć jest w procesie, mieści 500 odpowiedzi i po restarcie jest pusta, więc

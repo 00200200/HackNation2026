@@ -202,10 +202,8 @@ def test_check_counter_sees_calls_and_hits(tavily):
 
 
 def test_search_web_default_provider_is_cached_and_masks_the_query(tavily, monkeypatch):
-    assert (
-        websearch.search_web.__kwdefaults__["provider"]
-        is search_cache.cached_tavily_search
-    )
+    # Without a Perplexity key (conftest) every check goes through the cached Tavily search.
+    assert websearch.search_web.__kwdefaults__["provider"] is websearch.default_search
     query = "Co zrobił Jan na jan.kowalski@example.com"
     offline = httpx2.MockTransport(lambda request: httpx2.Response(404))
     for _ in range(2):
