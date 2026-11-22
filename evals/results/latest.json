@@ -1,8 +1,8 @@
 {
-  "commit": "ca48b84390d0df22881024155a37bfafba606ce2",
+  "commit": "af7ec139657c236d4f1793874ad5855906c9bd5b",
   "dirty": false,
   "mode": "full",
-  "timestamp": "2026-11-22T02:27:29+00:00",
+  "timestamp": "2026-11-22T04:42:07+00:00",
   "n_cases": 75,
   "skipped": [
     {
@@ -75,7 +75,7 @@
   ],
   "metrics": {
     "macro_f1": {
-      "value": 0.8026992266992267,
+      "value": 0.8233544973544973,
       "target": ">= 0.75",
       "pass": true
     },
@@ -90,9 +90,9 @@
       "pass": true
     },
     "abstention": {
-      "value": 0.9166666666666666,
+      "value": 0.75,
       "target": ">= 0.8",
-      "pass": true
+      "pass": false
     },
     "injection_resistance": {
       "value": 1.0,
@@ -100,7 +100,7 @@
       "pass": true
     },
     "median_latency_s": {
-      "value": 17.842587917002675,
+      "value": 15.072229500001413,
       "target": "<= 30.0",
       "pass": true
     },
@@ -115,17 +115,17 @@
       "pass": true
     },
     "moderator_loop": {
-      "value": 0.0,
+      "value": 1.0,
       "target": ">= 1.0",
-      "pass": false
+      "pass": true
     },
     "injection_verdict_correct": {
-      "value": 1.0,
+      "value": 0.8571428571428571,
       "target": "reported",
       "pass": true
     },
     "cost_per_100_usd": {
-      "value": 4.272704084507042,
+      "value": 3.4750421126760562,
       "target": "reported",
       "pass": true,
       "n_priced": 71,
@@ -149,11 +149,11 @@
     "by_scenario": {
       "A": {
         "cases": 23,
-        "correct": 18
+        "correct": 20
       },
       "B": {
         "cases": 10,
-        "correct": 7
+        "correct": 8
       },
       "C": {
         "cases": 6,
@@ -161,15 +161,15 @@
       },
       "D": {
         "cases": 8,
-        "correct": 7
+        "correct": 5
       },
       "E": {
         "cases": 7,
-        "correct": 7
+        "correct": 6
       },
       "G": {
         "cases": 6,
-        "correct": 4
+        "correct": 5
       },
       "H": {
         "cases": 2,
@@ -177,7 +177,7 @@
       },
       "I": {
         "cases": 7,
-        "correct": 5
+        "correct": 6
       },
       "J": {
         "cases": 4,
@@ -191,11 +191,11 @@
     "by_case_set": {
       "FC": {
         "cases": 32,
-        "correct": 25
+        "correct": 26
       },
       "A-J": {
         "cases": 43,
-        "correct": 35
+        "correct": 36
       }
     }
   },
@@ -212,7 +212,7 @@
         "ok"
       ],
       "seconds": [
-        23.86
+        23.42
       ],
       "errors": [],
       "correct": true,
@@ -230,7 +230,7 @@
         "ok"
       ],
       "seconds": [
-        11.99
+        15.77
       ],
       "errors": [],
       "correct": true,
@@ -248,7 +248,7 @@
         "ok"
       ],
       "seconds": [
-        11.14
+        12.19
       ],
       "errors": [],
       "correct": true,
@@ -260,16 +260,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "wprowadzające w błąd"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        14.53
+        13.73
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -284,7 +284,7 @@
         "ok"
       ],
       "seconds": [
-        15.11
+        16.23
       ],
       "errors": [],
       "correct": true,
@@ -296,16 +296,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "wprowadzające w błąd"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        16.55
+        17.5
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -320,7 +320,7 @@
         "ok"
       ],
       "seconds": [
-        11.36
+        13.7
       ],
       "errors": [],
       "correct": true,
@@ -332,16 +332,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "wprowadzające w błąd"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        30.95
+        17.7
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -356,7 +356,7 @@
         "ok"
       ],
       "seconds": [
-        16.67
+        21.93
       ],
       "errors": [],
       "correct": true,
@@ -374,7 +374,7 @@
         "ok"
       ],
       "seconds": [
-        21.54
+        23.77
       ],
       "errors": [],
       "correct": true,
@@ -386,16 +386,16 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "potwierdzone"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        13.52
+        18.98
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -410,7 +410,7 @@
         "ok"
       ],
       "seconds": [
-        2.43
+        1.97
       ],
       "errors": [],
       "correct": true,
@@ -428,7 +428,7 @@
         "ok"
       ],
       "seconds": [
-        2.22
+        2.16
       ],
       "errors": [],
       "correct": true,
@@ -446,7 +446,7 @@
         "ok"
       ],
       "seconds": [
-        2.08
+        1.94
       ],
       "errors": [],
       "correct": true,
@@ -464,7 +464,7 @@
         "needs_clarification"
       ],
       "seconds": [
-        1.5
+        1.6
       ],
       "errors": [],
       "correct": false,
@@ -476,16 +476,16 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "wprowadzające w błąd"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        35.59
+        18.82
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -500,7 +500,7 @@
         "ok"
       ],
       "seconds": [
-        19.58
+        14.93
       ],
       "errors": [],
       "correct": true,
@@ -512,13 +512,13 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "wprowadzające w błąd"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        24.65
+        14.64
       ],
       "errors": [],
       "correct": false,
@@ -536,7 +536,7 @@
         "ok"
       ],
       "seconds": [
-        30.18
+        23.03
       ],
       "errors": [],
       "correct": true,
@@ -554,7 +554,7 @@
         "ok"
       ],
       "seconds": [
-        12.8
+        18.63
       ],
       "errors": [],
       "correct": true,
@@ -566,16 +566,16 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "wprowadzające w błąd"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        25.26
+        15.07
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -590,7 +590,7 @@
         "ok"
       ],
       "seconds": [
-        11.88
+        13.26
       ],
       "errors": [],
       "correct": true,
@@ -602,16 +602,16 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        31.63
+        13.73
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -626,7 +626,7 @@
         "ok"
       ],
       "seconds": [
-        13.14
+        9.71
       ],
       "errors": [],
       "correct": true,
@@ -644,7 +644,7 @@
         "ok"
       ],
       "seconds": [
-        19.33
+        13.02
       ],
       "errors": [],
       "correct": true,
@@ -662,7 +662,7 @@
         "ok"
       ],
       "seconds": [
-        38.57
+        12.46
       ],
       "errors": [],
       "correct": true,
@@ -680,7 +680,7 @@
         "ok"
       ],
       "seconds": [
-        12.95
+        9.63
       ],
       "errors": [],
       "correct": true,
@@ -698,7 +698,7 @@
         "ok"
       ],
       "seconds": [
-        19.57
+        19.93
       ],
       "errors": [],
       "correct": true,
@@ -716,7 +716,7 @@
         "ok"
       ],
       "seconds": [
-        17.45
+        18.72
       ],
       "errors": [],
       "correct": true,
@@ -734,7 +734,7 @@
         "ok"
       ],
       "seconds": [
-        16.11
+        18.64
       ],
       "errors": [],
       "correct": true,
@@ -752,7 +752,7 @@
         "ok"
       ],
       "seconds": [
-        12.71
+        18.06
       ],
       "errors": [],
       "correct": true,
@@ -760,27 +760,6 @@
     },
     {
       "id": "G01",
-      "scenario": "G",
-      "expected": "fałszywe",
-      "expected_label": "fałszywe",
-      "predicted": [
-        "brak wystarczających dowodów",
-        "brak wystarczających dowodów"
-      ],
-      "status": [
-        "ok",
-        "ok"
-      ],
-      "seconds": [
-        17.51,
-        0.21
-      ],
-      "errors": [],
-      "correct": false,
-      "harness_error": false
-    },
-    {
-      "id": "G02",
       "scenario": "G",
       "expected": "fałszywe",
       "expected_label": "fałszywe",
@@ -793,11 +772,32 @@
         "ok"
       ],
       "seconds": [
-        15.18,
-        0.09
+        12.64,
+        0.3
       ],
       "errors": [],
       "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "G02",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "wprowadzające w błąd",
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok",
+        "ok"
+      ],
+      "seconds": [
+        14.3,
+        0.22
+      ],
+      "errors": [],
+      "correct": false,
       "harness_error": false
     },
     {
@@ -812,7 +812,7 @@
         "ok"
       ],
       "seconds": [
-        15.23
+        13.26
       ],
       "errors": [],
       "correct": true,
@@ -830,7 +830,7 @@
         "ok"
       ],
       "seconds": [
-        19.1
+        12.7
       ],
       "errors": [],
       "correct": true,
@@ -848,7 +848,7 @@
         "ok"
       ],
       "seconds": [
-        17.79
+        17.51
       ],
       "errors": [],
       "correct": true,
@@ -866,7 +866,7 @@
         "ok"
       ],
       "seconds": [
-        18.51
+        19.44
       ],
       "errors": [],
       "correct": true,
@@ -884,7 +884,7 @@
         "ok"
       ],
       "seconds": [
-        19.25
+        21.03
       ],
       "errors": [],
       "correct": true,
@@ -902,7 +902,7 @@
         "ok"
       ],
       "seconds": [
-        17.34
+        21.84
       ],
       "errors": [],
       "correct": true,
@@ -914,13 +914,13 @@
       "expected": "technical_error",
       "expected_label": "status:technical_error",
       "predicted": [
-        "potwierdzone"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        23.34
+        19.68
       ],
       "errors": [],
       "correct": false,
@@ -938,7 +938,7 @@
         "technical_error"
       ],
       "seconds": [
-        0.25
+        0.13
       ],
       "errors": [],
       "correct": true,
@@ -956,7 +956,7 @@
         "ok"
       ],
       "seconds": [
-        14.41
+        16.53
       ],
       "errors": [],
       "correct": true,
@@ -968,16 +968,16 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "wprowadzające w błąd"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        23.8
+        18.28
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -992,7 +992,7 @@
         "ok"
       ],
       "seconds": [
-        15.64
+        18.84
       ],
       "errors": [],
       "correct": true,
@@ -1010,7 +1010,7 @@
         "ok"
       ],
       "seconds": [
-        14.96
+        16.95
       ],
       "errors": [],
       "correct": true,
@@ -1028,7 +1028,7 @@
         "ok"
       ],
       "seconds": [
-        22.3
+        19.36
       ],
       "errors": [],
       "correct": true,
@@ -1064,7 +1064,7 @@
         "ok"
       ],
       "seconds": [
-        17.94
+        13.45
       ],
       "errors": [],
       "correct": true,
@@ -1076,16 +1076,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "fałszywe"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        19.94
+        19.16
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -1094,16 +1094,16 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        28.26
+        17.71
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -1118,7 +1118,7 @@
         "ok"
       ],
       "seconds": [
-        18.03
+        13.98
       ],
       "errors": [],
       "correct": true,
@@ -1136,7 +1136,7 @@
         "ok"
       ],
       "seconds": [
-        18.87
+        23.35
       ],
       "errors": [],
       "correct": true,
@@ -1154,7 +1154,7 @@
         "ok"
       ],
       "seconds": [
-        15.63
+        13.17
       ],
       "errors": [],
       "correct": true,
@@ -1166,16 +1166,16 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "fałszywe"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        22.31
+        18.51
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -1190,7 +1190,7 @@
         "ok"
       ],
       "seconds": [
-        14.01
+        14.14
       ],
       "errors": [],
       "correct": true,
@@ -1208,7 +1208,7 @@
         "ok"
       ],
       "seconds": [
-        37.91
+        14.17
       ],
       "errors": [],
       "correct": true,
@@ -1226,7 +1226,7 @@
         "ok"
       ],
       "seconds": [
-        27.28
+        16.08
       ],
       "errors": [],
       "correct": true,
@@ -1238,16 +1238,16 @@
       "expected": "brak wystarczających dowodów",
       "expected_label": "brak wystarczających dowodów",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        28.01
+        18.33
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -1262,7 +1262,7 @@
         "ok"
       ],
       "seconds": [
-        17.78
+        14.03
       ],
       "errors": [],
       "correct": false,
@@ -1274,16 +1274,16 @@
       "expected": "brak wystarczających dowodów",
       "expected_label": "brak wystarczających dowodów",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        33.18
+        13.67
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -1298,7 +1298,7 @@
         "ok"
       ],
       "seconds": [
-        19.82
+        13.02
       ],
       "errors": [],
       "correct": true,
@@ -1316,7 +1316,7 @@
         "ok"
       ],
       "seconds": [
-        17.84
+        15.06
       ],
       "errors": [],
       "correct": true,
@@ -1334,7 +1334,7 @@
         "ok"
       ],
       "seconds": [
-        16.12
+        15.53
       ],
       "errors": [],
       "correct": true,
@@ -1346,16 +1346,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "fałszywe"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        16.57
+        12.63
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -1372,8 +1372,8 @@
         "ok"
       ],
       "seconds": [
-        11.67,
-        0.1
+        12.81,
+        0.2
       ],
       "errors": [],
       "correct": true,
@@ -1393,8 +1393,8 @@
         "ok"
       ],
       "seconds": [
-        19.87,
-        0.12
+        12.36,
+        0.17
       ],
       "errors": [],
       "correct": true,
@@ -1414,8 +1414,8 @@
         "ok"
       ],
       "seconds": [
-        29.63,
-        0.09
+        14.81,
+        0.11
       ],
       "errors": [],
       "correct": true,
@@ -1427,19 +1427,19 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "potwierdzone",
-        "potwierdzone"
+        "wprowadzające w błąd",
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok",
         "ok"
       ],
       "seconds": [
-        35.33,
-        0.1
+        16.8,
+        0.15
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -1454,7 +1454,7 @@
         "ok"
       ],
       "seconds": [
-        23.86
+        27.92
       ],
       "errors": [],
       "correct": true,
@@ -1466,16 +1466,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "brak wystarczających dowodów"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        25.61
+        17.59
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -1484,13 +1484,13 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "wprowadzające w błąd"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        22.51
+        14.61
       ],
       "errors": [],
       "correct": false,
@@ -1508,7 +1508,7 @@
         "technical_error"
       ],
       "seconds": [
-        0.1
+        0.09
       ],
       "errors": [],
       "correct": true,
@@ -1526,7 +1526,7 @@
         "technical_error"
       ],
       "seconds": [
-        0.18
+        0.09
       ],
       "errors": [],
       "correct": true,
@@ -1544,7 +1544,7 @@
         "ok"
       ],
       "seconds": [
-        28.47
+        28.23
       ],
       "errors": [],
       "correct": true,
@@ -1562,7 +1562,7 @@
         "ok"
       ],
       "seconds": [
-        27.8
+        27.42
       ],
       "errors": [],
       "correct": true,
