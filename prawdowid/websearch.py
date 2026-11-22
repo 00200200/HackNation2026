@@ -17,6 +17,7 @@ limitation and never counts it as strong evidence.
 """
 
 import asyncio
+import json
 import logging
 import os
 from collections.abc import Sequence
@@ -28,6 +29,7 @@ from urllib.parse import urlsplit
 import httpx2
 import requests
 import trafilatura
+from lxml import etree, html
 from pydantic import BaseModel, HttpUrl, ValidationError
 from tavily import (
     BadRequestError,
@@ -38,9 +40,10 @@ from tavily import (
 from tavily.errors import ForbiddenError
 from tavily.errors import TimeoutError as TavilyTimeoutError
 
-from prawdowid import link, safefetch
+from prawdowid import factcheck, link, safefetch
 from prawdowid.cache import Document, save_document
 from prawdowid.privacy import mask_personal_data
+from prawdowid.rerank import canonical_url
 from prawdowid.search_cache import cached_tavily_search
 
 log = logging.getLogger("prawdowid")
@@ -401,6 +404,11 @@ async def _read(
     if not text or not title:
         raise Unread("no text or title", UNREADABLE)
     host = urlsplit(page.url).hostname or ""
+    reviews = (
+        await asyncio.to_thread(_claim_reviews, page.text(), page.url)
+        if entry.source_type == factcheck.SOURCE_TYPE and "html" in _media_type(page)
+        else []
+    )
     return Document(
         url=page.url,
         title=title,
@@ -411,7 +419,64 @@ async def _read(
         domain=host,
         licence=entry.licence,
         text=text,
+        reviews=reviews,
     )
+
+
+def _claim_reviews(page_html: str, page_url: str) -> list[str]:
+    """A fact-checker's own ratings on its page, as rating fragments
+    (`factcheck.review_fragment`): the schema.org ClaimReview markup Google Fact Check also
+    reads, whose `reviewRating.alternateName` is the rating and `claimReviewed` the claim.
+
+    JSON-LD may hold one object, a list or an `@graph`. A review whose `url` is another page is
+    left out, and a block that does not parse is skipped.
+    """
+    try:  # bytes, so an XML declaration naming an encoding is no error
+        tree = html.fromstring(
+            page_html.encode(), parser=html.HTMLParser(encoding="utf-8")
+        )
+    except (ValueError, etree.LxmlError):
+        return []
+    page = canonical_url(page_url)
+    reviews = []
+    for script in tree.iter("script"):
+        kind = (script.get("type") or "").split(";")[0].strip().lower()
+        if kind != "application/ld+json":
+            continue
+        try:
+            stack = [json.loads(script.text or "")]
+        except (ValueError, RecursionError):
+            continue
+        while stack:  # depth first, in document order
+            item = stack.pop()
+            if isinstance(item, list):
+                stack += reversed(item)
+            elif isinstance(item, dict):
+                stack.append(item.get("@graph"))
+                if fragment := _claim_review(item, page):
+                    reviews.append(fragment)
+    return reviews
+
+
+def _claim_review(item: dict, page: str) -> str | None:
+    """The rating fragment of one JSON-LD object when it is a ClaimReview of this page."""
+    kinds = item.get("@type")
+    if "ClaimReview" not in (kinds if isinstance(kinds, list) else [kinds]):
+        return None
+    url, rating, claim = (
+        item.get("url"),
+        item.get("reviewRating"),
+        item.get("claimReviewed"),
+    )
+    try:
+        if url and (not isinstance(url, str) or canonical_url(url) != page):
+            return None  # a review on another page
+    except ValueError:  # "https://[x" names no page: the markup is broken
+        return None
+    name = rating.get("alternateName") if isinstance(rating, dict) else None
+    if not isinstance(name, str):
+        return None
+    return factcheck.review_fragment(name, claim if isinstance(claim, str) else None)
 
 
 async def _extract(

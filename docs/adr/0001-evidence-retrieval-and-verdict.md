@@ -103,16 +103,24 @@ about the present (for example days for weather and safety warnings, the date of
   thing, the verdict is `brak wystarczających dowodów` and both sides are shown. Source type never settles a
   disagreement; it only lowers strength.
 - A fact-checker's own rating is reported with attribution and its exact wording ("Demagog ocenił to jako częściową
-  prawdę"), and maps to our classes: Prawda to `potwierdzone`, Fałsz to `fałszywe`, Manipulacja and Częściowa prawda to
-  `wprowadzające w błąd`, Nieweryfikowalne to `brak wystarczających dowodów`. The mapping is provisional and checked on
-  the eval set.
+  prawdę"), and maps to our classes: Prawda to `potwierdzone`, Fałsz to `fałszywe`, Manipulacja, Częściowa prawda and
+  Częściowy fałsz to `wprowadzające w błąd`, Nieweryfikowalne to `brak wystarczających dowodów`. The mapping is
+  provisional and checked on the eval set. The rating comes from Google Fact Check, the corpus or, since #127, the
+  ClaimReview markup of a review page we read (a Fact Check hit for the same page wins), and is looked up with case and
+  diacritics folded (Demagog also writes "Falsz"). Of one fact-checker's ratings of the same claim the newest counts
+  (a later review updates an earlier one); two fact-checkers whose ratings disagree are a disagreement (above).
 - `potwierdzone`: verified matching supporting citations from at least two independent publishers, or from one
   official source when it is not stale. With one source the strength is "low" or "medium" and the answer says that only
-  one source confirms it.
+  one source confirms it. A search snippet of a page we could not read confirms alone only when it is a fact-checker's
+  own conclusion; any other snippet needs a second independent publisher, and the answer says why (#127). Refuting
+  rules do not change for snippets.
 - `fałszywe`: a verified refuting citation from an official source or a fact-checker whose reviewed claim the stance
   step matched to ours, and no verified supporting citation.
 - `wprowadzające w błąd`: verified supporting citations exist, but the stance step marks a time or place mismatch, or
-  the only support is stale while the claim presents it as current (scenarios B and archival material).
+  the only support is stale while the claim presents it as current (scenarios B and archival material). A mismatch
+  named on a context citation counts only from a fact-checker or from a source that also supports or refutes the
+  claim: a page that takes no side shows its own scope (another year, region or alert level), not what the claim
+  leaves out (#127).
 - No verified citation: `brak wystarczających dowodów`.
 
 Strength is computed in code and returned with its premises, using the fields that already exist in the contract

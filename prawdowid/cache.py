@@ -9,6 +9,7 @@ licence, retention, access control and deletion):
 - Metadata of every page: URL, title, publisher, dates, source type, domain, licence.
 - Full text only when the domain's licence is confirmed (`Domain.licence` in websearch.py).
   Today none is, so `text` is stored empty. The pipeline still uses the live text in memory.
+  The same holds for a fact-checker's ratings read from the page's markup (`reviews`).
 - Never a search snippet of a page we could not read (`Document.snippet_only`), in either store.
 - Retention: records older than `RETENTION_DAYS` (by `fetched_at`) are dropped on every save;
   `delete_document(url)` removes one record, deleting the file removes everything.
@@ -118,6 +119,9 @@ class Document(BaseModel):
     text: str
     # `Source.snippet_only`: `text` is the search provider's extract, never stored.
     snippet_only: str | None = None
+    # A fact-checker's ratings from the page's ClaimReview markup (`websearch._claim_reviews`), as
+    # rating fragments; stored, like `text`, only under a licence.
+    reviews: list[str] = []
 
     def to_source(self, fragment: str | None = None) -> Source:
         return Source(
@@ -166,10 +170,14 @@ def delete_document(url: str, path: Path = CACHE_PATH) -> bool:
 
 
 def _write(path: Path, docs: list[Document]) -> None:
-    """Rewrite the file. Text of unlicensed records is dropped here, old records included."""
+    """Rewrite the file. Text and ratings of unlicensed records are dropped here, old records
+    included."""
     # ponytail: whole-file rewrite under a process-wide lock (searches save from worker threads);
     # a second writer process could still lose a record. The Supabase store (#19) replaces it.
-    docs = [d if d.licence else d.model_copy(update={"text": ""}) for d in docs]
+    docs = [
+        d if d.licence else d.model_copy(update={"text": "", "reviews": []})
+        for d in docs
+    ]
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
