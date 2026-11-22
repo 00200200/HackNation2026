@@ -140,13 +140,19 @@ async def get(
     allow: Callable[[str], bool],
     max_bytes: int,
     robots: bool = True,
+    headers: dict[str, str] | None = None,
 ) -> Page:
-    """GET `url`. Raises Blocked when refused, httpx2.HTTPError on network errors."""
+    """GET `url`. `headers` (content negotiation, never credentials) go only to hops on the first
+    URL's host. Raises Blocked when refused, httpx2.HTTPError on network errors."""
+    first_host = urlsplit(url).hostname
     for _ in range(MAX_REDIRECTS + 1):
         _check_url(url, allow)
         if robots and not await robots_allow(url, http, allow):
             raise Blocked(f"{url} disallowed by robots.txt")
-        async with http.stream("GET", url) as resp:
+        same_host = urlsplit(url).hostname == first_host
+        async with http.stream(
+            "GET", url, headers=headers if same_host else None
+        ) as resp:
             if resp.has_redirect_location:  # a 3xx without Location falls through
                 url = urljoin(str(resp.url), resp.headers["location"])
                 continue

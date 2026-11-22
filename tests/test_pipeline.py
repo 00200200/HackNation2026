@@ -502,3 +502,64 @@ def pipeline_check(queries, govpl_queries):
         )
 
     return asyncio.run(go())
+
+
+def fake_legal(monkeypatch):
+    seen = []
+
+    async def search_legal(queries, claim="", **kwargs):
+        assert claim == "Twierdzenie."  # the claim reaches the act-text step
+        seen.append(list(queries))
+        doc = document(
+            "https://isap.sejm.gov.pl/isap.nsf/DocDetails.xsp?id=WDU1"
+        ).model_copy(update={"publisher": "Kancelaria Sejmu (ISAP, ELI)"})
+        return websearch.WebSearch(documents=[doc])
+
+    monkeypatch.setattr(pipeline.legal, "ENABLED", True)
+    monkeypatch.setattr(pipeline.legal, "search_legal", search_legal)
+    return seen
+
+
+def test_legal_acts_meet_web_pages_at_rerank_only_for_legal_claims(monkeypatch, models):
+    laws = fake_legal(monkeypatch)
+    monkeypatch.setattr(pipeline.govpl, "ENABLED", False)
+    fake_search(monkeypatch, found=lambda q: False)
+
+    async def go(legal_queries):
+        deadline = asyncio.get_running_loop().time() + 30
+        return await pipeline.check_claim(
+            "Twierdzenie.", ["web 1"], deadline, legal_queries=legal_queries
+        )
+
+    asyncio.run(go([]))
+    assert laws == []  # no legal queries: the registers are not asked
+    result = asyncio.run(go(["handlu niedziele", " "]))
+    assert laws == [["handlu niedziele"]]
+    assert result.judgement.verdict is Verdict.CONFIRMED
+    assert [s.publisher for s in result.judgement.sources] == [
+        "Kancelaria Sejmu (ISAP, ELI)"
+    ]
+
+
+def test_legal_failing_with_every_other_source_is_not_checked(monkeypatch, models):
+    async def search_legal(queries, claim="", **kwargs):
+        return websearch.WebSearch(limitation=pipeline.legal.LOOKUP_UNAVAILABLE)
+
+    monkeypatch.setattr(pipeline.legal, "ENABLED", True)
+    monkeypatch.setattr(pipeline.legal, "search_legal", search_legal)
+    fake_govpl(monkeypatch, found=False)
+    fake_search(monkeypatch, found=lambda q: False)
+
+    async def go():
+        deadline = asyncio.get_running_loop().time() + 30
+        return await pipeline.check_claim(
+            "Twierdzenie.",
+            ["web 1"],
+            deadline,
+            govpl_queries=["RCB"],
+            legal_queries=["handlu niedziele"],
+        )
+
+    result = asyncio.run(go())
+    assert result.judgement.verdict is Verdict.NOT_CHECKED
+    assert pipeline.legal.LOOKUP_UNAVAILABLE in result.judgement.limitations

@@ -67,6 +67,12 @@ ALLOWLIST = {
     "fakenews.pl": Domain("fact_check", "FakeNews.pl"),
     "sprawdzam.afp.com": Domain("fact_check", "AFP Sprawdzam"),
     "pap.pl": Domain("news", "Polska Agencja Prasowa"),
+    # Crisis and safety sources from the team's list (corpus/seeds.txt); gov.pl hosts fall under gov.pl.
+    "policja.pl": Domain("official", "Policja"),
+    "cert.pl": Domain("official", "CERT Polska (NASK)"),
+    "imgw.pl": Domain("official", "IMGW-PIB"),
+    "portalpasazera.pl": Domain("primary", "PKP Polskie Linie Kolejowe"),
+    "kgsok.pl": Domain("primary", "Straż Ochrony Kolei"),
 }
 
 SEARCH_TIMEOUT_S = 10

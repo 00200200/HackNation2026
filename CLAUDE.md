@@ -23,6 +23,7 @@ nobody owns it. Parallel branches: on merge conflicts in `WORKLOG.md`, keep both
 | "Is there a library/SDK for X?", current API of a library | `researcher` agent |
 | Before every push, before submitting, "would the jury accept this?" | `/hacknation-judging` + `judge` agent |
 | Test cases, metrics, "do we meet the jury's thresholds?" | `/prawdowid-eval` (`uv run python -m evals.run`) |
+| "What did the team decide on Discord?", implementing what was agreed there | `/discord-read` |
 
 Agents: `builder` (implements an assigned slice), `reviewer` (read-only, before every commit),
 `researcher` (read-only, finds the SDK/library and its current API).

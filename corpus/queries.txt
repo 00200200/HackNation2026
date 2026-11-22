@@ -11,3 +11,13 @@ uchodźcy z Ukrainy
 NATO wschodnia flanka
 Unia Europejska budżet
 migracja granica z Białorusią
+# Crisis and safety topics. build() runs every topic on every search domain (ALLOWLIST and the
+# hosts in corpus/seeds.txt).
+ostrzeżenie
+alert RCB
+powódź
+komunikat
+utrudnienia
+cyberatak
+prawa pasażera
+ostrzeżenia dla podróżujących
