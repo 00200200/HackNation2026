@@ -1452,3 +1452,20 @@ def test_a_stated_false_counts_only_for_the_side_the_judge_read(stance):
         Verdict.CONFIRMED if stance == "supports" else Verdict.INSUFFICIENT_EVIDENCE
     )
     assert j.verdict is expected
+
+
+def test_a_fact_checkers_data_gap_decides_even_when_not_marked_its_own_conclusion():
+    j = run(
+        [CHECKER_NO_DATA, BORDER_CONTEXT],
+        answering(
+            label(CHECKER_NO_DATA, "gap", NO_DATA),
+            label(
+                BORDER_CONTEXT,
+                "context",
+                BORDER,
+                missing_context="Szacunek dotyczy innego roku.",
+                context_quote="wyłącznie o granicę polsko-białoruską",
+            ),
+        ),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE

@@ -110,9 +110,9 @@ about the present (for example days for weather and safety warnings, the date of
   after the rating is read as the page's own, not as the rating), and is looked up with case and diacritics folded
   (Demagog also writes "Falsz"). A fact-checker's own verdict sentence on the page or in its search snippet
   ("…wypowiedź oceniamy jako fałsz", "…uznajemy za nieweryfikowalną") counts as its rating when the stance step marks it
-  as the fact-checker's own conclusion. A fact-checker's Nieweryfikowalne, or its own conclusion that the data cannot
-  settle the claim, decides `brak wystarczających dowodów` unless another fact-checker takes a side or a reliable source
-  published after that finding does: an older or undated page never turns the gap into a verdict (22.11, after the
+  as the fact-checker's own conclusion. A fact-checker's Nieweryfikowalne, or any of its sentences the stance step
+  labels a data gap, decides `brak wystarczających dowodów` unless a fact-checker's own conclusion takes a side or a
+  reliable source published after that finding does: an older or undated page never turns the gap into a verdict (22.11, after the
   round-4 full run, where FC-D01, FC-D02 and FC-D03 lost Demagog's "nieweryfikowalne" to other sources). Of one
   fact-checker's ratings of the same claim the newest counts (a later review updates an earlier one), and an older
   rating in other words is listed with a note naming the newer one; two fact-checkers whose ratings disagree are a

@@ -566,8 +566,9 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     row of the table. "Nieweryfikowalne" is a gap. A fact-checker's own verdict sentence
     ("…oceniamy jako fałsz") is its rating, as its ClaimReview record's would be (`_stated`).
 
-    A fact-checker's own conclusion that the data cannot settle this claim (its "Nieweryfikowalne")
-    decides "brak wystarczających dowodów" after the conflict row (ADR 0001), unless a
+    A fact-checker's finding that the data cannot settle this claim (its "Nieweryfikowalne", or any
+    of its sentences the judge labels a gap) decides "brak wystarczających dowodów" after the
+    conflict row (ADR 0001), unless a
     fact-checker's rating or own conclusion takes a side, or a reliable source published after
     that finding does (a later finding updates an earlier one): an older or undated source never
     turns the fact-checker's gap into a verdict.
@@ -646,12 +647,12 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         rows = [row for row in rows if row[0] in rated]
     # A fact-checker that found the data cannot settle the claim decides, unless a fact-checker,
     # or a reliable source published after that finding, takes a side.
+    # Any data-gap label of a fact-checker counts (the judge marks such a sentence as the
+    # fact-checker's own conclusion only now and then); a side must be its own conclusion.
     checker_gap = [
         e
         for e in considered
-        if e.source.source_type == FACT_CHECK
-        and e.label.own_conclusion
-        and e.label.stance is Stance.GAP
+        if e.source.source_type == FACT_CHECK and e.label.stance is Stance.GAP
     ]
     gap_decides = False
     if checker_gap:
