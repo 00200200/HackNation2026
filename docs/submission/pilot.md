@@ -52,7 +52,7 @@ podróże do...?” istnieje jedna urzędowa odpowiedź, więc łatwo sprawdzić
 W buildzie `integration/r3` każde sprawdzenie przeszukuje korpus (#74, BM25 po `corpus/evidence.jsonl`,
 w tym 251 dokumentów z Odyseusza). Na `main` korpusu jeszcze nie czyta. Nie mierzyliśmy, czy pytanie
 o podróż faktycznie trafia na właściwy profil kraju i czy cytat z niego przechodzi sędziego:
-pełny przebieg na `ca48b84` dał `citation_correctness` 1,0, ale ta metryka sprawdza tylko, czy cytat z dokumentu korpusu występuje w nim dosłownie. Wpływu korpusu na odpowiedzi i trafień w pytaniach o podróż nie mierzyliśmy, a takich pytań nie ma w zestawie testowym. To pierwsza
+pełny przebieg na `a14b93c` dał `citation_correctness` 1,0, ale ta metryka sprawdza tylko, czy cytat z dokumentu korpusu występuje w nim dosłownie. Wpływu korpusu na odpowiedzi i trafień w pytaniach o podróż nie mierzyliśmy, a takich pytań nie ma w zestawie testowym. To pierwsza
 praca etapu 2.
 
 ## Etap 1. Odtworzenie wyników, przegląd licencji, bezpieczeństwa i architektury
@@ -65,7 +65,7 @@ Co już jest:
   ([deploy/pull-deploy.sh](../../deploy/pull-deploy.sh)), a do `prod` trafia tylko kod z `main`.
 - Testy: `make check` uruchamia ruff i pytest. 22.11.2026 na `integration/r4` (`af7ec13`) przechodzi 1180 testów, 8 jest
   pominiętych.
-- Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 73 przypadkach na `main` (86 w `integration/r3`, z czego pełny przebieg na `ca48b84` ocenił 75)
+- Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 73 przypadkach na `main` (86 w `integration/r3`, z czego pełny przebieg na `a14b93c` ocenił 75)
   ([evals/cases.jsonl](../../evals/cases.jsonl)). Runner zapisuje każdy przebieg do
   [evals/results/HISTORY.md](../../evals/results/HISTORY.md) z commitem i uwagami (przebiegów ze stagingu i z 21.11 nie zachowaliśmy, część wierszy jest odtworzona), a
   [docs/eval-notes.md](../eval-notes.md) mówi, którym przebiegom nie ufać.
@@ -123,7 +123,7 @@ Co już jest:
 Czego brakuje:
 
 - Pomiaru, że korpus poprawia odpowiedzi. Wyszukiwanie w nim jest podpięte do `verify()` w
-  `integration/r3` (#74), a pełny przebieg na `ca48b84` zmierzył tylko, że cytaty z korpusu występują w dokumentach (`citation_correctness` 1,0). Nie wiemy, czy korpus poprawia odpowiedzi ani czy pytania o podróż trafiają na właściwy profil (#16). Odpowiedzi
+  `integration/r3` (#74), a pełny przebieg na `a14b93c` zmierzył tylko, że cytaty z korpusu występują w dokumentach (`citation_correctness` 1,0). Nie wiemy, czy korpus poprawia odpowiedzi ani czy pytania o podróż trafiają na właściwy profil (#16). Odpowiedzi
   biorą dowody z Google Fact Check, EUvsDisinfo, wyszukiwarki www.gov.pl, Tavily i korpusu.
 - Trybu „tylko zamknięty korpus”, który na czas pilotażu wyłącza otwartą wyszukiwarkę. Dziś osobnym
   przełącznikiem da się wyłączyć tylko wyszukiwarkę gov.pl (`PRAWDOWID_GOVPL=0`).
@@ -157,7 +157,7 @@ Czego brakuje:
 - Zewnętrznego red teamu. Mamy tylko własne przypadki, a wzorce wykrywania pisaliśmy, znając
   pierwsze trzy przypadki E ([WORKLOG](../../WORKLOG.md), wpis do #15). Potrzebne są przypadki,
   których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures w
-  `integration/r3` (#94), ale eval z nimi jeszcze nie był uruchomiony: pełny przebieg na `ca48b84` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
+  `integration/r3` (#94), a eval z nimi uruchomiono osobno na `5e5be00`, ze stronami z fixture pod https://faktczyfejk.pl/eval-fixtures (`PRAWDOWID_FIXTURE_BASE`): 11 z 11 poprawnych, odporność 1,0. Pełny przebieg na `a14b93c` tych przypadków nie obejmuje. Razem, jako dwa przebiegi: 73 z 80 poprawnych, macro-F1 0,924 ([eval-notes.md](../eval-notes.md)). To własne strony testowe, nie zewnętrzny red team. Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
   `integration/r3`, nie w `main`.
 - Oceny skutków dla ochrony danych (DPIA) z inspektorem ochrony danych MSZ i umów powierzenia z
   dostawcami. Maskowanie nie łapie numerów dowodów, paszportów i części formatów telefonu (#82).
