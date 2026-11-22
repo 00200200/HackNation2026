@@ -41,7 +41,7 @@ technical error ("Nie mogę teraz sprawdzić ..."). A source that answered with 
   and labels quotes. The verdict comes from rules in `judge.decide()`.
 - **Sources per claim, in parallel:** Google Fact Check Tools (fact-checkers' ratings), EUvsDisinfo as context only, the www.gov.pl site search,
   Tavily web search restricted to allowlisted domains, and our evidence corpus (`corpus/evidence.jsonl`), which every check searches.
-- **Privacy:** PESEL, phone, e-mail, account and card numbers are masked before the model. Checks
+- **Privacy:** PESEL, ID card, passport, phone, e-mail, account and card numbers are masked before the model. Checks
   are kept for 30 days and can be deleted per session.
 - **Two channels, one API:** the web page and the Discord command `/sprawdz` call the same
   `POST /api/checks`.
@@ -64,7 +64,7 @@ comes back `not_checked` with the reason, never as a verdict. An
 opinion, forecast or question is `not_verifiable`. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
-paste the text. Personal data (PESEL, phone, e-mail, account and card numbers) is masked before
+paste the text. Personal data (PESEL, ID card, passport, phone, e-mail, account and card numbers) is masked before
 the text goes to the model. Each check is logged to stdout (session, status, latency, input length)
 with a second line for the model call (model, input and output tokens, latency), and kept for 30
 days as one masked record in the check log, which the user can delete per session. A link check
