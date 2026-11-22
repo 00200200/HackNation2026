@@ -6,6 +6,7 @@ from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.function import FunctionModel
 
+from prawdowid import factcheck
 from prawdowid.contract import SecurityEvent, Source, Verdict
 from prawdowid.judge import (
     CONFLICT,
@@ -50,7 +51,13 @@ EC = fragment(
 
 
 def label(
-    f, stance, quote, missing_context=None, own_conclusion=False, context_quote=None
+    f,
+    stance,
+    quote,
+    missing_context=None,
+    own_conclusion=False,
+    context_quote=None,
+    same_claim=False,
 ):
     return {
         "doc_id": f.doc_id,
@@ -59,6 +66,7 @@ def label(
         "missing_context": missing_context,
         "context_quote": context_quote,
         "own_conclusion": own_conclusion,
+        "same_claim": same_claim,
     }
 
 
@@ -597,11 +605,17 @@ def test_review_with_its_rating_in_the_fragment_refutes():
     j = run(
         [rated],
         answering(
-            label(rated, "refutes", "Ocena fact-checkera: Fałsz.", own_conclusion=True)
+            label(
+                rated,
+                "refutes",
+                "Ocena fact-checkera: Fałsz.",
+                own_conclusion=True,
+                same_claim=True,
+            )
         ),
     )
     assert j.verdict is Verdict.FALSE
-    assert "Ocena fact-checkera: Fałsz" in j.premises[0]
+    assert "ocena fact-checkera: Fałsz (z danych ClaimReview)" in j.premises[0]
 
 
 def test_two_labels_on_one_page_list_its_url_once():
@@ -644,3 +658,231 @@ def test_two_headlines_from_two_publishers_are_not_enough():
         ),
     )
     assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+
+
+# --- #100: a fact-checker's rating of this very claim is its verdict, one of another claim is
+# context; the rating is shown as the ClaimReview record's rating, never as a page quote ---
+
+
+def claim_review(
+    rating, claim, title=REVIEW_TITLE, url=REVIEW_URL, publisher="Demagog"
+):
+    """A Fact Check hit as rerank passes it on (`factcheck.review_fragment`)."""
+    source = Source(
+        title=title,
+        publisher=publisher,
+        published_at=date(2026, 10, 19),
+        fetched_at=datetime(2026, 11, 21, tzinfo=UTC),
+        url=url,
+        source_type="fact_check",
+        fragment=factcheck.review_fragment(rating, claim),
+    )
+    return Fragment(doc_id=url, source=source)
+
+
+def rating_label(f, stance="refutes", same_claim=True, **kwargs):
+    line = f.source.fragment.splitlines()[0]
+    return label(f, stance, line, own_conclusion=True, same_claim=same_claim, **kwargs)
+
+
+G01 = "Kibice Legii Warszawa poszli protestować pod Trybunał Konstytucyjny."
+G01_REVIEW = claim_review(
+    "Fałsz",
+    G01,
+    title="Kibice idą bronić Trybunału przed Tuskiem? Nie, przyjechali na mecz Legia-Wisła",
+)
+
+
+def test_false_rating_beats_a_missing_context_its_title_names():
+    # G01: without the rating map the title-grounded context gave "wprowadzające w błąd".
+    j = run(
+        [G01_REVIEW],
+        answering(
+            rating_label(
+                G01_REVIEW,
+                missing_context="Kibice przyjechali na mecz, nie na protest.",
+                context_quote="przyjechali na mecz Legia-Wisła",
+            )
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert j.justification == (
+        "Przeczy temu: Demagog, 19.10.2026, ocena fact-checkera: Fałsz "
+        "(z danych ClaimReview)."
+    )
+    # The rating line is ours: the answer carries the rating, never „Ocena fact-checkera: …”.
+    [source] = j.sources
+    assert source.rating == "Fałsz" and source.fragment == "Fałsz"
+    assert "„Ocena" not in j.model_dump_json()
+
+
+@pytest.mark.parametrize("stance", ["supports", "context", "refutes"])
+def test_partial_truth_rating_is_misleading_whatever_stance_the_model_gives(stance):
+    # C01: "Częściowa prawda" had no path to "wprowadzające w błąd".
+    rated = claim_review(
+        "Częściowa prawda", "Pracownik na etacie ma średnio dwa i pół dnia wolne."
+    )
+    j = run([rated], answering(rating_label(rated, stance)))
+    assert j.verdict is Verdict.MISLEADING
+    assert j.justification == (
+        "Fact-checker ocenił to twierdzenie jako mylące albo niepełne: Demagog, "
+        "19.10.2026, ocena fact-checkera: Częściowa prawda (z danych ClaimReview)."
+    )
+
+
+def test_manipulation_rating_is_misleading_not_false():
+    # B01: read as "refutes", Manipulacja came out "fałszywe".
+    rated = claim_review(
+        "Manipulacja", "Ten filmik z Francji przeraża chyba najbardziej…"
+    )
+    j = run([rated], answering(rating_label(rated, "refutes")))
+    assert j.verdict is Verdict.MISLEADING
+
+
+def test_true_rating_confirms():
+    rated = claim_review("Prawda", "Polska jest członkiem NATO od 1999 roku.")
+    j = run([rated], answering(rating_label(rated, "supports")))
+    assert j.verdict is Verdict.CONFIRMED
+    assert j.sources[0].rating == "Prawda"
+
+
+def test_a_part_of_the_rating_line_still_reads_the_whole_rating():
+    rated = claim_review("Częściowa prawda", "Pracownik ma co drugi dzień wolny.")
+    j = run(
+        [rated],
+        answering(
+            label(
+                rated,
+                "supports",
+                "Ocena fact-checkera: Częściowa",
+                own_conclusion=True,
+                same_claim=True,
+            )
+        ),
+    )
+    assert j.verdict is Verdict.MISLEADING  # never "potwierdzone" from half a rating
+    assert j.sources[0].rating == "Częściowa prawda"
+
+
+def test_unverifiable_rating_gives_no_verdict_but_leaves_other_sources():
+    rated = claim_review("Nieweryfikowalne", CLAIM)
+    j = run([rated], answering(rating_label(rated, "refutes")))
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert DATA_GAP.format(publishers="Demagog") in j.limitations
+    j = run(
+        [rated, GOV],
+        answering(
+            rating_label(rated, "gap"), label(GOV, "supports", GOV.source.fragment)
+        ),
+    )
+    assert j.verdict is Verdict.CONFIRMED
+
+
+def test_rating_and_a_reliable_source_on_the_other_side_are_a_conflict():
+    rated = claim_review("Fałsz", CLAIM)
+    j = run(
+        [rated, GOV],
+        answering(rating_label(rated), label(GOV, "supports", GOV.source.fragment)),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert CONFLICT in j.limitations
+
+
+def test_rating_replaces_the_models_reading_of_the_publishers_other_text():
+    rated = claim_review("Fałsz", CLAIM)
+    page = fragment(
+        "https://demagog.org.pl/inny",
+        "Wpis z 2019 roku krąży znowu, tym razem bez daty.",
+        "Demagog",
+        "fact_check",
+    )
+    j = run(
+        [rated, page],
+        answering(
+            rating_label(rated),
+            label(
+                page,
+                "context",
+                page.source.fragment,
+                "Wpis jest z 2019 roku.",
+                context_quote="Wpis z 2019 roku",
+            ),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+
+
+def test_two_fact_checkers_with_the_same_rating_are_two_origins():
+    demagog = claim_review("Fałsz", CLAIM)
+    konkret = claim_review(
+        "Fałsz", CLAIM, url="https://konkret24.tvn24.pl/k/1", publisher="Konkret24"
+    )
+    j = run([demagog, konkret], answering(rating_label(demagog), rating_label(konkret)))
+    assert j.verdict is Verdict.FALSE
+    assert j.strength.startswith("silna: 2 niezależnych źródeł (wiarygodnych: 2)")
+
+
+def test_unmapped_rating_keeps_the_judges_reading():
+    rated = claim_review("Satyra", CLAIM)
+    j = run([rated], answering(rating_label(rated, "context")))
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert j.sources[0].rating == "Satyra"
+
+
+def test_title_quote_of_the_same_claim_maps_no_rating():
+    rated = claim_review("Fałsz", CLAIM)
+    j = run(
+        [rated],
+        answering(
+            label(rated, "refutes", REVIEW_TITLE, own_conclusion=True, same_claim=True)
+        ),
+    )
+    assert (
+        j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    )  # a headline alone decides nothing
+    assert j.sources[0].rating is None
+
+
+# Scenario D: a review of a related but different claim never gives a verdict.
+OTHER = claim_review(
+    "Fałsz",
+    "Największa liczba osób do Rosji ratowała się ucieczką z Ukrainy.",
+    title="Ukraińscy uchodźcy. Czy Rosja była pierwszym kierunkiem?",
+    url="https://demagog.org.pl/wypowiedzi/ukrainscy-uchodzcy/",
+)
+
+
+@pytest.mark.parametrize(
+    "other_label",
+    [
+        rating_label(
+            OTHER, same_claim=False
+        ),  # a confused stance on another claim's rating
+        rating_label(OTHER, "supports", same_claim=False),
+        rating_label(
+            OTHER,
+            "context",
+            same_claim=False,
+            missing_context="To ocena innej wypowiedzi.",
+            context_quote="Czy Rosja była pierwszym kierunkiem",
+        ),
+        label(OTHER, "refutes", OTHER.source.title, own_conclusion=True),
+    ],
+)
+def test_review_of_another_claim_is_context_only(other_label):
+    j = run([OTHER], answering(other_label))
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    # Its rating is about something else: not shown for this claim, not named as the reason.
+    assert all(s.rating is None for s in j.sources)
+    assert "Fałsz" not in j.justification and "Demagog" not in j.justification
+    assert "ocenia inne twierdzenie" in j.premises[0]
+
+
+def test_review_of_this_claim_decides_next_to_one_of_another_claim():
+    rated = claim_review("Fałsz", CLAIM)
+    j = run(
+        [OTHER, rated],
+        answering(rating_label(OTHER, same_claim=False), rating_label(rated)),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert [s.rating for s in j.sources] == [None, "Fałsz"]

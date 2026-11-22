@@ -675,3 +675,164 @@ def test_an_euvsdisinfo_record_in_the_corpus_is_context_only():
     hit = corpus_hit("https://euvsdisinfo.eu/report/x")
     found = {"web": [], "corpus": corpus_bm25.EvidenceLookup(hits=[hit])}
     assert [s.source_type for s in pipeline._candidates(found)] == ["disinfo_database"]
+
+
+# --- #100: Fact Check gets short keys, and a fact-checker's rating reaches the answer ---
+
+
+def recording_factcheck(monkeypatch, hits_for=lambda query: []):
+    """Fact Check answers each key with `hits_for(key)` and notes the keys it got."""
+    sent = []
+
+    async def search_claims(query, **kwargs):
+        sent.append(query)
+        return pipeline.factcheck.FactCheckLookup(hits=hits_for(query))
+
+    monkeypatch.setattr(pipeline.factcheck, "search_claims", search_claims)
+    return sent
+
+
+CAPTION = "Ten filmik z Francji przeraża chyba najbardziej"
+B01_SENTENCE = (
+    "Poseł Konrad Berkowicz udostępnił 4 października 2026 film z podpisem "
+    f"„{CAPTION}…”, jako obraz obecnych protestów we Francji."
+)
+B01_CLAIM = (
+    "Poseł Konrad Berkowicz udostępnił 4 października 2026 film jako obraz obecnych "
+    "protestów we Francji."
+)
+
+
+@pytest.mark.parametrize("govpl_on", [True, False])
+def test_fact_check_gets_the_claim_its_names_quotes_and_every_query(
+    monkeypatch, models, govpl_on
+):
+    sent = recording_factcheck(monkeypatch)
+    fake_govpl(monkeypatch)
+    monkeypatch.setattr(pipeline.govpl, "ENABLED", govpl_on)
+    fake_search(monkeypatch, found=lambda q: False)
+
+    async def go():
+        deadline = asyncio.get_running_loop().time() + 30
+        return await pipeline.check_claim(
+            B01_CLAIM,
+            ["Berkowicz film Francja", "protesty Francja nagranie"],
+            deadline,
+            govpl_queries=["MSWiA protesty"],
+            source_sentence=B01_SENTENCE,
+        )
+
+    asyncio.run(go())
+    assert sent == [
+        B01_CLAIM,
+        "Konrad Berkowicz Francji",
+        CAPTION,
+        "Berkowicz film Francja",
+        "protesty Francja nagranie",
+        "MSWiA protesty",
+    ]
+
+
+def test_simulated_fact_check_outage_sends_no_key(monkeypatch, models):
+    from prawdowid import faults
+
+    sent = recording_factcheck(monkeypatch)
+    monkeypatch.setattr(websearch, "search_web", no_pages)
+    with faults.simulate(faults.FACTCHECK_UNAVAILABLE):
+        result = pipeline_check(["web 1", "web 2"], ["RCB alert"])
+    assert sent == []
+    assert result.outage
+    assert pipeline.FACTCHECK_DOWN in result.judgement.limitations[0]
+
+
+async def no_pages(query, **kwargs):
+    """Web search answers and finds nothing."""
+    return websearch.WebSearch()
+
+
+B01_REVIEW = {
+    "url": "https://demagog.org.pl/wypowiedzi/protesty-we-francji-berkowicz-udostepnia-stare-nagranie/",
+    "title": "Protesty we Francji. Berkowicz udostępnia stare nagranie",
+    "publisher": {"name": "Demagog", "site": "demagog.org.pl"},
+    "reviewDate": "2026-10-06T00:00:00Z",
+    "textualRating": "Manipulacja",
+}
+
+
+def rating_judge(same_claim: bool, stance: str = "refutes"):
+    """The judge quotes the rating line of every review it is shown."""
+
+    def answer(prompt: str) -> str:
+        labels = [
+            {
+                "doc_id": doc_id,
+                "stance": stance,
+                "quote": "Ocena fact-checkera: Manipulacja.",
+                "own_conclusion": True,
+                "same_claim": same_claim,
+            }
+            for doc_id in re.findall(r"doc_id: (\S+)", prompt)
+        ]
+        return judge.Labels(labels=labels).model_dump_json()
+
+    return model(answer, "claude-sonnet-5-5")
+
+
+def b01_check(monkeypatch, same_claim: bool):
+    """B01 offline from extraction to the answer: only the caption quoted in the post finds the
+    review (the claim sentence does not), and the judge says whether it reviews this claim."""
+    hit = pipeline.factcheck._to_hit(
+        {"text": f"{CAPTION}…"}, B01_REVIEW, datetime.now(UTC)
+    )
+    recording_factcheck(monkeypatch, lambda q: [hit] if q == CAPTION else [])
+    monkeypatch.setattr(websearch, "search_web", no_pages)
+    extraction = Extraction(
+        claims=[
+            ExtractedClaim(
+                claim=B01_CLAIM,
+                kind=ClaimKind.STATEMENT,
+                source_sentence=B01_SENTENCE,
+                checkable=True,
+                reason="Fakt.",
+                queries=["Berkowicz film protesty Francja"],
+            )
+        ],
+        other_claims=[],
+        unclear=False,
+    )
+    with (
+        rerank.agent.override(model=model(every_fragment)),
+        judge.agent.override(model=rating_judge(same_claim)),
+    ):
+        return verify("tekst", extraction)
+
+
+def test_fact_checkers_rating_of_this_claim_reaches_the_answer_as_its_rating(
+    monkeypatch,
+):
+    from evals.adapter import to_eval_shape
+
+    result = b01_check(monkeypatch, same_claim=True)
+    [claim] = result.claims
+    assert (
+        claim.verdict is Verdict.MISLEADING
+    )  # Manipulacja, though the judge said "refutes"
+    [source] = claim.sources
+    assert source.rating == "Manipulacja" and source.fragment == "Manipulacja"
+    assert claim.reasoning == (
+        "Fact-checker ocenił to twierdzenie jako mylące albo niepełne: Demagog, 6.10.2026, "
+        "ocena fact-checkera: Manipulacja (z danych ClaimReview)."
+    )
+    # Our rating line never reaches the answer as if it were the review page's words.
+    assert "Ocena fact-checkera: Manipulacja." not in result.model_dump_json()
+    # The eval still counts the rating as the cited evidence (citation coverage).
+    evidence = to_eval_shape(result.model_dump(mode="json"))["claims"][0]["evidence"]
+    assert evidence[0]["quote"] == "Manipulacja"
+
+
+def test_review_of_another_claim_leaves_the_claim_without_a_verdict(monkeypatch):
+    result = b01_check(monkeypatch, same_claim=False)
+    [claim] = result.claims
+    assert claim.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert [s.rating for s in claim.sources] == [None]
+    assert "Manipulacja" not in claim.reasoning

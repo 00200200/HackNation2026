@@ -419,7 +419,12 @@ async def verify_text(
     checks = await asyncio.gather(
         *(
             pipeline.check_claim(
-                c.claim, c.queries, deadline, exclude_url, c.govpl_queries
+                c.claim,
+                c.queries,
+                deadline,
+                exclude_url,
+                c.govpl_queries,
+                source_sentence=c.source_sentence,
             )
             if c.checkable
             else asyncio.sleep(0)

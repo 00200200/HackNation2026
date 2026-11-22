@@ -60,7 +60,12 @@ class Source(BaseModel):
     fetched_at: datetime
     url: HttpUrl
     source_type: str
+    # The source's own words that the verdict rests on. With `rating` set, it is that rating in
+    # the wording of the fact-checker's ClaimReview record, not text of the review page.
     fragment: str | None = None
+    # A fact-checker's rating of the checked claim (`textualRating` of its ClaimReview record).
+    # Channels show it as the fact-checker's rating, never as a quote from its page.
+    rating: str | None = None
 
 
 class ModelCall(BaseModel):

@@ -91,6 +91,15 @@ function notice(title, text, note) {
     note ? el("p", { className: "note", textContent: note }) : null);
 }
 
+// A fact-checker's rating comes from its ClaimReview record: shown as the rating, never as a quote.
+function sourceText(s) {
+  if (s.rating) {
+    return el("p", { className: "rating" }, el("b", { textContent: "Ocena fact-checkera: " }), s.rating,
+      el("span", { className: "rating-note", textContent: " (z danych ClaimReview)" }));
+  }
+  return s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null;
+}
+
 function sourceItem(s, i) {
   const url = safeUrl(s.url);
   const host = url ? new URL(url).hostname.replace(/^www\./, "") : null;
@@ -108,7 +117,7 @@ function sourceItem(s, i) {
     SOURCE_TYPES[s.source_type] ?? s.source_type,
   ].filter(Boolean).join(", ");
   return el("li", { className: "source" },
-    s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null,
+    sourceText(s),
     el("p", { className: "source-head" }, el("span", { className: "ref", textContent: `[${i + 1}]` }), " ",
       s.publisher ? el("b", { textContent: s.publisher }) : null, s.publisher ? ", " : null, title),
     el("p", { className: "source-meta" },

@@ -504,3 +504,23 @@ def test_render_names_the_checked_page():
     )
     assert "projekt, Gazeta, 2026-11-16\n  <https://news.example/a>\n" in first
     assert first.endswith(discord_bot.PAGE_NOTE)
+
+
+def test_fact_checkers_rating_is_shown_as_the_rating_not_as_a_quote():
+    # The ClaimReview rating ("Fałsz") is no text of the review page: never "> „Fałsz”".
+    rated = (
+        CHECK.claims[0]
+        .sources[0]
+        .model_copy(
+            update={
+                "publisher": "Demagog",
+                "source_type": "fact_check",
+                "fragment": "Fałsz",
+                "rating": "Fałsz",
+            }
+        )
+    )
+    claim = CHECK.claims[0].model_copy(update={"sources": [rated]})
+    text = render(CHECK.model_copy(update={"claims": [claim]}))
+    assert "  Ocena fact-checkera: Fałsz (z danych ClaimReview)" in text.splitlines()
+    assert "> „Fałsz”" not in text

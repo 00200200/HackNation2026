@@ -1,6 +1,7 @@
 """Steps 2 to 5 for one claim, under the time budget of the whole check.
 
-Step 2 runs five lookups at once: 2a Google Fact Check (`factcheck.search_claims`), EUvsDisinfo
+Step 2 runs five lookups at once: 2a Google Fact Check (`factcheck.search_keys`, the claim and its
+short keys from `factcheck.keys_for`), EUvsDisinfo
 known narratives (`euvsdisinfo.search_cases`, context that never decides alone), the www.gov.pl
 site search (`govpl.search_govpl`, the claim's gov.pl queries, else its first web query; off with
 PRAWDOWID_GOVPL=0), 2b web search and fetch (`websearch.search_web`, one search per web query of
@@ -105,13 +106,19 @@ async def check_claim(
     deadline: float,
     exclude_url: str | None = None,
     govpl_queries: list[str] = (),
+    source_sentence: str = "",
 ) -> ClaimCheck:
     """Verdict for one claim. `deadline` is `loop.time()` when the whole check must end.
 
     `queries` go to web search, `govpl_queries` to the gov.pl site search (to the web when it is
-    switched off).
+    switched off). Fact Check gets the claim and short keys: both kinds of queries, the names in
+    the claim and spans in quotation marks in the claim or `source_sentence`.
     """
     steps: dict[str, int] = {}
+    # Before the gov.pl switch below folds its queries into the web ones.
+    factcheck_keys = factcheck.keys_for(
+        claim, [*queries, *govpl_queries], [claim, source_sentence]
+    )
     # Messages of each reranker and judge run, priced and logged in `_done`.
     runs: list[list[ModelMessage]] = []
     # Each lookup's answer as soon as it arrives, so a time limit keeps what already failed.
@@ -127,7 +134,7 @@ async def check_claim(
         return _done(claim, _time_limit(found), runs, steps)
     try:
         async with asyncio.timeout_at(deadline):
-            await _retrieve(claim, searched, gov, steps, found)
+            await _retrieve(claim, searched, gov, steps, found, factcheck_keys)
             candidates = _candidates(found)
             judgement = await _judge(claim, candidates, exclude_url, steps, runs)
     except TimeoutError:
@@ -206,9 +213,11 @@ async def _retrieve(
     gov: list[str] | None,
     steps: dict[str, int],
     found: dict,
+    factcheck_keys: list[str] = (),
 ) -> None:
-    """Steps 2a, EUvsDisinfo, gov.pl (when `gov` is set), 2b and the corpus at once, each answer
-    stored in `found` as it arrives.
+    """Steps 2a (every key in `factcheck_keys` at once, the claim when there are none),
+    EUvsDisinfo, gov.pl (when `gov` is set), 2b and the corpus at once, each answer stored in
+    `found` as it arrives.
 
     TaskGroup: when the time limit cuts the claim, every lookup task still running is cancelled
     and awaited before this returns. Provider threads (`asyncio.to_thread`) cannot be cancelled:
@@ -229,7 +238,11 @@ async def _retrieve(
     # The corpus gets every wording: the rankings of the claim and of each query are merged.
     corpus_queries = list(dict.fromkeys([claim, *queries, *(gov or [])]))
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(keep("factcheck", _search_claims))
+        tg.create_task(
+            keep(
+                "factcheck", lambda _: _search_claims(claim, factcheck_keys or [claim])
+            )
+        )
         tg.create_task(keep("euvsdisinfo", _search_cases))
         tg.create_task(_timed(steps, "web", all_web))
         tg.create_task(keep("corpus", lambda _: _search_corpus(corpus_queries)))
@@ -346,11 +359,12 @@ async def _search_govpl(queries: list[str]) -> websearch.WebSearch:
         return websearch.WebSearch(limitation=govpl.LOOKUP_UNAVAILABLE)
 
 
-async def _search_claims(claim: str) -> factcheck.FactCheckLookup:
-    if faults.active(faults.FACTCHECK_UNAVAILABLE):  # eval traffic only, see faults.py
+async def _search_claims(claim: str, keys: list[str]) -> factcheck.FactCheckLookup:
+    # Eval traffic only (see faults.py): every key fails, so none is sent.
+    if faults.active(faults.FACTCHECK_UNAVAILABLE):
         return factcheck.FactCheckLookup(limitation=factcheck.LOOKUP_UNAVAILABLE)
     try:
-        return await factcheck.search_claims(claim)
+        return await factcheck.search_keys(claim, keys)
     except Exception:
         log.exception("factcheck failed")
         return factcheck.FactCheckLookup(limitation=factcheck.LOOKUP_UNAVAILABLE)

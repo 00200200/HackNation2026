@@ -28,6 +28,11 @@ CONFLICT = (
 DATA_GAP = "Źródła mówią, że dostępne dane nie pozwalają tego sprawdzić: {cited}."
 TOO_FEW = "Znaleźliśmy za mało, żeby to rozstrzygnąć: {cited}."
 CONTEXT = "Twierdzenie pomija ważny kontekst: {context} ({cited})."
+RATED_MISLEADING = (
+    "Fact-checker ocenił to twierdzenie jako mylące albo niepełne: {cited}."
+)
+# A rating from a ClaimReview record (`Source.rating`): named as the rating, never quoted as text.
+RATING = "ocena fact-checkera: {rating} (z danych ClaimReview)"
 SEE_SOURCES = "Ocena wynika ze źródeł wymienionych poniżej."
 SUPPORTED = "Potwierdza to: {cited}."
 REFUTED = "Przeczy temu: {cited}."
@@ -74,7 +79,9 @@ def explain(
 
 
 def _misleading(items: list[tuple[Source, str, str | None]]) -> str:
-    # The rules need a missing context found in a source, so `grounded` is never empty there.
+    # The rules need a fact-checker's rating of the claim or a missing context found in a source.
+    if rated := [s for s, _, _ in items if s.rating]:
+        return RATED_MISLEADING.format(cited=_cite(rated))
     grounded = [(s, ctx) for s, _, ctx in items if ctx]
     if not grounded:
         return SEE_SOURCES
@@ -98,7 +105,9 @@ def _one(s: Source, quote: bool) -> str:
     who = s.publisher or str(s.url.host)
     when = f", {_date(s)}" if s.published_at else ", bez daty"
     text = f"{who}{when}"
-    if quote and s.fragment:
+    if quote and s.rating:
+        text += f", {RATING.format(rating=_short(s.rating))}"
+    elif quote and s.fragment:
         text += f": „{_short(s.fragment)}”"
     return text
 
