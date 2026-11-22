@@ -33,6 +33,7 @@ from tavily.errors import TimeoutError as TavilyTimeoutError
 from prawdowid import safefetch
 from prawdowid.cache import Document, save_document
 from prawdowid.privacy import mask_personal_data
+from prawdowid.search_cache import cached_tavily_search
 
 log = logging.getLogger("prawdowid")
 
@@ -193,7 +194,7 @@ async def search_web(
     *,
     limit: int = 5,
     domains: Sequence[str] = tuple(ALLOWLIST),
-    provider: SearchProvider = tavily_search,
+    provider: SearchProvider = cached_tavily_search,
     transport: httpx2.AsyncBaseTransport | None = None,  # tests only
     save: bool = True,
     skip_hosts: frozenset[str] = frozenset(),
