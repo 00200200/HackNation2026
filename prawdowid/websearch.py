@@ -1,9 +1,10 @@
 """Step 2b: web search on allowlisted domains, page fetch, text extraction and the source cache.
 
-The search provider is one function with the `SearchProvider` signature. It is Tavily's official
-`/search` endpoint through `tavily-python` (https://docs.tavily.com/documentation/api-reference/endpoint/search),
-restricted server-side to `ALLOWLIST` via `include_domains`. A Brave or Exa wrapper with the same
-signature replaces it in one place.
+The search provider is one function with the `SearchProvider` signature, restricted server-side to
+`ALLOWLIST`. `default_search` picks it per call: Perplexity's Search API (`perplexityai` SDK,
+https://docs.perplexity.ai/api-reference/search-post) when `PERPLEXITY_API_KEY` is set, otherwise
+Tavily's `/search` (`tavily-python`, https://docs.tavily.com/documentation/api-reference/endpoint/search)
+behind the query cache. `PRAWDOWID_SEARCH_PROVIDER=tavily` forces Tavily.
 
 A failed or empty search is a technical limit returned in `WebSearch.limitation`, never a verdict.
 
@@ -27,6 +28,7 @@ from typing import NamedTuple, Protocol
 from urllib.parse import urljoin, urlsplit
 
 import httpx2
+import perplexity
 import requests
 import trafilatura
 from lxml import etree, html
@@ -44,7 +46,7 @@ from prawdowid import factcheck, link, safefetch
 from prawdowid.cache import Document, save_document
 from prawdowid.privacy import mask_personal_data
 from prawdowid.rerank import canonical_url
-from prawdowid.search_cache import cached_tavily_search, is_limit
+from prawdowid.search_cache import LIMIT_REASON, cached_tavily_search, is_limit
 
 log = logging.getLogger("prawdowid")
 
@@ -96,6 +98,8 @@ FETCH_TIMEOUT_S = 10
 ATTEMPTS = 2  # first call plus one retry
 MAX_PAGE_BYTES = 2_000_000
 KEY_ENV = "TAVILY_API_KEY"
+PERPLEXITY_KEY_ENV = "PERPLEXITY_API_KEY"
+PROVIDER_ENV = "PRAWDOWID_SEARCH_PROVIDER"
 # Both caps keep one claim inside the check's time budget (#11): DuckDuckGo took ~20 s to say
 # "no results" over two attempts in the full eval on f1e1684.
 SEARCH_BUDGET_S = float(
@@ -191,6 +195,71 @@ def _tavily_date(value: str | None) -> date | None:
         return None
 
 
+_perplexity_client: perplexity.Perplexity | None = None
+
+
+def perplexity_search(
+    query: str, *, domains: Sequence[str], limit: int
+) -> list[SearchHit]:
+    """Perplexity Search API, restricted to `domains` (subdomains included: a `gov.pl` entry
+    returned sejm.gov.pl and stat.gov.pl pages, probed 2026-11-22).
+    https://docs.perplexity.ai/api-reference/search-post
+    """
+    global _perplexity_client
+    api_key = os.getenv(PERPLEXITY_KEY_ENV)
+    if not api_key:
+        raise SearchUnavailable(f"{PERPLEXITY_KEY_ENV} not set")
+    if _perplexity_client is None:
+        # Retries live in `_search`, one layer only.
+        _perplexity_client = perplexity.Perplexity(
+            api_key=api_key, timeout=SEARCH_TIMEOUT_S, max_retries=0
+        )
+    try:
+        response = _perplexity_client.search.create(
+            query=query,
+            max_results=limit,
+            search_domain_filter=list(domains),
+            country="PL",
+            search_language_filter=["pl"],
+        )
+    except perplexity.RateLimitError as exc:  # HTTP 429: no retry within this check
+        raise SearchUnavailable(f"{LIMIT_REASON}: {exc}") from exc
+    except perplexity.APIError as exc:  # connection, timeout and every other HTTP error
+        raise SearchUnavailable(str(exc)) from exc
+    return [
+        SearchHit(
+            url=r.url,
+            title=r.title or "",
+            snippet=r.snippet or "",
+            published_date=_date(r.date),
+        )
+        for r in response.results
+        if r.url
+    ]
+
+
+def provider_name() -> str:
+    """ "perplexity" when its key is set and Tavily is not forced, else "tavily"."""
+    forced = (os.getenv(PROVIDER_ENV) or "").strip().lower()
+    if forced != "tavily" and os.getenv(PERPLEXITY_KEY_ENV):
+        return "perplexity"
+    return "tavily"
+
+
+def default_search(
+    query: str, *, domains: Sequence[str], limit: int
+) -> list[SearchHit]:
+    """`SearchProvider` of every check: Perplexity, or the cached Tavily search without its key."""
+    if provider_name() == "perplexity":
+        return perplexity_search(query, domains=domains, limit=limit)
+    return cached_tavily_search(query, domains=domains, limit=limit)
+
+
+def provider_key_env() -> str:
+    """The key the chosen provider needs."""
+    return PERPLEXITY_KEY_ENV if provider_name() == "perplexity" else KEY_ENV
+
+
 class WebSearch(BaseModel):
     documents: list[Document] = []
     # Set when search or every fetch failed; goes to ClaimResult.limitations.
@@ -220,7 +289,7 @@ async def search_web(
     *,
     limit: int = 5,
     domains: Sequence[str] = tuple(ALLOWLIST),
-    provider: SearchProvider = cached_tavily_search,
+    provider: SearchProvider = default_search,
     transport: httpx2.AsyncBaseTransport | None = None,  # tests only
     save: bool = True,
     skip_hosts: frozenset[str] = frozenset(),

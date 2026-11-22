@@ -14,7 +14,7 @@ from tavily import BadRequestError, InvalidAPIKeyError, UsageLimitExceededError
 from tavily.errors import ForbiddenError
 from tavily.errors import TimeoutError as TavilyTimeoutError
 
-from prawdowid import cache, factcheck, safefetch, websearch
+from prawdowid import cache, factcheck, safefetch, search_cache, websearch
 from prawdowid.privacy import mask_personal_data
 from prawdowid.websearch import (
     ALLOWLIST,
@@ -908,3 +908,98 @@ def test_markup_is_read_from_a_page_that_declares_its_encoding():
     page = '<?xml version="1.0" encoding="utf-8"?>' + marked_up(claim_review())
     assert websearch._claim_reviews(page, REVIEW_PAGE) == [RATING]
     assert websearch._claim_reviews("", REVIEW_PAGE) == []
+
+
+def test_perplexity_without_a_key_is_search_unavailable():
+    with pytest.raises(SearchUnavailable):
+        websearch.perplexity_search("x", domains=["gov.pl"], limit=5)
+
+
+def _perplexity_raising(exc):
+    class Broken:
+        class search:
+            @staticmethod
+            def create(**kwargs):
+                raise exc
+
+    return Broken()
+
+
+def test_perplexity_errors_become_search_unavailable(monkeypatch):
+    import httpx
+    import perplexity
+
+    error = perplexity.APIConnectionError(request=httpx.Request("POST", "https://x"))
+    monkeypatch.setattr(websearch, "_perplexity_client", _perplexity_raising(error))
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test")
+    with pytest.raises(SearchUnavailable) as err:
+        websearch.perplexity_search("x", domains=["gov.pl"], limit=5)
+    assert not search_cache.is_limit(err.value)
+
+
+def test_perplexity_rate_limit_is_a_search_limit(monkeypatch):
+    import httpx
+    import perplexity
+
+    request = httpx.Request("POST", "https://x")
+    error = perplexity.RateLimitError(
+        "too many", response=httpx.Response(429, request=request), body=None
+    )
+    monkeypatch.setattr(websearch, "_perplexity_client", _perplexity_raising(error))
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test")
+    with pytest.raises(SearchUnavailable) as err:
+        websearch.perplexity_search("x", domains=["gov.pl"], limit=5)
+    assert search_cache.is_limit(err.value)
+
+
+def test_perplexity_result_is_mapped_to_a_search_hit(monkeypatch):
+    from types import SimpleNamespace
+
+    seen = {}
+
+    class Fake:
+        class search:
+            @staticmethod
+            def create(**kwargs):
+                seen.update(kwargs)
+                return SimpleNamespace(
+                    results=[
+                        SimpleNamespace(
+                            url="https://stat.gov.pl/a",
+                            title="GUS",
+                            snippet="Inflacja 4,9%.",
+                            date="2026-10-30",
+                        ),
+                        SimpleNamespace(url="", title="no url", snippet="", date=None),
+                    ]
+                )
+
+    monkeypatch.setattr(websearch, "_perplexity_client", Fake())
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test")
+    hits = websearch.perplexity_search("inflacja", domains=["stat.gov.pl"], limit=5)
+    assert hits == [
+        SearchHit(
+            url="https://stat.gov.pl/a",
+            title="GUS",
+            snippet="Inflacja 4,9%.",
+            published_date=date(2026, 10, 30),
+        )
+    ]
+    assert seen["search_domain_filter"] == ["stat.gov.pl"]
+    assert seen["max_results"] == 5
+
+
+def test_default_search_uses_perplexity_only_with_its_key(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        websearch, "perplexity_search", lambda q, **kw: calls.append("perplexity") or []
+    )
+    monkeypatch.setattr(
+        websearch, "cached_tavily_search", lambda q, **kw: calls.append("tavily") or []
+    )
+    websearch.default_search("x", domains=["gov.pl"], limit=5)
+    monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-test")
+    websearch.default_search("x", domains=["gov.pl"], limit=5)
+    monkeypatch.setenv("PRAWDOWID_SEARCH_PROVIDER", "tavily")
+    websearch.default_search("x", domains=["gov.pl"], limit=5)
+    assert calls == ["tavily", "perplexity", "tavily"]

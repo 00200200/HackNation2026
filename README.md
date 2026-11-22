@@ -36,8 +36,8 @@ technical failure or a request to clarify is a grey notice, never a verdict.
 
 - Claude (through PydanticAI) splits the text into claims and labels quotes. The verdict itself
   comes from rules in code, `judge.decide()`.
-- Each claim is looked up in parallel in Google Fact Check Tools, the www.gov.pl site search, Tavily
-  web search on allowlisted domains, our evidence corpus (`corpus/evidence.jsonl`) and EUvsDisinfo,
+- Each claim is looked up in parallel in Google Fact Check Tools, the www.gov.pl site search, web
+  search on allowlisted domains (Perplexity, or Tavily without its key), our evidence corpus (`corpus/evidence.jsonl`) and EUvsDisinfo,
   which is context only.
 - PESEL, ID card, passport, phone, e-mail, account and card numbers are masked before
   the model sees the text. Checks are kept for 30 days and can be deleted per session.
@@ -107,7 +107,8 @@ Most setups need only these keys. Every variable, its default and what it change
 |---|---|
 | `ANTHROPIC_API_KEY` | Required. Without it every check returns `technical_error`. |
 | `GOOGLE_FACTCHECK_API_KEY` | Fact-checkers' ratings. Without it Fact Check counts as down, so a claim without enough other evidence is `nie sprawdzono`. |
-| `TAVILY_API_KEY` | Web search on allowlisted domains. Without it web search is reported as unavailable. |
+| `PERPLEXITY_API_KEY` | Web search on allowlisted domains (Perplexity Search API). Without it, `TAVILY_API_KEY` is used. |
+| `TAVILY_API_KEY` | Fallback web search on allowlisted domains. With neither key, web search is reported as unavailable. |
 | `EUVSDISINFO_API_KEY` | Known disinformation narratives, context only. |
 | `PRAWDOWID_ADMIN_TOKEN` | Turns on the moderator queue and `GET /api/cases`. Unset: no queue. |
 | `DISCORD_BOT_TOKEN` | Only for the Discord bot. |

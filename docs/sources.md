@@ -20,10 +20,10 @@ Step 2 also searches www.gov.pl itself, next to Fact Check, EUvsDisinfo and web 
 | robots.txt | `User-Agent: * / Allow: /` (checked 2026-11-21). |
 | Licence | Public sector information; re-use under the Polish act on open data and re-use of public sector information (ustawa z 11.08.2021) and the gov.pl terms: **UNCONFIRMED**, nobody has checked the gov.pl terms yet. We quote short passages with a link, as for every other source. |
 
-Web search leaves `www.gov.pl` (and bare `gov.pl`) pages to this lookup while it is on, so the same
+Web search (Perplexity or Tavily) leaves `www.gov.pl` (and bare `gov.pl`) pages to this lookup while it is on, so the same
 page is not searched twice. The filter is on the host in our code, not Tavily's `exclude_domains`:
 Tavily drops a `www.` prefix, so excluding `www.gov.pl` there also dropped `sejm.gov.pl` and every
-other `*.gov.pl` site (tested 2026-11-21). While filtering, web search asks Tavily for twice the
+other `*.gov.pl` site (tested 2026-11-21). While filtering, web search asks the provider for twice the
 results (10) and keeps the first 5 left, since www.gov.pl pages can fill most of a result list. Other `*.gov.pl` sites (Sejm, GUS, PKW, NIK) are not
 covered by the gov.pl search and stay in web search.
 
@@ -41,11 +41,13 @@ page with no date anywhere is kept with an empty `published_at`: the answer says
 publikacji", the verdict lists it as a limitation and an undated source never makes the evidence
 "silna" (#95). The per-document list goes to `corpus/manifest.jsonl` when the corpus is built with
 `uv run python -m prawdowid.corpus`.
-**The corpus is not built yet:** it needs `TAVILY_API_KEY`, which no one on the team has set yet.
-Search provider is now **Tavily** (`/search`, official API, see `WORKLOG.md` Decisions, #7, #8);
-it replaced DuckDuckGo (`ddgs`), which returned no results from our machine on 2026-11-21.
+**The corpus is not built yet:** it needs a search key (`PERPLEXITY_API_KEY` or `TAVILY_API_KEY`), which no one on the team has set yet.
+Search provider is **Perplexity** (Search API, `perplexityai` SDK, restricted to the allowlist with
+`search_domain_filter`, country PL, language pl) when `PERPLEXITY_API_KEY` is set, otherwise
+**Tavily** (`/search`, official API, see `WORKLOG.md` Decisions, #7, #8; `PRAWDOWID_SEARCH_PROVIDER=tavily`
+forces it). The `/zrodla` page names the active provider. Tavily replaced DuckDuckGo (`ddgs`), which returned no results from our machine on 2026-11-21.
 
-Tavily results are cached per query (`prawdowid/search_cache.py`, #110) so reruns and repeated
+Tavily results are cached per query (Perplexity results are not cached) (`prawdowid/search_cache.py`, #110) so reruns and repeated
 questions spend no credits: key = casefolded, whitespace-folded masked query + sorted domains +
 limit; TTL `PRAWDOWID_SEARCH_CACHE_TTL_S` (default 24 h, at most `RETENTION_DAYS`, 0 = off); at most
 2,000 entries, persisted in `corpus/search_cache.jsonl`. Failures and limit answers (HTTP 429, 432,
@@ -104,8 +106,8 @@ so that count is UNCONFIRMED here. Official pages and PDFs are not searched for 
 
 When our own fetch cannot use an allowlisted page (the site answers 403, 429 or another 4xx, a
 5xx or nothing after the retry, its robots.txt cannot be read, it is slower than 8 s, over 2 MB,
-of another type, or has no readable text), the hit stays as evidence built only from what the search API returned for it: Tavily's
-title and `content` (up to three passages of about 500 characters copied from the page, joined by
+of another type, or has no readable text), the hit stays as evidence built only from what the search API returned for it: the provider's
+title (the snippet rules below are from Tavily's docs; Perplexity's snippet length is UNCONFIRMED) and `content` (up to three passages of about 500 characters copied from the page, joined by
 `[...]`, per the [search API docs](https://docs.tavily.com/documentation/api-reference/endpoint/search),
 read 2026-11-22), with the type and publisher from the allowlist, the provider's
 `published_date` or none, and the time of the search as `fetched_at`. Tavily calls that date its
