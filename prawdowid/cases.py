@@ -10,15 +10,18 @@ written; when the write fails it logs that and returns None, so an answer never 
 went to the moderator when it did not (brief section 5: a recommended hand-off is not a hand-off).
 
 Who reads the queue: whoever the administrator gives `PRAWDOWID_ADMIN_TOKEN` (a moderator or an
-analyst), through `GET /api/cases` (`read_cases`). Nobody is notified otherwise: no e-mail, no webhook.
+analyst), through `GET /api/cases` (`read_cases`). Without the variable nobody can read it, so
+`report` files nothing and returns None: no answer mentions a moderator. Nobody is notified when a
+case opens: no e-mail, no webhook.
 
 Storage: one JSON line per case in `PRAWDOWID_CASES` (default `cases.jsonl` next to the check log,
 so on the `checklog` volume in Docker) with its reports: session, time, channel, reasons, the
-masked claims (the masked question when there is no claim), the masked page URL, the lookups that
-ran and the URLs they found. A report older than `RETENTION_DAYS` is dropped on every write, a case
-left without reports goes with it, and `delete_session` removes one session's reports. The last
-case number is kept in a `.seq` file next to it, so a number is never given twice. Writers hold a
-file lock, as in the check log.
+masked claims (the masked question when there is no claim, a link without its secret values), the
+masked page URL, the lookups that ran and the URLs they found. A report older than `RETENTION_DAYS`
+is dropped on every write (a filed question or a deleted session), a case left without reports goes
+with it, and `delete_session` removes one session's reports. The last case number is kept in a
+`.seq` file next to it, so a number is never given twice. Writers hold a file lock, as in the check
+log, and replace each file whole through a temporary one.
 """
 
 import fcntl
@@ -40,10 +43,12 @@ log = logging.getLogger("prawdowid")
 CASES = Path(
     os.getenv("PRAWDOWID_CASES") or checklog.CHECK_LOG.with_name("cases.jsonl")
 )
+# Bearer token for `GET /api/cases`. The queue exists only while it is set.
+ADMIN_TOKEN_ENV = "PRAWDOWID_ADMIN_TOKEN"
 # Share of their distinct stems two claims must have in common to be one case: a first guess, not
-# tuned. On hand-made rumours (none from the eval set), rewordings score 0.5 to 0.86 and unrelated
-# claims 0.0. Shared words are not shared meaning: "Rząd podniósł podatki" and "Rząd obniżył
-# podatki" (0.5) land in one case too, and the moderator sees every claim of a case.
+# tuned on any case. Shared words are not shared meaning: "Rząd podniósł podatki" and "Rząd obniżył
+# podatki" reach it too (tests/test_cases.py) and land in one case, and the moderator sees every
+# claim of a case.
 MIN_SIMILARITY = float(os.getenv("PRAWDOWID_CASE_MIN_SIMILARITY") or 0.5)
 # A check without claims (an unclear text, a refused link) keeps at most this much of the question.
 QUESTION_CHARS = 300
@@ -128,6 +133,11 @@ def high_risk(text: str) -> list[str]:
     return [topic for topic, pattern in HIGH_RISK.items() if pattern.search(folded)]
 
 
+def admin_token() -> str:
+    """The token that reads the queue, "" when none is set. Read per call, so tests can set it."""
+    return os.getenv(ADMIN_TOKEN_ENV) or ""
+
+
 def report(
     session: str,
     channel: str,
@@ -137,7 +147,10 @@ def report(
     started_at: datetime,
 ) -> ModeratorCase | None:
     """Adds the check to the moderator's queue when it needs a person. The case it joined, or
-    None: nothing to report, the session was deleted while the check ran, or the write failed."""
+    None: nobody can read the queue (no `admin_token`), nothing to report, the session was
+    deleted while the check ran, or the write failed."""
+    if not admin_token():
+        return None
     entry = _report(session, channel, question, result)
     deleted = checklog.DELETED.get(session)
     if entry is None or (deleted and started_at <= deleted):
@@ -190,7 +203,7 @@ def _report(
         time=datetime.now(UTC),
         channel=channel,
         reasons=sorted(reasons),
-        claims=claims or [mask_personal_data(question)[:QUESTION_CHARS]],
+        claims=claims or [checklog.masked_question(question)[:QUESTION_CHARS]],
         page=result.page and mask_personal_data(result.page.url),
         lookups=sorted(steps & LOOKUPS),
         sources=sorted(
@@ -236,20 +249,19 @@ def _next_id(path: Path, cases: list[Case]) -> int:
     except (OSError, ValueError):
         last = 0
     number = max([last, *(c.id for c in cases)]) + 1
-    seq.write_text(str(number), encoding="utf-8")
+    _replace(seq, str(number))
     return number
 
 
 def _drop_session(path: Path, session: str) -> int:
+    # Saved even when the session filed nothing: expired reports of others go too (`_load`).
     cases = _load(path)
     kept = [
         c.model_copy(update={"reports": [r for r in c.reports if r.session != session]})
         for c in cases
     ]
-    removed = sum(len(c.reports) for c in cases) - sum(len(c.reports) for c in kept)
-    if removed:
-        _save(path, [c for c in kept if c.reports])
-    return removed
+    _save(path, [c for c in kept if c.reports])
+    return sum(len(c.reports) for c in cases) - sum(len(c.reports) for c in kept)
 
 
 def _summary(case: Case) -> CaseSummary:
@@ -286,8 +298,14 @@ def _load(path: Path) -> list[Case]:
 
 
 def _save(path: Path, cases: list[Case]) -> None:
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text("".join(c.model_dump_json() + "\n" for c in cases), encoding="utf-8")
+    _replace(path, "".join(c.model_dump_json() + "\n" for c in cases))
+
+
+def _replace(path: Path, text: str) -> None:
+    """Writes `text` to `<name>.tmp` and renames it over `path`, so neither a reader nor a crash
+    leaves half a file."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 
 

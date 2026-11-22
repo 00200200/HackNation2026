@@ -5,10 +5,14 @@ A record holds the masked question, channel, start and end time, total and per-s
 and abstentions show up there), model calls with tokens, cost, security events, incident ids and the
 moderator case the check joined.
 
-The question is stored masked (prawdowid/privacy.py), records older than `RETENTION_DAYS` are
-dropped on every write, and `delete_session` removes every record of one session. Besides this
-file, only the moderator cases (prawdowid/cases.py) keep anything of a check: the masked claims of
-the ones a person should look at. The source cache and the database are never written by a check.
+The question is stored masked (prawdowid/privacy.py; a link without its secret query values, see
+`masked_question`), records older than `RETENTION_DAYS` are dropped on every write, and
+`delete_session` removes every record of one session. Besides this
+file, the moderator cases (prawdowid/cases.py) keep the masked claims of the checks a person should
+look at, with the session id. Web search in a check also stores what it found, never user text or
+a session id: the public pages it fetched in the source cache (`corpus/docs.jsonl`) and the hits
+under a hash of the masked query (prawdowid/search_cache.py). A check never writes the database.
+See docs/privacy.md.
 """
 
 import fcntl
@@ -19,7 +23,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from prawdowid.contract import CheckResult
+from prawdowid.link import redact
 from prawdowid.privacy import RETENTION_DAYS, mask_personal_data
+from prawdowid.verifier import is_link
 
 log = logging.getLogger("prawdowid")
 
@@ -28,6 +34,12 @@ CHECK_LOG = Path(os.getenv("PRAWDOWID_CHECK_LOG") or "logs/checks.jsonl")
 # deletion also covers checks still running. ponytail: in memory, one uvicorn process (Dockerfile);
 # a restart forgets it but also ends every running check. Move it into the log for several workers.
 DELETED: dict[str, datetime] = {}
+
+
+def masked_question(question: str) -> str:
+    """The question as stored here and in the moderator cases: personal data masked, and a link
+    without its secret query values (link.redact, as for the page URL)."""
+    return mask_personal_data(redact(question) if is_link(question) else question)
 
 
 def record(
@@ -51,7 +63,7 @@ def record(
         "started_at": started_at.isoformat(),
         "latency_ms": latency_ms,
         "channel": channel,
-        "question": mask_personal_data(question),
+        "question": masked_question(question),
         "status": result.status,
         "error": error,
         "message": result.message,

@@ -23,8 +23,9 @@ services:
       # Eval fault switch (docs/eval-notes.md): honoured only with this secret; leave it unset on
       # the public demo.
       PRAWDOWID_EVAL_TOKEN: ${PRAWDOWID_EVAL_TOKEN:-}
-      # Bearer token for GET /api/cases, the moderator queue (docs/privacy.md); unset: no such
-      # route. The cases file sits next to the check log, on the same volume.
+      # Bearer token for GET /api/cases, the moderator queue (docs/privacy.md); unset: no queue,
+      # so no case is filed and no such route. The cases file sits next to the check log, on the
+      # same volume.
       PRAWDOWID_ADMIN_TOKEN: ${PRAWDOWID_ADMIN_TOKEN:-}
     volumes:
       - ./incidents:/app/incidents:ro

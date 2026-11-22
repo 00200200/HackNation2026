@@ -88,7 +88,9 @@ A full run of 30+ cases therefore takes several minutes.
   are skipped). A local server cannot do: the product refuses private addresses.
 - `moderator_case_id`: the moderator loop (scenario H, #79). The product sends `moderator_case` (`id`, `status`
   `created` or `updated`, `count`) once the case is stored; the adapter passes it on and maps its `id` to
-  `moderator_case_id`.
+  `moderator_case_id`. The product files cases only while `PRAWDOWID_ADMIN_TOKEN` is set on it (without a reader
+  there is no queue): set it on the product under test (`.env` for `make dev`, the server's `.env`, see
+  `docs/deploy.md`), or the H cases fail `moderator_loop`. The harness does not need it.
 - A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord`. The adapter then runs the bot's own API client (`discord_bot.ask_api`, `X-Channel: discord`), so only the Discord connection itself is not exercised
   (formatting is covered by `tests/test_discord_bot.py`); without it `channel_consistency` is unknown.
   `PRAWDOWID_EXTRA_CHANNELS=demo` (or `discord,demo`) adds the /czat demo adapter (#116): the web request with

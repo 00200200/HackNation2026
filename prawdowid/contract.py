@@ -182,8 +182,8 @@ class CheckResult(BaseModel):
         None,
         description="The moderator case this question was stored in: a claim without enough "
         "evidence, a security event, or an unconfirmed claim on a high-risk topic. null when "
-        "nothing was stored, also when the case store failed: a channel then says nothing "
-        "about a moderator.",
+        "nothing was stored: the check needed no person, no moderator queue is set up on this "
+        "server, or the case store failed. A channel then says nothing about a moderator.",
     )
     # Check log only (prawdowid/checklog.py): never sent to a channel.
     steps_ms: dict[str, int] = Field(default={}, exclude=True)

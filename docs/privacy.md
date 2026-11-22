@@ -82,7 +82,7 @@ Where masking runs:
 One JSON line in the check log (`PRAWDOWID_CHECK_LOG`, default `logs/checks.jsonl`, in Docker
 `/var/lib/prawdowid/checks.jsonl` on the named volume `checklog`, so a redeploy keeps it), written by `POST /api/checks` for
 every check, also a failed or timed-out one (#14): session id, start and end time, total latency,
-channel, the masked question, status, `error` (`"timeout"` when the API's 60 s limit fired, or the exception class when verify raised;
+channel, the masked question (a link without its secret query values), status, `error` (`"timeout"` when the API's 60 s limit fired, or the exception class when verify raised;
 `null` when the pipeline returned a notice, also its own 40 s budget cut), the notice message, the masked page URL and content hash for a link, the
 time of each step (`fetch`, `extract`, and per claim `factcheck`, `euvsdisinfo`, `web`, `rerank`,
 `judge`, `retry_*`), every model answer (model name, input and output tokens), `cost_usd`, security
@@ -99,8 +99,9 @@ task.
 ## Moderator cases
 
 Brief section 2 asks that questions the sources cannot settle reach a person the administrator
-names. `prawdowid/cases.py` keeps them as moderator cases (#79, scenario H). The API files a check
-when a checked claim ends `brak wystarczających dowodów`, when the check logged a security event,
+names. `prawdowid/cases.py` keeps them as moderator cases (#79, scenario H). While
+`PRAWDOWID_ADMIN_TOKEN` is set, the API files a check when a checked claim ends `brak
+wystarczających dowodów`, when the check logged a security event,
 or when a claim about evacuation or an RCB alert, a health emergency, elections or mobilisation (a
 short list in code) ended false, misleading or without enough evidence. A question with a similar
 claim joins the open case and raises its count (shared word stems, `PRAWDOWID_CASE_MIN_SIMILARITY`,
@@ -109,13 +110,15 @@ default 0.5).
 Each case (`PRAWDOWID_CASES`, default `cases.jsonl` next to the check log, so in Docker
 `/var/lib/prawdowid/cases.jsonl` on the `checklog` volume) stores its number and opening time and,
 for each question in it, the session id, time, channel, why it was filed, the masked claims (for a
-check without claims, the first 300 characters of the masked question), the masked page URL of a
-link, the lookups that ran and the URLs they found. Claims are masked again right before the
-write. The last case number sits in `cases.seq`, so no number is given twice.
+check without claims, the first 300 characters of the masked question; for a link, its URL without
+secret query values), the masked page URL of a link, the lookups that ran and the URLs they found.
+Claims are masked again right before the write. The last case number sits in `cases.seq`, so no
+number is given twice.
 
 The administrator decides who reads the cases: they give `PRAWDOWID_ADMIN_TOKEN` to a moderator or
 an analyst, who calls `GET /api/cases` with `Authorization: Bearer <token>`. Without the variable
-the route does not exist (404). The list shows the open cases, the most asked first, with counts,
+nobody can read the cases, so there is no queue: no check is filed, no answer mentions a moderator
+and the route does not exist (404). The list shows the open cases, the most asked first, with counts,
 the first and last question time, the claims, channels, lookups and URLs. It never shows session
 ids. Nobody is told when a case opens: there is no e-mail or webhook, so the moderator has to read
 the list.
@@ -170,7 +173,9 @@ The API gives every check a session id in the `X-Session-Id` response header. A 
 the header back keeps the same session. The web page keeps it in `sessionStorage` (until the tab
 closes) and shows "Usuń moje sprawdzenia", which calls `DELETE /api/sessions/{id}` and removes every
 check log record of that session and its questions in the moderator cases (a case left without
-questions goes too). The answer is `{"deleted": <number of check log records>}`.
+questions goes too). The answer is `{"deleted": <check log records>, "withdrawn": <questions taken
+out of moderator cases>}`. When `withdrawn` is above 0, the web page and `/czat` also say the
+questions were withdrawn from the moderator's queue.
 The session id is a bearer token: anyone who has it can read (`GET /api/sessions/{id}`) and
 delete that session's records; there is no other login.
 

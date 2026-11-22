@@ -103,3 +103,12 @@ def test_every_channel_names_a_stored_moderator_case_the_same_way():
         assert "`${MODERATOR_NOTE} (sprawa ${c.id}).`" in js
         assert "(check.moderator_case)" in js
     assert 'f"{MODERATOR_NOTE} (sprawa {case.id})."' in BOT_SOURCE
+
+
+def test_both_pages_say_when_deleting_withdrew_questions_from_the_moderator_cases():
+    """DELETE /api/sessions/{id} answers how many questions it took out of the moderator cases
+    (`withdrawn`); after an earlier "Zgłoszenie trafiło ..." both pages say so, in the same words."""
+    sentence = "Usunęliśmy sprawdzenia z tej sesji i wycofaliśmy zgłoszenia z kolejki moderatora."
+    for js in ((PUBLIC / "app.js").read_text(encoding="utf-8"), CZAT_JS):
+        assert f'const DELETED_AND_WITHDRAWN = "{sentence}";' in js
+        assert "withdrawn > 0 ? DELETED_AND_WITHDRAWN" in js

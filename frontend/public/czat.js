@@ -26,6 +26,8 @@ const INCIDENT_NOTE = "Ta treść przypomina incydenty z bazy organizatora. To t
 const CONNECTION_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 // Scenario H: the API sets moderator_case only once the case is stored.
 const MODERATOR_NOTE = "Zgłoszenie trafiło do kolejki moderatora";
+// After "Usuń moje sprawdzenia" took the session's questions out of the moderator cases (as on the web page).
+const DELETED_AND_WITHDRAWN = "Usunęliśmy sprawdzenia z tej sesji i wycofaliśmy zgłoszenia z kolejki moderatora.";
 const TECHNICAL_ERROR_MESSAGE = "Wystąpił błąd techniczny i nie udało się sprawdzić tej treści. Spróbuj ponownie za chwilę.";
 const KIND_LABELS = { attribution: "Kto co powiedział", quoted: "Treść cytatu" };
 const MATCH_LABELS = { url: "ten sam adres", domain: "domena z bazy", text: "podobny tekst" };
@@ -379,10 +381,12 @@ deleteSession.addEventListener("click", async () => {
       signal: AbortSignal.timeout(10000),
     });
     if (!resp.ok) throw new Error(String(resp.status));
+    // How many of the session's questions left the moderator cases: a case note in an earlier answer no longer holds.
+    const { withdrawn } = await resp.json().catch(() => ({}));
     storeSession(null);
     deleteSession.hidden = true;
     input.focus();
-    sessionStatus.textContent = "Usunęliśmy sprawdzenia z tej sesji.";
+    sessionStatus.textContent = withdrawn > 0 ? DELETED_AND_WITHDRAWN : "Usunęliśmy sprawdzenia z tej sesji.";
   } catch {
     sessionStatus.textContent = "Nie udało się usunąć sprawdzeń. Spróbuj ponownie za chwilę.";
   } finally {

@@ -146,8 +146,10 @@ claims, keeps each question 30 days and drops a session's questions when the ses
 The answer carries `moderator_case` only after the write, and the channels say "Zgłoszenie trafiło
 do kolejki moderatora (sprawa N)" only then, so a failed write never reads as a hand-off (brief
 section 5). The moderator or analyst who holds `PRAWDOWID_ADMIN_TOKEN` reads the queue at
-`GET /api/cases`. There is no push notification and no moderator screen beyond that JSON list. It
-has not run on the live server yet.
+`GET /api/cases`. Without that variable nobody could read it, so no check is filed and no answer
+mentions a moderator. There is no push notification and no moderator screen beyond that JSON list.
+It has not run on the live server yet; the server's `.env` needs the variable first
+([deploy.md](../deploy.md)).
 
 ## Default limits, not performance measurements
 

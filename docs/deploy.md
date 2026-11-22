@@ -21,7 +21,7 @@ there. No CI service is involved, and a failed deploy is retried on the next run
 | `caddy/Caddyfile` | HTTPS sites: `DOMAIN` and `www`, doc2json.pl and `www` |
 | `deploy/pull-deploy.sh` | deploys `origin/prod` when it moves |
 | `deploy/faktczyfejk-deploy.service`, `.timer` | run the script every minute as `ubuntu` |
-| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*` (never committed; deploys leave it alone) |
+| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*`, `PRAWDOWID_ADMIN_TOKEN` (never committed; deploys leave it alone) |
 
 ## What you need
 
@@ -72,7 +72,7 @@ Back on the server, clone `prod` and write the configuration:
 sudo install -d -o ubuntu -g ubuntu /opt/faktczyfejk
 git clone --branch prod git@github.com:00200200/HackNation2026.git /opt/faktczyfejk
 cd /opt/faktczyfejk
-printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nTAVILY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
+printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nTAVILY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\nPRAWDOWID_ADMIN_TOKEN=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 32)" > .env
 chmod 600 .env
 nano .env      # paste the keys after ANTHROPIC_API_KEY=, TAVILY_API_KEY= and the others you have
 ```
@@ -90,6 +90,19 @@ the `DATABASE_URL` that Compose builds for the backend. `COMPOSE_FILE` makes eve
 `docker compose` command in `/opt/faktczyfejk` load both Compose files. Empty `PRAWDOWID_MODEL`
 means the default model. `get.docker.com` is Docker's install script; Docker recommends its apt
 repository for long-lived production hosts: https://docs.docker.com/engine/install/ubuntu/.
+
+`PRAWDOWID_ADMIN_TOKEN` is generated the same way as the password. It switches on the moderator
+queue (scenario H, [privacy.md](privacy.md#moderator-cases)) and is the bearer token that reads it,
+so give it only to the moderator the administrator names. With it empty, no check is filed and no
+answer mentions a moderator, so the eval's `moderator_loop` fails. In `/opt/faktczyfejk`:
+
+```bash
+# Only on a server set up before the queue existed: add the token and restart the backend.
+printf 'PRAWDOWID_ADMIN_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env && docker compose up -d
+# Read the queue: a JSON list, the most asked case first.
+TOKEN=$(sed -n 's/^PRAWDOWID_ADMIN_TOKEN=//p' .env)
+curl -fsS -H "Authorization: Bearer $TOKEN" https://DOMAIN/api/cases
+```
 
 If you turn on the provider's firewall, allow 22/tcp, 80/tcp, 443/tcp and 443/udp, and on a
 stateless one (OVHcloud Edge Network Firewall) also "TCP established", or the server's own outgoing

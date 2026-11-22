@@ -42,11 +42,14 @@ def check_log(monkeypatch, tmp_path):
 
 @pytest.fixture(autouse=True)
 def moderator_cases(monkeypatch, tmp_path):
-    """Every test keeps its moderator cases in a temporary file, never in the repo."""
+    """Every test keeps its moderator cases in a temporary file, never in the repo. As on a server
+    without PRAWDOWID_ADMIN_TOKEN, nobody reads the queue and nothing is filed, unless a test sets
+    the token (tests/test_cases.py does)."""
     from prawdowid import cases
 
     path = tmp_path / "cases.jsonl"
     monkeypatch.setattr(cases, "CASES", path)
+    monkeypatch.delenv(cases.ADMIN_TOKEN_ENV, raising=False)
     return path
 
 

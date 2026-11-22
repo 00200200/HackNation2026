@@ -73,6 +73,12 @@ def stored(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
+@pytest.fixture(autouse=True)
+def reader(monkeypatch, moderator_cases):
+    """Someone reads the queue (PRAWDOWID_ADMIN_TOKEN set); a test without one unsets it."""
+    monkeypatch.setenv(cases.ADMIN_TOKEN_ENV, TOKEN)
+
+
 def test_an_unanswered_claim_opens_a_case_and_a_reworded_one_joins_it():
     first = report(answer(claim(RUMOUR)))
     second = report(answer(claim(RUMOUR_REWORDED)), session="session-0002")
@@ -95,6 +101,12 @@ def test_a_different_claim_opens_its_own_case():
     assert other == ModeratorCase(id=2, status="created", count=1)
     assert cases.similarity(RUMOUR, OTHER) == 0.0
     assert cases.similarity(RUMOUR, RUMOUR_REWORDED) >= cases.MIN_SIMILARITY
+
+
+def test_shared_words_are_not_shared_meaning():
+    """A known limit (cases.MIN_SIMILARITY): opposite claims in the same words share a case."""
+    raised, lowered = "Rząd podniósł podatki.", "Rząd obniżył podatki."
+    assert cases.similarity(raised, lowered) >= cases.MIN_SIMILARITY
 
 
 @pytest.mark.parametrize(
@@ -150,6 +162,20 @@ def test_a_question_without_claims_is_cut_to_a_short_subject(moderator_cases):
     report(result, question="słowo " * 200)
     [case] = stored(moderator_cases)
     assert len(case["reports"][0]["claims"][0]) == cases.QUESTION_CHARS
+
+
+def test_a_link_without_claims_is_filed_without_its_secret_values(moderator_cases):
+    """The moderator sees the link as the page URL is kept (link.redact), never a token in it."""
+    result = CheckResult(
+        status=Status.NEEDS_CLARIFICATION,
+        message="Doprecyzuj.",
+        security_events=[SecurityEvent(location="page", detector="patterns")],
+    )
+    report(result, question="https://example.org/a?token=SECRET&strona=2")
+    [case] = stored(moderator_cases)
+    assert case["reports"][0]["claims"] == [
+        "https://example.org/a?token=REDACTED&strona=2"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -229,6 +255,18 @@ def test_delete_session_removes_only_that_sessions_questions(moderator_cases):
         "session-bbbb"
     ]
     assert report(answer(claim(OTHER))).id == 3
+
+
+def test_deleting_a_session_that_filed_nothing_drops_expired_questions(moderator_cases):
+    """docs/privacy.md: expired questions go when a question is filed or any session is deleted."""
+    report(answer(claim(RUMOUR)), session="session-aaaa")
+    old = stored(moderator_cases)
+    old[0]["reports"][0]["time"] = (
+        datetime.now(UTC) - timedelta(days=cases.RETENTION_DAYS, minutes=1)
+    ).isoformat()
+    moderator_cases.write_text(json.dumps(old[0]) + "\n", encoding="utf-8")
+    assert cases.delete_session("session-bbbb") == 0
+    assert moderator_cases.read_text(encoding="utf-8") == ""
 
 
 def test_a_check_still_running_when_its_session_was_deleted_is_not_filed(
@@ -355,14 +393,25 @@ def test_deleting_a_session_removes_its_questions_from_the_cases(client):
     headers = {"X-Session-Id": "session-0001"}
     client.post("/api/checks", json={"input": QUESTION}, headers=headers)
     client.post("/api/checks", json={"input": QUESTION})
-    assert client.delete("/api/sessions/session-0001").json() == {"deleted": 1}
+    assert client.delete("/api/sessions/session-0001").json() == {
+        "deleted": 1,
+        "withdrawn": 1,
+    }
     [case] = cases.read_cases()
     assert case.count == 1
 
 
-def test_the_admin_view_is_off_without_its_token(client, monkeypatch):
-    monkeypatch.delenv(app_module.ADMIN_TOKEN_ENV, raising=False)
-    client.post("/api/checks", json={"input": QUESTION})
+def test_without_the_token_nothing_is_filed_and_no_channel_mentions_a_moderator(
+    client, monkeypatch, moderator_cases
+):
+    """Brief section 5: with PRAWDOWID_ADMIN_TOKEN unset (the default) nobody can read the queue,
+    so a question without enough evidence is not filed and no answer says it went anywhere."""
+    monkeypatch.delenv(cases.ADMIN_TOKEN_ENV)
+    body = client.post("/api/checks", json={"input": QUESTION}).json()
+    assert body["claims"][0]["verdict"] == Verdict.INSUFFICIENT_EVIDENCE
+    assert body["moderator_case"] is None and not moderator_cases.exists()
+    text = discord_bot.render(CheckResult.model_validate(body))
+    assert "moderator" not in text.lower()
     resp = client.get("/api/cases", headers={"Authorization": "Bearer anything"})
     assert resp.status_code == 404
 
@@ -371,15 +420,13 @@ def test_the_admin_view_is_off_without_its_token(client, monkeypatch):
     "headers",
     [{}, {"Authorization": "Bearer wrong"}, {"Authorization": f"Basic {TOKEN}"}],
 )
-def test_the_admin_view_refuses_a_missing_or_wrong_token(client, monkeypatch, headers):
-    monkeypatch.setenv(app_module.ADMIN_TOKEN_ENV, TOKEN)
+def test_the_admin_view_refuses_a_missing_or_wrong_token(client, headers):
     resp = client.get("/api/cases", headers=headers)
     assert resp.status_code == 401
     assert resp.headers["WWW-Authenticate"] == "Bearer"
 
 
-def test_the_admin_view_lists_the_cases(client, monkeypatch):
-    monkeypatch.setenv(app_module.ADMIN_TOKEN_ENV, TOKEN)
+def test_the_admin_view_lists_the_cases(client):
     client.post("/api/checks", json={"input": QUESTION})
     client.post("/api/checks", json={"input": QUESTION})
     resp = client.get("/api/cases", headers={"Authorization": f"Bearer {TOKEN}"})
