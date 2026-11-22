@@ -12,16 +12,55 @@ brief section 5).
 | E-mail address | `name@domain.tld` | `[e-mail]` |
 | Polish account number (NRB) | 26 digits, optional `PL`, groups of four | `[numer konta]` |
 | Other IBAN | country code, check digits, mod-97 valid | `[numer konta]` |
-| Phone number | `+48 600 100 200` or `600-100-200` | `[telefon]` |
+| Phone number | With a country code (`+48 600 100 200`, `(+48) 600 123 456`, `+48600123456`, `0048 …`, `(48) …`): any nine digits, grouped 3-3-3, 3-2-2-2 or 2-3-2-2 (a landline: `+48 22 123 45 67`) or in one run. Without one: `600-100-200`, a landline with its area code in brackets (`(22) 123 45 67`), or nine digits (`600 100 200`, `600100200`, `600 12 34 56`) that start with a mobile prefix or follow a label such as "tel." (`tel. nr 22 123 45 67`) | `[telefon]` |
 | PESEL | 11 digits with a valid checksum | `[PESEL]` |
+| ID card number | 3 capital letters and 6 digits, with or without a space (`ABC123456`, `ABC 123456`), check digit valid | `[numer dowodu]` |
+| Passport number | 2 capital letters and 7 digits, no space (`AB1234567`) | `[numer paszportu]` |
 | Card number | 13–19 digits, in one run or groups of four, Luhn valid | `[numer karty]` |
 
-It does not detect names, addresses or phone numbers written as `600 100 200` or `600100200`: in a
-claim, digit runs like these are usually amounts. Checksums keep most ordinary numbers out (an
-11-digit register number without a valid PESEL checksum stays).
+It does not detect names or addresses. Names of public figures stay on purpose: the mentor's guidance
+(Discord, 21.11) is to mask PESEL, ID card and phone numbers, but not what changes the meaning of the
+question or is needed to find evidence. For the same reason ordinary numbers stay:
 
-We checked Presidio (presidio-analyzer 2.2.366, 2026-11-21). Its only Polish recognizer is PESEL,
-which this module already covers, and it needs spaCy plus a language model. We kept the module.
+- Amounts, years and statute references (`123456789 zł`, `500 000 000 zł`, `w 2024 roku 1500 osób`,
+  `Dz.U. 2024 poz. 123`). A bare nine-digit number is a phone only with a mobile prefix or a label in front.
+  It stays when it ends in `000` (`450 000 000`), has a currency in front (`PLN`, `€`, `$`) or a currency,
+  `mln`, `tys.`, `%` or a count (`osób`, `mieszkańców`) behind it, is the tail of a longer number
+  (`1 600 123 456 zł`) or the head of one (`600 123 456 789`), or has decimals (`600123456,50`). A label
+  such as `tel.` beats the `000` rule or the count rule alone (`tel. 600 100 000` and `tel. 600 123 456
+  osoby, która dzwoniła` are masked), not both together (`liczba telefonów 226 000 000 sztuk`) and not
+  the currency rule. A dashed number (`600-100-200`) is masked wherever it stands.
+- Ids in a URL (`/artykul/600123456`, `?id=600123456`, `/tytul,600123456.html`), unless a label such as
+  `phone=` says it is a phone, and ids with a letter behind the digits (`gus-532015686e`). A number
+  after `REGON` stays too (a REGON can start like a mobile number).
+- A register number without a valid PESEL checksum, a code that fails the ID card check digit, a
+  currency code in front of an amount (`PLN 123456`), an acronym and a space in front of an amount that
+  happens to pass the check digit (`NFZ 100000 zł`, `GUS 550000 osób`) and a phrase such as `nr 1234567`
+  (a passport number has no space and capital letters).
+
+What this can get wrong: a random 11-digit number passes the PESEL checksum 1 time in 10 and a random
+3-letters-6-digits code passes the ID card check digit 1 time in 10, so both are sometimes masked
+although they are not personal data. The passport pattern has no check digit: UNCONFIRMED, the two
+unofficial descriptions we found put it in different places (3rd or last character). So any 2 capital
+letters and 7 digits are masked, an invoice code such as `FV1234567` too. A bare number that is not a
+phone but starts with a mobile prefix and has no currency or count next to it is masked (`512 345 678
+użytkowników`). Not detected: a landline without a country code, brackets or a label, a bare mobile
+number ending in `000` or followed by a count (`600 123 456 osoby starsze`), a number with `48` but no
+`+`, an ID card number in lower case or one with a space and a unit behind it (`ABC 412345 osób`), and a
+bare number directly followed by more digits, labelled or not (`600 123 456 601 234 567`, `tel. 600 123
+456 2024`; with a country code, or dashed, every number is masked).
+
+No library fits (checked 2026-11-22). Presidio (presidio-analyzer 2.2.366): its only Polish recognizer
+is PESEL, which this module already covers (an ID card recognizer is an open pull request, #2444), and
+it needs spaCy plus a language model. python-stdnum 2.2 has `pl` modules for NIP, PESEL and REGON only:
+no ID card or passport. phonenumbers 9.0.44 reports `123456789 zł` and `500 000 000 zł` as valid
+Polish numbers, so it would mask the amounts. polish-pii-recognizers (GitHub only, needs Presidio) and
+polanon (a whole masker with its own rules) were created in October and November 2026, and we did not
+take them. We kept the module. The ID card check digit follows the Polish Wikipedia article "Dowód
+osobisty w Polsce" (we found no official specification) and is tested against vectors from other
+projects' test suites. The mobile prefixes are the 13 mobile ones of the numbering plan (Dz.U. 2024
+poz. 1862). libphonenumber's Polish metadata has the same plus the range 21x, which the plan assigns to
+machine-to-machine services, so we left it out.
 
 Where masking runs:
 
@@ -30,7 +69,7 @@ Where masking runs:
 | Text sent to Claude for claim extraction (`verifier.verify_text`), pasted text and the text of a linked page | yes | A placeholder keeps the sentence, so claims still split. A claim about the personal data itself (for example "this account belongs to the charity") can no longer be checked from the number, which is the point. The claim and source sentence shown to the user carry the placeholder. |
 | Everything after extraction (`prawdowid/pipeline.py`, #11): web search, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`) and database queries (`cache.build_tsquery`) are masked again. |
 | Check log record (`checklog.record`) | yes | The question, the claims, the unchecked claims and the source URLs are masked again when the record is written, so a call site that forgets to mask cannot leak into the log. |
-| stdout log lines | yes | No raw user text: session id, channel, status, lengths, token counts, and the claims and search queries of each check (written by the model from the masked text, so a name or a phone written as `600 100 200` can still appear). Link URLs are masked (an e-mail in a query string), fetch errors are logged by type only. On top of that, every line of the `prawdowid` and `prawdowid.discord` loggers, tracebacks included, goes through `privacy.MaskingFilter` (set in `prawdowid/app.py` and `prawdowid/discord_bot.py`; uvicorn's own error log is not covered), so an unexpected exception that carries raw input is masked too. |
+| stdout log lines | yes | No raw user text: session id, channel, status, lengths, token counts, and the claims and search queries of each check (written by the model from the masked text, so a name can still appear). Link URLs are masked (an e-mail in a query string), fetch errors are logged by type only. On top of that, every line of the `prawdowid` and `prawdowid.discord` loggers, tracebacks included, goes through `privacy.MaskingFilter` (set in `prawdowid/app.py` and `prawdowid/discord_bot.py`; uvicorn's own error log is not covered), so an unexpected exception that carries raw input is masked too. |
 | The link itself, when it is fetched | no | We need the real address to fetch the page. |
 | Evidence fragments from source pages | no | They are public pages, and the quote must match the page word for word. |
 
