@@ -175,7 +175,9 @@ więc nie łączymy go w jeden wynik (metoda: [docs/eval-notes.md](../eval-notes
 
 Krótko: mówimy, co nie zadziałało. Gdy padną wszystkie źródła albo model, werdyktu nie ma. Gdy
 padnie źródło, które może rozstrzygnąć, a dowodów nie starcza, werdyktu też nie ma, i to reguła
-z #60 (PR #109), obecna na `main` i `prod`. Luka z #60 jest zamknięta.
+z #60 (PR #109), obecna na `main` i `prod`. Gdy inne źródła rozstrzygają, ocena jednak zapada:
+w pełnym przebiegu na `a14b93c` przypadek J01 (symulowana awaria Fact Check) dostał „wprowadzające
+w błąd” zamiast komunikatu technicznego, więc end-to-end ma 0,987, poniżej progu 1,0.
 
 Szczegóły: każde źródło ma własny limit czasu. Google Fact Check ma 15 s, EUvsDisinfo 5 s w potoku,
 jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 40 s (#63; domyślnie
@@ -185,7 +187,8 @@ albo nie odpowie model-sędzia. Brak klucza do modelu albo jego błąd przy wyod
 komunikat techniczny. Jedenaste zapytanie w ciągu minuty dostaje komunikat „Wysłano za dużo zapytań w
 krótkim czasie”. Eval ma 4 przypadki J. Jest przełącznik awarii ([prawdowid/faults.py](../../prawdowid/faults.py)) i przypadki FC-J01 oraz FC-J02 działają z `simulate` (#60).
 
-Luka (#60), zamknięta na `main` i `prod` (PR #109). Wcześniej, gdy
+Luka (#60), zamknięta w kodzie na `main` i `prod` (PR #109); J01 pokazuje, czego ta reguła nie
+obejmuje (wyżej). Wcześniej, gdy
 padła tylko część źródeł, a reszta nic nie znalazła, zwracaliśmy „brak wystarczających dowodów”.
 W ograniczeniach odpowiedzi stało wtedy, które źródło nie odpowiedziało, ale sam werdykt wyglądał jak
 brak dowodów, a brief w scenariuszu J tego zabrania. Przykład: Tavily odmawia, bo skończyły się
