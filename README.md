@@ -54,6 +54,8 @@ sprawdzić ..."). A source that answered with nothing is no outage.
 
 ## Try it on Discord
 
+The bot is not running on a public server yet; until it is, use the fallback below or `/czat`.
+
 The second channel is a Discord bot with one command, `/sprawdz`. It sends your text to the same
 `POST /api/checks` as the web form and posts the same answer back as Discord messages.
 
@@ -108,7 +110,7 @@ Build demo to `integration/r4`. Kolumna "Na `main`" mówi, jak zachowuje się ko
 | Tekst korpusu maskowany przy budowie, `make corpus-check` zgłasza numer telefonu i inne dane, które maskowanie jeszcze by zmieniło | [#113] | `integration/r4` | Rekord `gus-ca9942c072` ma numer telefonu osoby podanej z nazwiskiem, a `make corpus-check` go nie wykrywa |
 | Wyjątki w maskowaniu tekstu użytkownika: numer karty zostaje po etykiecie produktu (w tym `nr`, `numer`, `id`), w adresie URL i jako EAN-13, dziewięć cyfr zostaje, gdy wygląda na kwotę lub identyfikator | [#113] | `integration/r4` | Każdy numer karty z poprawną sumą Luhna jest maskowany, także po `nr` |
 | Strona `/czat`: adapter demonstracyjny w stylu komunikatora, ten sam `POST /api/checks` z `X-Channel: demo` | [#116] | `integration/r4` | Brak. Jedyny drugi kanał to bot Discord, który według [#59] nie jest wdrożony (tego nie sprawdzaliśmy) |
-| Bot Discord na serwerze demo | [#59] | [PR #73] | Według zgłoszenia bot nie działa na serwerze demo (tego nie sprawdzaliśmy) |
+| Bot Discord na serwerze demo | [#59] | kod w `integration/r4` (PR #73), wdrożenie czeka | Według zgłoszenia bot nie działa na serwerze demo (tego nie sprawdzaliśmy) |
 
 `integration/r4` zawiera też poprawki harnessu eval ([#101], [#102]: nagłówek `X-Eval-Fault-Applied` potwierdza zastosowanie symulowanej awarii, błędy harnessu nie liczą się do metryk, koszt jest zawsze liczbą z osobnym licznikiem niewycenionych żądań), kontrolę wycieku przypadków eval do kodu produktu ([#91]) i materiały zgłoszenia ([#18]: opis i 12 stron w `docs/pitch/`). Wiersze metryk mówią, co z tego wynika dla pomiaru.
 

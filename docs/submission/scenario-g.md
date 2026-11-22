@@ -23,9 +23,12 @@ za darmo?”
 | Sources | none | none |
 
 Both channels gave the same claim and verdict. With web search down this is the "no evidence"
-path: the run shows that the channels agree and says nothing about whether the answer is right. Nothing makes the two
-answers agree by design: each request runs the whole pipeline again, so a run with real evidence
-can still split claims or rate them differently (issue #59, review comment).
+path: the run shows that the channels agree and says nothing about whether the answer is right.
+This record predates two later changes. The shared result cache (30 minutes, both channels) now
+answers a repeat of the same text with the stored result, so the channels agree by construction
+inside that window; after a restart, a deploy or 30 minutes the pipeline runs again and can split
+claims or rate them differently. And a claim whose web search was down now comes out
+`nie sprawdzono` (#60), not `brak wystarczających dowodów`.
 
 The message the bot would post (one message, no attachment):
 

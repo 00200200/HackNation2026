@@ -359,7 +359,8 @@ class Bot(discord.Client):
             except discord.HTTPException:
                 log.exception("attachment refused")
                 # Separate messages: `last` alone can fill Discord's 2000 characters.
-                # ATTACHED points to the file that failed, so the notice replaces it.
+                # ATTACHED points to the file that failed, so the notice replaces it and the
+                # 5-message cap holds; otherwise a five-part answer gets a sixth message.
                 try:
                     if last != ATTACHED:
                         await send(interaction, last)
