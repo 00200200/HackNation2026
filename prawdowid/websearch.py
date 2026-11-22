@@ -402,6 +402,9 @@ async def _read(
     page = await _get_page(url, client)
     if not (entry := allowed(page.url)):
         raise Unread(f"{page.url} is not allowlisted", None)
+    if canonical_url(url) != canonical_url(page.url):
+        # A redirect to another document: the hit's title and date describe the old one.
+        fallback_title, fallback_published = "", None
     text, title, sitename, published = await _extract(page)
     if _media_type(page) == link.PDF_TYPE:
         title = fallback_title.strip() or title

@@ -588,3 +588,20 @@ def test_a_phone_number_after_a_passport_number_is_masked():
 @pytest.mark.parametrize("label", ["karta nr", "kartą numer", "card no.", "Visa nr"])
 def test_a_card_number_after_a_card_label_is_masked(label):
     assert mask_personal_data(f"{label} 4111111111111111") == f"{label} [numer karty]"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "karta kredytowa o numerze 4111111111111111",
+        "Moja karta debetowa, numer 4111111111111111",
+    ],
+)
+def test_a_card_label_earlier_in_the_context_beats_a_generic_label(text):
+    assert "4111111111111111" not in mask_personal_data(text)
+    assert "[numer karty]" in mask_personal_data(text)
+
+
+def test_an_unambiguous_product_label_keeps_a_card_shaped_code_after_a_card_word():
+    text = "Karta produktu: SKU 4111111111111111"
+    assert mask_personal_data(text) == text

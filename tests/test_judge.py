@@ -20,11 +20,13 @@ from prawdowid.judge import (
     SNIPPET_ALONE,
     SNIPPET_ONLY,
     SUPERSEDED,
+    Label,
     Labels,
     _stated_rating,
     agent,
     find_quote,
     judge,
+    verify_quotes,
 )
 from prawdowid.rerank import RERANK_UNAVAILABLE, Fragment, Ranking
 
@@ -1466,6 +1468,91 @@ def test_a_fact_checkers_data_gap_decides_even_when_not_marked_its_own_conclusio
                 missing_context="Szacunek dotyczy innego roku.",
                 context_quote="wyłącznie o granicę polsko-białoruską",
             ),
+        ),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+
+
+# --- CodeRabbit on #129 ---
+
+CHECK_URL = "https://demagog.org.pl/cr"
+CHECK_CLAIM = "UE wprowadza podatek od wypieków."
+
+
+def _checker_record(page_text=""):
+    body = (
+        f"{factcheck.RATING_PREFIX} Nieznana.\n\n{factcheck.CLAIM_PREFIX} {CHECK_CLAIM}"
+    )
+    return fragment(
+        CHECK_URL, f"{body}\n\n{page_text}".strip(), "Demagog", "fact_check"
+    )
+
+
+@pytest.mark.parametrize(
+    ("page_text", "kept"),
+    [("", False), ("W tekście: UE wprowadza podatek od wypieków.", True)],
+)
+def test_a_context_quote_from_the_reviewed_claim_alone_is_not_verified(page_text, kept):
+    f = _checker_record(page_text)
+    lab = Label(
+        doc_id=CHECK_URL,
+        stance="context",
+        quote="Nieznana",
+        missing_context="x",
+        context_quote="UE wprowadza podatek od wypieków",
+    )
+    [e] = verify_quotes([lab], [f])
+    assert (e.context_span is not None) is kept
+
+
+def _on_date(f, d):
+    return f.model_copy(
+        update={"source": f.source.model_copy(update={"published_at": d})}
+    )
+
+
+def test_a_headline_cannot_make_a_publishers_body_refutation_disappear():
+    f = fragment(
+        "https://demagog.org.pl/h",
+        "Wnioskujemy, że takiego podatku nie ma w UE.",
+        "Demagog",
+        "fact_check",
+    )
+    f = f.model_copy(
+        update={
+            "source": f.source.model_copy(
+                update={"title": "Podatek od wypieków to prawda"}
+            )
+        }
+    )
+    j = run(
+        [f],
+        answering(
+            label(f, "supports", "Podatek od wypieków to prawda", own_conclusion=True),
+            label(f, "refutes", "takiego podatku nie ma w UE", own_conclusion=True),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+
+
+def test_one_undated_checker_gap_rules_out_the_date_override():
+    dated = _on_date(CHECKER_NO_DATA, date(2026, 11, 20))
+    undated = _on_date(
+        fragment(
+            "https://konkret24.tvn24.pl/u",
+            f"Brak. {NO_DATA}",
+            "Konkret24",
+            "fact_check",
+        ),
+        None,
+    )
+    gov = _on_date(GOV, date(2026, 11, 21))
+    j = run(
+        [dated, undated, gov],
+        answering(
+            label(dated, "gap", NO_DATA, own_conclusion=True),
+            label(undated, "gap", NO_DATA, own_conclusion=True),
+            label(gov, "supports", GOV.source.fragment),
         ),
     )
     assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
