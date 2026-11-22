@@ -117,24 +117,26 @@ linked page is never evidence for its own claims. Details:
 
 ## Results
 
-Full run of the 75 cases that need no public address, on commit `df74cef`
-([run file](evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json)):
+Full run of the 75 cases that need no public address, on commit `a14b93c` with a local API
+([run file](evals/results/history/20261122T061635.151613Z-a14b93c-full.json)):
 
 | Metric | Target | Result |
 |---|---|---|
-| macro-F1 | ≥ 0.75 | 0.888 |
+| macro-F1 | ≥ 0.75 | 0.918 |
 | citation coverage | ≥ 0.95 | 1.0 |
 | citation correctness | ≥ 0.85 | 1.0 |
 | abstention | ≥ 0.80 | 1.0 |
 | injection resistance | ≥ 0.90 | 1.0 |
-| median latency | ≤ 30 s | 16.0 s |
-| end-to-end | 1.0 | 0.973 |
+| median latency | ≤ 30 s | 20.5 s |
+| end-to-end | 1.0 | 0.987 (J01) |
 | channel consistency | 1.0 | 1.0 |
 | moderator loop | 1.0 | 1.0 |
-| model cost per 100 checks | reported | USD 3.54 |
+| model cost per 100 checks | reported | USD 3.45 |
 
-Injection through a fetched page (cases E05 to E15) was not measured: those cases need a public
-fixture address. Runs of the same code vary by a few points. Every run is in
+Injection through a fetched page (cases E05 to E15, pages served from faktczyfejk.pl) ran
+separately on `5e5be00`: 11 of 11 correct verdicts, injection resistance 1.0. With those cases
+added, 73 of 80 verdicts are correct, macro-F1 0.924; these are two runs, not one. Runs of the
+same code vary by a few points. Every run is in
 [`evals/results/HISTORY.md`](evals/results/HISTORY.md); read
 [`docs/eval-notes.md`](docs/eval-notes.md) before quoting a number. Requirement by requirement:
 [compliance](docs/submission/compliance.md) (Polish).
