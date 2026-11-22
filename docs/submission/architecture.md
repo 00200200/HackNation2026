@@ -16,7 +16,8 @@ Discord /sprawdz -> HTTP, X-Channel: discord +
     -> text, or guarded URL fetch and extraction
     -> claim extraction and search queries (PydanticAI / Anthropic)
     -> each checkable claim in parallel:
-         Google Fact Check + EUvsDisinfo MCP + Tavily / allowlisted pages
+         Google Fact Check + EUvsDisinfo MCP + www.gov.pl search + Tavily / allowlisted pages
+         + evidence corpus (BM25 over corpus/evidence.jsonl)
          -> deduplicate and rerank fragments -> label and validate quotes
          -> judge.decide() -> shared CheckResult -> channel rendering
 
@@ -51,7 +52,9 @@ Provider threads can finish in the background. Failed providers add limitations.
 the gov.pl search failed and the evidence found is not enough, when all providers failed, or when
 the claim deadline expires, the claim is `not_checked`; if every checkable claim ended that way
 because of an outage, the answer is a technical error. A provider that answered with no matching
-evidence can instead lead to `insufficient_evidence`. One extra search with the claim text is allowed if
+evidence can instead lead to `insufficient_evidence`. The evidence corpus is a file on our own disk,
+so it never counts as a source that answered: when every outside source failed, corpus hits count
+only if they settle the claim ([corpus_bm25.py](../../prawdowid/corpus_bm25.py)). One extra search with the claim text is allowed if
 enough time remains. Sources: [verifier.py](../../prawdowid/verifier.py),
 [pipeline.py](../../prawdowid/pipeline.py).
 

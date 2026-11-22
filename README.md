@@ -17,10 +17,12 @@ When the evidence is not there, it says so instead of guessing.
 |---|---|
 | <img src="docs/readme/home.png" alt="faktczyfejk.pl home page: the name, one box for text or a link" width="100%"> | <img src="docs/readme/answer.png" alt="An answer from the live API: two claims, each with its verdict, the answer's first words and what could not be established" width="100%"> |
 
-The answer on the right is a real response from the live API (21.11.2026). Google Fact Check and
-EUvsDisinfo were not configured on the server yet and web search found nothing, so both claims come
-back as `brak wystarczających dowodów` ("nie udało mi się potwierdzić") with the reasons listed,
-not as a guess.
+The answer on the right is a real response from the live API on 21.11.2026, taken before Google
+Fact Check and EUvsDisinfo were configured on the server and before the outage rule (#60). Today a
+claim whose Fact Check or web search is down comes back as `nie sprawdzono` with the outage as the
+reason, and an answer where no claim got a verdict for that reason is a technical error. When every
+source answered and nothing settles the claim, it is `brak wystarczających dowodów` ("nie udało mi
+się potwierdzić") with the reasons listed, not a guess.
 
 ## How an answer reads
 
@@ -133,7 +135,8 @@ Open http://localhost:8080. Stop with `make down`. Use another port with `make u
 Without `make`: `docker compose up --build -d`.
 
 The base stack forwards `GOOGLE_FACTCHECK_API_KEY`, `TAVILY_API_KEY` and `EUVSDISINFO_API_KEY`,
-and already points the check log and source cache at a writable `/tmp` path.
+keeps the check log on the `checklog` volume (`/var/lib/prawdowid/checks.jsonl`, so it survives a
+redeploy) and the source cache at a writable `/tmp/prawdowid` path.
 
 Add `--profile discord` before `up`
 to start the bot too. Set `DISCORD_BOT_TOKEN` in `.env`, install the application in your Discord
