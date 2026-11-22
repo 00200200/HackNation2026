@@ -78,7 +78,9 @@ def format_report(report: dict) -> str:
         head,
         f"{'group':<8}{'cases':>6}{'errored':>9}{'accuracy':>10}{'macro_f1':>10}{'abstention':>12}{'median_s':>10}",
     ]
-    for name, rows in split(report["cases"]).items():
+    # evals.run.score leaves harness errors out of every metric; so does the split.
+    scored = [r for r in report["cases"] if not r.get("harness_error")]
+    for name, rows in split(scored).items():
         m = group_metrics(rows)
         lines.append(
             f"{name:<8}{m['cases']:>6}{m['errored']:>9}{fmt(m['accuracy']):>10}"

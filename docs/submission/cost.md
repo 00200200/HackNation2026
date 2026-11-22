@@ -3,24 +3,22 @@
 This is an extrapolation from a saved test run, not an invoice or a hosting quote.
 The only monetary and measured latency inputs below come from
 [evals/results/latest.json](../../evals/results/latest.json), timestamp
-`2026-11-21T19:10:57+00:00`, product commit
-`95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `mode: "quick"`, `n_cases: 9`, `dirty: false`.
-The run has `overall_pass: false`; it is not evidence of production quality or capacity. It also
-predates PR #40 (this docs change) landing on `main`: no eval has run on the merged commit, by
-user decision (`HN_SKIP_EVAL=1`) — a fresh eval on the merged commit is pending.
+`2026-11-22T00:37:27+00:00`, product commit
+`edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `mode: "quick"`, `n_cases: 10`, `dirty: false`.
+The run has `overall_pass: false`; it is not evidence of production quality or capacity.
 
 ## Estimate for 1,000 checks
 
-The recorded `metrics.cost_per_100_usd.value` is exactly `1.8220444444444441` USD.
+The recorded `metrics.cost_per_100_usd.value` is exactly `4.912332` USD.
 The eval computes a mean of per-answer `cost_usd` over the answers that ran a check (cache hits and
 simulated outages are left out) and multiplies it by the reporting unit (`cost_per_100` in
 [evals/run.py](../../evals/run.py)). Applying that measured rate:
 
 ```text
-Estimated USD/check = 1.8220444444444441 / 100 = 0.018220444444444441
-Estimated USD for 1,000 checks = 0.018220444444444441 * 1000
-                              = 18.220444444444441
-Rounded display estimate = USD 18.22 for 1,000 checks
+Estimated USD/check = 4.912332 / 100 = 0.04912332
+Estimated USD for 1,000 checks = 0.04912332 * 1000
+                              = 49.12332
+Rounded display estimate = USD 49.12 for 1,000 checks
 ```
 
 This assumes the same request mix and retrieval conditions as the saved run. It prices model
@@ -54,7 +52,7 @@ or an ongoing operator subsidy. A free-to-user deployment budget remains UNCONFI
 
 ## Latency and load
 
-Saved `metrics.median_latency_s.value`: exactly `3.8964525419287384` seconds
+Saved `metrics.median_latency_s.value`: exactly `24.877917104000517` seconds
 ([latest.json](../../evals/results/latest.json)). The eval spaces requests and excludes that wait
 from latency ([adapter.py](../../evals/adapter.py)); this is not a concurrency benchmark.
 No simultaneous-user capacity, tail latency, saturation point or cost under load is measured:
@@ -66,13 +64,13 @@ from the linked code, not from a cost assumption:
 - API: `10/minute` per client IP, with HTTP `429` and a Polish notice; outer verification timeout
   `60` seconds ([app.py](../../prawdowid/app.py)). Discord users share the bot's API client IP;
   there is no per-Discord-user quota ([discord_bot.py](../../prawdowid/discord_bot.py)).
-- Extraction defaults to `5` claims and `3` queries per checkable claim
+- Extraction defaults to `3` checked claims and `3` queries per checkable claim
   ([verifier.py](../../prawdowid/verifier.py)). Claims and retrieval calls fan out with
   `asyncio.gather` and `asyncio.TaskGroup`; there is no global queue, concurrency semaphore or daily spend cap
   ([pipeline.py](../../prawdowid/pipeline.py)).
-- The nominal whole-check budget is `25` seconds, EUvsDisinfo's pipeline cap is `5` seconds and a
+- The nominal whole-check budget is `40` seconds, EUvsDisinfo's pipeline cap is `5` seconds and a
   retry needs at least `18` seconds remaining ([pipeline.py](../../prawdowid/pipeline.py)).
-  Extraction has a `45` second provider request timeout, but shares the `25` second whole-check
+  Extraction has a `45` second provider request timeout, but shares the `40` second whole-check
   deadline with URL fetching and claim checks ([verifier.py](../../prawdowid/verifier.py)).
   These are configured cancellation limits, not a measured capacity guarantee.
 - Web queries are capped at `10` seconds including retry, page fetches at `8` seconds
@@ -85,8 +83,8 @@ from the linked code, not from a cost assumption:
 - A timeout makes the claim `not_checked` with limitations and the answer stays `ok`. A failed
   Fact Check (its key for the claim itself, or every key), web search (every query) or (for a
   government claim) gov.pl search does the same when the other evidence is not enough; only when
-  every checkable claim ends that way is the answer a technical notice. A failed key or query
-  among others that answered is only named in a limitation. A provider that returns successfully without evidence can lead to
+  every checkable claim ends that way is the answer a technical notice. A failed short key, when the key for the claim itself answered, or a failed query
+  among others that answered is only named in a limitation; a failed claim key is a failed Fact Check whatever the short keys did. A provider that returns successfully without evidence can lead to
   `insufficient_evidence`. Missing extraction credentials or API failure also produce a technical
   notice, not a factual verdict ([pipeline.py](../../prawdowid/pipeline.py),
   [verifier.py](../../prawdowid/verifier.py)).

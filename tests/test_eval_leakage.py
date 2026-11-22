@@ -33,9 +33,10 @@ def ngrams(text: str, n: int = N) -> set[str]:
     return {" ".join(w[i : i + n]) for i in range(len(w) - n + 1)}
 
 
-def file_grams(text: str, n: int) -> set[str]:
-    """n-grams of a product file for any n up to N, so short inputs match as whole phrases."""
-    w = words(EXEMPT.sub("", text))
+def file_grams(text: str, n: int, chips_exempt: bool = False) -> set[str]:
+    """n-grams of a product file for any n up to N, so short inputs match as whole phrases.
+    Example chips are cut out only where they are chips: the web pages (.html)."""
+    w = words(EXEMPT.sub("", text) if chips_exempt else text)
     return {
         " ".join(w[i : i + k])
         for k in range(MIN_WORDS, n + 1)
@@ -79,7 +80,7 @@ def find_leaks(cases: list[dict], root: Path = PRODUCT) -> list[str]:
             text = path.read_text("utf-8")
         except UnicodeDecodeError:
             continue
-        grams = file_grams(text, N)
+        grams = file_grams(text, N, chips_exempt=path.suffix == ".html")
         rel = path.relative_to(root.parent)
         for case in cases:
             for kind, case_text in case_texts(case):
@@ -165,3 +166,13 @@ def test_example_chips_are_exempt_but_other_ui_text_is_not(tmp_path):
         "<p>Czy Polska jest członkiem NATO od 1999 roku?</p>", "utf-8"
     )
     assert "b.html" in "\n".join(find_leaks(case, tmp_path))
+
+
+def test_the_chip_exemption_covers_html_pages_only(tmp_path):
+    case = {"id": "Z98", "input": {"text": "one two three four five six seven eight"}}
+    chip = 'data-example="one two three four five six seven eight"'
+    (tmp_path / "page.html").write_text(f"<button {chip}>", "utf-8")
+    (tmp_path / "prompt.py").write_text(f"PROMPT = '{chip}'", "utf-8")
+    leaks = "\n".join(find_leaks([case], tmp_path))
+    assert "page.html" not in leaks
+    assert "prompt.py: Z98 input" in leaks

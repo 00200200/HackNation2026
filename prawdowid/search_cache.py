@@ -39,6 +39,7 @@ log = logging.getLogger("prawdowid")
 DEFAULT_TTL_S = 86_400
 MAX_ENTRIES = 2_000
 LIMIT_COOLDOWN_S = 60
+SWEEP_INTERVAL_S = 3600  # how often expired rows leave the file without a new write
 # `SearchUnavailable` message of a Tavily usage or plan limit; `is_limit` tells it from other failures.
 LIMIT_REASON = "search limit exceeded"
 
@@ -96,15 +97,32 @@ class SearchCache:
         )
         self._lock = threading.Lock()
         self._lines = 0
+        self._swept = clock()
         if path:
             self._load()
 
     def get(self, key: str) -> list[dict] | None:
         with self._lock:
+            self._sweep()
             entry = self._items.get(key)
         if entry and self.clock() - entry[0] < self.ttl:
             return entry[1]
         return None
+
+    def _sweep(self) -> None:
+        """Drops expired rows from the file at most hourly, with or without new writes (caller
+        holds the lock). Kept rows keep their original timestamps."""
+        now = self.clock()
+        if not self.path or now - self._swept < min(self.ttl, SWEEP_INTERVAL_S):
+            return
+        self._swept = now
+        for key in [
+            k for k, (stored, _) in self._items.items() if now - stored >= self.ttl
+        ]:
+            del self._items[key]
+        if self._lines != len(self._items):
+            with contextlib.suppress(OSError):
+                self._rewrite()
 
     def put(self, key: str, hits: list[dict]) -> None:
         now = self.clock()
@@ -127,10 +145,18 @@ class SearchCache:
         from prawdowid.websearch import SearchHit  # websearch imports this module
 
         try:
-            lines = self.path.read_text(encoding="utf-8").splitlines()
+            raw_lines = self.path.read_bytes().splitlines()
         except OSError:
             return
         now = self.clock()
+        lines = []
+        for raw in raw_lines:
+            # A write cut off inside a multi-byte character leaves an undecodable line: skip it.
+            try:
+                lines.append(raw.decode("utf-8"))
+            except UnicodeDecodeError:
+                continue
+        damaged = len(raw_lines) - len(lines)
         for line in lines:
             # Any line that is not a full, valid record is skipped: a damaged file never takes web
             # search down (pydantic's ValidationError is a ValueError).
@@ -148,7 +174,9 @@ class SearchCache:
             if now - stored < self.ttl:
                 self._items[key] = (stored, hits)
         self._lines = len(self._items)
-        if len(lines) != self._lines:  # expired and damaged lines leave the file now
+        if (
+            len(lines) + damaged != self._lines
+        ):  # expired and damaged lines leave the file now
             with contextlib.suppress(OSError):
                 self._rewrite()
 

@@ -150,9 +150,17 @@ def hidden_text(body: bytes) -> str:
     Parsed again with comments kept (trafilatura's loader removes them).
     """
     from lxml import etree, html
+    from trafilatura.utils import decode_file
 
+    parser = html.HTMLParser(remove_comments=False)
     try:
-        tree = html.fromstring(body, parser=html.HTMLParser(remove_comments=False))
+        # Decoded as `extract_html` decodes it: lxml guesses the encoding of raw bytes without a
+        # declaration, and a Polish comment would reach `screen` garbled.
+        try:
+            tree = html.fromstring(decode_file(body), parser=parser)
+        except ValueError:
+            # A str with an XML encoding declaration is refused; the raw bytes are not.
+            tree = html.fromstring(body, parser=parser)
     except (ValueError, etree.ParserError):
         return ""
     parts = [c.text or "" for c in tree.xpath("//comment()")]

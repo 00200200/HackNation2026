@@ -720,10 +720,13 @@ def _judgement(
 
 
 def _one_per_document(evidence: list[Evidence]) -> list[Source]:
-    """One source per document and stance: several labels on one page list its URL once."""
+    """One source per document and stance: several labels on one page list its URL once. The one
+    carrying a fact-checker's rating wins: it is what `decide` may have decided on."""
     seen = {}
     for e in evidence:
-        seen.setdefault((e.label.doc_id, e.label.stance), e.source)
+        key = (e.label.doc_id, e.label.stance)
+        if key not in seen or (e.source.rating and not seen[key].rating):
+            seen[key] = e.source
     return list(seen.values())
 
 

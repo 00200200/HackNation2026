@@ -406,6 +406,17 @@ def test_a_pdf_over_the_page_cap_stands_as_its_snippet(monkeypatch):
     assert doc.snippet_only == TOO_BIG
 
 
+@pytest.mark.parametrize(
+    ("status", "snippet"),
+    [(404, None), (410, None), (401, None), (402, None), (403, BLOCKED)],
+)
+def test_an_oversized_error_page_follows_the_status_rule(monkeypatch, status, snippet):
+    monkeypatch.setattr(websearch, "MAX_PAGE_BYTES", 100)
+    routes = {"www.gov.pl/p": httpx2.Response(status, content=b"x" * 500)}
+    docs = run(provider_returning("https://www.gov.pl/p"), routes).documents
+    assert [d.snippet_only for d in docs] == ([snippet] if snippet else [])
+
+
 def test_a_page_we_read_wins_over_a_snippet_of_the_same_url():
     read = fetched_doc()
     snippet = read.model_copy(update={"text": "s", "snippet_only": BLOCKED})

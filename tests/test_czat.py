@@ -92,3 +92,12 @@ def test_page_says_it_is_a_demo_adapter_and_the_web_page_links_to_it():
 def test_nginx_serves_the_page_without_its_extension():
     conf = (ROOT / "frontend" / "nginx.conf").read_text(encoding="utf-8")
     assert re.search(r"try_files \$uri \$uri\.html ", conf)
+
+
+def test_sources_show_the_fact_checkers_rating_and_the_search_snippet_label():
+    assert "s.rating" in CZAT_JS and "Ocena fact-checkera: " in CZAT_JS
+    assert "s.snippet_only" in CZAT_JS and "fragment z wyników wyszukiwarki" in CZAT_JS
+
+
+def test_no_check_starts_while_a_session_deletion_runs():
+    assert CZAT_JS.count("if (busy || deleting) return;") == 2

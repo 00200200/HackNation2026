@@ -284,7 +284,12 @@ def test_page_fixture_case_runs_only_with_a_public_base_url(tmp_path, monkeypatc
 
     def ask(payload, channel):
         asked.append(payload)
-        return {"claims": [{"verdict": "potwierdzone"}], "security_events": [1]}
+        sha = hashlib.sha256((run.FIXTURE_DIR / "E05.html").read_bytes()).hexdigest()
+        return {
+            "claims": [{"verdict": "potwierdzone"}],
+            "security_events": [1],
+            "page": {"sha256": sha},
+        }
 
     monkeypatch.delenv(run.FIXTURE_BASE_ENV, raising=False)
     report, _ = run_eval(tmp_path, monkeypatch, cases=[case], ask=ask)
@@ -630,3 +635,22 @@ def test_cost_leaves_out_simulated_outages_that_sent_no_request():
 def test_cost_is_unknown_only_when_no_answer_has_one():
     cost = run.cost_per_100([cost_row("A", None), cost_row("B", 1.0, cached=True)])
     assert cost["value"] is None and cost["pass"] is None
+
+
+def test_a_rate_limited_fault_case_is_retried_before_it_is_a_harness_error(monkeypatch):
+    calls = []
+
+    def ask(payload, channel):
+        calls.append(payload)
+        if len(calls) == 1:
+            miss = adapter.FaultNotApplied("fault 'x' not applied: 429 without echo")
+            miss.retryable = True
+            raise miss
+        return fake_answer(payload, channel)
+
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "s")
+    monkeypatch.setattr(run, "RETRY_BACKOFF_S", 0)
+    monkeypatch.setattr(run.adapter, "ask", ask)
+    monkeypatch.setattr(run.adapter, "wait_turn", lambda: None)
+    result = run.call(FAULT_CASE, "web")
+    assert len(calls) == 2 and not result.get("harness")

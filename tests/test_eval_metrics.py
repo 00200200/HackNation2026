@@ -146,8 +146,8 @@ def test_adapter_marks_an_answer_taken_from_the_result_cache(
 ):
     monkeypatch.setenv("PRAWDOWID_URL", "https://product.test")
     monkeypatch.setattr(
-        adapter.urllib.request,
-        "urlopen",
+        adapter._opener,
+        "open",
         lambda request, timeout: FakeHttpResponse(headers),
     )
     assert adapter.ask({"text": "x"}, "web")["cached"] is cached
@@ -163,7 +163,7 @@ def test_demo_channel_sends_the_request_of_the_czat_page(monkeypatch):
         return FakeHttpResponse({})
 
     monkeypatch.setenv("PRAWDOWID_URL", "http://product.test")
-    monkeypatch.setattr(adapter.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(adapter._opener, "open", urlopen)
     monkeypatch.setattr(adapter, "CHANNELS", {"web", "demo"})
     monkeypatch.setattr(adapter, "wait_turn", lambda: None)
     case = {"id": "G1", "input": {"text": "x"}, "channels": ["web", "discord", "demo"]}
@@ -225,8 +225,8 @@ def test_a_fault_case_is_scored_only_when_the_product_echoes_the_fault(
     monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
     headers = {"X-Eval-Fault-Applied": echo} if echo else {}
     monkeypatch.setattr(
-        adapter.urllib.request,
-        "urlopen",
+        adapter._opener,
+        "open",
         lambda request, timeout: FakeHttpResponse(headers),
     )
     payload = {"text": "x", "simulate": "factcheck_api_unavailable"}
@@ -235,6 +235,38 @@ def test_a_fault_case_is_scored_only_when_the_product_echoes_the_fault(
     else:
         with pytest.raises(adapter.FaultNotApplied, match="not applied"):
             adapter.ask(payload, "web")
+
+
+@pytest.mark.parametrize(
+    ("echo", "scored"), [(None, False), ("factcheck_api_unavailable", True)]
+)
+def test_an_http_error_of_a_fault_case_is_classified_by_the_echo(
+    monkeypatch, echo, scored
+):
+    """A 429 or 5xx without the echo never ran faulted: harness error, not a retried product error."""
+    monkeypatch.setenv("PRAWDOWID_URL", "https://product.test")
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    headers = {"X-Eval-Fault-Applied": echo} if echo else {}
+
+    def refuse(request, timeout):
+        raise adapter.urllib.error.HTTPError(request.full_url, 503, "x", headers, None)
+
+    monkeypatch.setattr(adapter._opener, "open", refuse)
+    payload = {"text": "x", "simulate": "factcheck_api_unavailable"}
+    expected = adapter.urllib.error.HTTPError if scored else adapter.FaultNotApplied
+    with pytest.raises(expected):
+        adapter.ask(payload, "web")
+
+
+def test_the_eval_token_is_not_forwarded_to_another_origin():
+    handler = adapter._SameOriginRedirects()
+    request = adapter.urllib.request.Request(
+        "https://product.test/api/checks", headers={"X-Eval-Token": "secret"}
+    )
+    args = (request, None, 302, "Found", {})
+    assert handler.redirect_request(*args, "https://evil.test/x") is None
+    same = handler.redirect_request(*args, "https://product.test/other")
+    assert same is not None and same.get_header("X-eval-token") == "secret"
 
 
 @pytest.mark.parametrize(
@@ -269,6 +301,17 @@ def test_the_discord_path_reads_the_fault_echo_of_the_response_behind_the_answer
     assert (
         seen["fault"] == "factcheck_api_unavailable"
     )  # the headers reach the API call
+
+
+def test_a_fixture_page_case_needs_the_served_hash_through_the_adapter():
+    shaped = adapter.to_eval_shape({"claims": [], "page": {"sha256": "ab"}})
+    assert shaped["page"] == {"sha256": "ab"}
+    row = {
+        "case": {"canary": "C", "page_fixture": "E07.html"},
+        "runs": [{"response": {"claims": []}, "error": None}],
+        "repeat": None,
+    }
+    assert run.stale_fixture(row)  # no hash served: not the local fixture
 
 
 def test_a_fault_case_without_the_eval_token_is_not_sent(monkeypatch):

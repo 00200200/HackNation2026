@@ -235,3 +235,44 @@ def test_a_damaged_line_is_skipped_not_fatal(tmp_path, hits):
     cache = search_cache.SearchCache(60, path)
     assert cache.get("k") is None
     assert [h["url"] for h in cache.get("k2")] == ["u"]
+
+
+def test_expired_rows_leave_the_file_without_new_writes(tmp_path):
+    """#110 retention: the file is swept on reads too, and kept rows keep their timestamps."""
+    now = [1000.0]
+    path = tmp_path / "age.jsonl"
+    cache = search_cache.SearchCache(600, path, clock=lambda: now[0])
+    cache.put("old", [])
+    now[0] = 1500.0
+    cache.put("new", [])
+    now[0] = 1700.0  # "old" is 700 s old, "new" 200 s
+    assert cache.get("new") is not None
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    assert [(r["key"], r["stored_at"]) for r in rows] == [("new", 1500.0)]
+
+
+def test_a_cache_file_cut_inside_a_character_is_not_fatal(tmp_path):
+    path = tmp_path / "cut.jsonl"
+    good = {"key": "k", "stored_at": time.time(), "hits": []}
+    path.write_bytes(
+        (json.dumps(good) + "\n").encode()
+        + '{"key": "z", "title": "Zażółć'.encode()[:-1]
+    )
+    cache = search_cache.SearchCache(60, path)
+    assert cache.get("k") == []
+
+
+@pytest.mark.parametrize("cooldown", [False, True])
+def test_a_search_limit_has_its_own_message(monkeypatch, cooldown):
+    cause = UsageLimitExceededError("Usage limit reached")
+
+    def limited(query, *, domains, limit):
+        raise SearchUnavailable(str(cause)) from cause
+
+    monkeypatch.setattr(websearch, "tavily_search", limited)
+    if cooldown:
+        with pytest.raises(SearchUnavailable):
+            search()
+    result = asyncio.run(websearch.search_web("pytanie", save=False))
+    assert result.failed and result.limitation == websearch.SEARCH_LIMIT
+    assert "limit wyszukiwarki" in result.limitation
