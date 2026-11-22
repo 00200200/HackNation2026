@@ -118,10 +118,10 @@ Return in labels one entry for every fragment that bears on the claim, and none 
   false, "gap" if it says the claim cannot be checked because the data behind it is missing,
   incomplete or covers something else, "context" if it is about the same matter but does none of
   these. The fragment need not repeat the claim: when the claim follows from it, or is ruled out by
-  it, through a date, a figure or a simple comparison, that is "supports" or "refutes" (a Sejm
-  resolution of 20 December 2007 on Poland joining the Schengen area supports "Poland has been in
-  Schengen since 2007"; yearly figures that show another year was higher refute "the fastest growth
-  this century"). Use "context" only when the fragment settles nothing about the claim.
+  it, through a date, a figure or a simple comparison, that is "supports" or "refutes" (a notice
+  that a bridge opened to traffic on 3 May supports "the bridge has been open since May"; a table
+  showing 4.1% unemployment in March refutes "unemployment was above 5% in March"). Use "context"
+  only when the fragment settles nothing about the claim.
 - quote: the one or two sentences of the fragment that show the stance, copied character for
   character. Never shorten, translate or join pieces of text.
 - own_conclusion: true when the quote is the source's own conclusion or rating on the claim (a
