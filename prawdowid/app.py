@@ -85,9 +85,10 @@ _results: TTLCache[str, CheckResult] = TTLCache(
 
 
 def cache_key(text: str) -> str:
-    """Hash of the input with whitespace collapsed (CheckRequest already made it NFC), so the raw
-    text is not kept as a key. Session and channel stay out of it."""
-    normalised = " ".join(unicodedata.normalize("NFC", text).split())
+    """Hash of the input (CheckRequest already made it NFC), so the raw text is not kept as a key.
+    Internal whitespace stays: the model reads it and it can change the verdict. Session and
+    channel stay out of it."""
+    normalised = unicodedata.normalize("NFC", text)
     return hashlib.sha256(normalised.encode()).hexdigest()
 
 

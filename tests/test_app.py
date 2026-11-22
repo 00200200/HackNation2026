@@ -212,7 +212,7 @@ def test_same_text_from_two_channels_runs_once_and_returns_the_same_result(
     )
     discord = client.post(
         "/api/checks",
-        json={"input": " Tekst do sprawdzenia "},
+        json={"input": " Tekst  do\nsprawdzenia "},
         headers={"X-Channel": "discord", "X-Session-Id": "discord-user-1234"},
     )
     assert len(calls) == 1
@@ -226,10 +226,11 @@ def test_different_text_is_a_miss(client, monkeypatch):
     assert len(calls) == 2
 
 
-def test_cache_key_normalises_unicode_and_whitespace():
+def test_cache_key_normalises_unicode_but_keeps_whitespace():
     composed = "za\u017c\u00f3\u0142\u0107 g\u0119\u015bl\u0105"
     decomposed = unicodedata.normalize("NFD", composed)
-    assert app_module.cache_key(f"  {decomposed}\t\n") == app_module.cache_key(composed)
+    assert app_module.cache_key(decomposed) == app_module.cache_key(composed)
+    assert app_module.cache_key("A  B") != app_module.cache_key("A B")
     assert app_module.cache_key(composed) != app_module.cache_key(composed + "!")
     assert composed not in app_module.cache_key(composed)
 

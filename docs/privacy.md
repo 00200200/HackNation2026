@@ -117,7 +117,9 @@ One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:
   process's memory for 30 minutes (at most 500 answers), under a hash of the normalised input, so
   the same text from the web form and from Discord gets the same answer. The answer holds the
   claims and the sentences they came from. It is never written to disk, a restart empties it, and
-  "Usuń moje sprawdzenia" does not reach it (it expires on its own). A fast answer shows that the
+  "Usuń moje sprawdzenia" does not reach it. After 30 minutes an answer is no longer reused, but an
+  expired entry can stay in process memory until the next write to the cache evicts it; the 30
+  minutes is not a promise of deletion from memory. A fast answer shows that the
   same text was checked in the last 30 minutes (response header `X-Cache: hit`), whoever sent it.
   This is not governed by `RETENTION_DAYS`.
 
