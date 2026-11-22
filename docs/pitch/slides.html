@@ -37,7 +37,7 @@ body.one .slide { display: none; } body.one .slide.on { display: block; }
 .hd .brand svg { width: 46px; height: 46px; }
 .hd .ev { text-align: right; line-height: 1.25; }
 .hd .ev span { display: block; font-weight: 500; opacity: .8; font-size: 20px; }
-.ft { position: absolute; bottom: 44px; left: 110px; right: 110px; display: flex; justify-content: space-between; font-size: 20px; color: var(--muted); }
+.ft { position: absolute; bottom: 44px; left: 110px; right: 110px; display: flex; justify-content: flex-end; font-size: 20px; color: var(--muted); }
 .red .ft { color: rgba(255,255,255,.75); }
 .ft .n { font-variant-numeric: tabular-nums; }
 
@@ -156,7 +156,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="card"><div class="k">Obywatel</div><h3>Nie wie, czy podać wiadomość dalej</h3><p>Wkleja tekst albo link, bez konta. Dostaje „Tak.”, „Nie.” albo „Nie udało mi się potwierdzić” i źródło z cytatem.</p></div>
     <div class="card"><div class="k">Analityk lub moderator MSZ</div><h3>Chce wiedzieć, skąd wzięła się ocena</h3><p>Każda ocena ma źródła i wpis w dzienniku. Pytania bez odpowiedzi trafiają do kolejki moderatora.</p></div>
   </div>
-  <div class="ft"><span>Odbiorcy według zadania MSZ (punkt 3) · badań z użytkownikami nie prowadziliśmy</span><span class="n">03 / 12</span></div>
+  <div class="ft"><span class="n">03 / 12</span></div>
 </section>
 
 <!-- 4. How we answer -->
@@ -167,7 +167,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="bubble b-user" style="max-width:1250px"><div class="who">Pytanie</div>Poseł Konrad Berkowicz udostępnił 4 października 2026 film z podpisem „Ten filmik z Francji przeraża chyba najbardziej…”, jako obraz obecnych protestów we Francji. Czy ten wpis rzetelnie pokazuje, co dzieje się teraz we Francji?</div>
     <div class="bubble b-bot" style="max-width:1300px"><div class="who">Odpowiedź faktczyfejk.pl</div><b>To wprowadza w błąd.</b> Nagranie pochodzi z marca 2023 roku i dotyczy protestów przeciwko reformie emerytalnej, a nie obecnych protestów uczniów.<div style="font-size:24px; opacity:.75; margin-top:14px">Demagog, 6.10.2026: „Materiał nie dotyczy jednak aktualnych wydarzeń we Francji, lecz pochodzi z marca 2023 roku…” Ocena fact-checkera: Manipulacja.</div></div>
   </div>
-  <div class="ft"><span>Odpowiedź produktu z pełnego testu 22.11.2026 (commit df74cef, przypadek B01). Cytat jest na stronie Demagoga.</span><span class="n">04 / 12</span></div>
+  <div class="ft"><span class="n">04 / 12</span></div>
 </section>
 
 <!-- 5. Verdicts -->
@@ -182,7 +182,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <span><span class="chip c-nv">nie podlega weryfikacji</span></span><span>Opinia, prognoza, pytanie bez faktu.</span>
   </div>
   <p class="muted" style="position:absolute; top:850px; left:110px; max-width:1500px; margin:0; font-size:26px; line-height:1.35; text-wrap:balance">Osobno i nigdy jako ocena: „nie sprawdzono” (awaria źródła albo koniec czasu), błąd techniczny, strona, której nie da się sprawdzić, i prośba o doprecyzowanie.</p>
-  <div class="ft"><span>Format odpowiedzi według przykładów organizatora</span><span class="n">05 / 12</span></div>
+  <div class="ft"><span class="n">05 / 12</span></div>
 </section>
 
 <!-- 6. How it works -->
@@ -196,7 +196,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="step"><div class="k">4</div><h3>Cytat ze źródła</h3><p>Model wskazuje cytat, a kod sprawdza go dosłownie, zanim stanie się dowodem.</p></div>
     <div class="step code"><div class="k">5</div><h3>Werdykt z reguł</h3><p>Ocenę wyznacza kod z dowodów. Brak dowodów to „nie wiem”.</p></div>
   </div>
-  <div class="ft"><span>Architektura: docs/adr/0001, docs/submission/architecture.md</span><span class="n">06 / 12</span></div>
+  <div class="ft"><span class="n">06 / 12</span></div>
 </section>
 
 <!-- 7. Risks -->
@@ -211,7 +211,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="card"><h3>Dostępność</h3><p>Gdy dowodów brak, bo padło źródło zdolne rozstrzygnąć albo czas minął przed odpowiedzią, pokazujemy <span class="nw">„nie sprawdzono”</span> albo błąd techniczny.</p><p class="rest">Zostaje: nie ma zapasowego dostawcy ani zmierzonej przepustowości.</p></div>
     <div class="card"><h3>Nadużycia</h3><p>Jeden adres IP może wysłać najwyżej 10 sprawdzeń na minutę.</p><p class="rest">Zostaje: limit na adres IP nie zatrzyma wielu klientów naraz ani nie ogranicza wydatków.</p></div>
   </div>
-  <div class="ft"><span>Pełna lista z miejscami w kodzie: docs/submission/risks.md</span><span class="n">07 / 12</span></div>
+  <div class="ft"><span class="n">07 / 12</span></div>
 </section>
 
 <!-- 8. Channels -->
@@ -224,7 +224,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <p><span class="tag t-off">kod gotowy</span><br><b>Discord /sprawdz</b>: to samo API. Wdrożenie czeka, a bot nie był jeszcze uruchomiony na prawdziwym Discordzie.</p>
   </div>
   <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; box-shadow:0 30px 80px rgba(29,18,21,.25); border:1px solid var(--line)">
-  <div class="ft"><span>Zrzut strony głównej z kodu integration/r2, uruchomionej lokalnie 22.11.2026 · stan kanałów na 22.11.2026</span><span class="n">08 / 12</span></div>
+  <div class="ft"><span class="n">08 / 12</span></div>
 </section>
 
 <!-- 9. Results -->
@@ -245,7 +245,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div><b style="color:var(--red)">0,97</b><span>End-to-end (cel 1,00): nie przeszły J01 (awaria Fact Check) i A15 (opinia)</span></div>
     <div><b>1,00</b><span>Pętla moderatora: 2&nbsp;przypadki, powtórzone pytanie trafia do tej samej sprawy (cel 1,00)</span></div>
   </div>
-  <div class="ft"><span>Nasz zestaw, pełny przebieg, 75 przypadków · commit df74cef (w HISTORY.md: f4c9aa8) · 22.11.2026 · pominięte: 11 z poleceniem na stronie (brak publicznego adresu)</span><span class="n">09 / 12</span></div>
+  <div class="ft"><span class="n">09 / 12</span></div>
 </section>
 
 <!-- 10. Deployment -->
@@ -257,7 +257,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="card"><h3>Bez uzależnienia</h3><p>Model każdego kroku wybiera się zmienną środowiskową (PydanticAI). Inny dostawca wymaga jeszcze swojego pakietu i klucza. Każde źródło ma własny limit czasu.</p></div>
     <div class="card"><h3>Źródła urzędowe</h3><p>Korpus 1158 dokumentów: gov.pl, CERT Polska, Policja, Sejm, IMGW, Odyseusz, GUS. Oceny <span class="nw">fact-checkerów</span> z Google Fact Check Tools i&nbsp;ze stron recenzji. Lista źródeł z&nbsp;licencjami jest na stronie&nbsp;/zrodla.</p></div>
   </div>
-  <div class="ft"><span>docs/deploy.md, docs/corpus.md · miejsca przetwarzania: tabela dostawców w docs/privacy.md · stan na 22.11.2026</span><span class="n">10 / 12</span></div>
+  <div class="ft"><span class="n">10 / 12</span></div>
 </section>
 
 <!-- 11. Next -->
@@ -269,7 +269,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="card"><h3>Trafniejsze oceny</h3><p>W ostatnim teście 4 z&nbsp;8 pomyłek to „nie wiem” tam, gdzie oczekiwaliśmy oceny. Do tego korpus odświeżany według harmonogramu.</p></div>
     <div class="card"><h3>Baza incydentów MSZ</h3><p>Dopasowanie do znanych narracji, zawsze jako kontekst, nigdy jako werdykt.</p></div>
   </div>
-  <div class="ft"><span>Plan na teraz i na czas po hackathonie</span><span class="n">11 / 12</span></div>
+  <div class="ft"><span class="n">11 / 12</span></div>
 </section>
 
 <!-- 12. Close -->
