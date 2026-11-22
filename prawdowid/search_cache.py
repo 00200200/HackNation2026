@@ -124,18 +124,26 @@ class SearchCache:
                 log.warning("search cache not saved: %s", type(exc).__name__)
 
     def _load(self) -> None:
+        from prawdowid.websearch import SearchHit  # websearch imports this module
+
         try:
             lines = self.path.read_text(encoding="utf-8").splitlines()
         except OSError:
             return
         now = self.clock()
         for line in lines:
+            # Any line that is not a full, valid record is skipped: a damaged file never takes web
+            # search down (pydantic's ValidationError is a ValueError).
             try:
                 row = json.loads(line)
-                key, stored, hits = row["key"], float(row["stored_at"]), row["hits"]
-                if not all({"url", "title", "snippet"} <= h.keys() for h in hits):
+                key, stored = row["key"], float(row["stored_at"])
+                if not isinstance(row["hits"], list):
                     continue
-            except (ValueError, KeyError, TypeError):
+                hits = [
+                    SearchHit.model_validate(h).model_dump(mode="json")
+                    for h in row["hits"]
+                ]
+            except (ValueError, KeyError, TypeError, AttributeError):
                 continue
             if now - stored < self.ttl:
                 self._items[key] = (stored, hits)
@@ -222,7 +230,10 @@ def cached_tavily_search(query: str, *, domains: Sequence[str], limit: int):
     if store and (cached := store.get(key)) is not None:
         _count("cache_hits")
         log.info("tavily search: cache hit")
-        return [websearch.SearchHit(**h) for h in cached]
+        try:
+            return [websearch.SearchHit(**h) for h in cached]
+        except (ValueError, TypeError):  # a bad entry is a miss, never an error
+            log.warning("tavily search: unreadable cache entry, calling the provider")
     if time.monotonic() < _limit_until:
         raise websearch.SearchUnavailable(f"{LIMIT_REASON} (cool-down, no call made)")
     _count("tavily_calls")

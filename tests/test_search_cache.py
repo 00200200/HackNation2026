@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import time
 from datetime import date
 
+import httpx2
 import pytest
 from tavily import UsageLimitExceededError
 from tavily.errors import BadRequestError, ForbiddenError
@@ -205,7 +207,31 @@ def test_search_web_default_provider_is_cached_and_masks_the_query(tavily, monke
         is search_cache.cached_tavily_search
     )
     query = "Co zrobił Jan na jan.kowalski@example.com"
+    offline = httpx2.MockTransport(lambda request: httpx2.Response(404))
     for _ in range(2):
-        asyncio.run(websearch.search_web(query, save=False))
+        asyncio.run(websearch.search_web(query, save=False, transport=offline))
     assert len(tavily) == 1
     assert "example.com" not in tavily[0][0]
+
+
+@pytest.mark.parametrize(
+    "hits",
+    [["x"], "x", {"url": "u"}, [{"url": "u", "title": None, "snippet": "s"}]],
+)
+def test_a_damaged_line_is_skipped_not_fatal(tmp_path, hits):
+    """A line that is JSON but not a valid record is dropped on load; search keeps working."""
+    path = tmp_path / "s.jsonl"
+    good = {
+        "key": "k2",
+        "stored_at": time.time(),
+        "hits": [{"url": "u", "title": "t", "snippet": "s"}],
+    }
+    path.write_text(
+        json.dumps({"key": "k", "stored_at": time.time(), "hits": hits})
+        + "\n"
+        + json.dumps(good)
+        + "\n"
+    )
+    cache = search_cache.SearchCache(60, path)
+    assert cache.get("k") is None
+    assert [h["url"] for h in cache.get("k2")] == ["u"]
