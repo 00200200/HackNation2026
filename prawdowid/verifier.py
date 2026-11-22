@@ -146,8 +146,16 @@ A quote or reported speech ("Minister X powiedział, że Y") gives two claims: o
 "attribution" (that X said Y) and one of kind "quoted" (Y itself, as a claim of its own). Every
 other claim has kind "statement".
 
+Keep one sentence's claim whole: a comparison ("w 2000 roku X, a teraz Y"), a cause and its effect
+("odwet po ataku") or a thing with its description ("policja, która aresztuje") is one claim, not
+several. Split a sentence only when it makes independent statements about different matters.
+
 Rank every claim from most to least central to the text: the main point first, then specific
-claims (names, numbers, dates) before vague ones.
+claims (names, numbers, dates) before vague ones. When the text asks whether something is true or
+accurate ("Czy X?", "Czy to prawda?", "Czy film pokazuje...?", "Czy to się zgadza?"), the claim it
+asks about is the main point and comes first, stated with everything it asserts (for a post or a
+recording: what it is said to show, and when). Facts the text takes as given (who posted, when, that
+someone said something) come after it, and a "quoted" claim comes before its "attribution".
 
 Return in claims the {MAX_CHECKED_CLAIMS} highest-ranked claims, in rank order, each with:
 - claim: the claim restated as one short self-contained sentence in Polish, faithful to the text.

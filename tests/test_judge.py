@@ -654,3 +654,56 @@ def test_a_rating_of_another_claim_decides_nothing():
         ),
     )
     assert j.verdict is Verdict.CONFIRMED
+
+
+def test_true_rating_beats_grounded_missing_context():
+    review = rated("Prawda")
+    quote = "Nagranie pochodzi z 2019 roku"
+    portal = fragment("https://b.pl/c", quote + ", nie z UE.", "Portal B")
+    office = fragment("https://gov.pl/c", quote + ", nie z UE.", "Urząd", "official")
+    context = [
+        label(f, "context", quote, missing_context="inny czas", context_quote=quote)
+        for f in (portal, office)
+    ]
+    j = run(
+        [review, portal, office],
+        answering(
+            label(review, "supports", "Podatek od wypieków", own_conclusion=True),
+            *context,
+        ),
+    )
+    assert j.verdict is Verdict.CONFIRMED
+    assert any("portal b" in x and "demagog" not in x for x in j.limitations)
+
+
+def test_true_rating_needs_the_fact_checkers_own_conclusion():
+    review = rated("Prawda")
+    quote = "Nagranie pochodzi z 2019 roku"
+    office = fragment("https://gov.pl/c", quote + ", nie z UE.", "Urząd", "official")
+    j = run(
+        [review, office],
+        answering(
+            label(review, "supports", "Podatek od wypieków"),
+            label(
+                office,
+                "context",
+                quote,
+                missing_context="inny czas",
+                context_quote=quote,
+            ),
+        ),
+    )
+    assert j.verdict is Verdict.MISLEADING
+
+
+def test_true_rating_against_reliable_refute_is_a_conflict():
+    review = rated("Prawda")
+    j = run(
+        [review, GOV],
+        answering(
+            label(review, "supports", "Podatek od wypieków", own_conclusion=True),
+            label(GOV, "refutes", "Podatek od wypieków obowiązuje od 2025 roku."),
+        ),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert CONFLICT in j.limitations

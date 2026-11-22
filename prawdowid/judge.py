@@ -43,6 +43,8 @@ FACT_CHECK = "fact_check"
 # "Fałsz" with three plain refutes became "wprowadzające w błąd" (FC-A06, full eval 2026-11-21).
 # Folded with `_rating_word`. Polish values seen in Google Fact Check for Demagog and AFP.
 FALSE_RATINGS = {"falsz", "false"}
+# Demagog's "Prawda" lost to another source's context row (FC-A04, full eval 2026-11-22).
+TRUE_RATINGS = {"prawda", "true"}
 MISLEADING_RATINGS = {"manipulacja", "brak kontekstu", "misleading", "missing context"}
 # Sources older than this get an archival warning. First guess, not tuned.
 ARCHIVE_DAYS = int(os.getenv("PRAWDOWID_ARCHIVE_DAYS") or 730)
@@ -115,7 +117,11 @@ Return in labels one entry for every fragment that bears on the claim, and none 
 - stance: "supports" if the fragment says the claim is true, "refutes" if it says the claim is
   false, "gap" if it says the claim cannot be checked because the data behind it is missing,
   incomplete or covers something else, "context" if it is about the same matter but does none of
-  these.
+  these. The fragment need not repeat the claim: when the claim follows from it, or is ruled out by
+  it, through a date, a figure or a simple comparison, that is "supports" or "refutes" (a Sejm
+  resolution of 20 December 2007 on Poland joining the Schengen area supports "Poland has been in
+  Schengen since 2007"; yearly figures that show another year was higher refute "the fastest growth
+  this century"). Use "context" only when the fragment settles nothing about the claim.
 - quote: the one or two sentences of the fragment that show the stance, copied character for
   character. Never shorten, translate or join pieces of text.
 - own_conclusion: true when the quote is the source's own conclusion or rating on the claim (a
@@ -123,7 +129,10 @@ Return in labels one entry for every fragment that bears on the claim, and none 
 - missing_context: only for stance "context" or "refutes", and only when the fragment shows that
   the claim's material comes from a different time, place, speaker or setting than the claim says:
   one sentence in Polish naming that other context. Missing or incomplete data is "gap", never
-  missing context. Otherwise null.
+  missing context. A wrong fact (another newspaper, person, number, place or event than the claim
+  names, or an event that did not happen) is a plain "refutes" with missing_context null: missing
+  context is only for real material (a recording, photo, quote or figure) presented as if it came
+  from another time, place or setting. Otherwise null.
 - context_quote: with missing_context, the words of the fragment (at least three) that name that
   other time, place, speaker or setting, copied character for character. Otherwise null.
 
@@ -328,6 +337,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     |-----------------|----------------|------------------------|------------------------------|
     | yes             | yes            | any                    | insufficient, shown conflict |
     | any             | false rating   | any                    | false                        |
+    | true rating     | any            | any                    | confirmed                    |
     | any             | any            | yes                    | misleading                   |
     | any             | yes            | no                     | false                        |
     | yes             | no             | no                     | confirmed                    |
@@ -338,8 +348,9 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     type counts too; its report of what someone said does not.
     A fact-checker's own conclusion with a false rating ("Fałsz") is the false row; one with a
     manipulation or missing-context rating counts as missing context (`_rated`): its review is the
-    named context, also when its fragment has no other words to quote. Otherwise missing context
-    counts only from a "context" or "refutes" label with a `context_quote` found verbatim in the
+    named context, also when its fragment has no other words to quote. One with a true rating
+    ("Prawda") is the confirmed row, before missing context; other sources' context is then shown as
+    a limitation. Otherwise missing context counts only from a "context" or "refutes" label with a `context_quote` found verbatim in the
     same document (`_grounded`). A "gap" label (the data cannot settle the claim)
     never decides: it adds a limitation, and a publisher whose own conclusion is a gap counts for
     no side (its quote of the claim confirms nothing).
@@ -383,6 +394,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
             limitations + [CONFLICT],
         )
     rated_false = [e for e in refutes if _rated(e, FALSE_RATINGS)]
+    rated_true = [e for e in supports if _rated(e, TRUE_RATINGS)]
     rated_misleading = [
         e
         for e in counted
@@ -391,6 +403,16 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     ]
     for verdict, side, other in (
         (Verdict.FALSE, rated_false, supports),
+        (
+            Verdict.CONFIRMED,
+            rated_true,
+            # Other sources only: the confirming fact-checker's own context is no counter-evidence.
+            [
+                e
+                for e in refutes + context + rated_misleading
+                if _publisher(e) not in _publishers(rated_true)
+            ],
+        ),
         (Verdict.MISLEADING, context + rated_misleading, []),
         (Verdict.FALSE, refutes, supports),
         (Verdict.CONFIRMED, supports, refutes),

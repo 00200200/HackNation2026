@@ -12,3 +12,5 @@
 | 2026-11-22T01:15:50+00:00 | ab6cb23 | full | 71 | 0.311 | 0.333 | 0.000 | 0.944 | — | 25.0 | — | FAIL | TAVILY control for the Perplexity run on :8011 (same code, same time): Fact Check fan-out + rating rules + source screen; default budgets; dirty tree |
 | 2026-11-22T01:36:32+00:00 | ab6cb23 | full | 71 | 0.763 | 0.917 | 1.000 | 0.958 | — | 19.3 | — | FAIL | NO CUT: CHECK_BUDGET_S=600; Perplexity search; extraction SONNET; concurrency 2, run alongside the Opus run on :8011; Fact Check fan-out + rating rules + source screen; dirty tree |
 | 2026-11-22T01:36:47+00:00 | ab6cb23 | full | 71 | 0.745 | 0.750 | 1.000 | 0.972 | — | 20.9 | — | FAIL | NO CUT: CHECK_BUDGET_S=600; Perplexity search; extraction OPUS; concurrency 2, run alongside the Sonnet run on :8012; Fact Check fan-out + rating rules + source screen; dirty tree |
+| 2026-11-22T05:09:32+00:00 | 3eed3a2 | full | 20 | 0.556 | 1.000 | 1.000 | 1.000 | — | 19.2 | 3.89 | FAIL | extraction main-claim prompt, subset |
+| 2026-11-22T05:22:11+00:00 | 3eed3a2 | full | 71 | 0.816 | 0.917 | 1.000 | 0.972 | — | 13.6 | 3.21 | FAIL | extraction main-claim + judge entailment/wrong-fact + true rating, budget 600 |
