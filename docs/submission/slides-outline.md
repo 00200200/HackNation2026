@@ -91,7 +91,7 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 - Kod oddziela dane od instrukcji, sprawdza obecność cytatów i ogranicza pobieranie podanych URL. W [PR #126](https://github.com/00200200/HackNation2026/pull/126)
   treść pobranych stron jest też sprawdzana w kodzie pod kątem wstrzykniętych instrukcji ([#61](https://github.com/00200200/HackNation2026/issues/61),
-  [#62](https://github.com/00200200/HackNation2026/issues/62)); na `main` źródła czyta tylko model sędziego, który może zgłosić wstrzyknięcie, a kod ich nie przeszukuje.
+  [#62](https://github.com/00200200/HackNation2026/issues/62)); na `main` źródła czytają reranker i model sędziego, wstrzyknięcie w źródle może zgłosić tylko sędzia, a kod ich nie przeszukuje.
 - Maskowanie danych osobowych (e-mail, IBAN/NRB, karta, PESEL, telefon; w PR #126 także numer dowodu i
   paszportu, a numer karty po etykiecie produktu, na przykład `nr`, zostaje bez maski) działa przed modelem i w każdym logu; dziennik sprawdzeń trzyma maskowany zapis 30 dni, sesję
   można usunąć (`DELETE /api/sessions/{id}`, przycisk na stronie). Imiona i adresy nie są wykrywane.
