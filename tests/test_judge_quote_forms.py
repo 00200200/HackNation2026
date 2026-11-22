@@ -1,4 +1,7 @@
-"""G01 (quick eval on ca48b84): every judge quote was dropped, the Demagog "Fałsz" record included.
+"""G01 answered "brak wystarczających dowodów" next to a Demagog "Fałsz" record in the quick eval
+on ca48b84 (results file 20261122T021403.618691Z-ca48b84-quick.json, committed in cd61db5, not in
+this tree). That every judge quote was dropped comes from that run's log, not the results file:
+UNCONFIRMED here.
 Forms a judge returns for a ClaimReview record or a page, and what the check keeps."""
 
 from datetime import UTC, date, datetime

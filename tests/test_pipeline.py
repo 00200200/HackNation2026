@@ -286,7 +286,10 @@ def test_govpl_page_survives_the_rerank_cap_behind_many_web_pages():
             documents=[document("https://www.gov.pl/decisive")]
         ),
     }
-    ids = {f.doc_id for f in rerank.split_all(pipeline._candidates(found), None)}
+    ids = {
+        f.doc_id
+        for f in rerank.split_all(pipeline._candidates(found, "Twierdzenie."), None)
+    }
     assert rerank.canonical_url("https://www.gov.pl/decisive") in ids
 
 
@@ -658,7 +661,7 @@ def test_corpus_sources_come_before_the_web_in_the_candidates():
         "web": [websearch.WebSearch(documents=[document("https://www.gov.pl/a")])],
         "corpus": corpus_bm25.EvidenceLookup(hits=[corpus_hit()]),
     }
-    assert [str(s.url) for s in pipeline._candidates(found)] == [
+    assert [str(s.url) for s in pipeline._candidates(found, "Twierdzenie.")] == [
         str(corpus_hit().source.url),
         "https://www.gov.pl/a",
     ]
@@ -671,7 +674,7 @@ def test_a_page_fetched_now_replaces_its_stored_copy_in_the_candidates():
         "web": [websearch.WebSearch(documents=[document("http://gov.pl/a")])],
         "corpus": corpus_bm25.EvidenceLookup(hits=[corpus_hit(), stored]),
     }
-    candidates = pipeline._candidates(found)
+    candidates = pipeline._candidates(found, "Twierdzenie.")
     assert [str(s.url) for s in candidates] == [
         str(corpus_hit().source.url),
         "http://gov.pl/a",
@@ -689,14 +692,16 @@ def test_a_snippet_of_a_page_leaves_its_stored_full_copy_in_the_candidates():
         "web": [websearch.WebSearch(documents=[snippet])],
         "corpus": corpus_bm25.EvidenceLookup(hits=[corpus_hit("https://www.gov.pl/a")]),
     }
-    urls = [str(s.url) for s in pipeline._candidates(found)]
+    urls = [str(s.url) for s in pipeline._candidates(found, "Twierdzenie.")]
     assert urls == ["https://www.gov.pl/a", "https://www.gov.pl/a"]
 
 
 def test_an_euvsdisinfo_record_in_the_corpus_is_context_only():
     hit = corpus_hit("https://euvsdisinfo.eu/report/x")
     found = {"web": [], "corpus": corpus_bm25.EvidenceLookup(hits=[hit])}
-    assert [s.source_type for s in pipeline._candidates(found)] == ["disinfo_database"]
+    assert [s.source_type for s in pipeline._candidates(found, "Twierdzenie.")] == [
+        "disinfo_database"
+    ]
 
 
 def test_cost_is_the_priced_sum_of_answered_requests_plus_a_count_of_the_rest():
@@ -897,7 +902,7 @@ def review_page(rating="Manipulacja") -> Document:
 
 def test_a_rating_from_a_review_page_leads_its_text_like_a_fact_check_hit():
     found = {"web": [websearch.WebSearch(documents=[review_page()])]}
-    [first] = rerank.split_all(pipeline._candidates(found), None)
+    [first] = rerank.split_all(pipeline._candidates(found, B01_CLAIM), None)
     assert first.source.fragment == (
         f"Ocena fact-checkera: Manipulacja.\n\nSprawdzane twierdzenie: {CAPTION}…"
         f"\n\nWstęp. {QUOTE}"
@@ -910,10 +915,66 @@ def test_a_rating_from_a_review_page_leads_its_text_like_a_fact_check_hit():
     )
     found["factcheck"] = factcheck.FactCheckLookup(hits=[hit])
     found["web"] = [websearch.WebSearch(documents=[review_page("Prawda")])]
-    [only] = rerank.split_all(pipeline._candidates(found), None)
+    [only] = rerank.split_all(pipeline._candidates(found, B01_CLAIM), None)
     assert only.source.fragment.startswith("Ocena fact-checkera: Manipulacja.")
     assert "Prawda" not in only.source.fragment
     assert only.source.fragment.endswith(f"Wstęp. {QUOTE}")  # the page text after it
+    # A hit without a rating has none to win with: the page's rating stands in, under the hit's
+    # publisher and review date, which name the same review.
+    unrated = {k: v for k, v in B01_REVIEW.items() if k != "textualRating"}
+    hit = factcheck._to_hit(
+        {"text": B01_CLAIM}, {**unrated, "url": REVIEW_PAGE}, datetime.now(UTC)
+    )
+    found["factcheck"] = factcheck.FactCheckLookup(hits=[hit])
+    [only] = rerank.split_all(pipeline._candidates(found, B01_CLAIM), None)
+    assert only.source.fragment.startswith("Ocena fact-checkera: Prawda.")
+    assert (only.source.publisher, only.source.published_at) == (
+        "Demagog",
+        date(2026, 10, 6),
+    )
+
+
+def first_piece_evidence(page: Document, quote: str) -> list[judge.Evidence]:
+    """What the check keeps of a judge's label quoting `quote` from the page's first piece."""
+    found = {"web": [websearch.WebSearch(documents=[page])]}
+    [first] = rerank.split_all(pipeline._candidates(found, B01_CLAIM), None)
+    label = judge.Label(
+        doc_id=first.doc_id, stance="refutes", quote=quote, own_conclusion=True
+    )
+    return judge.verify_quotes([label], [first])
+
+
+@pytest.mark.parametrize("rating", ["Manipulacja", "Satyra"])
+def test_the_page_text_after_a_rating_keeps_the_judges_label(rating):
+    # The page's lead shares the rating's piece, but it is the fact-checker's own text: it is read
+    # as on the same page without markup, whether the record rates another claim (the judge's
+    # same_claim stays false) or carries a rating the map does not know.
+    marked = first_piece_evidence(review_page(rating), QUOTE)
+    plain = first_piece_evidence(
+        review_page(rating).model_copy(update={"reviews": []}), QUOTE
+    )
+    assert [e.review for e in marked] == [False]
+    for evidence in (marked, plain):
+        j = judge.decide(evidence, [], date(2026, 11, 22))
+        assert j.verdict is Verdict.FALSE
+        assert "ocenia inne twierdzenie" not in j.premises[0]
+    # The rating line in the same piece is still the record's.
+    [line] = first_piece_evidence(
+        review_page(rating), f"Ocena fact-checkera: {rating}."
+    )
+    assert (line.review, line.rating) == (True, rating)
+
+
+def test_of_several_ratings_on_a_page_the_one_closest_to_the_claim_leads_it():
+    # Document order alone would put the other statement's rating first. `factcheck.search_keys`
+    # keeps the Fact Check review closest to the claim among those of one URL; markup is read so too.
+    other = factcheck.review_fragment("Prawda", "Sejm przyjął ustawę o podatku.")
+    page = review_page().model_copy(update={"reviews": [other, *review_page().reviews]})
+    found = {"web": [websearch.WebSearch(documents=[page])]}
+    [first] = rerank.split_all(pipeline._candidates(found, B01_CLAIM), None)
+    assert first.source.fragment.startswith("Ocena fact-checkera: Manipulacja.")
+    assert pipeline._closest_review([other, *page.reviews], "Nic wspólnego.") == [other]
+    assert pipeline._closest_review([], B01_CLAIM) == []
 
 
 def test_a_rating_on_a_review_page_decides_without_a_fact_check_hit(monkeypatch):
