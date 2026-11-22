@@ -46,3 +46,11 @@ def quiet_sources(monkeypatch):
         euvsdisinfo, "search_cases", empty(euvsdisinfo.EuvsdisinfoLookup)
     )
     monkeypatch.setattr(websearch, "search_web", empty(websearch.WebSearch))
+
+
+@pytest.fixture(autouse=True)
+def empty_result_cache():
+    """The API's result cache is module state: no answer may leak from one test into another."""
+    from prawdowid import app
+
+    app._results.clear()

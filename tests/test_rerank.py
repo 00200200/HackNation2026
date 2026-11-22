@@ -298,3 +298,26 @@ def test_input_budget_applies_before_splitting(monkeypatch):
     fragments = rr.split_all(pages, exclude_url=None)
     assert {f.doc_id for f in fragments} == {"https://p0.pl/", "https://p1.pl/"}
     assert sum(len(f.source.fragment) for f in fragments) <= 2 * 100
+
+
+def test_fact_check_rating_stays_first_and_the_fetched_page_follows_it():
+    hit = source(
+        "https://konkret24.tvn24.pl/x/",
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Polska wyszła z UE.",
+    ).model_copy(update={"source_type": "fact_check"})
+    page = source("https://konkret24.tvn24.pl/x", "Pełny tekst analizy.")
+    ranking = run([hit, page], answering([0]))
+    [fragment] = ranking.fragments
+    assert fragment.source.fragment == f"{hit.fragment}\n\n{page.fragment}"
+    assert fragment.source.source_type == "fact_check"
+
+
+def test_the_same_page_text_is_appended_once():
+    hit = source(
+        "https://konkret24.tvn24.pl/x/",
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Polska wyszła z UE.",
+    ).model_copy(update={"source_type": "fact_check"})
+    page = source("https://konkret24.tvn24.pl/x", "Pełny tekst analizy.")
+    ranking = run([hit, page, page.model_copy()], answering([0]))
+    [fragment] = ranking.fragments
+    assert fragment.source.fragment.count("Pełny tekst analizy.") == 1

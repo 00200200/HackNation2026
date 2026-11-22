@@ -79,8 +79,8 @@ nano .env      # paste the keys after ANTHROPIC_API_KEY=, TAVILY_API_KEY= and th
 
 The evidence keys matter as much as the model key: without `TAVILY_API_KEY` (web search, the only
 search provider), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` every source lookup fails,
-`/health` still answers, and every checkable claim ends as "nie sprawdzono". `compose.yaml`
-forwards all three to the backend.
+`/health` still answers, and a check ends as a technical error ("Nie mogę teraz sprawdzić ..."),
+never as a verdict. `compose.yaml` forwards all three to the backend.
 
 The database password is generated on the server and never leaves it; hex keeps it safe inside
 the `DATABASE_URL` that Compose builds for the backend. `COMPOSE_FILE` makes every
@@ -175,6 +175,85 @@ The second answer must contain `"status":"ok"`. Without a valid Anthropic key it
 and run one check. On the server,
 `docker compose logs frontend | grep 'POST /api/checks' | tail -n 3` must show your public IPv4
 address, not a `172.x` one: that is the address the backend rate limit counts.
+
+## 7. Discord bot (optional second channel)
+
+The `discord` service in `compose.yaml` runs `python -m prawdowid.discord_bot` from the same image
+as the backend and calls `http://backend:8000/api/checks` with `X-Channel: discord`. It needs only
+two lines in the server's `.env`: `COMPOSE_PROFILES=discord` and `DISCORD_BOT_TOKEN`. No compose
+change, no extra key (it never talks to Anthropic itself), no open port. Nobody has run it against
+real Discord yet (UNCONFIRMED until step E below passes), and the token is created by a person,
+never by an agent or a script.
+
+**A. Create the application and the bot** (Discord account, the account that owns the bot):
+
+1. Open https://discord.com/developers/applications, **New Application**, name it (for example
+   "Prawdowid"), accept the terms.
+2. **General Information**: copy the **Application ID**. It is the `client_id` of the invite link.
+3. **Bot** tab: **Reset Token**, copy it once. Treat it like a password: it goes only into the
+   server's `.env`, never into the repository, a chat or a ticket. Leave all three **Privileged
+   Gateway Intents** off: the bot only answers slash commands and reads no messages. Switch
+   **Public Bot** on if people outside your own account are to add it.
+
+**B. Invite link.** Replace `APPLICATION_ID` with the number from step A.2:
+
+```
+https://discord.com/oauth2/authorize?client_id=APPLICATION_ID&scope=bot%20applications.commands&permissions=34816
+```
+
+Scopes: `bot` and `applications.commands` (the slash command). Permissions `34816` = Send Messages
+(2048) + Attach Files (32768); the bot attaches `odpowiedz.md` when an answer is too long for five
+messages. Open the link while signed in to Discord, choose a server where you have **Manage
+Server**, authorise. Use a test server first.
+
+**C. Server `.env`.** On the server, in `/opt/faktczyfejk`:
+
+```bash
+nano .env      # add the two lines below, keep the rest
+```
+
+```
+COMPOSE_PROFILES=discord
+DISCORD_BOT_TOKEN=paste-the-token-here
+```
+
+`.env` stays `chmod 600` and is never committed; deploys leave it alone.
+
+**D. Start it and read the log.** Do this by hand before the next promotion to `prod` (see the
+warning below):
+
+```bash
+cd /opt/faktczyfejk
+docker compose up -d --build discord
+docker compose logs --tail 30 discord
+```
+
+The log must show the bot logging in and connecting to the gateway, and no `LoginFailure` or
+traceback. `docker compose ps` must list `discord` as `running`. A wrong token ends the process
+with `LoginFailure: Improper token`; Docker then restarts the container three times (`restart: on-failure:3`) and gives up.
+
+**E. Test in Discord.** In the test server run `/sprawdz tekst:Warszawa jest stolicą Polski.` The
+first answer can take up to a minute. A new slash command can need a minute, or a restart of the
+Discord client (Ctrl+R), before it shows up. Check `docker compose logs backend | tail` for a
+line with `channel=discord`. Then run the same sentence in the web form: the verdict and sources
+must be identical when you ask within 30 minutes (the result cache returns the stored answer for the same text; it is empty after a restart or deploy, and an answer with a claim marked `nie sprawdzono` is not stored, so then a second run may differ).
+Only after that may the README and `docs/submission/description.md` say the bot was tested, and
+the invite link go into both.
+
+**Apply a change to the token or the profile:** edit `.env`, then `docker compose up -d` in
+`/opt/faktczyfejk` (a changed token recreates `discord`). **Switch the bot off:** remove the two
+lines and run `docker compose --profile discord rm -sf discord`.
+
+Warning: `deploy/pull-deploy.sh` runs `docker compose up -d --wait`. With `COMPOSE_PROFILES=discord`
+a bot that exits (missing or wrong token) makes that command fail, so a promotion to `prod` stops
+before the Caddy reload and the HTTPS check, is not recorded as deployed, and is retried every
+minute. The web channel keeps serving the new containers meanwhile. So put a verified token in
+`.env` first (D), and remove the profile line if the bot is not wanted any more.
+
+Limits of this channel: the bot calls the backend from its container, so all Discord users share
+one rate limit of 10 checks per minute (the backend counts per IP address); the 11th request in
+a minute is answered with the rate-limit notice in Discord. The bot sends no `X-Session-Id`, so a
+Discord user cannot delete their checks through the web form's "delete my data" (`docs/privacy.md`).
 
 ## Logs and status
 

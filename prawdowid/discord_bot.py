@@ -335,7 +335,12 @@ class Bot(discord.Client):
                 await send(interaction, last, file=file)
             except discord.HTTPException:
                 log.exception("attachment refused")
-                await send(interaction, f"{last}\n\n{ATTACHMENT_FAILED}")
+                # Two messages: last may already be near the limit, so the notice cannot join it.
+                try:
+                    await send(interaction, last)
+                    await send(interaction, ATTACHMENT_FAILED)
+                except discord.HTTPException:
+                    log.exception("fallback message refused")
 
     async def setup_hook(self) -> None:
         # Created here so the client lives in the bot's event loop.

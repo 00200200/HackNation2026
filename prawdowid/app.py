@@ -1,12 +1,15 @@
 """HTTP API. Channels (the web frontend now) call it; it calls verify and returns CheckResult."""
 
 import asyncio
+import hashlib
 import logging
 import re
 import time
+import unicodedata
 import uuid
 from datetime import UTC, datetime
 
+from cachetools import TTLCache
 from fastapi import FastAPI, Path, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl, TypeAdapter, ValidationError, field_validator
@@ -16,7 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from prawdowid import checklog, faults
-from prawdowid.contract import CheckResult, Status
+from prawdowid.contract import CheckResult, Status, Verdict
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
 from prawdowid.verifier import failed, is_link, verify
@@ -44,6 +47,29 @@ RATE_LIMIT_MESSAGE = (
 
 _http_url = TypeAdapter(HttpUrl)
 
+# Same text, same answer: a channel (web, Discord) asking again within the TTL gets the stored
+# result instead of a second model run that could split the claims differently. In process, so
+# a restart or a second worker starts empty; never shared and never persisted.
+RESULT_CACHE_TTL_S = 30 * 60
+RESULT_CACHE_SIZE = 500
+_results: TTLCache[str, CheckResult] = TTLCache(
+    maxsize=RESULT_CACHE_SIZE, ttl=RESULT_CACHE_TTL_S
+)
+
+
+def cache_key(text: str) -> str:
+    """Hash of the input with whitespace collapsed (CheckRequest already made it NFC), so the raw
+    text is not kept as a key. Session and channel stay out of it."""
+    normalised = " ".join(unicodedata.normalize("NFC", text).split())
+    return hashlib.sha256(normalised.encode()).hexdigest()
+
+
+def _cacheable(result: CheckResult) -> bool:
+    """Only a finished check: not an error, and no claim left unchecked by a source failure."""
+    return result.status != Status.TECHNICAL_ERROR and not any(
+        c.verdict == Verdict.NOT_CHECKED for c in result.claims
+    )
+
 
 class CheckRequest(BaseModel):
     input: str
@@ -51,7 +77,9 @@ class CheckRequest(BaseModel):
     @field_validator("input")
     @classmethod
     def _valid_input(cls, value: str) -> str:
-        value = value.strip()
+        # NFC, so the pipeline sees what the cache key hashes (a decomposed ń must not slip past
+        # the injection patterns, which are written with composed letters).
+        value = unicodedata.normalize("NFC", value).strip()
         if not value:
             raise PydanticCustomError("empty", "Wpisz tekst do sprawdzenia.")
         if len(value) > MAX_INPUT_CHARS:
@@ -98,11 +126,23 @@ async def create_check(
     response.headers[SESSION_HEADER] = session
     # Why a check ended in a technical error, for the check log; None when verify returned.
     error = None
+    key = cache_key(body.input)
+    # Eval traffic only (scenario J): honoured with the secret eval token, ignored for everyone
+    # else. A faulted run neither reads nor fills the result cache: a stored answer would hide
+    # the simulated outage, and an answer computed with a dependency "down" is not the real one.
+    fault = faults.requested(request.headers)
+    cached = None if fault else _results.get(key)
     try:
-        # Eval traffic only: honoured with the secret eval token, ignored for everyone else.
-        with faults.simulate(faults.requested(request.headers)):
-            async with asyncio.timeout(VERIFY_TIMEOUT_S):
-                result = await verify(body.input)
+        if cached:
+            result = cached.model_copy(deep=True)
+            # Lets a client (the eval) tell a stored answer from a fresh run, e.g. for latency.
+            response.headers["X-Cache"] = "hit"
+        else:
+            with faults.simulate(fault):
+                async with asyncio.timeout(VERIFY_TIMEOUT_S):
+                    result = await verify(body.input)
+            if not fault and _cacheable(result):
+                _results[key] = result.model_copy(deep=True)
     except Exception as exc:
         log.exception("verify failed")
         error = "timeout" if isinstance(exc, TimeoutError) else type(exc).__name__
@@ -124,20 +164,35 @@ async def create_check(
     channel = channel if channel in CHANNELS else "other"
     latency_ms = round((time.perf_counter() - started) * 1000)
     log.info(
-        "check session=%s channel=%s status=%s security_events=%d cost_usd=%s latency_ms=%d input_chars=%d",
+        "check session=%s channel=%s status=%s security_events=%d cost_usd=%s cache=%s "
+        "latency_ms=%d input_chars=%d",
         session,
         channel,
         result.status,
         len(result.security_events),
-        result.cost_usd,
+        0.0 if cached else result.cost_usd,
+        "hit" if cached else "miss",
         latency_ms,
         len(body.input),
     )
+    # A hit cost nothing and ran no steps: the check log must not count them twice.
+    logged = result
+    if cached:
+        logged = result.model_copy(
+            update={
+                "cost_usd": 0.0,
+                "steps_ms": {},
+                "model_calls": [],
+                "claims": [
+                    c.model_copy(update={"steps_ms": {}}) for c in result.claims
+                ],
+            }
+        )
     checklog.record(
         session,
         channel,
         body.input,
-        result,
+        logged,
         started_at=started_at,
         latency_ms=latency_ms,
         error=error,

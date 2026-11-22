@@ -396,7 +396,7 @@ def test_url_longer_than_a_message_is_whole_in_the_attachment():
     assert f"<{url}>" in full
 
 
-def slash(monkeypatch, check, refuse_files=False):
+def slash(monkeypatch, check, refuse_files=False, then_nothing=False):
     """Run the registered /sprawdz callback; return (text, attachment, kwargs) per send."""
 
     async def fake_api(text, client):
@@ -404,6 +404,7 @@ def slash(monkeypatch, check, refuse_files=False):
 
     monkeypatch.setattr(discord_bot, "ask_api", fake_api)
     sent = []
+    refused = []
 
     class Response:
         async def defer(self, thinking):
@@ -413,6 +414,9 @@ def slash(monkeypatch, check, refuse_files=False):
         async def send(self, content, **kwargs):
             file = kwargs.get("file")
             if file and refuse_files:
+                refused.append(True)
+                raise discord.HTTPException(httpx_response(), "no files")
+            if refused and then_nothing:
                 raise discord.HTTPException(httpx_response(), "no files")
             sent.append((content, file.fp.read().decode() if file else None, kwargs))
 
@@ -465,6 +469,19 @@ def test_refused_attachment_ends_with_a_notice(monkeypatch):
     sent = slash(monkeypatch, five_claims(), refuse_files=True)
     assert all(f is None for _, f, _ in sent)
     assert sent[-1][0].endswith(discord_bot.ATTACHMENT_FAILED)
+
+
+def test_refused_attachment_notice_is_its_own_message(monkeypatch):
+    sent = slash(monkeypatch, five_claims(), refuse_files=True)
+    assert sent[-1][0] == discord_bot.ATTACHMENT_FAILED
+    assert all(len(text) <= MESSAGE_LIMIT for text, _, _ in sent)
+
+
+def test_refused_fallback_messages_do_not_crash_the_command(monkeypatch):
+    sent = slash(monkeypatch, five_claims(), refuse_files=True, then_nothing=True)
+    # The parts before the attachment went out; the refused fallback raised nothing.
+    assert sent and all(f is None for _, f, _ in sent)
+    assert not sent[-1][0].endswith(discord_bot.ATTACHMENT_FAILED)
 
 
 def test_render_names_the_checked_page():

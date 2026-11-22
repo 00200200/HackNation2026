@@ -60,8 +60,10 @@ def test_known_claim_returns_its_review_as_a_source():
     assert hit.source.published_at == date(2021, 3, 4)
     assert str(hit.source.url) == "https://demagog.org.pl/fake_news/mikroczipy/"
     assert hit.source.source_type == "fact_check"
-    # The reviewed claim is the disputed statement, never shown as the source's quote.
-    assert hit.source.fragment is None
+    # The rating and the reviewed claim reach rerank and the judge as data.
+    assert hit.source.fragment == (
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Szczepionki zawierają mikroczipy."
+    )
 
     [request] = calls
     assert request.url.params["query"] == "Szczepionki mają mikroczipy"
@@ -173,3 +175,18 @@ def test_trickling_response_hits_the_overall_deadline(monkeypatch):
     lookup, elapsed = asyncio.run(go())
     assert lookup.hits == [] and lookup.limitation == LOOKUP_UNAVAILABLE
     assert elapsed < 1
+
+
+def test_review_without_a_rating_has_no_fragment():
+    body = {
+        "claims": [
+            {
+                "text": "Szczepionki zawierają mikroczipy.",
+                "claimReview": [
+                    {"url": "https://demagog.org.pl/x/", "title": "Mikroczipy?"}
+                ],
+            }
+        ]
+    }
+    lookup, _ = run(lambda r: httpx2.Response(200, json=body))
+    assert lookup.hits[0].source.fragment is None

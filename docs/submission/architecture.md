@@ -43,9 +43,11 @@ The checked page is excluded as evidence for its own claims. Sources:
 Extraction ranks self-contained claims, separates reported speech from its attribution, marks
 checkability and writes search queries. Claims run with `asyncio.gather`; retrieval within a claim
 uses `asyncio.TaskGroup`, cancelling and awaiting unfinished lookup tasks at the deadline.
-Provider threads can finish in the background. Failed providers add limitations; when all retrieval providers fail or the claim
-deadline expires, the claim is `not_checked`. An available provider returning no matching evidence
-can instead lead to `insufficient_evidence`. One extra search with the claim text is allowed if
+Provider threads can finish in the background. Failed providers add limitations. When Fact Check, every web query or (for a government claim)
+the gov.pl search failed and the evidence found is not enough, when all providers failed, or when
+the claim deadline expires, the claim is `not_checked`; if every checkable claim ended that way
+because of an outage, the answer is a technical error. A provider that answered with no matching
+evidence can instead lead to `insufficient_evidence`. One extra search with the claim text is allowed if
 enough time remains. Sources: [verifier.py](../../prawdowid/verifier.py),
 [pipeline.py](../../prawdowid/pipeline.py).
 
@@ -93,8 +95,10 @@ in [sources.md](sources.md).
 [compose.yaml](../../compose.yaml) publishes only the frontend by default, with backend health
 checks. The Discord service and local PostgreSQL service are opt-in profiles. Compose now
 forwards the extraction model setting, Anthropic key, `GOOGLE_FACTCHECK_API_KEY`,
-`TAVILY_API_KEY`, `EUVSDISINFO_API_KEY` and `PRAWDOWID_INCIDENTS_PATH`, and already points the
-check log and source cache at a writable `/tmp` path for the non-root `nobody` user.
+`TAVILY_API_KEY`, `EUVSDISINFO_API_KEY`, `PRAWDOWID_GOVPL`, `PRAWDOWID_INCIDENTS_PATH` and the
+eval-only `PRAWDOWID_EVAL_TOKEN` (unset on the public demo). The check log sits on the `checklog`
+volume (`/var/lib/prawdowid`, kept across deploys) and the source cache at a writable `/tmp` path,
+both writable for the non-root `nobody` user.
 
 The API runs without PostgreSQL. Step 2c, the own source store, is explicitly disabled in
 `pipeline._retrieve`. Its seed-only path uses psycopg, local PostgreSQL, a `simple` full-text index
@@ -124,8 +128,8 @@ references and [sources.md](sources.md) for storage limits.
 | Limit | Default | Source |
 |---|---|---|
 | Input / checked page prefix | 5000 characters | [app.py](../../prawdowid/app.py), [verifier.py](../../prawdowid/verifier.py) |
-| Fully considered claims / queries per checkable claim | 5 / 3 | [verifier.py](../../prawdowid/verifier.py) |
-| Check budget / API timeout | 25 s / 60 s | [pipeline.py](../../prawdowid/pipeline.py), [app.py](../../prawdowid/app.py) |
+| Fully considered claims / queries per checkable claim | 3 / 3 | [verifier.py](../../prawdowid/verifier.py) |
+| Check budget / API timeout | 40 s / 60 s | [pipeline.py](../../prawdowid/pipeline.py), [app.py](../../prawdowid/app.py) |
 | Extraction call timeout | 45 s provider setting, bounded by the shared check deadline | [verifier.py](../../prawdowid/verifier.py) |
 | Web query / whole page fetch budget | 10 s / 8 s | [websearch.py](../../prawdowid/websearch.py) |
 | Link fetch | 10 s, 3 redirects, `2 * 1024 * 1024` bytes | [link.py](../../prawdowid/link.py) |
@@ -148,8 +152,9 @@ Latest tracked result: [evals/results/latest.json](../../evals/results/latest.js
 `2026-11-21T19:10:57+00:00`, product commit
 `95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `dirty: false`, `mode: "quick"`, `n_cases: 9`,
 `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J`; `FC-J01`/`FC-J02`
-skipped (need a product eval fault switch, not built). This is a quick regression run, not the full
-jury-sized evaluation, even though the saved `coverage_ok` flag is true, and it **predates** PR #40
+skipped in that run (the eval fault switch did not exist yet; since #60 it does and they are scored).
+This is a quick regression run, not the full jury-sized evaluation, even though the saved
+`coverage_ok` flag is true, and it **predates** PR #40
 (this docs change) landing on `main`: no eval has been run on the merged commit, by user decision
 (`HN_SKIP_EVAL=1`) — **a fresh eval on the merged commit is pending**. The following values and
 targets are copied exactly from that file:

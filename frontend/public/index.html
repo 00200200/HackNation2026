@@ -49,7 +49,9 @@
             <button type="submit" class="ask-btn" id="submit" aria-label="Sprawdź"><svg class="ask-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15.4 15.4 L21 21" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
           </form>
           <p class="form-error" id="form-error" role="alert" hidden></p>
-          <p class="check-note" id="check-note">Bezpłatnie i bez konta. Nie wklejaj danych osobowych, sprawdzenia trzymamy do 30 dni.</p>
+          <p class="check-note"><span id="check-note">Bezpłatnie i bez konta. Nie wklejaj danych osobowych, sprawdzenia trzymamy do 30 dni.</span>
+            <button type="button" class="link-btn" id="delete-session" hidden>Usuń moje sprawdzenia</button>
+            <span id="session-status" role="status"></span></p>
 
           <div class="examples">
             <span>Spróbuj:</span>
@@ -78,15 +80,6 @@
   <main id="tresc" class="results">
     <div class="wrap narrow">
       <section id="result" aria-live="polite" aria-label="Wynik sprawdzenia"></section>
-
-      <p class="session" id="session" hidden>
-        Twoje sprawdzenia trzymamy do 30 dni. Przed zapisem ukrywamy numery PESEL, kont i kart,
-        adresy e-mail i telefony zapisane z +48 albo z myślnikami.
-        <button type="button" class="link-btn" id="delete-session">Usuń moje sprawdzenia</button>
-        <span id="session-status" role="status"></span>
-      </p>
-
-
     </div>
   </main>
 

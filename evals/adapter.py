@@ -132,7 +132,11 @@ def ask(payload: dict, channel: str) -> dict:
         },
     )
     with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
-        return to_eval_shape(json.loads(response.read().decode()))
+        shaped = to_eval_shape(json.loads(response.read().decode()))
+        # Read by `evals.run.call`: an answer from the product's result cache says nothing about
+        # how long a check takes. The Discord client does not expose headers.
+        shaped["cached"] = response.headers.get("X-Cache") == "hit"
+    return shaped
 
 
 async def _ask_discord(base: str, text: str, headers: dict) -> dict:

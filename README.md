@@ -59,7 +59,8 @@ search (ministry and RCB pages; web search leaves www.gov.pl to it) and web sear
 allowlisted domains (our own database, #19, is out of the pipeline for now), then
 rerank and a judge that labels quotes; the verdict is set in code (`judge.decide`). The whole check
 has one time budget (`PRAWDOWID_CHECK_BUDGET_S`, 40 s). A claim that runs out of time, or whose
-web search, gov.pl, Fact Check and EUvsDisinfo all fail, comes back `not_checked` with the reason, never as a verdict. An
+sources failed (all of them, or one that could decide the verdict while the rest is not enough),
+comes back `not_checked` with the reason, never as a verdict. An
 opinion, forecast or question is `not_verifiable`. A link is fetched (`prawdowid/link.py`) and the page's
 main text is checked like pasted text; a blocked page, paywall, login wall, social media post,
 private address or file that is not HTML or PDF comes back as `cannot_check` with a request to
@@ -78,8 +79,8 @@ domain's licence is confirmed, none today), one record per URL, dropped after 30
 Put these in `.env` in the repository root. The file is git-ignored and is not copied into the
 image. `make dev` loads it into the API environment. Compose reads it for interpolation but only
 forwards variables declared in `compose.yaml`: the backend gets `ANTHROPIC_API_KEY`,
-`PRAWDOWID_MODEL`, `GOOGLE_FACTCHECK_API_KEY`, `TAVILY_API_KEY`, `EUVSDISINFO_API_KEY` and
-`PRAWDOWID_INCIDENTS_PATH`, its check log sits on the `checklog` volume (`/var/lib/prawdowid`, kept across
+`PRAWDOWID_MODEL`, `GOOGLE_FACTCHECK_API_KEY`, `TAVILY_API_KEY`, `EUVSDISINFO_API_KEY`,
+`PRAWDOWID_GOVPL`, `PRAWDOWID_INCIDENTS_PATH` and `PRAWDOWID_EVAL_TOKEN`, its check log sits on the `checklog` volume (`/var/lib/prawdowid`, kept across
 deploys) and its source cache points at a writable `/tmp` path. Other tuning variables need an explicit Compose environment override.
 
 | Variable | Required | Default | What it does |
