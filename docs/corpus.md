@@ -89,7 +89,7 @@ search and web search (`prawdowid/corpus_bm25.py`, called from `prawdowid/pipeli
 - **After that:** the hits are candidates like any other. Rerank and the judge decide whether they
   matter for the claim, and an EUvsDisinfo record is context only. A page that web search or the
   gov.pl search fetched in the same check replaces the stored copy of the same URL, so the answer
-  rests on the page as it is now (the retry pass keeps the stored copy). The lookup never sets a
+  rests on the page as it is now. The lookup never sets a
   verdict.
 - **Failure:** a missing or unreadable file, or no answer within 5 s, is a limitation shown with the
   answer, never evidence. A line of the file that is no usable record (cut JSON, not UTF-8, a

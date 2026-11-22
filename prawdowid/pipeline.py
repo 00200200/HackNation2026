@@ -5,12 +5,14 @@ short keys from `factcheck.keys_for`), EUvsDisinfo
 known narratives (`euvsdisinfo.search_cases`, context that never decides alone), the www.gov.pl
 site search (`govpl.search_govpl`, the claim's gov.pl queries, else its first web query; off with
 PRAWDOWID_GOVPL=0), 2b web search and fetch (`websearch.search_web`, one search per web query of
-the claim, www.gov.pl pages left to the gov.pl lookup) and our evidence corpus
+the claim, the claim itself, and the claim among the fact-checkers' domains only, www.gov.pl pages left to the gov.pl lookup) and our evidence corpus
 (`corpus_bm25.search_evidence`: BM25 over `corpus/evidence.jsonl`, the claim and all its queries).
 Step 2c (our own database, #19) is out of the pipeline for now (team decision). Any EUvsDisinfo
 source, whichever lookup found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
-steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
-remains, the web is searched once more with a rewritten query and the claim is judged again.
+steps 4 and 5 (`judge.judge`, verdict from `decide()`). There is no second pass: the claim sentence
+itself is always one of the first web searches, and one more search of the claim is restricted to
+the fact-checkers' domains, all in parallel with the rest. The old sequential retry is gone (#106,
+WORKLOG).
 
 A source that fails adds a limitation. The sources that can decide a verdict (Fact Check, web
 search) are the ones whose outage matters: when one of them failed and the evidence is not enough,
@@ -56,8 +58,6 @@ log = logging.getLogger("prawdowid")
 # Whole check, from the request to the last verdict (the API gives up at 60 s, nginx at 75 s).
 # 25 s left a long page with no judged claim (#63): extraction alone takes much of it.
 CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 40)
-# The retry starts only with at least this much time left: a web search, rerank and judge again.
-RETRY_MIN_S = float(os.getenv("PRAWDOWID_RETRY_MIN_S") or 18)
 # EUvsDisinfo only adds context: it may not hold up the claim for its own 15 s deadline.
 EUVSDISINFO_BUDGET_S = float(os.getenv("PRAWDOWID_EUVSDISINFO_BUDGET_S") or 5)
 # The API builds the corpus index at startup (about a second, more on a small server); a lookup
@@ -73,9 +73,8 @@ WEB_PARTIAL = (
     "więc źródła mogą być niepełne."
 )
 DISINFO_DATABASE = websearch.ALLOWLIST["euvsdisinfo.eu"].source_type
-RETRY_UNJUDGED = (
-    "Dodatkowe wyszukiwanie znalazło strony, ale model nie zdążył ich ocenić, "
-    "więc ocena opiera się tylko na pierwszym wyszukiwaniu."
+FACT_CHECK_DOMAINS = tuple(
+    host for host, d in websearch.ALLOWLIST.items() if d.source_type == "fact_check"
 )
 FACTCHECK_DOWN = "bazy Google Fact Check"
 WEB_DOWN = "wyszukiwarki internetowej"
@@ -134,7 +133,8 @@ async def check_claim(
         gov = gov or [q for q in queries if q.strip()][:1] or [claim]
     else:
         gov, queries = None, [*queries, *govpl_queries]
-    searched = queries or [claim]
+    # The claim sentence is always searched: it is what a retry would have searched.
+    searched = list(dict.fromkeys([*queries, claim]))
     if _now() >= deadline:  # nothing is started after the budget ran out
         return _done(claim, _time_limit(found), runs, steps)
     try:
@@ -148,43 +148,9 @@ async def check_claim(
         # The pattern pre-check needs no model: pages already found are still screened.
         timed_out.security_events = _source_events(_candidates(found), exclude_url)
         return _done(claim, timed_out, runs, steps)
-    # Instructions in retrieved pages, kept from both passes: the pattern pre-check on every
+    # Instructions in retrieved pages: the pattern pre-check on every
     # candidate (rerank may drop it before the judge sees it) and the judge's own flag.
     events = [*_source_events(candidates, exclude_url), *judgement.security_events]
-
-    cut = False
-    # The claim itself is the rewritten query, so no retry when it was searched already.
-    retry = claim not in searched
-    if retry and _needs_more(judgement) and deadline - _now() >= RETRY_MIN_S:
-        try:
-            async with asyncio.timeout_at(deadline):
-                # ponytail: the claim itself is the rewritten query (the first pass used the
-                # model's queries); a HyDE-FC rewrite costs one more model call per claim.
-                web = await _timed(steps, "retry_web", _search_web, claim)
-                if web.documents:
-                    fresh = _candidates({"web": [web]})
-                    # Screened before the retry judge, which may time out or fail.
-                    events += _source_events(fresh, exclude_url)
-                    more = candidates + fresh
-                    second = await _judge(
-                        claim, more, exclude_url, steps, runs, "retry_"
-                    )
-                    # The first pass assessed evidence only when it had fragments left after
-                    # rerank (the linked page excluded): otherwise there is no verdict to keep.
-                    assessed = judge.NO_FRAGMENTS not in judgement.limitations
-                    if second.verdict is Verdict.NOT_CHECKED and assessed:
-                        # The retry judge failed: the verdict from the first pass's evidence
-                        # stands, judged without the extra pages.
-                        judgement.limitations.append(RETRY_UNJUDGED)
-                    else:
-                        judgement = second
-                        events += judgement.security_events
-                        candidates = more
-                # Only a finished retry counts: a cut one keeps the first pass as it was.
-                found["web"].append(web)
-        except TimeoutError:
-            log.info("retry cut by the time limit claim=%r", claim)
-            cut = True
 
     limits = _limits(found)
     outage = judgement.verdict is Verdict.NOT_CHECKED  # the judge did not answer
@@ -196,9 +162,8 @@ async def check_claim(
     if every_source_failed and (
         not candidates or judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
     ):
-        outage = not cut
-        reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
-        judgement = _not_checked(reason)
+        outage = True
+        judgement = _not_checked(SOURCES_FAILED)
     elif down and _needs_more(judgement):
         # Not "no evidence exists": the source that could have had it did not answer.
         outage = True
@@ -232,13 +197,15 @@ async def _retrieve(
     async def keep(name, fn):
         found[name] = await _timed(steps, name, fn, claim)
 
-    async def web(query):
-        found["web"].append(await _search_web(query))
+    async def web(query, domains=None):
+        found["web"].append(await _search_web(query, domains))
 
     async def all_web():
         async with asyncio.TaskGroup() as tg:
             for query in queries:
                 tg.create_task(web(query))
+            # The fact-checkers alone: a review is not crowded out by the other allowlisted sites.
+            tg.create_task(web(claim, FACT_CHECK_DOMAINS))
 
     # The corpus gets every wording: the rankings of the claim and of each query are merged.
     corpus_queries = list(dict.fromkeys([claim, *queries, *(gov or [])]))
@@ -258,13 +225,21 @@ async def _retrieve(
 
 def _candidates(found: dict) -> list[Source]:
     webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
-    # A fact-checker's rating from its page's markup comes right before the page, as a Fact Check
+    govpl = found.get("govpl", websearch.WebSearch()).documents
+    web = [d for w in found["web"] for d in w.documents]
+    # rerank keeps the first MAX_DOCUMENTS URLs, so the narrow lookups (gov.pl, the fact-checkers'
+    # reviews) come before the general web pages, whatever order the searches finished in. A
+    # fact-checker's rating from its page's markup comes right before the page, as a Fact Check
     # hit would: rerank keeps it first and the page text after it, and a Fact Check hit for the
     # same page, which comes earlier, wins.
+    ordered = [
+        *govpl,
+        *(d for d in web if d.source_type == "fact_check"),
+        *(d for d in web if d.source_type != "fact_check"),
+    ]
     pages = [
         d.to_source(fragment=fragment)
-        for w in webs
-        for d in w.documents
+        for d in ordered
         for fragment in [*d.reviews[:1], d.text]
     ]
     # A page fetched in this check beats its stored copy: rerank keeps the first source per URL.
@@ -359,12 +334,16 @@ def _time_limit(found: dict) -> judge.Judgement:
     return judgement
 
 
-async def _search_web(query: str) -> websearch.WebSearch:
+async def _search_web(
+    query: str, domains: tuple[str, ...] | None = None
+) -> websearch.WebSearch:
     """An unexpected error (cache write, extraction) is a limitation of this source only."""
     try:
         # Bounded inside: search by SEARCH_BUDGET_S, each page by PAGE_BUDGET_S.
         return await websearch.search_web(
-            query, skip_hosts=govpl.HOSTS if govpl.ENABLED else frozenset()
+            query,
+            skip_hosts=govpl.HOSTS if govpl.ENABLED else frozenset(),
+            **({"domains": domains} if domains else {}),
         )
     except Exception:
         log.exception("web search failed query=%r", query)

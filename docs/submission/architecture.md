@@ -55,8 +55,8 @@ the claim deadline expires, the claim is `not_checked`; if every checkable claim
 because of an outage, the answer is a technical error. A provider that answered with no matching
 evidence can instead lead to `insufficient_evidence`. The evidence corpus is a file on our own disk,
 so it never counts as a source that answered: when every outside source failed, corpus hits count
-only if they settle the claim ([corpus_bm25.py](../../prawdowid/corpus_bm25.py)). One extra search with the claim text is allowed if
-enough time remains. Sources: [verifier.py](../../prawdowid/verifier.py),
+only if they settle the claim ([corpus_bm25.py](../../prawdowid/corpus_bm25.py)). There is no second search pass: the first pass already searches the claim
+sentence and, separately, the fact-checkers' domains only, in parallel with the model's queries. Sources: [verifier.py](../../prawdowid/verifier.py),
 [pipeline.py](../../prawdowid/pipeline.py).
 
 The reranker canonicalises URLs, removes repeated and near-identical fragments and interleaves
@@ -162,7 +162,7 @@ It has not run on the live server yet; the server's `.env` needs the variable fi
 | Limit | Default | Source |
 |---|---|---|
 | Input / checked page prefix | 5000 characters | [app.py](../../prawdowid/app.py), [verifier.py](../../prawdowid/verifier.py) |
-| Fully considered claims / queries per checkable claim | 3 / 3 | [verifier.py](../../prawdowid/verifier.py) |
+| Fully considered claims / queries per checkable claim | 3 / 2 | [verifier.py](../../prawdowid/verifier.py) |
 | Check budget / API timeout | 40 s / 60 s | [pipeline.py](../../prawdowid/pipeline.py), [app.py](../../prawdowid/app.py) |
 | Extraction call timeout | 45 s provider setting, bounded by the shared check deadline | [verifier.py](../../prawdowid/verifier.py) |
 | Web query / whole page fetch budget | 10 s / 8 s | [websearch.py](../../prawdowid/websearch.py) |
@@ -172,8 +172,7 @@ It has not run on the live server yet; the server's `.env` needs the variable fi
 | Discord response cap | 5 messages of 2000 characters, with truncation notice | [discord_bot.py](../../prawdowid/discord_bot.py) |
 
 Extraction and URL fetching share the check deadline. A cut extraction returns a technical notice;
-unfinished claims return `not_checked`. A judge outage also maps to `not_checked`; a retry judge
-failure can preserve the first-pass assessment with a limitation when first-pass candidates existed.
+unfinished claims return `not_checked`. A judge outage also maps to `not_checked`.
 Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
 There is no OCR or reverse image search. The moderator queue (#79, above) files cases only while

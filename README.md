@@ -105,7 +105,8 @@ deploys) and its source cache points at a writable `/tmp` path. Other tuning var
 | `PRAWDOWID_WEB_SEARCH_BUDGET_S` | no | `10` | Longest one web search query may take, retry included, before it counts as unavailable. |
 | `PRAWDOWID_PAGE_BUDGET_S` | no | `8` | Longest one page fetch may take (robots.txt and page); a slower web-search page counts only through its search snippet, labelled "fragment z wyników wyszukiwarki" ([docs/sources.md](docs/sources.md)), a slower page from the www.gov.pl site search is skipped; the others are kept. |
 | `PRAWDOWID_GOVPL` | no | `1` | `0` switches off the www.gov.pl site search (`prawdowid/govpl.py`); its queries then go to web search, which searches www.gov.pl again. See [docs/sources.md](docs/sources.md). |
-| `PRAWDOWID_RETRY_MIN_S` | no | `18` | A claim without enough evidence is searched once more only if at least this many seconds remain. |
+| `PRAWDOWID_QUERIES_PER_CLAIM` | no | `2` | Web search queries the extraction model writes per checked claim. The claim sentence itself and one fact-checkers-only search of it are always added, so a claim costs about 4 Tavily searches, all in parallel. |
+| `PRAWDOWID_EXTRACT_THINKING`, `PRAWDOWID_RERANK_THINKING`, `PRAWDOWID_JUDGE_THINKING` | no | `low`, `false`, `low` | PydanticAI `thinking` setting of the extraction, rerank and judge agents: `false`, `minimal`, `low`, `medium` or `high`. A bad value stops the service at startup. |
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is reported as unavailable, which counts as an outage: a claim without enough other evidence is then `nie sprawdzono`, not "brak wystarczających dowodów". |
@@ -128,9 +129,9 @@ limit. Extraction errors and a missing model key return `technical_error`; a
 model refusal returns `cannot_check`. Both carry a Polish message and no claims. Retrieval
 failures are listed per claim; an outage of a source that could decide the verdict (see above) or a
 judge-model outage makes the claim `not_checked`, and the whole answer a `technical_error` when no
-claim has a verdict;
-a failed retry judgement can retain the first-pass assessment with a warning when first-pass
-candidates existed.
+claim has a verdict.
+There is no second search pass: the claim sentence and a fact-checkers-only search of it run in the
+first one.
 
 ## Run
 

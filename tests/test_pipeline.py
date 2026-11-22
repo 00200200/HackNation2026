@@ -130,8 +130,8 @@ def test_five_claims_with_fast_sources_finish_under_budget(monkeypatch, models):
     result = verify("tekst", claims(5))
     elapsed = time.perf_counter() - started
     assert [c.verdict for c in result.claims] == [Verdict.CONFIRMED] * 5
-    assert len(seen) == 15
-    # 15 searches of 0.2 s each: parallel, not one after another.
+    assert len(seen) == 25  # per claim: 3 queries, the claim, the fact-checkers' search
+    # 25 searches of 0.2 s each: parallel, not one after another.
     assert elapsed < 1.5 < pipeline.CHECK_BUDGET_S
     assert {s.fragment for c in result.claims for s in c.sources} == {QUOTE}
     # Extraction (opus) plus rerank (haiku) and judge (sonnet) for each claim.
@@ -174,24 +174,77 @@ def check(claim, queries, budget_s, exclude_url=None):
     return asyncio.run(run())
 
 
-def test_one_retry_with_the_claim_as_query_when_time_remains(monkeypatch, models):
+def test_the_claim_sentence_is_among_the_first_pass_searches(monkeypatch, models):
     claim = "Polska wstąpiła do UE w 2004 roku."
     seen = fake_search(monkeypatch, found=lambda q: q == claim)
     result = check(claim, ["model 1", "model 2"], budget_s=30)
-    assert seen == ["model 1", "model 2", claim]
+    assert seen.count("model 1") == seen.count("model 2") == 1
+    assert claim in seen
     assert result.judgement.verdict is Verdict.CONFIRMED
-    assert "retry_web" in result.steps_ms and "retry_judge" in result.steps_ms
-    # The web found pages on the retry: its first failure is no longer a limitation.
-    assert websearch.SEARCH_UNAVAILABLE not in result.judgement.limitations
 
 
-def test_no_retry_without_time_left(monkeypatch, models):
+def test_the_claim_is_not_searched_twice_when_the_model_wrote_it(monkeypatch, models):
+    claim = "Twierdzenie."
+    domains = {}
+
+    async def search(query, **kwargs):
+        domains.setdefault(query, []).append(kwargs.get("domains"))
+        return websearch.WebSearch()
+
+    monkeypatch.setattr(websearch, "search_web", search)
+    check(claim, [claim, "model 1"], budget_s=30)
+    # One search over the whole allowlist, one over the fact-checkers only.
+    assert sorted(map(bool, domains[claim])) == [False, True]
+    assert domains["model 1"] == [None]
+
+
+def test_one_fact_checker_search_per_claim(monkeypatch, models):
+    claim = "Twierdzenie."
+    restricted = []
+
+    async def search(query, **kwargs):
+        if "domains" in kwargs:
+            restricted.append((query, set(kwargs["domains"])))
+        return websearch.WebSearch()
+
+    monkeypatch.setattr(websearch, "search_web", search)
+    check(claim, ["model 1", "model 2"], budget_s=30)
+    assert len(restricted) == 1 and restricted[0][0] == claim
+    types = {websearch.ALLOWLIST[d].source_type for d in restricted[0][1]}
+    assert types == {"fact_check"}
+    assert "demagog.org.pl" in restricted[0][1]
+
+
+def test_insufficient_first_judgement_is_final_without_a_second_pass(
+    monkeypatch, models, factcheck_answers
+):
     claim = "Polska wstąpiła do UE w 2004 roku."
-    seen = fake_search(monkeypatch, found=lambda q: q == claim)
-    result = check(claim, ["model 1"], budget_s=pipeline.RETRY_MIN_S - 1)
-    assert seen == ["model 1"]
-    assert "retry_web" not in result.steps_ms
-    # Fact Check without a key and web empty: no verdict.
+    searches = fake_search(monkeypatch)
+    judged = []
+
+    def only_context(prompt: str) -> str:
+        judged.append(prompt)
+        labels = [
+            {"doc_id": d, "stance": "context", "quote": QUOTE}
+            for d in re.findall(r"doc_id: (\S+)", prompt)
+        ]
+        return judge.Labels(labels=labels).model_dump_json()
+
+    with judge.agent.override(model=model(only_context, "claude-sonnet-5-5")):
+        result = check(claim, ["model 1"], budget_s=30)
+    assert result.judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert len(judged) == 1
+    assert (
+        len(searches) == 3
+    )  # the query, the claim, the fact-checkers' search; no second pass
+    assert not [step for step in result.steps_ms if step.startswith("retry_")]
+
+
+def test_every_source_failing_is_not_checked_without_a_retry_step(monkeypatch, models):
+    claim = "Polska wstąpiła do UE w 2004 roku."
+    fake_search(monkeypatch, found=lambda q: False)
+    result = check(claim, ["model 1"], budget_s=30)
+    assert not [step for step in result.steps_ms if step.startswith("retry_")]
     assert result.judgement.verdict is Verdict.NOT_CHECKED
     assert result.judgement.limitations == [
         pipeline.SOURCES_FAILED,
@@ -199,6 +252,42 @@ def test_no_retry_without_time_left(monkeypatch, models):
         pipeline.euvsdisinfo.LOOKUP_UNAVAILABLE,
         websearch.SEARCH_UNAVAILABLE,
     ]
+
+
+def test_govpl_page_survives_the_rerank_cap_behind_many_web_pages():
+    def hit(cls, url, **kw):
+        return cls(source=document(url).to_source(), **kw)
+
+    found = {
+        "factcheck": pipeline.factcheck.FactCheckLookup(),
+        "euvsdisinfo": pipeline.euvsdisinfo.EuvsdisinfoLookup(
+            hits=[
+                hit(
+                    pipeline.euvsdisinfo.EuvsdisinfoHit,
+                    f"https://euvsdisinfo.eu/{i}",
+                    kind="article",
+                )
+                for i in range(5)
+            ]
+        ),
+        "corpus": corpus_bm25.EvidenceLookup(
+            hits=[
+                hit(corpus_bm25.EvidenceHit, f"https://corpus.example/{i}", score=1.0)
+                for i in range(5)
+            ]
+        ),
+        "web": [
+            websearch.WebSearch(
+                documents=[document(f"https://web.example/{n}/{i}") for i in range(5)]
+            )
+            for n in range(4)
+        ],
+        "govpl": websearch.WebSearch(
+            documents=[document("https://www.gov.pl/decisive")]
+        ),
+    }
+    ids = {f.doc_id for f in rerank.split_all(pipeline._candidates(found), None)}
+    assert rerank.canonical_url("https://www.gov.pl/decisive") in ids
 
 
 def test_linked_page_is_not_evidence_for_its_own_claims(monkeypatch, models):
@@ -223,7 +312,7 @@ def test_judge_failure_is_a_limitation_without_retry(monkeypatch):
     # A judge outage is a technical limit, never "brak wystarczających dowodów" (scenario J).
     assert result.judgement.verdict is Verdict.NOT_CHECKED
     assert result.judgement.limitations[0] == judge.JUDGE_UNAVAILABLE
-    assert seen == ["model 1"]
+    assert sorted(seen) == ["Twierdzenie.", "Twierdzenie.", "model 1"]
     assert result.unpriced_requests == 1 and result.cost_usd >= 0.0
 
 
@@ -235,34 +324,6 @@ def test_a_crashing_source_is_a_limitation_of_that_source(monkeypatch, models):
     result = check("Twierdzenie.", ["model 1"], 30)
     assert result.judgement.verdict is Verdict.NOT_CHECKED
     assert websearch.SEARCH_UNAVAILABLE in result.judgement.limitations
-
-
-@pytest.mark.parametrize("queries", [[], ["Twierdzenie."]])
-def test_no_retry_that_would_repeat_the_first_search(monkeypatch, models, queries):
-    seen = fake_search(monkeypatch, found=lambda q: False)
-    result = check("Twierdzenie.", queries, 30)
-    assert seen == ["Twierdzenie."]
-    assert "retry_web" not in result.steps_ms
-
-
-def test_retry_cut_by_the_deadline_keeps_the_first_pass(monkeypatch):
-    claim = "Polska wstąpiła do UE w 2004 roku."
-    fake_search(monkeypatch, found=lambda q: q == claim)
-    monkeypatch.setattr(pipeline, "RETRY_MIN_S", 0.1)
-
-    async def slow_rank(messages, info):
-        await asyncio.sleep(60)
-
-    with rerank.agent.override(model=FunctionModel(slow_rank)):
-        result = check(claim, ["model 1"], budget_s=0.5)
-    assert result.judgement.verdict is Verdict.NOT_CHECKED
-    # The retry found pages: time ran out, not the sources.
-    assert result.judgement.limitations[0] == pipeline.TIME_LIMIT.format(
-        budget=pipeline.CHECK_BUDGET_S
-    )
-    assert websearch.SEARCH_UNAVAILABLE in result.judgement.limitations
-    # The cut rerank request is counted, not priced.
-    assert (result.cost_usd, result.unpriced_requests) == (0.0, 1)
 
 
 def test_injection_in_a_source_reaches_the_check_result(monkeypatch):
@@ -343,7 +404,7 @@ def test_a_failed_query_is_kept_when_another_finds_pages(monkeypatch, models):
     result = check("Twierdzenie.", ["model 1", "model 2"], 30)
     assert result.judgement.verdict is Verdict.CONFIRMED
     assert (
-        pipeline.WEB_PARTIAL.format(failed=1, total=2) in result.judgement.limitations
+        pipeline.WEB_PARTIAL.format(failed=3, total=4) in result.judgement.limitations
     )
 
 
@@ -388,72 +449,6 @@ def test_slow_link_fetch_is_cut_by_the_check_budget(monkeypatch):
     assert result.cost_usd == 0.0
 
 
-def test_retry_judge_failure_keeps_the_first_pass(monkeypatch, factcheck_answers):
-    claim = "Polska wstąpiła do UE w 2004 roku."
-    fake_search(monkeypatch)
-    calls = []
-
-    def context_then_fail(messages, info):
-        calls.append(1)
-        if len(calls) > 1:
-            raise ModelHTTPError(529, "claude", "overloaded")
-        prompt = messages[0].parts[-1].content
-        labels = [
-            {"doc_id": d, "stance": "context", "quote": QUOTE, "missing_context": None}
-            for d in re.findall(r"doc_id: (\S+)", prompt)
-        ]
-        return ModelResponse(
-            parts=[TextPart(judge.Labels(labels=labels).model_dump_json())]
-        )
-
-    with (
-        rerank.agent.override(model=model(every_fragment)),
-        judge.agent.override(model=FunctionModel(context_then_fail)),
-    ):
-        result = check(claim, ["model 1"], 30)
-    assert len(calls) == 2  # the retry ran and its judge failed
-    assert result.judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
-    assert result.judgement.sources
-    assert pipeline.RETRY_UNJUDGED in result.judgement.limitations
-    assert judge.JUDGE_UNAVAILABLE not in result.judgement.limitations
-
-
-def test_retry_judge_failure_after_an_empty_first_pass_is_not_checked(monkeypatch):
-    claim = "Polska wstąpiła do UE w 2004 roku."
-    fake_search(monkeypatch, found=lambda q: q == claim)
-
-    def failing(messages, info):
-        raise ModelHTTPError(529, "claude", "overloaded")
-
-    with (
-        rerank.agent.override(model=model(every_fragment)),
-        judge.agent.override(model=FunctionModel(failing)),
-    ):
-        result = check(claim, ["model 1"], 30)
-    assert "retry_judge" in result.steps_ms
-    assert result.judgement.verdict is Verdict.NOT_CHECKED
-    assert result.judgement.limitations[0] == judge.JUDGE_UNAVAILABLE
-
-
-def test_retry_judge_failure_after_an_excluded_first_pass_is_not_checked(monkeypatch):
-    # The first search finds only the linked page: rerank drops it, nothing was judged.
-    claim = "Polska wstąpiła do UE w 2004 roku."
-    fake_search(monkeypatch)
-
-    def failing(messages, info):
-        raise ModelHTTPError(529, "claude", "overloaded")
-
-    with (
-        rerank.agent.override(model=model(every_fragment)),
-        judge.agent.override(model=FunctionModel(failing)),
-    ):
-        result = check(claim, ["model 1"], 30, exclude_url="https://www.gov.pl/model-1")
-    assert "retry_judge" in result.steps_ms
-    assert result.judgement.verdict is Verdict.NOT_CHECKED
-    assert result.judgement.limitations[0] == judge.JUDGE_UNAVAILABLE
-    assert pipeline.RETRY_UNJUDGED not in result.judgement.limitations
-
-
 def fake_govpl(monkeypatch, found=True):
     """gov.pl on: returns one RCB page, or a failure."""
     seen = []
@@ -483,7 +478,7 @@ def test_govpl_pages_meet_web_pages_at_rerank(monkeypatch, models):
     monkeypatch.setattr(websearch, "search_web", search)
     result = pipeline_check(["web 1"], ["RCB alert"])
     assert gov == [["RCB alert"]]
-    assert skipped == [pipeline.govpl.HOSTS]
+    assert skipped == [pipeline.govpl.HOSTS] * 3  # query, claim, fact-checkers' search
     assert result.judgement.verdict is Verdict.CONFIRMED
     assert [s.publisher for s in result.judgement.sources] == [
         "Rządowe Centrum Bezpieczeństwa"
@@ -506,7 +501,12 @@ def test_govpl_switched_off_sends_its_queries_to_the_web(monkeypatch, models):
     monkeypatch.setattr(pipeline.govpl, "ENABLED", False)
     seen = fake_search(monkeypatch)
     pipeline_check(["web 1"], ["RCB alert"])
-    assert gov == [] and seen == ["web 1", "RCB alert"]
+    assert gov == [] and sorted(seen) == [
+        "RCB alert",
+        "Twierdzenie.",
+        "Twierdzenie.",
+        "web 1",
+    ]
 
 
 def test_govpl_failing_with_every_other_source_is_not_checked(monkeypatch, models):

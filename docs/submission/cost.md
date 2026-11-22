@@ -82,18 +82,19 @@ from the linked code, not from a cost assumption:
 - The same input within 30 minutes gets the stored answer from a per-process result cache (at
   most 500 answers), with no model or search calls, whichever channel asks
   ([app.py](../../prawdowid/app.py)).
-- Extraction checks at most `3` claims in full and asks for `3` web queries per checkable claim
+- Extraction checks at most `3` claims in full and asks for `2` model queries per checkable claim,
+  plus the claim sentence and one fact-checker-only search, so about `4` Tavily searches per claim
   ([verifier.py](../../prawdowid/verifier.py)). Claims and retrieval calls fan out with
   `asyncio.gather` and `asyncio.TaskGroup`; there is no global queue or daily spend cap, only
   per-process limits on page extraction and gov.pl requests ([pipeline.py](../../prawdowid/pipeline.py),
   [link.py](../../prawdowid/link.py), [govpl.py](../../prawdowid/govpl.py)).
 - The whole-check budget is `40` seconds, EUvsDisinfo and the corpus lookup are capped at `5`
-  seconds each in the pipeline and a retry needs at least `18` seconds remaining
+  seconds each in the pipeline, and there is no second search pass
   ([pipeline.py](../../prawdowid/pipeline.py)). Extraction has a `45` second provider request
   timeout, but shares the `40` second whole-check deadline with URL fetching and claim checks
   ([verifier.py](../../prawdowid/verifier.py)). These are configured cancellation limits, not a
   measured capacity guarantee.
-- Web queries are capped at `10` seconds including retry, page fetches at `8` seconds
+- Web queries are capped at `10` seconds including the provider's retry, page fetches at `8` seconds
   ([websearch.py](../../prawdowid/websearch.py)), the gov.pl search at `10` seconds
   ([govpl.py](../../prawdowid/govpl.py)) and Fact Check at `15` seconds
   ([factcheck.py](../../prawdowid/factcheck.py)). Cancellation of a thread-backed search does not
