@@ -6,11 +6,21 @@ const submit = document.getElementById("submit");
 const formError = document.getElementById("form-error");
 const result = document.getElementById("result");
 const chips = document.querySelectorAll("[data-example]");
+const attachButton = document.getElementById("attach");
+const fileInput = document.getElementById("image-file");
+const preview = document.getElementById("preview");
+const previewImg = document.getElementById("preview-img");
+const previewName = document.getElementById("preview-name");
+const removeImage = document.getElementById("remove-image");
+const imageStatus = document.getElementById("image-status");
 
 const SECURITY_NOTE = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
 const SOURCE_SECURITY_NOTE = "W źródłach są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę.";
 const SECURITY_NOTE_ONLY = "W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich.";
 const MAX_CHARS = 5000;
+// Same limits as the API (prawdowid/image_input.py), so a file it would refuse is never sent.
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const GENERIC_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę.";
 const NOT_A_VERDICT = "To nie jest ocena prawdziwości tej treści.";
 const NOTICE_TITLES = {
@@ -45,6 +55,8 @@ const ANSWER_LEAD = {
 const ENTER_SENDS = window.matchMedia("(hover: hover) and (pointer: fine)");
 let busy = false;
 let errorFrame = 0;
+// The attached image: { data: base64 without the data: prefix, name }, or null.
+let image = null;
 
 // The API counts characters, not UTF-16 units: an emoji is one character.
 function chars(text) {
@@ -98,6 +110,61 @@ function sourceItem(s, i) {
       snippet ? " " : null, meta));
 }
 
+// The evidence chain (#78): sources grouped by the side their verified quote stands on (`stance`, set by
+// judge.decide() in the API). The heading names the side in words; the icon and the colour only help. A source
+// the verdict rules set aside has no stance. An answer with no stance at all keeps one plain list, as before.
+// The same groups, in the same order, as /czat and the Discord bot.
+const SIDES = [
+  ["potwierdza", "Potwierdza"],
+  ["przeczy", "Przeczy"],
+  ["kontekst", "Uzupełnia kontekst"],
+  [null, "Nie wpływa na ocenę"],
+];
+const NOT_COUNTED_NOTE = "Na przykład sam nagłówek albo starsza ocena tego samego fact-checkera.";
+const SIDE_ICONS = { potwierdza: "M5 12.5l4.5 4.5L19 7.5", przeczy: "M7 7l10 10M17 7L7 17", kontekst: "M12 6v12M6 12h12" };
+let sideCount = 0;
+
+function sideOf(s) {
+  return SIDES.some(([key]) => key && key === s.stance) ? s.stance : null;
+}
+
+function sideIcon(key) {
+  if (!SIDE_ICONS[key]) return null;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", SIDE_ICONS[key]);
+  svg.append(path);
+  const icon = el("span", { className: "side-icon" }, svg);
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
+}
+
+function sourcesBlock(sources) {
+  if (!sources.length) return el("p", { className: "empty", textContent: "Brak źródła przy tej ocenie." });
+  if (!sources.some(sideOf)) return el("ol", { className: "sources" }, ...sources.map(sourceItem));
+  // One numbering across the groups, so [n] still names one source of the claim.
+  let n = 0;
+  const groups = {};
+  for (const [key, title] of SIDES) {
+    const items = sources.filter((s) => sideOf(s) === key);
+    if (!items.length) continue;
+    const id = `strona-${++sideCount}`;
+    const list = el("ol", { className: "sources", start: n + 1 }, ...items.map((s) => sourceItem(s, n++)));
+    list.setAttribute("aria-labelledby", id);
+    groups[key ?? "none"] = el("div", { className: `side side-${key ?? "none"}` },
+      el("h4", { className: "side-title", id }, sideIcon(key), title),
+      key ? null : el("p", { className: "side-note", textContent: NOT_COUNTED_NOTE }),
+      list);
+  }
+  // Both sides of a conflict next to each other (one under the other on a narrow screen).
+  const sides = groups.potwierdza && groups.przeczy
+    ? el("div", { className: "sides" }, groups.potwierdza, groups.przeczy)
+    : groups.potwierdza ?? groups.przeczy;
+  return el("div", { className: "chain" }, sides, groups.kontekst, groups.none);
+}
+
 // Claims from a quote: who said it, and what was said. Plain statements get no tag.
 const KIND_LABELS = { attribution: "Kto co powiedział", quoted: "Treść cytatu" };
 
@@ -137,9 +204,7 @@ function claimBlock(c) {
       VERDICT_MEANING[c.verdict] ? el("span", { className: "verdict-meaning", textContent: VERDICT_MEANING[c.verdict] }) : null),
     el("p", { className: "answer", textContent: answerText(c) }),
     el("h3", { className: "part", textContent: "Co mówią źródła" }),
-    c.sources.length
-      ? el("ol", { className: "sources" }, ...c.sources.map(sourceItem))
-      : el("p", { className: "empty", textContent: "Brak źródła przy tej ocenie." }),
+    sourcesBlock(c.sources),
     sourcesNote(),
     el("h3", { className: "part", textContent: "Nasza ocena" }),
     el("div", { className: "assessment" },
@@ -175,6 +240,40 @@ function copyButton(check) {
     setTimeout(() => { button.textContent = "Skopiuj odpowiedź na czat"; }, 2500);
   });
   return button;
+}
+
+// Export (#86): the JSON is the API answer as it came, the STIX 2.1 bundle is built by the API from that
+// same answer (masked data only). Both download as files; nothing else leaves the page.
+function download(name, type, text) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const link = el("a", { href: url, download: name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportButtons(check) {
+  const json = el("button", { type: "button", className: "copy-btn secondary", textContent: "Pobierz wynik (JSON)" });
+  json.addEventListener("click", () => download("faktczyfejk-wynik.json", "application/json", JSON.stringify(check, null, 2)));
+  const stix = el("button", { type: "button", className: "copy-btn secondary", textContent: "Pobierz STIX 2.1" });
+  stix.addEventListener("click", async () => {
+    const label = "Pobierz STIX 2.1";
+    try {
+      const resp = await fetch("/api/export/stix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(check),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      download("faktczyfejk-stix.json", "application/stix+json", await resp.text());
+    } catch {
+      stix.textContent = "Nie udało się pobrać";
+      setTimeout(() => { stix.textContent = label; }, 2500);
+    }
+  });
+  return [json, stix];
 }
 
 // Scenario I: a known incident the input looks like. Context only, never a verdict.
@@ -220,6 +319,23 @@ const MODERATOR_NOTE = "Zgłoszenie trafiło do kolejki moderatora";
 // After "Usuń moje sprawdzenia" took the session's questions out of the moderator cases.
 const DELETED_AND_WITHDRAWN = "Usunęliśmy sprawdzenia z tej sesji i wycofaliśmy zgłoszenia z kolejki moderatora.";
 
+// Scenario F: what a model read from the image, above the claims. It is what was checked, never
+// evidence. On a notice the limitations are already listed above it.
+function imageSection(check, withLimits) {
+  const img = check.image;
+  if (!img?.text) return null;
+  const exif = [img.taken_at ? `zrobiono ${img.taken_at}` : null, img.camera ? `aparat ${img.camera}` : null].filter(Boolean);
+  return el("section", { className: "image-read" },
+    el("h2", { className: "part", textContent: "Odczytany tekst" }),
+    el("blockquote", { className: "read-text", textContent: img.text }),
+    img.visible_date ? el("p", { className: "origin", textContent: `Data widoczna na obrazie: ${img.visible_date}` }) : null,
+    exif.length ? el("p", { className: "origin", textContent: `Metadane EXIF: ${exif.join(", ")}` }) : null,
+    withLimits && check.limitations?.length
+      ? el("div", { className: "unknown" }, el("h3", { className: "unknown-title", textContent: "Ograniczenia" }),
+          el("ul", {}, ...check.limitations.map((l) => el("li", { textContent: l }))))
+      : null);
+}
+
 function moderatorNote(c) {
   return c ? el("p", { className: "note moderator", textContent: `${MODERATOR_NOTE} (sprawa ${c.id}).` }) : null;
 }
@@ -233,10 +349,11 @@ function render(check, seconds) {
     const limits = check.limitations?.length
       ? el("ul", {}, ...check.limitations.map((l) => el("li", { textContent: l })))
       : null;
-    if (!check.security_events?.length && !limits && !warning && !moderator) return main;
+    const read = imageSection(check, false);
+    if (!check.security_events?.length && !limits && !warning && !moderator && !read) return main;
     return el("div", {},
       check.security_events?.length ? notice("Polecenia dla modelu", SECURITY_NOTE_ONLY) : null,
-      main, limits, warning, moderator);
+      main, limits, read, warning, moderator);
   }
   const unchecked = check.unchecked_claims ?? [];
   if (!check.claims.length && !unchecked.length) {
@@ -253,8 +370,9 @@ function render(check, seconds) {
         el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
           el("span", { className: "took", textContent: costLine(seconds, check.cost_usd, check.unpriced_requests) })),
         summary(check.claims)),
-      copyButton(check)),
+      el("div", { className: "card-actions" }, copyButton(check), ...exportButtons(check))),
     check.page ? pageNote(check.page) : null,
+    imageSection(check, true),
     warning,
     ...check.claims.map(claimBlock),
     unchecked.length ? uncheckedList(unchecked) : null,
@@ -308,27 +426,61 @@ async function errorMessage(resp) {
 // screen readers may skip updates made while it is set, and the waiting notice should be heard.
 function setBusy(value) {
   busy = value;
-  [submit, ...chips, deleteSession].forEach((control) => control.setAttribute("aria-disabled", String(value)));
+  [submit, ...chips, deleteSession, attachButton, removeImage].forEach((control) => control.setAttribute("aria-disabled", String(value)));
 }
 
-// Cleared first so the same message is announced again on a repeated attempt.
-function fieldError(message) {
+// Cleared first so the same message is announced again on a repeated attempt. `field` is marked
+// invalid; an image error marks none, since the text box is not at fault.
+function fieldError(message, field = input) {
   cancelAnimationFrame(errorFrame);
   formError.textContent = "";
   formError.hidden = !message;
-  if (message) {
-    input.setAttribute("aria-invalid", "true");
-    errorFrame = requestAnimationFrame(() => { formError.textContent = message; });
-  } else {
-    input.removeAttribute("aria-invalid");
+  input.removeAttribute("aria-invalid");
+  if (!message) return;
+  field?.setAttribute("aria-invalid", "true");
+  errorFrame = requestAnimationFrame(() => { formError.textContent = message; });
+}
+
+// Read in the browser as a data: URL, which the page's CSP allows as an image source; the API
+// gets the base64 part. Nothing is uploaded until the check is sent.
+function setImage(file) {
+  if (busy) return;
+  if (!IMAGE_TYPES.includes(file.type)) {
+    fieldError("Przyjmujemy tylko obrazy PNG, JPEG i WebP.", null);
+    return;
   }
+  if (file.size > MAX_IMAGE_BYTES) {
+    fieldError("Obraz jest za duży. Limit to 5 MB.", null);
+    return;
+  }
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    const url = String(reader.result);
+    image = { data: url.slice(url.indexOf(",") + 1), name: file.name || "obraz ze schowka" };
+    previewImg.src = url;
+    previewImg.alt = `Podgląd dodanego obrazu: ${image.name}`;
+    previewName.textContent = image.name;
+    preview.hidden = false;
+    fieldError("");
+    imageStatus.textContent = `Dodano obraz ${image.name}. Wyślij, a odczytamy z niego tekst i go sprawdzimy.`;
+  });
+  reader.addEventListener("error", () => fieldError("Nie udało się wczytać obrazu. Spróbuj innego pliku.", null));
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  image = null;
+  preview.hidden = true;
+  previewImg.removeAttribute("src");
+  previewImg.alt = "";
+  previewName.textContent = "";
 }
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (busy) return;
   const text = input.value.trim();
-  if (!text || chars(text) > MAX_CHARS) {
+  if ((!text && !image) || chars(text) > MAX_CHARS) {
     fieldError(text ? `Treść jest za długa. Limit to ${MAX_CHARS} znaków.` : "Wpisz tekst do sprawdzenia.");
     input.focus();
     return;
@@ -337,7 +489,8 @@ form.addEventListener("submit", async (event) => {
   setBusy(true);
   const started = Date.now();
   const elapsed = () => Math.max(1, Math.round((Date.now() - started) / 1000));
-  const waiting = notice("Sprawdzamy", "Szukamy w Google Fact Check, EUvsDisinfo, na www.gov.pl i w wyszukiwarce ograniczonej do zaufanych stron. Może to potrwać kilkadziesiąt sekund.");
+  const where = "w Google Fact Check, EUvsDisinfo, na www.gov.pl i w wyszukiwarce ograniczonej do zaufanych stron. Może to potrwać kilkadziesiąt sekund.";
+  const waiting = notice("Sprawdzamy", image ? `Odczytujemy tekst z obrazu, potem szukamy ${where}` : `Szukamy ${where}`);
   const seconds = el("p", { className: "note", textContent: "0 s" });
   seconds.setAttribute("aria-hidden", "true");
   waiting.append(seconds);
@@ -351,7 +504,7 @@ form.addEventListener("submit", async (event) => {
     const resp = await fetch("/api/checks", {
       method: "POST",
       headers,
-      body: JSON.stringify({ input: text }),
+      body: JSON.stringify(image ? { input: text, image: image.data } : { input: text }),
       signal: AbortSignal.timeout(75000),
     });
     rememberSession(resp.headers.get("X-Session-Id"));
@@ -368,6 +521,28 @@ form.addEventListener("submit", async (event) => {
 });
 
 input.addEventListener("input", () => fieldError(""));
+// A screenshot pasted into the box is attached; pasted text still goes in as text.
+input.addEventListener("paste", (event) => {
+  const file = [...(event.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+  if (!file) return;
+  if (!event.clipboardData.getData("text/plain")) event.preventDefault();
+  setImage(file);
+});
+attachButton.addEventListener("click", () => {
+  if (!busy) fileInput.click();
+});
+fileInput.addEventListener("change", () => {
+  const [file] = fileInput.files;
+  // Cleared, so choosing the same file again still fires "change".
+  fileInput.value = "";
+  if (file) setImage(file);
+});
+removeImage.addEventListener("click", () => {
+  if (busy) return;
+  clearImage();
+  imageStatus.textContent = "Usunięto obraz.";
+  attachButton.focus();
+});
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing && ENTER_SENDS.matches) {
     event.preventDefault();
@@ -430,6 +605,8 @@ if (storedSession()) deleteSession.hidden = false;
 
 chips.forEach((chip) => chip.addEventListener("click", () => {
   if (busy) return;
+  // An example is checked on its own, not with an image added earlier.
+  clearImage();
   input.value = chip.dataset.example;
   fieldError("");
   // The chips hide once a check starts, so keep keyboard focus in the box.

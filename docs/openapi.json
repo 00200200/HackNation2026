@@ -29,7 +29,7 @@
     "/api/checks": {
       "post": {
         "summary": "Check a text or a link",
-        "description": "`input` is a message, a question or one `http`/`https` link. For a link the server fetches the page and checks its text. Allow up to 60 s for the answer.\n\nA check that could not run still returns `200`: `status` is then `technical_error`, `cannot_check` or `needs_clarification`, and `message` says why in Polish. An `input` that is empty, too long or not a valid link returns `422` with a Polish text in `detail[0].msg`; too many requests return `429`.",
+        "description": "`input` is a message, a question or one `http`/`https` link. For a link the server fetches the page and checks its text. Allow up to 60 s for the answer.\n\nA check that could not run still returns `200`: `status` is then `technical_error`, `cannot_check` or `needs_clarification`, and `message` says why in Polish. An `input` that is empty, too long or not a valid link returns `422` with a Polish text in `detail[0].msg`; too many requests return `429`.\n\n`image` is an optional screenshot or photo in base64: a PNG, JPEG or WebP of at most 5 MB, 25 million pixels and 8000 px a side. A model reads its text and any visible date, and that text is checked like `input`, which may then be empty and is checked along with it. The answer's `image` shows the text that was read and `limitations` what an image check cannot tell. The image goes to the model provider as uploaded, metadata included; the API does not store it. Another type, a larger image or an image with a link returns `422`.",
         "operationId": "create_check_api_checks_post",
         "parameters": [
           {
@@ -215,6 +215,23 @@
                 "schema": {
                   "$ref": "#/components/schemas/SourceList"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/export/stix": {
+      "post": {
+        "summary": "Export Stix",
+        "description": "The answer the client holds (the JSON of `POST /api/checks`) as a STIX 2.1 bundle\n(prawdowid/export.py). Masked again, nothing fetched; at most `export.MAX_ANSWER_BYTES` read.",
+        "operationId": "export_stix_api_export_stix_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -440,13 +457,23 @@
           "input": {
             "type": "string",
             "title": "Input",
-            "description": "1 to 5000 characters after trimming. A single token with `://` is read as a link and must be a valid http or https URL."
+            "description": "1 to 5000 characters after trimming; may be empty only with `image`. A single token with `://` is read as a link and must be a valid http or https URL.",
+            "default": ""
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image",
+            "description": "Optional screenshot or photo: base64 of a PNG, JPEG or WebP file (a data URL is accepted too), at most 5 MB, 25 million pixels and 8000 px a side. Sent to the model provider as uploaded; the API never stores it."
           }
         },
         "type": "object",
-        "required": [
-          "input"
-        ],
         "title": "CheckRequest",
         "examples": [
           {
@@ -474,6 +501,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/CheckedPage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckedImage"
               },
               {
                 "type": "null"
@@ -549,6 +586,64 @@
           "status"
         ],
         "title": "CheckResult"
+      },
+      "CheckedImage": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "visible_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible Date"
+          },
+          "taken_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taken At"
+          },
+          "camera": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Camera"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha256"
+        ],
+        "title": "CheckedImage",
+        "description": "The screenshot or photo the user sent (scenario F, prawdowid/image_input.py). A model read\nits text, which was then checked like pasted text. The image itself is never stored."
       },
       "CheckedPage": {
         "properties": {
@@ -942,6 +1037,7 @@
             "enum": [
               "input",
               "page",
+              "image",
               "source"
             ],
             "title": "Location"
@@ -1033,6 +1129,17 @@
               }
             ],
             "title": "Rating"
+          },
+          "stance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceStance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The side this source stands on, from a quote found verbatim in it: 'potwierdza' (confirms the claim), 'przeczy' (contradicts it) or 'kontekst' (adds context, a data gap or a fact-checker's review of another claim). A fact-checker's rating of this claim gives its side through the rating. null when the verdict rules did not count the source: a headline alone, an older rating by the same fact-checker, or a source that says both."
           }
         },
         "type": "object",
@@ -1081,6 +1188,16 @@
           "catalogue"
         ],
         "title": "SourceList"
+      },
+      "SourceStance": {
+        "type": "string",
+        "enum": [
+          "potwierdza",
+          "przeczy",
+          "kontekst"
+        ],
+        "title": "SourceStance",
+        "description": "Which side of the claim a source stands on, for the evidence chain (#78)."
       },
       "Status": {
         "type": "string",

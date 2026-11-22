@@ -36,15 +36,34 @@ technical failure or a request to clarify is a grey notice, never a verdict.
 
 - Claude (through PydanticAI) splits the text into claims and labels quotes. The verdict itself
   comes from rules in code, `judge.decide()`.
+- Evidence chain (#78): each source says whether it confirms the claim, contradicts it or adds
+  context (`stance`). The side comes only from a judge label whose quote was found verbatim. The
+  web page, `/czat` and Discord group the quotes under "Potwierdza", "Przeczy" and "Uzupełnia
+  kontekst", put both sides of a conflict next to each other on a wide screen, and list what the
+  rules did not count under "Nie wpływa na ocenę".
 - Each claim is looked up in parallel in Google Fact Check Tools, the www.gov.pl site search, web
   search on allowlisted domains (Perplexity, or Tavily without its key), our evidence corpus (`corpus/evidence.jsonl`) and EUvsDisinfo,
   which is context only.
 - PESEL, ID card, passport, phone, e-mail, account and card numbers are masked before
-  the model sees the text. Checks are kept for 30 days and can be deleted per session.
+  the model sees the text. An image is the exception: it goes to the model provider as uploaded,
+  metadata included, and only the text read from it is masked. Checks are kept for 30 days and
+  can be deleted per session.
+- Screenshots and photos (#80): the web page (a button, or a paste into the box) and `/sprawdz`
+  with an attached image take a PNG, JPEG or WebP up to 5 MB. One model call reads its text and
+  any visible date; the answer shows the read text under "Odczytany tekst" and checks it like
+  pasted text. It also says what an image check cannot tell: the text was read by a model, a date
+  on the image does not prove when the post appeared, and there is no search for earlier copies
+  and no check for edits. We do not store the image (the check log keeps its SHA-256 and the
+  masked text). A date and camera from EXIF are shown as context only. `/czat` does not take
+  images. Cost per image: [cost.md](docs/submission/cost.md#image-checks-scenario-f-80).
 - The web page, the Discord command `/sprawdz` and the messenger-style
   demo page `/czat` all call the same `POST /api/checks`.
+- Export for analysts (#86): every `ok` answer with claims downloads as JSON (the API answer as
+  it is) or as a STIX 2.1 bundle (`POST /api/export/stix`, built with the OASIS `stix2` library
+  from masked data). The OpenCTI import is untested.
 - With `PRAWDOWID_ADMIN_TOKEN` set, a claim without enough evidence, a security
-  event or an unconfirmed high-risk claim goes to a queue read through `GET /api/cases`.
+  event or an unconfirmed high-risk claim goes to a queue read through `GET /api/cases`, and the
+  token's holder gets the check log as CSV or JSON at `GET /api/export/checks`.
 
 Details: [how a check runs](docs/reference.md#how-a-check-runs),
 [architecture](docs/submission/architecture.md), [privacy](docs/privacy.md),
@@ -110,7 +129,7 @@ Most setups need only these keys. Every variable, its default and what it change
 | `PERPLEXITY_API_KEY` | Web search on allowlisted domains (Perplexity Search API). Without it, `TAVILY_API_KEY` is used. |
 | `TAVILY_API_KEY` | Fallback web search on allowlisted domains. With neither key, web search is reported as unavailable. |
 | `EUVSDISINFO_API_KEY` | Known disinformation narratives, context only. |
-| `PRAWDOWID_ADMIN_TOKEN` | Turns on the moderator queue and `GET /api/cases`. Unset: no queue. |
+| `PRAWDOWID_ADMIN_TOKEN` | Turns on the moderator queue (`GET /api/cases`) and the check-log export (`GET /api/export/checks`). Unset: no queue and no export. |
 | `DISCORD_BOT_TOKEN` | Only for the Discord bot. |
 
 ## Docs

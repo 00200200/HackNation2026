@@ -12,7 +12,8 @@ fact-checking source, and whether a source shows, in its own verified words, tha
 material comes from another context. A source that only says the data cannot settle the claim is a
 limitation, never a verdict. The domain, author or popularity never decide on their own: every
 counted source needs a verified quote with a stance. Strength, premises and limitations come from
-the same facts.
+the same facts, and so does each source's side in the answer (`Source.stance`, the evidence chain):
+the side its counted label stands on, or none when the rules set the label aside.
 
 A fact-checker's ClaimReview record (from Google Fact Check, the corpus or the review page's own
 markup) counts only for the claim it reviews, which the model reports as `same_claim`. Its rating,
@@ -36,7 +37,7 @@ from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
 from prawdowid import corpus_bm25, justification
-from prawdowid.contract import SecurityEvent, Source, Verdict
+from prawdowid.contract import SecurityEvent, Source, SourceStance, Verdict
 from prawdowid.factcheck import CLAIM_PREFIX, RATING_PREFIX
 from prawdowid.factcheck import SOURCE_TYPE as FACT_CHECK
 from prawdowid.rerank import (
@@ -213,6 +214,14 @@ RATED_STANCE = {
     Verdict.MISLEADING: Stance.CONTEXT,
     Verdict.INSUFFICIENT_EVIDENCE: Stance.GAP,
 }
+# The side a counted label puts its source on in the answer (`Source.stance`, #78). A rating comes
+# here already mapped by `RATED_STANCE`; a data gap takes no side, so it adds context.
+SIDES = {
+    Stance.SUPPORTS: SourceStance.SUPPORTS,
+    Stance.REFUTES: SourceStance.REFUTES,
+    Stance.CONTEXT: SourceStance.CONTEXT,
+    Stance.GAP: SourceStance.CONTEXT,
+}
 
 
 class Label(BaseModel):
@@ -351,6 +360,7 @@ def verify_quotes(labels: list[Label], fragments: list[Fragment]) -> list[Eviden
                     for g in fragments
                     if g.doc_id == label.doc_id
                     and (c := _find_in(label.context_quote, g.source))
+                    and not _only_reviewed_claim(label.context_quote, g.source)
                 ),
                 None,
             )
@@ -587,24 +597,38 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         if _publisher(e) not in newest
         or (_rated(e) and _reviewed_on(e) == newest[_publisher(e)])
     ]
+    # A headline is listed for display, but it takes no side and shows no gap: only the words of a
+    # page's body decide, so a headline cannot make a publisher's body finding disappear.
+    body = [e for e in considered if not e.title_only]
     undecided = {
         _publisher(e)
-        for e in considered
+        for e in body
         if e.label.stance is Stance.GAP and e.label.own_conclusion
     }
     decisive = [e for e in considered if _publisher(e) not in undecided]
     sided = {
         e.label.doc_id
         for e in decisive
-        if e.label.stance in (Stance.SUPPORTS, Stance.REFUTES)
+        if not e.title_only and e.label.stance in (Stance.SUPPORTS, Stance.REFUTES)
     }
     evidence = [_scoped(e, sided) for e in evidence]
     decisive = [_scoped(e, sided) for e in decisive]
-    supports = [e for e in decisive if e.label.stance is Stance.SUPPORTS]
-    refutes = [e for e in decisive if e.label.stance is Stance.REFUTES]
+    supports = [
+        e for e in decisive if e.label.stance is Stance.SUPPORTS and not e.title_only
+    ]
+    refutes = [
+        e for e in decisive if e.label.stance is Stance.REFUTES and not e.title_only
+    ]
     both = _publishers(supports) & _publishers(refutes)
+    headlines = [
+        e
+        for e in decisive
+        if e.title_only
+        and e.label.own_conclusion
+        and e.label.stance in (Stance.SUPPORTS, Stance.REFUTES)
+    ]
     supports, refutes, limitations = _one_side_per_publisher(
-        supports, refutes, limitations
+        supports, refutes, limitations, headlines
     )
     # Only labels still counted: a publisher dropped above cannot decide "misleading" either.
     dropped = both - _publishers(supports + refutes)
@@ -621,10 +645,11 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     limitations = (
         limitations + _superseded(ratings, newest) + _source_limits(evidence, today)
     )
-    if gaps := [e for e in considered if e.label.stance is Stance.GAP]:
+    if gaps := [e for e in body if e.label.stance is Stance.GAP]:
         names = {e.source.publisher or str(e.source.url.host) for e in gaps}
         limitations.append(DATA_GAP.format(publishers=", ".join(sorted(names))))
     premises = [_premise(e) for e in evidence]
+    evidence = _placed(evidence, counted + gaps)
 
     if _conflicting(supports, refutes) and _conflicting(refutes, supports):
         return _judgement(
@@ -651,16 +676,15 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     # fact-checker's own conclusion only now and then); a side must be its own conclusion.
     checker_gap = [
         e
-        for e in considered
+        for e in body
         if e.source.source_type == FACT_CHECK and e.label.stance is Stance.GAP
     ]
     gap_decides = False
     if checker_gap:
-        # An undated finding counts as current: no source is known to come after it.
-        found_on = max(
-            (e.source.published_at for e in checker_gap if e.source.published_at),
-            default=None,
-        )
+        # An undated finding counts as current: no source is known to come after it, so one
+        # undated gap rules out the date override.
+        dates = [e.source.published_at for e in checker_gap]
+        found_on = None if None in dates else max(dates)
         side = _body_only(supports + refutes)
         if not rated and not any(
             (e.source.source_type == FACT_CHECK and e.label.own_conclusion)
@@ -880,10 +904,19 @@ def _other_claim(e: Evidence) -> bool:
     return e.review and not e.label.same_claim
 
 
-def _one_side_per_publisher(supports, refutes, limitations):
+def _one_side_per_publisher(supports, refutes, limitations, headlines=()):
     """A publisher on both sides keeps the side of its own conclusion (a fact-check that quotes the
     claim, then rates it false, refutes it). With no single conclusion it counts for neither side.
+    A headline's own conclusion is never counted or cited, but it vetoes the opposite body side of
+    its publisher when that side is not an own conclusion (the claim repeated before it is rated).
     """
+    for e in headlines:
+        refuting = e.label.stance is Stance.REFUTES
+        opposite = supports if refuting else refutes
+        body = [x for x in opposite if _publisher(x) == _publisher(e)]
+        if body and not any(x.label.own_conclusion for x in body):
+            rest = [x for x in opposite if _publisher(x) != _publisher(e)]
+            supports, refutes = (rest, refutes) if refuting else (supports, rest)
     for publisher in sorted(_publishers(supports) & _publishers(refutes)):
         mine = [
             any(e.label.own_conclusion for e in side if _publisher(e) == publisher)
@@ -1076,15 +1109,41 @@ def _judgement(
     )
 
 
+def _placed(evidence: list[Evidence], counted: list[Evidence]) -> list[Evidence]:
+    """Each source with the side its verified label counted for in `decide` (`Source.stance`).
+    None for a label the rules set aside: a headline alone, a fact-checker's older rating or its
+    other text next to its rating, a publisher whose own conclusion is a data gap or that says
+    both. `counted` holds copies of the same labels, so it is compared by value."""
+    return [
+        e.model_copy(
+            update={
+                "source": e.source.model_copy(
+                    update={
+                        "stance": SIDES[e.label.stance]
+                        if e in counted and not e.title_only
+                        else None
+                    }
+                )
+            }
+        )
+        for e in evidence
+    ]
+
+
 def _one_per_document(evidence: list[Evidence]) -> list[Source]:
     """One source per document and stance: several labels on one page list its URL once. The one
-    carrying a fact-checker's rating wins: it is what `decide` may have decided on."""
+    carrying a fact-checker's rating wins: it is what `decide` may have decided on. Next, one that
+    `decide` counted wins over one it set aside, so the page keeps its side."""
     seen = {}
     for e in evidence:
         key = (e.label.doc_id, e.label.stance)
-        if key not in seen or (e.source.rating and not seen[key].rating):
+        if key not in seen or _weight(e.source) > _weight(seen[key]):
             seen[key] = e.source
     return list(seen.values())
+
+
+def _weight(source: Source) -> tuple[bool, bool]:
+    return bool(source.rating), source.stance is not None
 
 
 def _cited(evidence: list[Evidence], stance: str):

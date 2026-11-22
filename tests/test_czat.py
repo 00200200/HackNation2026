@@ -121,3 +121,17 @@ def test_both_pages_say_when_deleting_withdrew_questions_from_the_moderator_case
     for js in ((PUBLIC / "app.js").read_text(encoding="utf-8"), CZAT_JS):
         assert f'const DELETED_AND_WITHDRAWN = "{sentence}";' in js
         assert "withdrawn > 0 ? DELETED_AND_WITHDRAWN" in js
+
+
+def test_every_channel_groups_sources_by_side_in_the_same_words_and_order():
+    """#78: the evidence chain reads the same on the web page, /czat and Discord (scenario G)."""
+    expected = [
+        (stance.value if stance else "", name)
+        for stance, name in discord_bot.SIDES.items()
+    ]
+    for js in ((PUBLIC / "app.js").read_text(encoding="utf-8"), CZAT_JS):
+        block = re.search(r"const SIDES = \[(.*?)\];", js, re.DOTALL).group(1)
+        assert re.findall(r'\[(?:"(\w+)"|null), "([^"]+)"\]', block) == expected
+        assert f'const NOT_COUNTED_NOTE = "{discord_bot.NOT_COUNTED_NOTE}";' in js
+        # Snippets and ratings keep their labels inside the groups.
+        assert "s.snippet_only" in js and "Ocena fact-checkera: " in js

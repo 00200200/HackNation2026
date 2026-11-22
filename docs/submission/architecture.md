@@ -44,6 +44,24 @@ The checked page is excluded as evidence for its own claims. Sources:
 [app.py](../../prawdowid/app.py), [link.py](../../prawdowid/link.py),
 [verifier.py](../../prawdowid/verifier.py), [rerank.py](../../prawdowid/rerank.py).
 
+A check can also carry a screenshot or photo (#80, scenario F): `image` in the request, base64 of a
+PNG, JPEG or WebP of at most 5 MB, 25 million pixels and 8000 px a side, with or without text. The
+web page takes it from a file button or a paste into the text box; Discord takes an attachment on
+`/sprawdz`; `/czat` does not take images. Pillow checks the type from the file's own signature and
+reads the size and EXIF (date taken, camera) from the header without decoding pixels; EXIF is shown
+as context only, and no prompt or verdict uses it. The file itself goes to the model provider as
+uploaded, metadata included ([privacy.md](../privacy.md)): nothing is stripped or rotated. One PydanticAI call with the image as `BinaryContent`, on the
+extraction model unless `PRAWDOWID_IMAGE_MODEL` names another, reads the visible text verbatim and
+any visible date as printed (20 s, one attempt, inside the 40 s check budget). The read text goes
+through the same pattern screening as page text (an instruction in the image is a security event
+with `location: "image"`), is masked, and is then checked by the same `verify_text()`; the answer
+shows it under "Odczytany tekst" with the image limits in `limitations`, among them that a date
+shown on the image does not prove when the post appeared. A failed read is a
+`technical_error` or `cannot_check` notice that says the image was not read, never a verdict. There
+is no reverse image search and no check for edits or generated images. Sources:
+[image_input.py](../../prawdowid/image_input.py), [app.py](../../prawdowid/app.py),
+[discord_bot.py](../../prawdowid/discord_bot.py), [app.js](../../frontend/public/app.js).
+
 Extraction ranks self-contained claims, separates reported speech from its attribution, marks
 checkability and writes search queries. Claims run with `asyncio.gather`; retrieval within a claim
 uses `asyncio.TaskGroup`, cancelling and awaiting unfinished lookup tasks at the deadline.
@@ -74,6 +92,22 @@ verdict (`judge.RATINGS`, ADR 0001); a review of another claim is context only.
 Sources: [rerank.py](../../prawdowid/rerank.py), [judge.py](../../prawdowid/judge.py),
 [factcheck.py](../../prawdowid/factcheck.py), [EUvsDisinfo](../../prawdowid/euvsdisinfo.py).
 
+Each source in the answer also says which side of the claim it stands on (the evidence chain,
+#78). `judge.decide()` sets `stance` to `potwierdza`, `przeczy` or `kontekst` from a label whose
+quote passed the verbatim check, and only when the verdict rules counted that label. A
+fact-checker's rating of the checked claim sets the side through `judge.RATINGS`: a false-type
+rating contradicts the claim, a true-type rating confirms it, and the other mapped ratings add
+context. A review of another claim, a data gap and plain context from EUvsDisinfo or the corpus add
+context. A headline alone, an older rating by the same fact-checker, a fact-checker's other text
+next to its rating and a publisher that says both get `null`, so no channel puts them on a side.
+The web page groups the quotes under "Potwierdza", "Przeczy" and "Uzupełnia kontekst", each with
+publisher and date. Both sides of a conflict sit next to each other on a wide screen and stack on a
+phone. Sources the rules did not count are listed under "Nie wpływa na ocenę". `/czat` and the
+Discord bot use the same groups in the same words, and an answer with no stance at all keeps the
+plain list. Sources: [contract.py](../../prawdowid/contract.py), [judge.py](../../prawdowid/judge.py),
+[app.js](../../frontend/public/app.js), [czat.js](../../frontend/public/czat.js),
+[Discord](../../prawdowid/discord_bot.py).
+
 Incident matching against the organiser's incident base ([PR #38](https://github.com/00200200/HackNation2026/pull/38),
 `prawdowid/incidents.py`) is merged into `main`: a match on URL, flagged domain or text similarity
 is shown as neutral context next to the claims and never touches the verdict. It is, per the PR's
@@ -88,13 +122,15 @@ separate, already-populated source and does not substitute for the incident base
 | Extract claims and queries | `anthropic:claude-sonnet-5-5` (was Opus until 22.11, #88) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
 | Rerank fragments | `anthropic:claude-haiku-5-5` | `PRAWDOWID_RERANK_MODEL`, [rerank.py](../../prawdowid/rerank.py) |
 | Label evidence | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_JUDGE_MODEL`, [judge.py](../../prawdowid/judge.py) |
+| Read an image's text (#80) | the extraction model | `PRAWDOWID_IMAGE_MODEL`, [image_input.py](../../prawdowid/image_input.py) |
 
 These are literal code defaults, not a statement about currently available public model names.
 Availability is UNCONFIRMED. The saved eval's JSON does not record its models; the results section
 below says what it ran on. All model calls use PydanticAI native structured output through the
 installed Anthropic provider. Another provider needs its PydanticAI extra (only
 `pydantic-ai-slim[anthropic,mcp]` is installed, [pyproject.toml](../../pyproject.toml)), its key
-and an image rebuild; none is demonstrated. The EU-processed option is described under "Deployment, storage and data processing" below. Compose forwards only `PRAWDOWID_MODEL`, so changing
+and an image rebuild; none is demonstrated. The EU-processed option is described under "Deployment, storage and data processing" below. Compose forwards `PRAWDOWID_MODEL` and the image reading
+settings (`PRAWDOWID_IMAGE_MODEL`, `PRAWDOWID_IMAGE_TIMEOUT_S`, `PRAWDOWID_IMAGE_THINKING`), so changing
 the rerank or judge model on the server also needs a line in [compose.yaml](../../compose.yaml).
 Web search (step 2b) is **Perplexity's Search API** (`perplexity_search` in `prawdowid/websearch.py`,
 `perplexityai` SDK, restricted to the allowlist with `search_domain_filter`, country PL, language pl)
@@ -110,7 +146,7 @@ in [sources.md](sources.md).
 [Frontend Dockerfile](../../frontend/Dockerfile) serves static files with nginx.
 [compose.yaml](../../compose.yaml) publishes only the frontend by default, with backend health
 checks. The Discord service and local PostgreSQL service are opt-in profiles. Compose now
-forwards the extraction model setting, Anthropic key, `GOOGLE_FACTCHECK_API_KEY`,
+forwards the extraction model setting, the image reading settings (#80), Anthropic key, `GOOGLE_FACTCHECK_API_KEY`,
 `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `PRAWDOWID_SEARCH_PROVIDER`, `EUVSDISINFO_API_KEY`, `PRAWDOWID_GOVPL`, `PRAWDOWID_INCIDENTS_PATH` and the
 eval-only `PRAWDOWID_EVAL_TOKEN` (unset on the public demo). The check log sits on the `checklog`
 volume (`/var/lib/prawdowid`, kept across deploys) and the source cache at a writable `/tmp` path,
@@ -132,8 +168,9 @@ checksums, not names or addresses) is masked by `privacy.mask_personal_data` bef
 reaches the extraction model and again in every log line, web search and own-store query (#17,
 #39, #82).
 Each check is kept 30 days as one masked record in the check log (`prawdowid/checklog.py`), which
-the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Input goes to
-Anthropic masked (a placeholder keeps the sentence shape so claims still split); masked claim text
+the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Text input goes to
+Anthropic masked (a placeholder keeps the sentence shape so claims still split); an image goes to
+Anthropic as uploaded, metadata included, and only the text read from it is masked (#80); masked claim text
 and queries go to Google, Perplexity or Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
 has no delete command, Docker stdout logs sit outside retention): [docs/privacy.md](../privacy.md).
 Who processes what, from each provider's own terms read on 22.11.2026. The full table, with
@@ -142,7 +179,7 @@ retention, training use and links to the terms, is in
 
 | Processor | Receives | Processes in |
 |---|---|---|
-| Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
+| Anthropic (extraction, rerank, judge, image reading) | Masked text; masked claims and public fragments; an uploaded image as is, metadata included (#80) | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
 | Perplexity (web search, when its key is set) | The same masked search queries as Tavily, plus the domain allowlist, country PL and language pl. Not cached | Perplexity AI, Inc. (USA); where the API processes data is not stated, UNCONFIRMED |
 | Tavily (web search, the fallback) | Masked search queries: the model's queries, the claim sentence and one search of it restricted to fact-checker domains (#106) | United States. An EU endpoint exists for selected customers only |
 | Google Fact Check Tools | Masked claim text and up to 8 short queries per claim, each masked (#100) | Not stated for this API, UNCONFIRMED. Google's privacy policy says its servers are worldwide |
@@ -182,6 +219,19 @@ mentions a moderator. There is no push notification and no moderator screen beyo
 It has not run on the live server yet; the server's `.env` needs the variable first
 ([deploy.md](../deploy.md)).
 
+## Integrations for analysts
+
+Brief section 6 (premium) asks for data export and analytical integrations (#86). Each `ok` answer with claims on the
+web page downloads as JSON, exactly the API answer, and as a STIX 2.1 bundle: the page posts the
+answer it holds to `POST /api/export/stix`, and `prawdowid/export.py` builds the bundle with the OASIS
+`stix2` library (an Identity for faktczyfejk.pl, a Report for the check, one Note per claim labelled
+`verdict:<code>` with the justification and the sources as external references, and one Note for matched
+incidents). The text is masked again, nothing is fetched, the request is capped at 64 kB. No DISARM
+technique ids are added, because no source we read names any. The bundle parses back with `stix2` in
+`tests/test_export.py`; the import into OpenCTI is untested, no instance was available. For analysts,
+`GET /api/export/checks` (bearer token `PRAWDOWID_ADMIN_TOKEN`, the same as `/api/cases`) returns the check
+log as CSV or JSON for a date range, from the masked fields only, without session ids.
+
 ## Default limits, not performance measurements
 
 
@@ -195,13 +245,14 @@ It has not run on the live server yet; the server's `.env` needs the variable fi
 | Link fetch | 10 s, 3 redirects, `2 * 1024 * 1024` bytes | [link.py](../../prawdowid/link.py) |
 | Evidence fragments: size / candidates / retained | 800 characters / 60 / 12 | [rerank.py](../../prawdowid/rerank.py) |
 | Requests per client IP | 10/minute; the bot shares its IP across users | [app.py](../../prawdowid/app.py), [Discord client](../../prawdowid/discord_bot.py) |
+| Image (#80) | 5 MB, 25 million pixels, 8000 px a side; read call 20 s, one attempt, inside the check budget; read text checked up to 5000 characters | [image_input.py](../../prawdowid/image_input.py) |
 | Discord response cap | 5 messages of 2000 characters, with truncation notice | [discord_bot.py](../../prawdowid/discord_bot.py) |
 
 Extraction and URL fetching share the check deadline. A cut extraction returns a technical notice;
 unfinished claims return `not_checked`. A judge outage also maps to `not_checked`.
 Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
-There is no OCR or reverse image search. The moderator queue (#79, above) files cases only while
+There is no OCR library or reverse image search: a model reads an image's text (#80, above). The moderator queue (#79, above) files cases only while
 `PRAWDOWID_ADMIN_TOKEN` is set. The evidence corpus is built and
 searched in every check ([corpus.md](../corpus.md)); a live Discord run remains open in
 [WORKLOG](../../WORKLOG.md). Two URL cases (U01, U02) are in the saved full run; do not present

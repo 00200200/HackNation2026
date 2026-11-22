@@ -64,6 +64,10 @@ body.chat-page { background-color: var(--red); background-image: var(--weave); }
 .m-sources .quote { margin: .35rem 0 0; font-size: 1rem; }
 .src-head a { color: var(--navy); font-weight: 700; }
 .src-meta { font-size: .85rem; color: var(--muted); }
+/* The evidence chain: the side's heading and icon from styles.css, spaced for a message */
+.msg > .m-side { margin-top: .6rem; }
+.msg .side-title { margin: 0 0 .3rem; font-size: .95rem; }
+.msg .side-note { margin: 0 0 .3rem; font-size: .85rem; }
 
 /* Quick replies under the greeting, as a bot offers them */
 .quick { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; max-width: 36rem; margin-top: .3rem; font-size: .92rem; }

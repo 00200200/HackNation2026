@@ -3,7 +3,7 @@
 A record holds the masked question, channel, start and end time, total and per-step latency, status
 (with why a technical error happened), claims with verdicts, sources and limitations (search errors
 and abstentions show up there), model calls with tokens, cost, security events, incident ids and the
-moderator case the check joined.
+moderator case the check joined. For an image, only its SHA-256 and the masked text read from it.
 
 The question is stored masked (prawdowid/privacy.py; a link without its secret query values, see
 `masked_question`), records older than `RETENTION_DAYS` are dropped on every write, and
@@ -55,7 +55,7 @@ def record(
     """Append one check. A write failure is logged and never fails the check.
 
     `error` says why verify did not return ("timeout" or the exception class)."""
-    page = result.page
+    page, image = result.page, result.image
     entry = {
         "session": session,
         # End of the check; retention counts from it.
@@ -68,6 +68,12 @@ def record(
         "error": error,
         "message": result.message,
         "page": page and {"url": mask_personal_data(page.url), "sha256": page.sha256},
+        # Never the image itself: its hash and the text read from it, masked again here.
+        "image": image
+        and {
+            "sha256": image.sha256,
+            "text": image.text and mask_personal_data(image.text),
+        },
         "steps_ms": result.steps_ms,
         "model_calls": [m.model_dump() for m in result.model_calls],
         "cost_usd": result.cost_usd,
@@ -111,6 +117,13 @@ def read_session(session: str) -> list[dict]:
     return [
         r for r in map(_parse, lines) if r and r["session"] == session and _fresh(r)
     ]
+
+
+def read_all() -> list[dict]:
+    """Every record within retention, oldest first (admin export, prawdowid/export.py)."""
+    path = CHECK_LOG
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    return [r for r in map(_parse, lines) if r and _fresh(r)]
 
 
 def delete_session(session: str) -> int:

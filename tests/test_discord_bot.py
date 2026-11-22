@@ -17,6 +17,7 @@ from prawdowid.contract import (
     ClaimResult,
     SecurityEvent,
     Source,
+    SourceStance,
     Status,
     Verdict,
 )
@@ -558,6 +559,77 @@ def test_fact_checkers_rating_is_shown_as_the_rating_not_as_a_quote():
     text = render(CHECK.model_copy(update={"claims": [claim]}))
     assert "  Ocena fact-checkera: Fałsz" in text.splitlines()
     assert "> „Fałsz”" not in text
+
+
+# --- #78: the evidence chain, the same groups as the web form ---
+
+
+def sided(stance, n, **update):
+    return (
+        CHECK.claims[0]
+        .sources[0]
+        .model_copy(
+            update={
+                "title": f"Źródło {n}",
+                "url": f"https://www.gov.pl/web/{n}",
+                "stance": stance,
+                **update,
+            }
+        )
+    )
+
+
+def test_sources_are_grouped_by_the_side_they_stand_on():
+    claim = CHECK.claims[0].model_copy(
+        update={
+            "verdict": Verdict.INSUFFICIENT_EVIDENCE,
+            "sources": [
+                sided(SourceStance.REFUTES, 1, publisher="KE"),
+                sided(None, 2),
+                sided(SourceStance.SUPPORTS, 3),
+                sided(SourceStance.CONTEXT, 4),
+            ],
+        }
+    )
+    text = render(CheckResult(status=Status.OK, claims=[claim]))
+    section = text.split("**Źródła:**\n", 1)[1].split("**Ograniczenia:**")[0]
+    lines = section.splitlines()
+    assert [line for line in lines if line.startswith(("__", "-# "))] == [
+        "__Potwierdza__",
+        "__Przeczy__",
+        "__Uzupełnia kontekst__",
+        "__Nie wpływa na ocenę__",
+        f"-# {discord_bot.NOT_COUNTED_NOTE}",
+    ]
+    # Each source under its side, with its publisher and date.
+    assert [line for line in lines if line.startswith("- ")] == [
+        "- Źródło 3, gov.pl, 2024-05-01",
+        "- Źródło 1, KE, 2024-05-01",
+        "- Źródło 4, gov.pl, 2024-05-01",
+        "- Źródło 2, gov.pl, 2024-05-01",
+    ]
+
+
+def test_an_answer_without_sides_keeps_one_plain_list():
+    text = render(CHECK)
+    assert "**Źródła:**\n- Polska w UE, gov.pl, 2024-05-01" in text
+    assert "__" not in text
+
+
+def test_both_sides_of_a_long_answer_stay_within_discord_limits():
+    fragment = "Długi cytat ze źródła o podatku. " * 40
+    stances = [SourceStance.SUPPORTS, SourceStance.REFUTES] * 4
+    sources = [sided(s, i, fragment=fragment) for i, s in enumerate(stances)]
+    check = CheckResult(
+        status=Status.OK,
+        claims=[CHECK.claims[0].model_copy(update={"sources": sources})],
+    )
+    parts, full = reply(check)
+    assert len(parts) <= MAX_MESSAGES
+    assert all(0 < len(p) <= MESSAGE_LIMIT for p in parts)
+    assert parts[-1] == discord_bot.ATTACHED
+    assert full.count("__Potwierdza__") == 1 and full.count("__Przeczy__") == 1
+    assert all(f"<{s.url}>" in full for s in sources)
 
 
 def test_refused_attachment_notice_never_pushes_a_full_message_over_the_limit(

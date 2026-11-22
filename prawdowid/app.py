@@ -9,12 +9,23 @@ import time
 import unicodedata
 import uuid
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 from cachetools import TTLCache
-from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+)
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import (
     BaseModel,
@@ -24,13 +35,15 @@ from pydantic import (
     TypeAdapter,
     ValidationError,
     field_validator,
+    model_validator,
 )
 from pydantic_core import PydanticCustomError
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from starlette.concurrency import run_in_threadpool
 
-from prawdowid import cases, checklog, corpus_bm25, faults
+from prawdowid import cases, checklog, corpus_bm25, export, faults, image_input
 from prawdowid.contract import CheckResult, Status, Verdict
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
@@ -73,7 +86,16 @@ CHECK_DESCRIPTION = (
     "A check that could not run still returns `200`: `status` is then "
     "`technical_error`, `cannot_check` or `needs_clarification`, and `message` says "
     "why in Polish. An `input` that is empty, too long or not a valid link returns "
-    "`422` with a Polish text in `detail[0].msg`; too many requests return `429`."
+    "`422` with a Polish text in `detail[0].msg`; too many requests return `429`.\n\n"
+    "`image` is an optional screenshot or photo in base64: a PNG, JPEG or WebP of at "
+    f"most {image_input.MAX_IMAGE_BYTES // (1024 * 1024)} MB, "
+    f"{image_input.MAX_IMAGE_PIXELS // 1_000_000} million pixels and "
+    f"{image_input.MAX_IMAGE_SIDE} px a side. A model reads its text and any visible "
+    "date, and that text is checked like `input`, which may then be empty and is "
+    "checked along with it. The answer's `image` shows the text that was read and "
+    "`limitations` what an image check cannot tell. The image goes to the model "
+    "provider as uploaded, metadata included; the API does not store it. Another "
+    "type, a larger image or an image with a link returns `422`."
 )
 
 _http_url = TypeAdapter(HttpUrl)
@@ -88,11 +110,14 @@ _results: TTLCache[str, CheckResult] = TTLCache(
 )
 
 
-def cache_key(text: str) -> str:
+def cache_key(text: str, image_sha256: str | None = None) -> str:
     """Hash of the input (CheckRequest already made it NFC), so the raw text is not kept as a key.
-    Internal whitespace stays: the model reads it and it can change the verdict. Session and
-    channel stay out of it."""
+    Internal whitespace stays: the model reads it and it can change the verdict. An image counts
+    by its hash, so the same words with another image are another check. Session and channel
+    stay out of it."""
     normalised = unicodedata.normalize("NFC", text)
+    if image_sha256:
+        normalised += f"\0image:{image_sha256}"
     return hashlib.sha256(normalised.encode()).hexdigest()
 
 
@@ -115,10 +140,22 @@ class CheckRequest(BaseModel):
     )
 
     input: str = Field(
+        "",
         description=(
-            f"1 to {MAX_INPUT_CHARS} characters after trimming. A single token with "
-            "`://` is read as a link and must be a valid http or https URL."
-        )
+            f"1 to {MAX_INPUT_CHARS} characters after trimming; may be empty only with "
+            "`image`. A single token with `://` is read as a link and must be a valid "
+            "http or https URL."
+        ),
+    )
+    image: str | None = Field(
+        None,
+        description=(
+            "Optional screenshot or photo: base64 of a PNG, JPEG or WebP file (a data URL "
+            f"is accepted too), at most {image_input.MAX_IMAGE_BYTES // (1024 * 1024)} MB, "
+            f"{image_input.MAX_IMAGE_PIXELS // 1_000_000} million pixels and "
+            f"{image_input.MAX_IMAGE_SIDE} px a side. Sent to the model provider as "
+            "uploaded; the API never stores it."
+        ),
     )
 
     @field_validator("input")
@@ -127,8 +164,6 @@ class CheckRequest(BaseModel):
         # NFC, so the pipeline sees what the cache key hashes (a decomposed ń must not slip past
         # the injection patterns, which are written with composed letters).
         value = unicodedata.normalize("NFC", value).strip()
-        if not value:
-            raise PydanticCustomError("empty", "Wpisz tekst do sprawdzenia.")
         if len(value) > MAX_INPUT_CHARS:
             raise PydanticCustomError(
                 "too_long", f"Treść jest za długa. Limit to {MAX_INPUT_CHARS} znaków."
@@ -143,6 +178,30 @@ class CheckRequest(BaseModel):
                     "Przyjmujemy adresy zaczynające się od http:// lub https://.",
                 ) from None
         return value
+
+    @model_validator(mode="after")
+    def _text_or_image(self) -> "CheckRequest":
+        # The image itself is decoded in create_check, after the rate limit counted the request.
+        if not self.image:
+            if not self.input:
+                raise PydanticCustomError("empty", "Wpisz tekst do sprawdzenia.")
+        elif is_link(self.input):
+            raise PydanticCustomError("link_and_image", image_input.LINK_AND_IMAGE)
+        return self
+
+
+def decoded_image(body: CheckRequest) -> image_input.Upload | None:
+    """The request's image, checked. Called inside the endpoint, so a refused image counts
+    against the rate limit (validation runs before it); each failure is the same Polish 422 as a
+    validation error, without the input."""
+    if not body.image:
+        return None
+    try:
+        # Type, size and pixel count come from the file itself.
+        return image_input.decode(body.image)
+    except PydanticCustomError as exc:
+        error = {"type": exc.type, "loc": ("body", "image"), "msg": exc.message()}
+        raise RequestValidationError([error]) from None
 
 
 @asynccontextmanager
@@ -178,6 +237,13 @@ app.state.limiter = limiter
 @app.exception_handler(RateLimitExceeded)
 async def rate_limited(request: Request, exc: RateLimitExceeded):
     return JSONResponse({"detail": RATE_LIMIT_MESSAGE}, status_code=429)
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, exc: RequestValidationError):
+    """FastAPI's 422 without the echo of the input: a refused image would come back whole."""
+    errors = [{k: v for k, v in e.items() if k != "input"} for e in exc.errors()]
+    return JSONResponse({"detail": jsonable_encoder(errors)}, status_code=422)
 
 
 @app.get("/health")
@@ -231,6 +297,7 @@ async def create_check(
         ),
     ] = None,
 ) -> CheckResult:
+    upload = decoded_image(body)
     started = time.perf_counter()
     started_at = datetime.now(UTC)
     session = x_session_id or ""
@@ -239,7 +306,7 @@ async def create_check(
     response.headers[SESSION_HEADER] = session
     # Why a check ended in a technical error, for the check log; None when verify returned.
     error = None
-    key = cache_key(body.input)
+    key = cache_key(body.input, upload and upload.sha256)
     # Eval traffic only (scenario J): honoured with the secret eval token, ignored for everyone
     # else. A faulted run neither reads nor fills the result cache: a stored answer would hide
     # the simulated outage, and an answer computed with a dependency "down" is not the real one.
@@ -256,7 +323,10 @@ async def create_check(
         else:
             with faults.simulate(fault):
                 async with asyncio.timeout(VERIFY_TIMEOUT_S):
-                    result = await verify(body.input)
+                    if upload:
+                        result = await image_input.verify_image(upload, body.input)
+                    else:
+                        result = await verify(body.input)
             if not fault and _cacheable(result):
                 _results[key] = result.model_copy(deep=True)
     except Exception as exc:
@@ -269,24 +339,31 @@ async def create_check(
         if is_link(body.input):
             # Only the URL was screened, not the page, so the "patterns only" note would mislead.
             result.limitations = []
+        if upload:
+            # Likewise only the typed text, not the image; its hash still goes to the check log.
+            result.limitations = list(image_input.UNREAD)
+            result.image = image_input.received(upload)
+    # Text read from an image (masked), or "".
+    read = (result.image and result.image.text) or ""
     # Scenario I context, added after the verdicts so it cannot change them.
     try:
         # The final address after redirects counts too (a short link to a known page).
         final_url = result.page.url if result.page else ""
-        result.incident_matches = match_incidents(f"{body.input} {final_url}")
+        result.incident_matches = match_incidents(f"{body.input} {final_url} {read}")
     except Exception:
         log.exception("incident matching failed")
     channel = x_channel if x_channel in CHANNELS else "other"
     # Scenario H: set only once the case is stored, and never while nobody can read the queue
     # (PRAWDOWID_ADMIN_TOKEN unset), so an answer never claims a hand-off that did not happen.
     # A hit is one more question: it counts.
+    # An image sent alone: the moderator sees the text read from it (masked).
     result.moderator_case = cases.report(
-        session, channel, body.input, result, started_at=started_at
+        session, channel, body.input or read, result, started_at=started_at
     )
     latency_ms = round((time.perf_counter() - started) * 1000)
     log.info(
         "check session=%s channel=%s status=%s security_events=%d cost_usd=%s cache=%s "
-        "latency_ms=%d input_chars=%d",
+        "latency_ms=%d input_chars=%d image=%s",
         session,
         channel,
         result.status,
@@ -295,6 +372,7 @@ async def create_check(
         "hit" if cached else "miss",
         latency_ms,
         len(body.input),
+        upload.sha256 if upload else "-",
     )
     # A hit cost nothing and ran no steps: the check log must not count them twice.
     logged = result
@@ -370,11 +448,78 @@ def list_cases(
     PRAWDOWID_ADMIN_TOKEN; without the variable there is no queue (no check files a case) and the
     route does not exist. Left out of the channel spec (docs/openapi.json): no channel calls it.
     Plain def: it reads a file."""
+    _check_admin(credentials)
+    return cases.read_cases()
+
+
+def _check_admin(credentials: HTTPAuthorizationCredentials | None) -> None:
+    """404 without PRAWDOWID_ADMIN_TOKEN, 401 on a missing or wrong bearer token. Call it inside
+    the rate-limited route body: slowapi counts only when the endpoint runs, not in a dependency,
+    so a check made as a dependency would leave wrong guesses unlimited."""
     token = cases.admin_token()
     if not token:
         raise HTTPException(status_code=404)
     given = credentials.credentials if credentials else ""
     if not hmac.compare_digest(given.encode(), token.encode()):
-        log.warning("moderator cases refused: wrong or missing token")
+        log.warning("admin route refused: wrong or missing token")
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Bearer"})
-    return cases.read_cases()
+
+
+@app.post("/api/export/stix")
+@limiter.limit(RATE_LIMIT)
+async def export_stix(request: Request) -> Response:
+    """The answer the client holds (the JSON of `POST /api/checks`) as a STIX 2.1 bundle
+    (prawdowid/export.py). Masked again, nothing fetched; at most `export.MAX_ANSWER_BYTES` read."""
+    body = b""
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > export.MAX_ANSWER_BYTES:
+            raise HTTPException(
+                status_code=413, detail="Odpowiedź jest za duża do eksportu."
+            )
+    try:
+        answer = CheckResult.model_validate_json(body)
+        # A thread: building the bundle is CPU work and must not stall the event loop.
+        bundle = await run_in_threadpool(export.stix_bundle, answer)
+    except (ValidationError, ValueError):
+        raise HTTPException(
+            status_code=422,
+            detail="To nie jest odpowiedź z wynikami do wyeksportowania.",
+        ) from None
+    return Response(
+        bundle,
+        media_type="application/stix+json;version=2.1",
+        headers={"Content-Disposition": 'attachment; filename="faktczyfejk-stix.json"'},
+    )
+
+
+DATE_MIN, DATE_MAX = (
+    date(2020, 1, 1),
+    date(2100, 1, 1),
+)  # keeps `to` + 1 day inside datetime
+
+
+@app.get("/api/export/checks", include_in_schema=False)
+@limiter.limit(RATE_LIMIT)
+def export_checks(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_admin)],
+    format: Annotated[str, Query(pattern="^(csv|json)$")] = "json",
+    start: Annotated[date | None, Query(alias="from", ge=DATE_MIN, le=DATE_MAX)] = None,
+    end: Annotated[date | None, Query(alias="to", ge=DATE_MIN, le=DATE_MAX)] = None,
+) -> Response:
+    """The masked check log for a date range (UTC days, default: the retention period) as CSV or
+    JSON, for the holder of PRAWDOWID_ADMIN_TOKEN. No session ids. Not in the channel spec."""
+    _check_admin(credentials)
+    if start and end and start > end:
+        raise HTTPException(status_code=422, detail="`from` is after `to`.")
+    records = export.log_records(start, end)
+    if format == "csv":
+        return PlainTextResponse(
+            export.log_csv(records),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="checks.csv"'},
+        )
+    return JSONResponse(
+        records, headers={"Content-Disposition": 'attachment; filename="checks.json"'}
+    )

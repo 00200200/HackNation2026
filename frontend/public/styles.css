@@ -119,6 +119,16 @@ a { color: var(--red-deep); }
 .chip:hover { border-color: var(--red); color: var(--red-deep); }
 .chip[aria-disabled="true"] { opacity: .6; cursor: progress; }
 
+/* Image input (scenario F): the button under the box, the preview under it; neutral, never a verdict colour */
+.attach { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; margin: .8rem 0 0; }
+.attach-btn { display: inline-flex; align-items: center; gap: .45rem; }
+.attach-icon { width: 1.25rem; height: 1.25rem; flex: none; }
+.attach-note { font-size: .92rem; color: var(--muted); }
+.preview { display: flex; align-items: center; gap: .9rem; margin: .8rem 0 0; font-size: .92rem; }
+.preview[hidden] { display: none; }
+.preview img { width: 5rem; height: 5rem; flex: none; object-fit: cover; border-radius: .6rem; border: 1px solid var(--line); background: var(--soft); }
+.preview figcaption { min-width: 0; overflow-wrap: anywhere; }
+
 .pane-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
 .pane-title { margin: 0; font-size: 1.1rem; font-weight: 800; letter-spacing: -.01em; }
 .pane-pill { font-size: .8rem; font-weight: 700; padding: .2rem .65rem; border-radius: 999px; background: #fff;
@@ -165,6 +175,9 @@ body.checked .results { flex: 1 0 auto; }
 .tag { margin-left: .5rem; font-size: .8rem; font-weight: 700; background: var(--soft); color: var(--muted); padding: .2rem .6rem; border-radius: 999px; }
 .copy-btn { border: 0; border-radius: .75rem; background: var(--navy); color: #fff; font: inherit; font-weight: 700; font-size: .95rem; padding: .65rem 1rem; cursor: pointer; min-height: 2.75rem; }
 .copy-btn:hover { background: #3a2328; }
+.card-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.copy-btn.secondary { background: transparent; color: var(--navy); box-shadow: inset 0 0 0 2px var(--navy); }
+.copy-btn.secondary:hover { background: rgba(0, 0, 0, .06); }
 
 .claim { padding: 1.75rem 0; border-bottom: 1px solid var(--line); }
 .claim:last-child { border-bottom: 0; padding-bottom: .25rem; }
@@ -199,11 +212,32 @@ body.checked .results { flex: 1 0 auto; }
 .empty { margin: 0; color: var(--muted); }
 .sources-note { margin: .65rem 0 0; font-size: .92rem; }
 
+/* The evidence chain (#78): sources grouped by the side they stand on. Both sides of a conflict sit next to
+   each other on a wide screen and one under the other on a narrow one. The heading names the side; the icon
+   and the colour of the quote rule only help. */
+.chain { display: grid; gap: 1.25rem; }
+.sides { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+@media (min-width: 52rem) { .sides { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.side-title { display: flex; align-items: center; gap: .5rem; margin: 0 0 .6rem; font-size: 1rem; font-weight: 800; }
+.side-icon { flex: none; display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; }
+.side-icon svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.side-potwierdza .side-icon { background: var(--navy); color: #fff; }
+.side-przeczy .side-icon { background: var(--red); color: #fff; }
+.side-kontekst .side-icon { background: #ecebeb; color: var(--navy); }
+.side-note { margin: -.3rem 0 .6rem; font-size: .9rem; color: var(--muted); }
+.side-potwierdza .quote { border-left-color: var(--navy); }
+.side-kontekst .quote, .side-none .quote { border-left-color: #8a7f82; }
+
 .assessment { background: var(--soft); border-radius: 1rem; padding: .9rem 1.1rem; }
 .assessment p { margin: 0 0 .4rem; color: var(--muted); }
 .assessment p:last-child { margin-bottom: 0; }
 .assessment b { color: var(--navy); font-weight: 700; }
 .premises { margin: 0; padding-left: 1.2rem; color: var(--muted); font-size: .95rem; }
+
+/* Text read from an image: what was checked, not a source, so a grey rule instead of the red one */
+.image-read { padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+.read-text { margin: 0 0 .6rem; padding: .75rem 1rem; border-left: 3px solid #a59c9d; border-radius: 0 .6rem .6rem 0;
+  background: var(--soft); white-space: pre-line; }
 
 .unknown { margin: 1rem 0 0; background: var(--pink-bg); color: var(--dark-red); border: 1px dashed #efb3bf; border-radius: .9rem; padding: .9rem 1rem; }
 .unknown-title { margin: 0; font-size: 1rem; font-weight: 800; }

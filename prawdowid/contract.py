@@ -53,6 +53,14 @@ class ClaimKind(StrEnum):
     QUOTED = "quoted"
 
 
+class SourceStance(StrEnum):
+    """Which side of the claim a source stands on, for the evidence chain (#78)."""
+
+    SUPPORTS = "potwierdza"
+    REFUTES = "przeczy"
+    CONTEXT = "kontekst"
+
+
 class Source(BaseModel):
     title: str
     publisher: str
@@ -69,6 +77,16 @@ class Source(BaseModel):
     # A fact-checker's rating of the checked claim (`textualRating` of its ClaimReview record).
     # Channels show it as the fact-checker's rating, never as a quote from its page.
     rating: str | None = None
+    # Set only by `judge.decide()`, from a label whose quote was found verbatim in this source.
+    stance: SourceStance | None = Field(
+        None,
+        description="The side this source stands on, from a quote found verbatim in it: "
+        "'potwierdza' (confirms the claim), 'przeczy' (contradicts it) or 'kontekst' (adds "
+        "context, a data gap or a fact-checker's review of another claim). A fact-checker's "
+        "rating of this claim gives its side through the rating. null when the verdict rules "
+        "did not count the source: a headline alone, an older rating by the same "
+        "fact-checker, or a source that says both.",
+    )
 
 
 class ModelCall(BaseModel):
@@ -129,13 +147,29 @@ class CheckedPage(BaseModel):
     published_at: date | None
 
 
+class CheckedImage(BaseModel):
+    """The screenshot or photo the user sent (scenario F, prawdowid/image_input.py). A model read
+    its text, which was then checked like pasted text. The image itself is never stored."""
+
+    sha256: str
+    # The text the model read, personal data masked: what was checked. None when the image could
+    # not be read (the answer is then a notice); "" when it holds no text.
+    text: str | None = None
+    # A date shown in the image, as printed ("12 marca 2026", "3 godz."), when the model saw one.
+    visible_date: str | None = None
+    # From the file's EXIF metadata, when it has any: context only, never used for a verdict.
+    # Messengers usually strip it, so a missing value says nothing about the image.
+    taken_at: str | None = None
+    camera: str | None = None
+
+
 class SecurityEvent(BaseModel):
     """Instructions aimed at the model were found and ignored. Never carries their wording."""
 
     kind: Literal["prompt_injection"] = "prompt_injection"
-    # Where they were found: "input" (the user's text), "page" (the page a link points to) or
-    # "source" (a retrieved evidence page).
-    location: Literal["input", "page", "source"]
+    # Where they were found: "input" (the user's text), "page" (the page a link points to),
+    # "image" (text read from an image the user sent) or "source" (a retrieved evidence page).
+    location: Literal["input", "page", "image", "source"]
     # "patterns": the fixed pre-check in code; "model": a model's own flag (extraction or judge).
     detector: Literal["patterns", "model"]
 
@@ -157,6 +191,8 @@ class CheckResult(BaseModel):
     message: str | None = None
     # Set when the input was a link and the page was fetched.
     page: CheckedPage | None = None
+    # Set when the input had an image; its limitations are in `limitations`.
+    image: CheckedImage | None = None
     claims: list[ClaimResult] = []
     # Claims found but left out by the per-check cap. They have no verdict.
     unchecked_claims: list[str] = []

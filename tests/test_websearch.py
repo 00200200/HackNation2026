@@ -910,6 +910,38 @@ def test_markup_is_read_from_a_page_that_declares_its_encoding():
     assert websearch._claim_reviews("", REVIEW_PAGE) == []
 
 
+def test_a_redirect_to_another_document_does_not_inherit_the_hits_date(isolated):
+    routes = {
+        "www.gov.pl/p": httpx2.Response(302, headers={"location": "/q"}),
+        "www.gov.pl/q": html(UNDATED),
+    }
+    provider = provider_returning_with_dates(("https://www.gov.pl/p", date(2025, 1, 1)))
+    [doc] = run(provider, routes).documents
+    assert doc.url.endswith("/q") and doc.published_at is None
+
+
+def test_a_redirect_to_a_pdf_shows_the_pdfs_own_title():
+    text = "Raport z kontroli wydatkow na obrone cywilna w latach 2023-2025. " * 5
+    routes = {
+        "www.gov.pl/p": httpx2.Response(302, headers={"location": "/raport.pdf"}),
+        "www.gov.pl/raport.pdf": typed(
+            pdf(text, title="Raport NIK 2025"), "application/pdf"
+        ),
+    }
+    [doc] = run(provider_returning("https://www.gov.pl/p"), routes).documents
+    assert doc.title == "Raport NIK 2025"
+
+
+def test_a_redirected_pdf_without_a_title_is_still_read_under_its_file_name():
+    text = "Raport z kontroli wydatkow na obrone cywilna w latach 2023-2025. " * 5
+    routes = {
+        "www.gov.pl/p": httpx2.Response(302, headers={"location": "/raport.pdf"}),
+        "www.gov.pl/raport.pdf": typed(pdf(text), "application/pdf"),
+    }
+    [doc] = run(provider_returning("https://www.gov.pl/p"), routes).documents
+    assert doc.title == "raport.pdf" and doc.snippet_only is None
+
+
 def test_perplexity_without_a_key_is_search_unavailable():
     with pytest.raises(SearchUnavailable):
         websearch.perplexity_search("x", domains=["gov.pl"], limit=5)
