@@ -256,6 +256,8 @@ function download(name, type, text) {
 function exportButtons(check) {
   const json = el("button", { type: "button", className: "copy-btn secondary", textContent: "Pobierz wynik (JSON)" });
   json.addEventListener("click", () => download("faktczyfejk-wynik.json", "application/json", JSON.stringify(check, null, 2)));
+  // The API builds a bundle only from an ok answer with checked claims (prawdowid/export.py).
+  if (check.status !== "ok" || !(check.claims || []).length) return [json];
   const stix = el("button", { type: "button", className: "copy-btn secondary", textContent: "Pobierz STIX 2.1" });
   stix.addEventListener("click", async () => {
     const label = "Pobierz STIX 2.1";
