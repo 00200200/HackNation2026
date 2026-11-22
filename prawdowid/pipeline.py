@@ -1,12 +1,13 @@
 """Steps 2 to 5 for one claim, under the time budget of the whole check.
 
-Step 2 runs four lookups at once: 2a Google Fact Check (`factcheck.search_claims`), EUvsDisinfo
+Step 2 runs five lookups at once: 2a Google Fact Check (`factcheck.search_claims`), EUvsDisinfo
 known narratives (`euvsdisinfo.search_cases`, context that never decides alone), the www.gov.pl
 site search (`govpl.search_govpl`, the claim's gov.pl queries, else its first web query; off with
-PRAWDOWID_GOVPL=0) and 2b web search and fetch (`websearch.search_web`, one search per web query of
-the claim, www.gov.pl pages left to the gov.pl lookup). Step 2c (our own database,
-#19) is out of the pipeline for now (team decision). Any EUvsDisinfo source, whichever lookup
-found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
+PRAWDOWID_GOVPL=0), 2b web search and fetch (`websearch.search_web`, one search per web query of
+the claim, www.gov.pl pages left to the gov.pl lookup) and our evidence corpus
+(`corpus_bm25.search_evidence`: BM25 over `corpus/evidence.jsonl`, the claim and all its queries).
+Step 2c (our own database, #19) is out of the pipeline for now (team decision). Any EUvsDisinfo
+source, whichever lookup found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
 steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
 remains, the web is searched once more with a rewritten query and the claim is judged again.
 
@@ -14,9 +15,11 @@ A source that fails adds a limitation. The sources that can decide a verdict (Fa
 search) are the ones whose outage matters: when one of them failed and the evidence is not enough,
 when every source failed, or when the judge did not answer, the claim is not checked and the
 outage is the reason, never "brak wystarczających dowodów" (`ClaimCheck.outage`, which turns an
-all-outage answer into a technical error). A claim that runs out of time is not checked either,
-and keeps the limitations of the sources that had already failed. Every step's time goes to the
-log; the reranker and judge calls are priced like the extraction call.
+all-outage answer into a technical error). The corpus is a file on our own disk, so it never counts
+as a source that answered: when every outside source failed, corpus hits count only if they settle
+the claim, otherwise it is not checked. A claim that runs out of time is not checked either, and
+keeps the limitations of the sources that had already failed. Every step's time goes to the log;
+the reranker and judge calls are priced like the extraction call.
 
 Retrieved pages are screened for instructions in code (`_source_events`, the same patterns as the
 user's text), whatever the models do: an injection is logged even when rerank drops the page
@@ -32,7 +35,16 @@ from pydantic import BaseModel
 from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
-from prawdowid import euvsdisinfo, factcheck, faults, govpl, judge, rerank, websearch
+from prawdowid import (
+    corpus_bm25,
+    euvsdisinfo,
+    factcheck,
+    faults,
+    govpl,
+    judge,
+    rerank,
+    websearch,
+)
 from prawdowid.contract import ModelCall, SecurityEvent, Source, Verdict
 
 log = logging.getLogger("prawdowid")
@@ -45,6 +57,9 @@ CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 40)
 RETRY_MIN_S = float(os.getenv("PRAWDOWID_RETRY_MIN_S") or 18)
 # EUvsDisinfo only adds context: it may not hold up the claim for its own 15 s deadline.
 EUVSDISINFO_BUDGET_S = float(os.getenv("PRAWDOWID_EUVSDISINFO_BUDGET_S") or 5)
+# The API builds the corpus index at startup (about a second, more on a small server); a lookup
+# that finds it ready takes a millisecond, one that comes first builds it while the web lookups run.
+CORPUS_BUDGET_S = 5
 
 TIME_LIMIT = (
     "Nie sprawdzono: skończył się czas przeznaczony na sprawdzenie ({budget:g} s). "
@@ -162,7 +177,13 @@ async def check_claim(
     limits = _limits(found)
     outage = judgement.verdict is Verdict.NOT_CHECKED  # the judge did not answer
     down = _deciders_down(found, govpl_decides=bool(govpl_queries))
-    if len(limits) == len(found) and not candidates:  # every source failed
+    # The corpus is a file on our disk and says nothing about the outside sources: when all of
+    # them failed, it counts only if it settled the claim, else the claim is not checked.
+    outside = {name: lookup for name, lookup in found.items() if name != "corpus"}
+    every_source_failed = set(outside) <= set(limits) and not _candidates(outside)
+    if every_source_failed and (
+        not candidates or judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    ):
         outage = not cut
         reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
         judgement = _not_checked(reason)
@@ -186,7 +207,8 @@ async def _retrieve(
     steps: dict[str, int],
     found: dict,
 ) -> None:
-    """Steps 2a, EUvsDisinfo, gov.pl (when `gov` is set) and 2b at once, each answer stored in `found` as it arrives.
+    """Steps 2a, EUvsDisinfo, gov.pl (when `gov` is set), 2b and the corpus at once, each answer
+    stored in `found` as it arrives.
 
     TaskGroup: when the time limit cuts the claim, every lookup task still running is cancelled
     and awaited before this returns. Provider threads (`asyncio.to_thread`) cannot be cancelled:
@@ -204,25 +226,32 @@ async def _retrieve(
             for query in queries:
                 tg.create_task(web(query))
 
+    # The corpus gets every wording: the rankings of the claim and of each query are merged.
+    corpus_queries = list(dict.fromkeys([claim, *queries, *(gov or [])]))
     async with asyncio.TaskGroup() as tg:
         tg.create_task(keep("factcheck", _search_claims))
         tg.create_task(keep("euvsdisinfo", _search_cases))
         tg.create_task(_timed(steps, "web", all_web))
+        tg.create_task(keep("corpus", lambda _: _search_corpus(corpus_queries)))
         if gov is not None:
             tg.create_task(keep("govpl", lambda _: _search_govpl(gov)))
         # Step 2c (`cache.search_documents`, #19) plugs in here when it is back in the pipeline.
 
 
 def _candidates(found: dict) -> list[Source]:
+    webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
+    pages = [d.to_source(fragment=d.text) for w in webs for d in w.documents]
+    # A page fetched in this check beats its stored copy: rerank keeps the first source per URL.
+    live = {rerank.canonical_url(str(p.url)) for p in pages}
     sources = [
         h.source
-        for name in ("factcheck", "euvsdisinfo")
+        for name in ("factcheck", "euvsdisinfo", "corpus")
         if name in found
         for h in found[name].hits
+        if name != "corpus" or rerank.canonical_url(str(h.source.url)) not in live
     ]
-    webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
-    sources += [d.to_source(fragment=d.text) for w in webs for d in w.documents]
-    return [_context_only(s) for s in sources]
+    # The corpus comes before the web: past MAX_DOCUMENTS the web's tail is cut, not its hits.
+    return [_context_only(s) for s in [*sources, *pages]]
 
 
 def _source_events(
@@ -271,6 +300,7 @@ def _limits(found: dict) -> dict[str, str]:
         else None,
         "govpl": found["govpl"].limitation if "govpl" in found else None,
         "web": web,
+        "corpus": found["corpus"].limitation if "corpus" in found else None,
     }
     return {k: v for k, v in limits.items() if v}
 
@@ -334,6 +364,16 @@ async def _search_cases(claim: str) -> euvsdisinfo.EuvsdisinfoLookup:
     except Exception:  # TimeoutError of its own budget included
         log.exception("euvsdisinfo failed")
         return euvsdisinfo.EuvsdisinfoLookup(limitation=euvsdisinfo.LOOKUP_UNAVAILABLE)
+
+
+async def _search_corpus(queries: list[str]) -> corpus_bm25.EvidenceLookup:
+    try:
+        return await asyncio.wait_for(
+            corpus_bm25.search_evidence(queries), CORPUS_BUDGET_S
+        )
+    except Exception:  # TimeoutError of its own budget included
+        log.exception("corpus search failed")
+        return corpus_bm25.EvidenceLookup(limitation=corpus_bm25.CORPUS_UNAVAILABLE)
 
 
 async def _judge(

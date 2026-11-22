@@ -11,7 +11,7 @@ from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
 
-from prawdowid import judge, pipeline, rerank, verifier, websearch
+from prawdowid import corpus_bm25, judge, pipeline, rerank, verifier, websearch
 from prawdowid.cache import Document
 from prawdowid.contract import ClaimKind, Status, Verdict
 from prawdowid.verifier import ExtractedClaim, Extraction
@@ -515,3 +515,163 @@ def pipeline_check(queries, govpl_queries):
         )
 
     return asyncio.run(go())
+
+
+ODYSEUSZ = "Ministerstwo Spraw Zagranicznych (serwis Odyseusz)"
+
+
+def corpus_hit(url="https://odyseusz.gov.pl/api/v1/informacje/profile-panstw/IL"):
+    source = document(url).to_source(fragment=QUOTE)
+    return corpus_bm25.EvidenceHit(
+        source=source.model_copy(update={"publisher": ODYSEUSZ}), score=0.03
+    )
+
+
+def fake_corpus(monkeypatch, hits=(), limitation=None, error=None):
+    """The corpus lookup: notes the queries it gets, answers with `hits` and a limitation, or fails."""
+    seen = []
+
+    async def search_evidence(queries):
+        seen.append(list(queries))
+        if error:
+            raise error
+        return corpus_bm25.EvidenceLookup(hits=list(hits), limitation=limitation)
+
+    monkeypatch.setattr(corpus_bm25, "search_evidence", search_evidence)
+    return seen
+
+
+def test_corpus_hits_are_judged_when_every_outside_source_failed(monkeypatch, models):
+    fake_corpus(monkeypatch, [corpus_hit()])
+    fake_search(monkeypatch, found=lambda q: False)
+    result = check("Twierdzenie.", ["model 1"], 5)
+    assert result.judgement.verdict is Verdict.CONFIRMED
+    assert [s.publisher for s in result.judgement.sources] == [ODYSEUSZ]
+    assert isinstance(result.steps_ms["corpus"], int)
+    # The corpus does not hide that the outside sources failed.
+    assert websearch.SEARCH_UNAVAILABLE in result.judgement.limitations
+
+
+def test_the_corpus_gets_the_claim_and_every_query_once(monkeypatch, models):
+    seen = fake_corpus(monkeypatch)
+    fake_search(monkeypatch, found=lambda q: False)
+    pipeline_check(["web 1", "Twierdzenie.", "web 2"], ["RCB alert"])
+    fake_govpl(monkeypatch)
+    pipeline_check(["web 1"], ["RCB alert"])
+    assert seen == [
+        # gov.pl off: its queries went to the web, the claim is not repeated.
+        ["Twierdzenie.", "web 1", "web 2", "RCB alert"],
+        ["Twierdzenie.", "web 1", "RCB alert"],
+    ]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        {"error": OSError("disk gone")},
+        {"limitation": corpus_bm25.CORPUS_UNAVAILABLE},
+    ],
+)
+def test_a_failing_corpus_is_a_limitation_of_the_corpus_only(
+    monkeypatch, models, failure
+):
+    fake_corpus(monkeypatch, **failure)
+    fake_search(monkeypatch)
+    result = check("Twierdzenie.", ["model 1"], 30)
+    assert result.judgement.verdict is Verdict.CONFIRMED
+    assert corpus_bm25.CORPUS_UNAVAILABLE in result.judgement.limitations
+
+
+def test_a_slow_corpus_is_cut_by_its_own_budget(monkeypatch, models):
+    monkeypatch.setattr(pipeline, "CORPUS_BUDGET_S", 0.05)
+
+    async def slow(queries):
+        await asyncio.sleep(60)
+
+    monkeypatch.setattr(corpus_bm25, "search_evidence", slow)
+    fake_search(monkeypatch)
+    result = check("Twierdzenie.", ["model 1"], 30)
+    assert result.judgement.verdict is Verdict.CONFIRMED
+    assert corpus_bm25.CORPUS_UNAVAILABLE in result.judgement.limitations
+    assert result.steps_ms["corpus"] < 1000
+
+
+@pytest.mark.parametrize("limitation", [None, corpus_bm25.CORPUS_UNAVAILABLE])
+def test_a_corpus_without_hits_does_not_hide_that_every_outside_source_failed(
+    monkeypatch, models, limitation
+):
+    fake_corpus(monkeypatch, limitation=limitation)
+    fake_search(monkeypatch, found=lambda q: False)
+    result = check("Twierdzenie.", ["model 1"], 5)
+    assert result.judgement.verdict is Verdict.NOT_CHECKED
+    assert result.judgement.limitations[0] == pipeline.SOURCES_FAILED
+    assert (corpus_bm25.CORPUS_UNAVAILABLE in result.judgement.limitations) == bool(
+        limitation
+    )
+
+
+def test_corpus_hits_that_settle_nothing_do_not_hide_that_every_outside_source_failed(
+    monkeypatch,
+):
+    """An unrelated page the corpus returns must not turn an outage into "no evidence"."""
+    fake_corpus(monkeypatch, [corpus_hit()])
+    fake_search(monkeypatch, found=lambda q: False)
+    no_labels = judge.Labels(labels=[]).model_dump_json()
+    with (
+        rerank.agent.override(model=model(every_fragment)),
+        judge.agent.override(model=model(lambda _: no_labels, "claude-sonnet-5-5")),
+    ):
+        result = check("Twierdzenie.", ["model 1"], 5)
+    assert result.judgement.verdict is Verdict.NOT_CHECKED
+    assert result.judgement.limitations[0] == pipeline.SOURCES_FAILED
+    assert "judge" in result.steps_ms  # the corpus hit was judged, and settled nothing
+
+
+def test_a_web_page_that_settles_nothing_is_still_no_evidence(
+    monkeypatch, factcheck_answers
+):
+    """Only the corpus is exempt: pages the outside sources did find keep "brak dowodów" (Fact Check
+    answers, so #60's outage rule does not apply)."""
+    fake_corpus(monkeypatch)
+    fake_search(monkeypatch)
+    no_labels = judge.Labels(labels=[]).model_dump_json()
+    with (
+        rerank.agent.override(model=model(every_fragment)),
+        judge.agent.override(model=model(lambda _: no_labels, "claude-sonnet-5-5")),
+    ):
+        result = check("Twierdzenie.", ["model 1"], 5)
+    assert result.judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
+
+
+def test_corpus_sources_come_before_the_web_in_the_candidates():
+    found = {
+        "web": [websearch.WebSearch(documents=[document("https://www.gov.pl/a")])],
+        "corpus": corpus_bm25.EvidenceLookup(hits=[corpus_hit()]),
+    }
+    assert [str(s.url) for s in pipeline._candidates(found)] == [
+        str(corpus_hit().source.url),
+        "https://www.gov.pl/a",
+    ]
+
+
+def test_a_page_fetched_now_replaces_its_stored_copy_in_the_candidates():
+    # The same page, written another way: http, no www, no end slash.
+    stored = corpus_hit("https://www.gov.pl/a/")
+    found = {
+        "web": [websearch.WebSearch(documents=[document("http://gov.pl/a")])],
+        "corpus": corpus_bm25.EvidenceLookup(hits=[corpus_hit(), stored]),
+    }
+    candidates = pipeline._candidates(found)
+    assert [str(s.url) for s in candidates] == [
+        str(corpus_hit().source.url),
+        "http://gov.pl/a",
+    ]
+    assert (
+        candidates[-1].fragment == f"Wstęp. {QUOTE}"
+    )  # the page's text, not the stored one
+
+
+def test_an_euvsdisinfo_record_in_the_corpus_is_context_only():
+    hit = corpus_hit("https://euvsdisinfo.eu/report/x")
+    found = {"web": [], "corpus": corpus_bm25.EvidenceLookup(hits=[hit])}
+    assert [s.source_type for s in pipeline._candidates(found)] == ["disinfo_database"]

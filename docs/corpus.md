@@ -61,6 +61,47 @@ Demagog is not collected directly (team decision, 21.11.2026). Its ratings reach
 the live check only as ClaimReview records through the Google Fact Check Tools API, which needs a
 key (see below).
 
+## Use in a check
+
+Every check searches this corpus, in parallel with Fact Check, EUvsDisinfo, the www.gov.pl site
+search and web search (`prawdowid/corpus_bm25.py`, called from `prawdowid/pipeline.py`).
+
+- **Input:** the claim and each of its search queries.
+- **Index:** when the API starts it reads `corpus/evidence.jsonl` and indexes it in memory (a check
+  that comes before that has finished builds the index itself): 1,158 records become 6,942
+  passages of at most 800 characters (cut at line breaks), which takes 0.7 s on a laptop. A new
+  corpus file is used after the next start. BM25 comes from the `bm25s` library. There is no
+  database and no embedding model, so the lookup works the same on the server and on a laptop.
+- **Words:** lowercase, no diacritics ("Łódź" meets "lodz"), only the first five letters of a word
+  ("strajku" meets "strajków"), common Polish function words ignored. The title of a record counts
+  too, so the Izrael profile ranks above a page that mentions Izrael once. A passage matches only
+  through a word that is rare in the corpus (in at most 3.5% of the passages or titles), so a
+  question made of common words matches nothing.
+- **Output:** each query ranks the passages on its own and the rankings are merged by reciprocal
+  rank fusion. A check gets at most 5 documents with at most 2 passages each. Each one is a
+  `Source` with the record's `publisher`, `published_at` and `retrieved_at` (as `fetched_at`), and
+  its best passages as `fragment`, copied from the record word for word. A quote the judge takes
+  from it passes the same check as a quote from a web page. The source type `fact_checker` becomes
+  `fact_check`. A record with `rating` and `claim` reaches the judge as the rating line and the
+  reviewed-claim line, like a Fact Check hit.
+- **After that:** the hits are candidates like any other. Rerank and the judge decide whether they
+  matter for the claim, and an EUvsDisinfo record is context only. A page that web search or the
+  gov.pl search fetched in the same check replaces the stored copy of the same URL, so the answer
+  rests on the page as it is now (the retry pass keeps the stored copy). The lookup never sets a
+  verdict.
+- **Failure:** a missing or unreadable file, or no answer within 5 s, is a limitation shown with the
+  answer, never evidence. A line of the file that is no usable record (cut JSON, not UTF-8, a
+  required field missing or invalid) is skipped and logged, and the rest is served; a rating or
+  claim of the wrong type is ignored. When every outside source also failed, corpus hits count only if the judge
+  settles the claim on them; otherwise the claim is `nie sprawdzono`. A file on our own disk says
+  nothing about whether the outside sources were reachable, and an unrelated hit must not turn an
+  outage into "brak wystarczających dowodów".
+- **Cost:** about 0.6 ms per lookup once the index exists (median of 400 lookups, 1 ms at p95). The
+  time of each lookup is in the check log under `corpus`.
+
+The pgvector search (`prawdowid/corpus_search.py`, `make index`) is still in the code. Checks do not
+use it.
+
 ## Admission, update and exclusion
 
 The rules are in `corpus/catalog.yaml` under `rules`. In short:
@@ -178,3 +219,10 @@ out of date within the hour. Details and dates: `corpus/catalog.yaml`.
   first published in the Official Journal, without later amendments.
 - Odyseusz country records link to the JSON endpoint the portal uses, because the address of the
   rendered country page could not be confirmed without running the app.
+- The lookup matches words, not meaning. Forms that differ before the fifth letter do not meet
+  ("w Egipcie" against "Egipt"); the claim's other queries usually carry the base form. A rare
+  word can also match another word that starts with the same five letters, so a claim about a
+  topic the corpus does not cover can still return a few unrelated documents. Rerank and the judge
+  drop them.
+- 259 of the 1,158 records have no publication date because their page states none. A hit from
+  such a record shows no date; its retrieval date is in the record.

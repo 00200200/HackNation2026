@@ -39,8 +39,8 @@ technical error ("Nie mogę teraz sprawdzić ..."). A source that answered with 
 
 - **The model reads, the code decides.** Claude (through PydanticAI) splits the text into claims
   and labels quotes. The verdict comes from rules in `judge.decide()`.
-- **Sources per claim, in parallel:** Google Fact Check Tools (fact-checkers' ratings), EUvsDisinfo as context only, the www.gov.pl site search, and
-  Tavily web search restricted to allowlisted domains.
+- **Sources per claim, in parallel:** Google Fact Check Tools (fact-checkers' ratings), EUvsDisinfo as context only, the www.gov.pl site search,
+  Tavily web search restricted to allowlisted domains, and our evidence corpus (`corpus/evidence.jsonl`), which every check searches.
 - **Privacy:** PESEL, phone, e-mail, account and card numbers are masked before the model. Checks
   are kept for 30 days and can be deleted per session.
 - **Two channels, one API:** the web page and the Discord command `/sprawdz` call the same
@@ -188,11 +188,23 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   fact-checker's rating and the reviewed claim kept beside it, not in `fragment`: the rating is a
   signal, not a verdict. One retry on a network error or 5xx, 15 s deadline for the whole lookup. A missing key, 4xx (bad key, quota) or outage returns a `limitation`
   message and no hits. Called per claim from `prawdowid/pipeline.py` (#11).
+- `prawdowid/corpus_bm25.py`: `search_evidence(queries)`, the corpus lookup of every check, in step 2
+  next to Fact Check, EUvsDisinfo, gov.pl and web search. BM25 in memory over
+  `corpus/evidence.jsonl` (`bm25s`, numpy only): no database, no embedding model, no network. The
+  API builds the index at startup (0.7 s on a laptop, 1,158 records; a lookup that comes first
+  builds it); a lookup takes about a millisecond. Words are lowercased, stripped of diacritics and cut to five letters,
+  stopwords dropped. The claim and each of its queries are ranked on their own and merged by
+  reciprocal rank fusion: at most 5 documents, 2 passages of each. A hit is a `Source` with the
+  record's publisher, publication date and retrieval date, and a `fragment` that is a verbatim
+  part of the document, so the judge's quote check works as for any other source. A missing or
+  unreadable file returns a `limitation`; a line that is no record is skipped. When every outside source fails, corpus hits count only
+  if the judge settles the claim on them; otherwise the claim is `nie sprawdzono`. Try it:
+  `uv run python -m prawdowid.corpus_bm25 "czy MSZ odradza podróże do Izraela"`.
 - `prawdowid/corpus_search.py`: `search_corpus(query)`, hybrid search in the evidence corpus
   (pgvector nearest chunks and Postgres full-text, merged by reciprocal rank fusion, at most two
   chunks per document). Each hit is a `Source` whose `fragment` is a verbatim chunk of the stored
   document, plus the fact-checker's rating and reviewed claim for fact-checks. 10 s deadline; no
-  database or an error returns a `limitation`. Not wired into `verify()` yet.
+  database or an error returns a `limitation`. Checks do not call it, they use `corpus_bm25.py`.
   `prawdowid/index.py` builds the tables (`make index`), `prawdowid/embeddings.py` holds the
   local embedding model.
 - `prawdowid/app.py`: the API, input validation, rate limit, and the `technical_error` path.
