@@ -360,6 +360,7 @@ def verify_quotes(labels: list[Label], fragments: list[Fragment]) -> list[Eviden
                     for g in fragments
                     if g.doc_id == label.doc_id
                     and (c := _find_in(label.context_quote, g.source))
+                    and not _only_reviewed_claim(label.context_quote, g.source)
                 ),
                 None,
             )
@@ -596,24 +597,38 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         if _publisher(e) not in newest
         or (_rated(e) and _reviewed_on(e) == newest[_publisher(e)])
     ]
+    # A headline is listed for display, but it takes no side and shows no gap: only the words of a
+    # page's body decide, so a headline cannot make a publisher's body finding disappear.
+    body = [e for e in considered if not e.title_only]
     undecided = {
         _publisher(e)
-        for e in considered
+        for e in body
         if e.label.stance is Stance.GAP and e.label.own_conclusion
     }
     decisive = [e for e in considered if _publisher(e) not in undecided]
     sided = {
         e.label.doc_id
         for e in decisive
-        if e.label.stance in (Stance.SUPPORTS, Stance.REFUTES)
+        if not e.title_only and e.label.stance in (Stance.SUPPORTS, Stance.REFUTES)
     }
     evidence = [_scoped(e, sided) for e in evidence]
     decisive = [_scoped(e, sided) for e in decisive]
-    supports = [e for e in decisive if e.label.stance is Stance.SUPPORTS]
-    refutes = [e for e in decisive if e.label.stance is Stance.REFUTES]
+    supports = [
+        e for e in decisive if e.label.stance is Stance.SUPPORTS and not e.title_only
+    ]
+    refutes = [
+        e for e in decisive if e.label.stance is Stance.REFUTES and not e.title_only
+    ]
     both = _publishers(supports) & _publishers(refutes)
+    headlines = [
+        e
+        for e in decisive
+        if e.title_only
+        and e.label.own_conclusion
+        and e.label.stance in (Stance.SUPPORTS, Stance.REFUTES)
+    ]
     supports, refutes, limitations = _one_side_per_publisher(
-        supports, refutes, limitations
+        supports, refutes, limitations, headlines
     )
     # Only labels still counted: a publisher dropped above cannot decide "misleading" either.
     dropped = both - _publishers(supports + refutes)
@@ -630,7 +645,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     limitations = (
         limitations + _superseded(ratings, newest) + _source_limits(evidence, today)
     )
-    if gaps := [e for e in considered if e.label.stance is Stance.GAP]:
+    if gaps := [e for e in body if e.label.stance is Stance.GAP]:
         names = {e.source.publisher or str(e.source.url.host) for e in gaps}
         limitations.append(DATA_GAP.format(publishers=", ".join(sorted(names))))
     premises = [_premise(e) for e in evidence]
@@ -661,16 +676,15 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     # fact-checker's own conclusion only now and then); a side must be its own conclusion.
     checker_gap = [
         e
-        for e in considered
+        for e in body
         if e.source.source_type == FACT_CHECK and e.label.stance is Stance.GAP
     ]
     gap_decides = False
     if checker_gap:
-        # An undated finding counts as current: no source is known to come after it.
-        found_on = max(
-            (e.source.published_at for e in checker_gap if e.source.published_at),
-            default=None,
-        )
+        # An undated finding counts as current: no source is known to come after it, so one
+        # undated gap rules out the date override.
+        dates = [e.source.published_at for e in checker_gap]
+        found_on = None if None in dates else max(dates)
         side = _body_only(supports + refutes)
         if not rated and not any(
             (e.source.source_type == FACT_CHECK and e.label.own_conclusion)
@@ -890,10 +904,19 @@ def _other_claim(e: Evidence) -> bool:
     return e.review and not e.label.same_claim
 
 
-def _one_side_per_publisher(supports, refutes, limitations):
+def _one_side_per_publisher(supports, refutes, limitations, headlines=()):
     """A publisher on both sides keeps the side of its own conclusion (a fact-check that quotes the
     claim, then rates it false, refutes it). With no single conclusion it counts for neither side.
+    A headline's own conclusion is never counted or cited, but it vetoes the opposite body side of
+    its publisher when that side is not an own conclusion (the claim repeated before it is rated).
     """
+    for e in headlines:
+        refuting = e.label.stance is Stance.REFUTES
+        opposite = supports if refuting else refutes
+        body = [x for x in opposite if _publisher(x) == _publisher(e)]
+        if body and not any(x.label.own_conclusion for x in body):
+            rest = [x for x in opposite if _publisher(x) != _publisher(e)]
+            supports, refutes = (rest, refutes) if refuting else (supports, rest)
     for publisher in sorted(_publishers(supports) & _publishers(refutes)):
         mine = [
             any(e.label.own_conclusion for e in side if _publisher(e) == publisher)

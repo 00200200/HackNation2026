@@ -19,7 +19,8 @@ channels, and the delete button does not remove it.
 #113 in `integration/r4` changes the masking in two ways that let more through, and masks the corpus text when
 the corpus is built. A card number is left alone when it follows a product label (EAN, GTIN, UPC, SKU, "kod",
 "nr", "numer", "partii", "lot", "id"), sits in a URL, or is 13 digits with a valid EAN-13 check digit; a card
-word (karta, card, visa, mastercard, maestro) right in front of the number wins over such a label. So
+word (karta, card, visa, mastercard, maestro) right in front of the number wins over such a label, and one
+earlier in the same sentence wins over a generic label (not over EAN, GTIN, UPC or SKU). So
 `nr 4111 1111 1111 1111` goes to the model as typed, while `numer karty 4111 1111 1111 1111` and
 `karta nr 4111 1111 1111 1111` are masked. `main` masks all of them. The check log writes the question through
 the same function, so a number that stays reaches it unmasked and stays 30 days. The stdout logs call it too

@@ -23,8 +23,9 @@ import os
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
+from pathlib import PurePosixPath
 from typing import NamedTuple, Protocol
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit
 
 import httpx2
 import requests
@@ -402,9 +403,17 @@ async def _read(
     page = await _get_page(url, client)
     if not (entry := allowed(page.url)):
         raise Unread(f"{page.url} is not allowlisted", None)
+    redirected = canonical_url(url) != canonical_url(page.url)
+    if redirected:
+        # A redirect to another document: the hit's title and date describe the old one.
+        fallback_title, fallback_published = "", None
     text, title, sitename, published = await _extract(page)
     if _media_type(page) == link.PDF_TYPE:
         title = fallback_title.strip() or title
+        if (
+            redirected and not title
+        ):  # still readable: the file's name is a neutral title
+            title = unquote(PurePosixPath(urlsplit(page.url).path).name)
     else:
         title = title or fallback_title.strip()
     if not text or not title:
