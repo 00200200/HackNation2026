@@ -1,16 +1,18 @@
 """Screenshot or photo input (scenario F): check the upload, read its text, then verify that text.
 
-The image stays in memory for one check and is never stored; the check log keeps its SHA-256 and
-the masked read text (docs/privacy.md). One model call, on the extraction model's provider, reads
-the visible text and any visible date. That text goes through the same pattern screening as page
-text, so an instruction hidden in an image is a security event, and is masked before any other
-model call or log line; `verifier.verify_text` then checks it like pasted text. A read that fails
-is a notice, never a verdict.
+We never store the image: it stays in memory for one check, and the check log keeps its SHA-256
+and the masked read text (docs/privacy.md). One model call, on the extraction model's provider,
+reads the visible text and any visible date; the provider gets the file as uploaded, metadata
+included. That text goes through the same pattern screening as page text, so an instruction
+hidden in an image is a security event, and is masked before any other model call or log line;
+`verifier.verify_text` then checks it like pasted text. A read that fails is a notice, never a
+verdict.
 
 Pillow opens the upload: the type comes from the file's own signature, never from the client, and
 size, pixel count and EXIF come from the header, without decoding the pixels. EXIF (date taken,
-camera) is context only: it never reaches a model or a verdict. No OCR library: the model already
-in the stack reads images, so there is no new key or SDK.
+camera) is context only: no prompt and no verdict uses it (Anthropic says its models do not read
+image metadata either). No OCR library: the model already in the stack reads images, so there is
+no new key or SDK.
 """
 
 import asyncio
@@ -112,8 +114,14 @@ EXIF_MISSING = (
     "społecznościowe zwykle je usuwają, więc ich brak nic nie mówi o obrazie."
 )
 NOT_STORED = (
-    "Obrazu nie przechowujemy: przetwarzamy go tylko w pamięci. W dzienniku sprawdzeń zostaje "
-    "jego skrót SHA-256 i odczytany tekst z zamaskowanymi danymi osobowymi."
+    "Obraz wysyłamy w całości, z metadanymi pliku, do dostawcy modelu językowego, który odczytuje "
+    "z niego tekst. Sami go nie przechowujemy: w dzienniku sprawdzeń zostaje jego skrót SHA-256 "
+    "i odczytany tekst z zamaskowanymi danymi osobowymi."
+)
+# The visible date also goes to extraction as the post's date (model_input), to resolve "wczoraj".
+DATE_NOT_PROOF = (
+    "Data widoczna na obrazie nie dowodzi, kiedy tę treść naprawdę opublikowano: "
+    "łatwo ją zmienić."
 )
 UNREAD = [NOT_CHECKED, NOT_STORED]
 
@@ -270,12 +278,13 @@ def received(upload: Upload) -> CheckedImage:
     )
 
 
-def limitations(upload: Upload, cut: bool) -> list[str]:
-    """Shown with every image whose text was read."""
+def limitations(upload: Upload, cut: bool, dated: bool = False) -> list[str]:
+    """Shown with every image whose text was read; `dated` when the image shows a date."""
     exif = EXIF_FOUND if upload.taken_at or upload.camera else EXIF_MISSING
     return [
         READ_BY_MODEL,
         *([READ_CUT] if cut else []),
+        *([DATE_NOT_PROOF] if dated else []),
         NO_COPIES,
         NO_EDIT_CHECK,
         exif,
@@ -328,17 +337,20 @@ async def verify_image(upload: Upload, note: str = "") -> CheckResult:
             status=Status.CANNOT_CHECK,
             message=NO_TEXT,
             security_events=events,
-            limitations=limitations(upload, cut=False),
+            limitations=limitations(upload, cut=False, dated=bool(date)),
         )
     else:
         body, cut = model_input(masked, date, mask_personal_data(note))
         check = await verifier.verify_text(body, location="image", deadline=deadline)
-        # verify_text screened the joined text as "image"; the patterns of each part, with
-        # where they were found, replace its own, and the model's flags stay.
+        # verify_text screened the joined text as "image": the patterns of each part, with where
+        # they were found, replace that one event. The model's flags and the events of retrieved
+        # sources ("source", #61) stay.
         check.security_events = events + [
-            e for e in check.security_events if e.detector != "patterns"
+            e
+            for e in check.security_events
+            if (e.location, e.detector) != ("image", "patterns")
         ]
-        check.limitations += limitations(upload, cut)
+        check.limitations += limitations(upload, cut, dated=bool(date))
     check.image = image
     check.cost_usd += cost
     check.unpriced_requests += unpriced

@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 
+import aiohttp
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
@@ -235,6 +236,8 @@ def test_the_image_reaches_the_model_and_its_text_is_checked_masked():
         image_input.NO_EDIT_CHECK,
         image_input.NOT_STORED,
         image_input.EXIF_MISSING,
+        # A date read from the image proves nothing about when the post appeared (ADR 0001).
+        image_input.DATE_NOT_PROOF,
     ):
         assert limit in result.limitations
     assert result.steps_ms["image"] >= 0 and "extract" in result.steps_ms
@@ -260,6 +263,7 @@ def test_an_instruction_inside_the_image_is_a_security_event():
 def test_a_long_text_is_cut_like_a_page_and_says_so():
     result, seen = run_check(reading("Zdanie. " * 1000))
     assert image_input.READ_CUT in result.limitations
+    assert image_input.DATE_NOT_PROOF not in result.limitations  # no date on this image
     assert len(prompt_text(seen[0])) < image_input.MAX_TEXT_CHARS + 200
 
 
@@ -379,6 +383,26 @@ def test_bad_requests_get_a_polish_422(client, monkeypatch, body, kind):
     assert not calls
 
 
+def test_a_refused_image_counts_against_the_rate_limit(client, monkeypatch):
+    """The image is decoded after the limiter counted the request, so a client cannot send
+    refused images without limit (FastAPI validates the body before the limiter runs)."""
+    calls = answered(monkeypatch)
+    refused = {"image": b64(b"%PDF-1.7 nie obraz")}
+    codes = [client.post("/api/checks", json=refused).status_code for _ in range(11)]
+    assert codes == [422] * 10 + [429]
+    assert not calls
+
+
+def test_only_the_check_route_takes_an_image_sized_body():
+    conf = (ROOT / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    route = conf.split("location = /api/checks {", 1)[1].split("}", 1)[0]
+    assert "client_max_body_size 7m;" in route and "proxy_pass" in route
+    assert conf.count("client_max_body_size 7m;") == 1
+    assert "client_max_body_size 64k;" in conf.split("location", 1)[0]
+    # The largest accepted image, in base64, with a full text next to it fits the 7m.
+    assert image_input.MAX_BASE64_CHARS + 6 * 5000 < 7 * 1024 * 1024
+
+
 def test_same_words_with_another_image_are_another_check(client, monkeypatch):
     calls = answered(monkeypatch)
     for size in [(40, 20), (40, 20), (41, 20)]:
@@ -411,7 +435,7 @@ def test_request_schema_documents_the_image():
 
 
 class Attachment:
-    def __init__(self, data=b"", content_type="image/png", size=None, fail=False):
+    def __init__(self, data=b"", content_type="image/png", size=None, fail=None):
         self.data, self.content_type, self.fail = data, content_type, fail
         self.size = len(data) if size is None else size
         self.downloads = 0
@@ -419,7 +443,7 @@ class Attachment:
     async def read(self):
         self.downloads += 1
         if self.fail:
-            raise discord_bot.discord.HTTPException(FakeHttp(), "gone")
+            raise self.fail
         return self.data
 
 
@@ -433,7 +457,17 @@ class FakeHttp:
     [
         (Attachment(content_type="image/gif"), image_input.WRONG_TYPE),
         (Attachment(size=image_input.MAX_IMAGE_BYTES + 1), image_input.TOO_LARGE),
-        (Attachment(b"x", fail=True), discord_bot.ATTACHMENT_UNREAD),
+        (
+            Attachment(
+                b"x", fail=discord_bot.discord.HTTPException(FakeHttp(), "gone")
+            ),
+            discord_bot.ATTACHMENT_UNREAD,
+        ),
+        # discord.py lets aiohttp's network errors through Attachment.read().
+        (
+            Attachment(b"x", fail=aiohttp.ClientConnectionError("reset")),
+            discord_bot.ATTACHMENT_UNREAD,
+        ),
     ],
 )
 def test_a_discord_attachment_the_api_would_refuse_is_a_notice(attachment, message):

@@ -18,6 +18,7 @@ import re
 import sys
 import textwrap
 
+import aiohttp
 import discord
 import httpx2
 from discord import app_commands
@@ -374,7 +375,8 @@ async def read_attachment(
     try:
         async with asyncio.timeout(DOWNLOAD_TIMEOUT_S):
             data = await attachment.read()
-    except (discord.HTTPException, TimeoutError):
+    # discord.py fetches the file with aiohttp and lets its network errors through.
+    except (discord.HTTPException, aiohttp.ClientError, TimeoutError):
         log.exception("attachment download failed")
         return None, ATTACHMENT_UNREAD
     return base64.b64encode(data).decode(), None

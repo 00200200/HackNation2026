@@ -23,7 +23,6 @@ from pydantic import (
     ConfigDict,
     Field,
     HttpUrl,
-    PrivateAttr,
     TypeAdapter,
     ValidationError,
     field_validator,
@@ -84,7 +83,8 @@ CHECK_DESCRIPTION = (
     f"{image_input.MAX_IMAGE_SIDE} px a side. A model reads its text and any visible "
     "date, and that text is checked like `input`, which may then be empty and is "
     "checked along with it. The answer's `image` shows the text that was read and "
-    "`limitations` what an image check cannot tell. The image is not stored. Another "
+    "`limitations` what an image check cannot tell. The image goes to the model "
+    "provider as uploaded, metadata included; the API does not store it. Another "
     "type, a larger image or an image with a link returns `422`."
 )
 
@@ -143,15 +143,10 @@ class CheckRequest(BaseModel):
             "Optional screenshot or photo: base64 of a PNG, JPEG or WebP file (a data URL "
             f"is accepted too), at most {image_input.MAX_IMAGE_BYTES // (1024 * 1024)} MB, "
             f"{image_input.MAX_IMAGE_PIXELS // 1_000_000} million pixels and "
-            f"{image_input.MAX_IMAGE_SIDE} px a side. Never stored."
+            f"{image_input.MAX_IMAGE_SIDE} px a side. Sent to the model provider as "
+            "uploaded; the API never stores it."
         ),
     )
-    # The decoded image, set by validation; not part of the request schema.
-    _upload: image_input.Upload | None = PrivateAttr(None)
-
-    @property
-    def upload(self) -> image_input.Upload | None:
-        return self._upload
 
     @field_validator("input")
     @classmethod
@@ -176,15 +171,27 @@ class CheckRequest(BaseModel):
 
     @model_validator(mode="after")
     def _text_or_image(self) -> "CheckRequest":
+        # The image itself is decoded in create_check, after the rate limit counted the request.
         if not self.image:
             if not self.input:
                 raise PydanticCustomError("empty", "Wpisz tekst do sprawdzenia.")
-            return self
-        if is_link(self.input):
+        elif is_link(self.input):
             raise PydanticCustomError("link_and_image", image_input.LINK_AND_IMAGE)
-        # Type, size and pixel count come from the file itself; each failure is a Polish 422.
-        self._upload = image_input.decode(self.image)
         return self
+
+
+def decoded_image(body: CheckRequest) -> image_input.Upload | None:
+    """The request's image, checked. Called inside the endpoint, so a refused image counts
+    against the rate limit (validation runs before it); each failure is the same Polish 422 as a
+    validation error, without the input."""
+    if not body.image:
+        return None
+    try:
+        # Type, size and pixel count come from the file itself.
+        return image_input.decode(body.image)
+    except PydanticCustomError as exc:
+        error = {"type": exc.type, "loc": ("body", "image"), "msg": exc.message()}
+        raise RequestValidationError([error]) from None
 
 
 @asynccontextmanager
@@ -280,6 +287,7 @@ async def create_check(
         ),
     ] = None,
 ) -> CheckResult:
+    upload = decoded_image(body)
     started = time.perf_counter()
     started_at = datetime.now(UTC)
     session = x_session_id or ""
@@ -288,7 +296,6 @@ async def create_check(
     response.headers[SESSION_HEADER] = session
     # Why a check ended in a technical error, for the check log; None when verify returned.
     error = None
-    upload = body.upload
     key = cache_key(body.input, upload and upload.sha256)
     # Eval traffic only (scenario J): honoured with the secret eval token, ignored for everyone
     # else. A faulted run neither reads nor fills the result cache: a stored answer would hide

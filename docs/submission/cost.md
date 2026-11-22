@@ -73,9 +73,20 @@ Eval fixture F01, 900x454 px            33 * 17 = 561 tokens    -> USD 0.0011
 On top come the reading instructions (a few hundred input tokens, under USD 0.001) and the read
 text as output: a short post of 100 to 200 tokens costs USD 0.001 to 0.002, and a screenshot with
 the 5,000 characters we check, roughly 1,500 to 2,000 tokens, about USD 0.015 to 0.02 (UNCONFIRMED:
-Polish token counts for the current tokenizer are not measured here). So reading one image costs
-roughly USD 0.003 to 0.03, before the text check that follows. The answer's `cost_usd` includes
-the reading call, priced by genai-prices like the other calls, so the next eval run with the F cases
+Polish token counts for the current tokenizer are not measured here). A typical image therefore
+costs roughly USD 0.003 to 0.03 to read, before the text check that follows.
+
+That range is not a bound. The model transcribes everything it can see, and only the read call's
+`max_tokens` of 8,000 ([image_input.py](../../prawdowid/image_input.py)) caps its output; the
+5,000 characters apply later, to what we check. The most one read can cost at these prices:
+
+```text
+Input: largest image plus instructions   about 5,300 * 2 / 1,000,000  = USD 0.011
+Output: max_tokens                       8,000 * 10 / 1,000,000       = USD 0.080
+One image read, at most                                                 about USD 0.09
+```
+
+The answer's `cost_usd` includes the reading call, priced by genai-prices like the other calls, so the next eval run with the F cases
 will record it.
 
 ## Channel and infrastructure cost

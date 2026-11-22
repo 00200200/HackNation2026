@@ -29,7 +29,7 @@
     "/api/checks": {
       "post": {
         "summary": "Check a text or a link",
-        "description": "`input` is a message, a question or one `http`/`https` link. For a link the server fetches the page and checks its text. Allow up to 60 s for the answer.\n\nA check that could not run still returns `200`: `status` is then `technical_error`, `cannot_check` or `needs_clarification`, and `message` says why in Polish. An `input` that is empty, too long or not a valid link returns `422` with a Polish text in `detail[0].msg`; too many requests return `429`.\n\n`image` is an optional screenshot or photo in base64: a PNG, JPEG or WebP of at most 5 MB, 25 million pixels and 8000 px a side. A model reads its text and any visible date, and that text is checked like `input`, which may then be empty and is checked along with it. The answer's `image` shows the text that was read and `limitations` what an image check cannot tell. The image is not stored. Another type, a larger image or an image with a link returns `422`.",
+        "description": "`input` is a message, a question or one `http`/`https` link. For a link the server fetches the page and checks its text. Allow up to 60 s for the answer.\n\nA check that could not run still returns `200`: `status` is then `technical_error`, `cannot_check` or `needs_clarification`, and `message` says why in Polish. An `input` that is empty, too long or not a valid link returns `422` with a Polish text in `detail[0].msg`; too many requests return `429`.\n\n`image` is an optional screenshot or photo in base64: a PNG, JPEG or WebP of at most 5 MB, 25 million pixels and 8000 px a side. A model reads its text and any visible date, and that text is checked like `input`, which may then be empty and is checked along with it. The answer's `image` shows the text that was read and `limitations` what an image check cannot tell. The image goes to the model provider as uploaded, metadata included; the API does not store it. Another type, a larger image or an image with a link returns `422`.",
         "operationId": "create_check_api_checks_post",
         "parameters": [
           {
@@ -453,7 +453,7 @@
               }
             ],
             "title": "Image",
-            "description": "Optional screenshot or photo: base64 of a PNG, JPEG or WebP file (a data URL is accepted too), at most 5 MB, 25 million pixels and 8000 px a side. Never stored."
+            "description": "Optional screenshot or photo: base64 of a PNG, JPEG or WebP file (a data URL is accepted too), at most 5 MB, 25 million pixels and 8000 px a side. Sent to the model provider as uploaded; the API never stores it."
           }
         },
         "type": "object",

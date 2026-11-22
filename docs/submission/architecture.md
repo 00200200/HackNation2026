@@ -49,12 +49,14 @@ PNG, JPEG or WebP of at most 5 MB, 25 million pixels and 8000 px a side, with or
 web page takes it from a file button or a paste into the text box; Discord takes an attachment on
 `/sprawdz`; `/czat` does not take images. Pillow checks the type from the file's own signature and
 reads the size and EXIF (date taken, camera) from the header without decoding pixels; EXIF is shown
-as context and never reaches a model. One PydanticAI call with the image as `BinaryContent`, on the
+as context only, and no prompt or verdict uses it. The file itself goes to the model provider as
+uploaded, metadata included ([privacy.md](../privacy.md)): nothing is stripped or rotated. One PydanticAI call with the image as `BinaryContent`, on the
 extraction model unless `PRAWDOWID_IMAGE_MODEL` names another, reads the visible text verbatim and
 any visible date as printed (20 s, one attempt, inside the 40 s check budget). The read text goes
 through the same pattern screening as page text (an instruction in the image is a security event
 with `location: "image"`), is masked, and is then checked by the same `verify_text()`; the answer
-shows it under "Odczytany tekst" with the image limits in `limitations`. A failed read is a
+shows it under "Odczytany tekst" with the image limits in `limitations`, among them that a date
+shown on the image does not prove when the post appeared. A failed read is a
 `technical_error` or `cannot_check` notice that says the image was not read, never a verdict. There
 is no reverse image search and no check for edits or generated images. Sources:
 [image_input.py](../../prawdowid/image_input.py), [app.py](../../prawdowid/app.py),
@@ -104,13 +106,15 @@ separate, already-populated source and does not substitute for the incident base
 | Extract claims and queries | `anthropic:claude-sonnet-5-5` (was Opus until 22.11, #88) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
 | Rerank fragments | `anthropic:claude-haiku-5-5` | `PRAWDOWID_RERANK_MODEL`, [rerank.py](../../prawdowid/rerank.py) |
 | Label evidence | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_JUDGE_MODEL`, [judge.py](../../prawdowid/judge.py) |
+| Read an image's text (#80) | the extraction model | `PRAWDOWID_IMAGE_MODEL`, [image_input.py](../../prawdowid/image_input.py) |
 
 These are literal code defaults, not a statement about currently available public model names.
 Availability is UNCONFIRMED. The saved eval's JSON does not record its models; the results section
 below says what it ran on. All model calls use PydanticAI native structured output through the
 installed Anthropic provider. Another provider needs its PydanticAI extra (only
 `pydantic-ai-slim[anthropic,mcp]` is installed, [pyproject.toml](../../pyproject.toml)), its key
-and an image rebuild; none is demonstrated. The EU-processed option is described under "Deployment, storage and data processing" below. Compose forwards only `PRAWDOWID_MODEL`, so changing
+and an image rebuild; none is demonstrated. The EU-processed option is described under "Deployment, storage and data processing" below. Compose forwards `PRAWDOWID_MODEL` and the image reading
+settings (`PRAWDOWID_IMAGE_MODEL`, `PRAWDOWID_IMAGE_TIMEOUT_S`, `PRAWDOWID_IMAGE_THINKING`), so changing
 the rerank or judge model on the server also needs a line in [compose.yaml](../../compose.yaml).
 Web search (step 2b) is now **Tavily** (`tavily_search` in `prawdowid/websearch.py`), which
 replaced DuckDuckGo (#7, proposed as #20; wired as #45) because DuckDuckGo via `ddgs` returned no
@@ -123,7 +127,7 @@ in [sources.md](sources.md).
 [Frontend Dockerfile](../../frontend/Dockerfile) serves static files with nginx.
 [compose.yaml](../../compose.yaml) publishes only the frontend by default, with backend health
 checks. The Discord service and local PostgreSQL service are opt-in profiles. Compose now
-forwards the extraction model setting, Anthropic key, `GOOGLE_FACTCHECK_API_KEY`,
+forwards the extraction model setting, the image reading settings (#80), Anthropic key, `GOOGLE_FACTCHECK_API_KEY`,
 `TAVILY_API_KEY`, `EUVSDISINFO_API_KEY`, `PRAWDOWID_GOVPL`, `PRAWDOWID_INCIDENTS_PATH` and the
 eval-only `PRAWDOWID_EVAL_TOKEN` (unset on the public demo). The check log sits on the `checklog`
 volume (`/var/lib/prawdowid`, kept across deploys) and the source cache at a writable `/tmp` path,
@@ -145,8 +149,9 @@ checksums, not names or addresses) is masked by `privacy.mask_personal_data` bef
 reaches the extraction model and again in every log line, web search and own-store query (#17,
 #39, #82).
 Each check is kept 30 days as one masked record in the check log (`prawdowid/checklog.py`), which
-the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Input goes to
-Anthropic masked (a placeholder keeps the sentence shape so claims still split); masked claim text
+the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Text input goes to
+Anthropic masked (a placeholder keeps the sentence shape so claims still split); an image goes to
+Anthropic as uploaded, metadata included, and only the text read from it is masked (#80); masked claim text
 and queries go to Google, Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
 has no delete command, Docker stdout logs sit outside retention): [docs/privacy.md](../privacy.md).
 Who processes what, from each provider's own terms read on 22.11.2026. The full table, with
@@ -155,7 +160,7 @@ retention, training use and links to the terms, is in
 
 | Processor | Receives | Processes in |
 |---|---|---|
-| Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
+| Anthropic (extraction, rerank, judge, image reading) | Masked text; masked claims and public fragments; an uploaded image as is, metadata included (#80) | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
 | Tavily (web search) | Masked search queries: the model's queries, the claim sentence and one search of it restricted to fact-checker domains (#106) | United States. An EU endpoint exists for selected customers only |
 | Google Fact Check Tools | Masked claim text and up to 8 short queries per claim, each masked (#100) | Not stated for this API, UNCONFIRMED. Google's privacy policy says its servers are worldwide |
 | EUvsDisinfo MCP | Claim text, cut to 200 characters | Not stated, UNCONFIRMED |

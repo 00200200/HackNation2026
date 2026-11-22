@@ -12,6 +12,7 @@ dependencies = [
     "httpcore2>=2.16.2",
     "httpx2>=2.16.2",
     "pgvector>=0.5.1",
+    "pillow>=13.0.0",
     "protego>=0.7.0",
     "psycopg[binary]>=3.3.9",
     "pydantic-ai-slim[anthropic,mcp]>=2.71.0",

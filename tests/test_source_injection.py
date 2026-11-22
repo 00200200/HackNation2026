@@ -10,15 +10,18 @@ that exists in the product), which the live eval measures.
 """
 
 import asyncio
+import base64
+import io
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
+from PIL import Image
 from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
-from prawdowid import judge, link, pipeline, rerank, verifier, websearch
+from prawdowid import image_input, judge, link, pipeline, rerank, verifier, websearch
 from prawdowid.cache import Document
 from prawdowid.contract import ClaimKind, Verdict
 from prawdowid.verifier import ExtractedClaim, Extraction
@@ -196,6 +199,49 @@ def test_pattern_screen_logs_a_source_the_reranker_dropped(monkeypatch):
     assert [(e.location, e.detector) for e in result.security_events] == [
         ("source", "patterns")
     ]
+
+
+@pytest.mark.parametrize(
+    ("read", "events"),
+    [
+        (CLAIM, [("source", "patterns")]),
+        (
+            f"{CLAIM} {INJECTED_SENTENCE}",
+            [("image", "patterns"), ("source", "patterns")],
+        ),
+    ],
+)
+def test_an_image_check_keeps_the_event_of_an_injected_source(
+    monkeypatch, read, events
+):
+    """The same retrieved source as above, for a claim read from an image (#80): the image check
+    replaces only verify_text's pattern event for the joined text, never a source's event."""
+
+    async def search(query, **kwargs):
+        return websearch.WebSearch(
+            documents=[source(f"Polska w NATO. {INJECTED_SENTENCE}")]
+        )
+
+    def vision(messages, info):
+        return ModelResponse(
+            parts=[TextPart(image_input.Reading(text=read).model_dump_json())]
+        )
+
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 20), "white").save(buf, "PNG")
+    upload = image_input.decode(base64.b64encode(buf.getvalue()).decode())
+    monkeypatch.setattr(websearch, "search_web", search)
+    with (
+        image_input.agent.override(model=FunctionModel(vision)),
+        verifier.agent.override(model=reply(lambda _: extraction().model_dump_json())),
+        rerank.agent.override(model=reply(lambda _: '{"ids": []}')),
+        judge.agent.override(
+            model=reply(lambda _: judge.Labels(labels=[]).model_dump_json())
+        ),
+    ):
+        result = asyncio.run(image_input.verify_image(upload))
+
+    assert [(e.location, e.detector) for e in result.security_events] == events
 
 
 def test_a_source_without_an_instruction_logs_nothing(monkeypatch):
