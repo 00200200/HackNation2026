@@ -46,7 +46,10 @@ technical error ("Nie mogę teraz sprawdzić ..."). A source that answered with 
 - **Privacy:** PESEL, ID card, passport, phone, e-mail, account and card numbers are masked before the model. Checks
   are kept for 30 days and can be deleted per session.
 - **Two channels, one API:** the web page and the Discord command `/sprawdz` call the same
-  `POST /api/checks`.
+  `POST /api/checks`. The page `/czat` is a demo adapter of a messenger channel (WhatsApp, Messenger
+  and the like): it sends the same request with `X-Channel: demo` and shows the answer as the bot's
+  messages, so jurors can try a second channel without Discord. A real messenger would plug into the
+  same API.
 
 Measured results live in [`evals/results/HISTORY.md`](evals/results/HISTORY.md), one row per eval
 run with its commit and notes. Read [`docs/eval-notes.md`](docs/eval-notes.md) before quoting a number.
@@ -171,6 +174,9 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 ## Layout
 
 - `frontend/`: static `index.html`, `styles.css` and `app.js` (no build step) served by nginx.
+  `czat.html`, `czat.js` and `czat.css` are the messenger demo adapter at `/czat` (#116): the same
+  `POST /api/checks` with `X-Channel: demo`, the reply in the sections and order of the Discord bot's
+  message plus the web page's first words (`tests/test_czat.py` keeps the wording in step).
   nginx also proxies `/api/` and `/health` to the backend, caps request bodies at 64 KB and sets
   a strict Content-Security-Policy (wider only for `/api/docs`, which loads Swagger UI from
   cdn.jsdelivr.net).
@@ -240,7 +246,8 @@ interactive docs at https://faktczyfejk.pl/api/docs, and a copy in
 run `make openapi`; a test fails while the copy is stale. A channel sends `POST /api/checks`
 with `X-Channel: <its name>` (a name missing from `CHANNELS` in `prawdowid/app.py` is logged
 as `other`) and, to keep its checks together, the `X-Session-Id` it got back. The Discord bot
-([`prawdowid/discord_bot.py`](prawdowid/discord_bot.py)) sends `X-Channel: discord`; the web
+([`prawdowid/discord_bot.py`](prawdowid/discord_bot.py)) sends `X-Channel: discord`, the demo
+adapter at `/czat` ([`frontend/public/czat.js`](frontend/public/czat.js)) `X-Channel: demo`; the web
 page ([`frontend/public/app.js`](frontend/public/app.js)) sends the session id back.
 
 Input is trimmed and must be 1 to 5000 characters. A single token containing `://` counts as a

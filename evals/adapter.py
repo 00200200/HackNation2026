@@ -24,6 +24,8 @@ TIMEOUT_S = float(os.environ.get("PRAWDOWID_TIMEOUT_S", "90"))
 MIN_INTERVAL_S = float(os.environ.get("PRAWDOWID_MIN_INTERVAL_S", "6.5"))
 # Channels besides the web API, comma-separated. "discord" runs the bot's own API client
 # (prawdowid/discord_bot.ask_api), so only the Discord connection itself is not exercised.
+# "demo" sends the request of the /czat demo adapter (frontend/public/czat.js): the web
+# request with X-Channel: demo.
 CHANNELS = {
     "web",
     *filter(None, os.environ.get("PRAWDOWID_EXTRA_CHANNELS", "").split(",")),
