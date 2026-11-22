@@ -45,7 +45,7 @@ enabled are UNCONFIRMED. Earlier unsuccessful DuckDuckGo retrieval is recorded i
 | Web | nginx and static assets call the shared backend; [compose.yaml](../../compose.yaml), [frontend](../../frontend/public/app.js) | Hosting, bandwidth and domain cost UNCONFIRMED |
 | Discord | Persistent discord.py bot calls the same API; [discord_bot.py](../../prawdowid/discord_bot.py) | Platform fees, bot hosting and incremental channel cost UNCONFIRMED; no live channel cost measured |
 | Verification through either channel | Same API and models, no channel-specific model pipeline; [app.py](../../prawdowid/app.py) | Applying the measured rate to Discord is an assumption; no measured per-channel cost comparison |
-| Google / Tavily / EUvsDisinfo | [factcheck.py](../../prawdowid/factcheck.py), [websearch.py](../../prawdowid/websearch.py), [euvsdisinfo.py](../../prawdowid/euvsdisinfo.py) | Tavily: free tier 1,000 credits/month, 1 credit per basic search, observed ~4.9 credits/check on a separate live-key smoke run before this branch merged onto `main` (the "#7/#8 live proof" entry in [WORKLOG.md](../../WORKLOG.md), not the committed `latest.json`); well inside the free tier for a demo. Google/EUvsDisinfo charges and quotas UNCONFIRMED; none included as a measured `cost_usd` line item |
+| Google / Tavily / EUvsDisinfo | [factcheck.py](../../prawdowid/factcheck.py), [websearch.py](../../prawdowid/websearch.py), [euvsdisinfo.py](../../prawdowid/euvsdisinfo.py) | Tavily: free tier 1,000 credits/month, 1 credit per basic search, observed ~4.9 credits/check on a separate live-key smoke run on an older pipeline (3 queries, a retry in some checks; the current one makes about 4 searches per claim, not re-measured) (the "#7/#8 live proof" entry in [WORKLOG.md](../../WORKLOG.md), not the committed `latest.json`); well inside the free tier for a demo. Google/EUvsDisinfo charges and quotas UNCONFIRMED; none included as a measured `cost_usd` line item |
 | Own store | Local opt-in PostgreSQL, disabled in checks; [compose.yaml](../../compose.yaml), [pipeline.py](../../prawdowid/pipeline.py) | Database operation cost UNCONFIRMED; Supabase is not deployed |
 
 The app has no checkout or user billing path ([frontend](../../frontend/public/index.html),
@@ -66,16 +66,16 @@ from the linked code, not from a cost assumption:
 - API: `10/minute` per client IP, with HTTP `429` and a Polish notice; outer verification timeout
   `60` seconds ([app.py](../../prawdowid/app.py)). Discord users share the bot's API client IP;
   there is no per-Discord-user quota ([discord_bot.py](../../prawdowid/discord_bot.py)).
-- Extraction defaults to `5` claims and `3` queries per checkable claim
+- Extraction defaults to `3` checked claims and `2` model queries per checkable claim (plus the claim sentence and one fact-checker-only search, so about `4` Tavily searches per claim)
   ([verifier.py](../../prawdowid/verifier.py)). Claims and retrieval calls fan out with
   `asyncio.gather` and `asyncio.TaskGroup`; there is no global queue, concurrency semaphore or daily spend cap
   ([pipeline.py](../../prawdowid/pipeline.py)).
-- The nominal whole-check budget is `25` seconds, EUvsDisinfo's pipeline cap is `5` seconds and a
-  retry needs at least `18` seconds remaining ([pipeline.py](../../prawdowid/pipeline.py)).
-  Extraction has a `45` second provider request timeout, but shares the `25` second whole-check
+- The nominal whole-check budget is `40` seconds and EUvsDisinfo's pipeline cap is `5` seconds;
+  there is no retry pass ([pipeline.py](../../prawdowid/pipeline.py)).
+  Extraction has a `45` second provider request timeout, but shares the `40` second whole-check
   deadline with URL fetching and claim checks ([verifier.py](../../prawdowid/verifier.py)).
   These are configured cancellation limits, not a measured capacity guarantee.
-- Web queries are capped at `10` seconds including retry, page fetches at `8` seconds
+- Web queries are capped at `10` seconds including the provider's retry, page fetches at `8` seconds
   ([websearch.py](../../prawdowid/websearch.py)). Cancellation of a thread-backed search does not
   stop its underlying synchronous work immediately. Slow providers can consume resources after
   the request stops waiting.

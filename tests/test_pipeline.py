@@ -123,7 +123,7 @@ def test_five_claims_with_fast_sources_finish_under_budget(monkeypatch, models):
     elapsed = time.perf_counter() - started
     assert [c.verdict for c in result.claims] == [Verdict.CONFIRMED] * 5
     assert len(seen) == 25  # per claim: 3 queries, the claim, the fact-checkers' search
-    # 15 searches of 0.2 s each: parallel, not one after another.
+    # 25 searches of 0.2 s each: parallel, not one after another.
     assert elapsed < 1.5 < pipeline.CHECK_BUDGET_S
     assert {s.fragment for c in result.claims for s in c.sources} == {QUOTE}
     # Extraction (opus) plus rerank (haiku) and judge (sonnet) for each claim.
@@ -207,9 +207,32 @@ def test_one_fact_checker_search_per_claim(monkeypatch, models):
     assert "demagog.org.pl" in restricted[0][1]
 
 
-def test_insufficient_first_judgement_is_final_without_a_retry_step(
-    monkeypatch, models
+def test_insufficient_first_judgement_is_final_without_a_second_pass(
+    monkeypatch, models, factcheck_answers
 ):
+    claim = "Polska wstąpiła do UE w 2004 roku."
+    searches = fake_search(monkeypatch)
+    judged = []
+
+    def only_context(prompt: str) -> str:
+        judged.append(prompt)
+        labels = [
+            {"doc_id": d, "stance": "context", "quote": QUOTE}
+            for d in re.findall(r"doc_id: (\S+)", prompt)
+        ]
+        return judge.Labels(labels=labels).model_dump_json()
+
+    with judge.agent.override(model=model(only_context, "claude-sonnet-5-5")):
+        result = check(claim, ["model 1"], budget_s=30)
+    assert result.judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert len(judged) == 1
+    assert (
+        len(searches) == 3
+    )  # the query, the claim, the fact-checkers' search; no second pass
+    assert not [step for step in result.steps_ms if step.startswith("retry_")]
+
+
+def test_every_source_failing_is_not_checked_without_a_retry_step(monkeypatch, models):
     claim = "Polska wstąpiła do UE w 2004 roku."
     fake_search(monkeypatch, found=lambda q: False)
     result = check(claim, ["model 1"], budget_s=30)
@@ -221,6 +244,42 @@ def test_insufficient_first_judgement_is_final_without_a_retry_step(
         pipeline.euvsdisinfo.LOOKUP_UNAVAILABLE,
         websearch.SEARCH_UNAVAILABLE,
     ]
+
+
+def test_govpl_page_survives_the_rerank_cap_behind_many_web_pages():
+    def hit(cls, url, **kw):
+        return cls(source=document(url).to_source(), **kw)
+
+    found = {
+        "factcheck": pipeline.factcheck.FactCheckLookup(),
+        "euvsdisinfo": pipeline.euvsdisinfo.EuvsdisinfoLookup(
+            hits=[
+                hit(
+                    pipeline.euvsdisinfo.EuvsdisinfoHit,
+                    f"https://euvsdisinfo.eu/{i}",
+                    kind="article",
+                )
+                for i in range(5)
+            ]
+        ),
+        "corpus": corpus_bm25.EvidenceLookup(
+            hits=[
+                hit(corpus_bm25.EvidenceHit, f"https://corpus.example/{i}", score=1.0)
+                for i in range(5)
+            ]
+        ),
+        "web": [
+            websearch.WebSearch(
+                documents=[document(f"https://web.example/{n}/{i}") for i in range(5)]
+            )
+            for n in range(4)
+        ],
+        "govpl": websearch.WebSearch(
+            documents=[document("https://www.gov.pl/decisive")]
+        ),
+    }
+    ids = {f.doc_id for f in rerank.split_all(pipeline._candidates(found), None)}
+    assert rerank.canonical_url("https://www.gov.pl/decisive") in ids
 
 
 def test_linked_page_is_not_evidence_for_its_own_claims(monkeypatch, models):

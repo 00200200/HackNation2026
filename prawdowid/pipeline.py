@@ -11,8 +11,8 @@ Step 2c (our own database, #19) is out of the pipeline for now (team decision). 
 source, whichever lookup found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
 steps 4 and 5 (`judge.judge`, verdict from `decide()`). There is no second pass: the claim sentence
 itself is always one of the first web searches, and one more search of the claim is restricted to
-the fact-checkers' domains, all in parallel with the rest (a sequential retry never changed a
-verdict in 19 of 48 logged staging checks, #106).
+the fact-checkers' domains, all in parallel with the rest. The old sequential retry is gone (#106,
+WORKLOG).
 
 A source that fails adds a limitation. The sources that can decide a verdict (Fact Check, web
 search) are the ones whose outage matters: when one of them failed and the evidence is not enough,
@@ -224,8 +224,16 @@ async def _retrieve(
 
 
 def _candidates(found: dict) -> list[Source]:
-    webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
-    pages = [d.to_source(fragment=d.text) for w in webs for d in w.documents]
+    govpl = found.get("govpl", websearch.WebSearch()).documents
+    web = [d for w in found["web"] for d in w.documents]
+    # rerank keeps the first MAX_DOCUMENTS URLs, so the narrow lookups (gov.pl, the fact-checkers'
+    # reviews) come before the general web pages, whatever order the searches finished in.
+    ordered = [
+        *govpl,
+        *(d for d in web if d.source_type == "fact_check"),
+        *(d for d in web if d.source_type != "fact_check"),
+    ]
+    pages = [d.to_source(fragment=d.text) for d in ordered]
     # A page fetched in this check beats its stored copy: rerank keeps the first source per URL.
     live = {rerank.canonical_url(str(p.url)) for p in pages}
     sources = [
