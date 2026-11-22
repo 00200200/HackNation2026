@@ -44,6 +44,22 @@ The checked page is excluded as evidence for its own claims. Sources:
 [app.py](../../prawdowid/app.py), [link.py](../../prawdowid/link.py),
 [verifier.py](../../prawdowid/verifier.py), [rerank.py](../../prawdowid/rerank.py).
 
+A check can also carry a screenshot or photo (#80, scenario F): `image` in the request, base64 of a
+PNG, JPEG or WebP of at most 5 MB, 25 million pixels and 8000 px a side, with or without text. The
+web page takes it from a file button or a paste into the text box; Discord takes an attachment on
+`/sprawdz`; `/czat` does not take images. Pillow checks the type from the file's own signature and
+reads the size and EXIF (date taken, camera) from the header without decoding pixels; EXIF is shown
+as context and never reaches a model. One PydanticAI call with the image as `BinaryContent`, on the
+extraction model unless `PRAWDOWID_IMAGE_MODEL` names another, reads the visible text verbatim and
+any visible date as printed (20 s, one attempt, inside the 40 s check budget). The read text goes
+through the same pattern screening as page text (an instruction in the image is a security event
+with `location: "image"`), is masked, and is then checked by the same `verify_text()`; the answer
+shows it under "Odczytany tekst" with the image limits in `limitations`. A failed read is a
+`technical_error` or `cannot_check` notice that says the image was not read, never a verdict. There
+is no reverse image search and no check for edits or generated images. Sources:
+[image_input.py](../../prawdowid/image_input.py), [app.py](../../prawdowid/app.py),
+[discord_bot.py](../../prawdowid/discord_bot.py), [app.js](../../frontend/public/app.js).
+
 Extraction ranks self-contained claims, separates reported speech from its attribution, marks
 checkability and writes search queries. Claims run with `asyncio.gather`; retrieval within a claim
 uses `asyncio.TaskGroup`, cancelling and awaiting unfinished lookup tasks at the deadline.
@@ -169,13 +185,14 @@ It has not run on the live server yet; the server's `.env` needs the variable fi
 | Link fetch | 10 s, 3 redirects, `2 * 1024 * 1024` bytes | [link.py](../../prawdowid/link.py) |
 | Evidence fragments: size / candidates / retained | 800 characters / 60 / 12 | [rerank.py](../../prawdowid/rerank.py) |
 | Requests per client IP | 10/minute; the bot shares its IP across users | [app.py](../../prawdowid/app.py), [Discord client](../../prawdowid/discord_bot.py) |
+| Image (#80) | 5 MB, 25 million pixels, 8000 px a side; read call 20 s, one attempt, inside the check budget; read text checked up to 5000 characters | [image_input.py](../../prawdowid/image_input.py) |
 | Discord response cap | 5 messages of 2000 characters, with truncation notice | [discord_bot.py](../../prawdowid/discord_bot.py) |
 
 Extraction and URL fetching share the check deadline. A cut extraction returns a technical notice;
 unfinished claims return `not_checked`. A judge outage also maps to `not_checked`.
 Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
-There is no OCR or reverse image search. The moderator queue (#79, above) files cases only while
+There is no OCR library or reverse image search: a model reads an image's text (#80, above). The moderator queue (#79, above) files cases only while
 `PRAWDOWID_ADMIN_TOKEN` is set. The evidence corpus is built and
 searched in every check ([corpus.md](../corpus.md)); a live Discord run remains open in
 [WORKLOG](../../WORKLOG.md). Two URL cases (U01, U02) are in the saved full run; do not present

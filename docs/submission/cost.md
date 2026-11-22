@@ -50,6 +50,34 @@ The case mix is our test set, not a sample of real traffic. The JSON does not re
 per-provider retrieval outcomes, model overrides or MCP credentials. Costs with different claim
 counts, retries, different models or all providers succeeding are UNCONFIRMED.
 
+## Image checks (scenario F, #80)
+
+Not measured: no image check has run against the real model (no API key in this repository), and
+the saved eval runs predate image input. What follows is the provider's published pricing applied to
+image sizes, not a recorded `cost_usd`.
+
+An image check adds one model call before the usual text check. Anthropic bills an image as input
+tokens: `⌈width / 28⌉ × ⌈height / 28⌉` visual tokens, and models from Claude 4.7 on (Sonnet 5.5, the
+default image model, included) shrink an image to at most 2,576 px on the long edge and 4,784 visual
+tokens ([vision guide](https://platform.claude.com/docs/en/build-with-claude/vision), "Resolution
+and token cost", fetched 2026-11-22). Claude Sonnet 5.5 costs $2 per million input tokens and $10
+per million output tokens ([pricing](https://platform.claude.com/docs/en/about-claude/pricing),
+fetched 2026-11-22). For the image itself:
+
+```text
+Largest image (4,784 visual tokens)     4,784 * 2 / 1,000,000 = USD 0.0096
+Phone screenshot 1170x2532 px           42 * 91 = 3,822 tokens  -> USD 0.0076
+Eval fixture F01, 900x454 px            33 * 17 = 561 tokens    -> USD 0.0011
+```
+
+On top come the reading instructions (a few hundred input tokens, under USD 0.001) and the read
+text as output: a short post of 100 to 200 tokens costs USD 0.001 to 0.002, and a screenshot with
+the 5,000 characters we check, roughly 1,500 to 2,000 tokens, about USD 0.015 to 0.02 (UNCONFIRMED:
+Polish token counts for the current tokenizer are not measured here). So reading one image costs
+roughly USD 0.003 to 0.03, before the text check that follows. The answer's `cost_usd` includes
+the reading call, priced by genai-prices like the other calls, so the next eval run with the F cases
+will record it.
+
 ## Channel and infrastructure cost
 
 | Component | Confirmed implementation | Cost status |

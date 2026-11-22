@@ -1,12 +1,14 @@
 """Calls the product under test and maps its answer to the eval's internal shape.
 
-Product API: POST /api/checks with {"input": "..."}, returns CheckResult (prawdowid/contract.py).
+Product API: POST /api/checks with {"input": "..."} (and "image", base64, for scenario F), returns
+CheckResult (prawdowid/contract.py).
 Notes on the contract and its gaps: .claude/skills/prawdowid-eval/SKILL.md.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import threading
@@ -14,12 +16,14 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 import httpx2
 
 from prawdowid.discord_bot import ask_api
 from prawdowid.faults import APPLIED_HEADER
 
+ROOT = Path(__file__).resolve().parent.parent
 TIMEOUT_S = float(os.environ.get("PRAWDOWID_TIMEOUT_S", "90"))
 # The API allows 10 requests per minute per client; stay under it.
 MIN_INTERVAL_S = float(os.environ.get("PRAWDOWID_MIN_INTERVAL_S", "6.5"))
@@ -47,6 +51,8 @@ PASSTHROUGH = (
     "moderator_case",
     "incident_matches",
     "page",
+    # Scenario F: the text read from the image, kept for a reader of the results (not scored).
+    "image",
 )
 
 
@@ -112,6 +118,12 @@ def to_eval_shape(raw: dict) -> dict:
     return shaped
 
 
+def image_data(payload: dict) -> str | None:
+    """Scenario F: the case's image file (a path from the repository root) as base64."""
+    path = payload.get("image")
+    return base64.b64encode((ROOT / path).read_bytes()).decode() if path else None
+
+
 def fault_headers(payload: dict) -> dict:
     """Headers that make the product simulate `payload["simulate"]` (scenario J), none without it.
 
@@ -170,14 +182,15 @@ def ask(payload: dict, channel: str) -> dict:
             "PRAWDOWID_URL is not set, e.g. http://127.0.0.1:8000 (make dev)"
         )
     text = payload.get("text") or payload.get("url", "")
+    image = image_data(payload)
     faults = fault_headers(payload)
     if faults:
         require_private_transport(base)
     if channel == "discord":
-        raw, applied = asyncio.run(_ask_discord(base, text, faults))
+        raw, applied = asyncio.run(_ask_discord(base, text, faults, image))
         confirm_fault(payload, applied)
         return to_eval_shape(raw)
-    body = json.dumps({"input": text}).encode()
+    body = json.dumps({"input": text, **({"image": image} if image else {})}).encode()
     request = urllib.request.Request(
         f"{base.rstrip('/')}/api/checks",
         data=body,
@@ -207,7 +220,9 @@ def ask(payload: dict, channel: str) -> dict:
     return shaped
 
 
-async def _ask_discord(base: str, text: str, headers: dict) -> tuple[dict, str | None]:
+async def _ask_discord(
+    base: str, text: str, headers: dict, image: str | None = None
+) -> tuple[dict, str | None]:
     """The bot's answer and the fault echo of the response behind it."""
     applied: list[str | None] = []
 
@@ -220,5 +235,5 @@ async def _ask_discord(base: str, text: str, headers: dict) -> tuple[dict, str |
         headers=headers,
         event_hooks={"response": [note_echo]},
     ) as client:
-        check = await ask_api(text, client)
+        check = await ask_api(text, client, image=image)
     return check.model_dump(mode="json"), next(iter(applied), None)

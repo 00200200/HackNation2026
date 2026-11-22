@@ -46,6 +46,13 @@ sprawdzić ..."). A source that answered with nothing is no outage.
   Tavily web search restricted to allowlisted domains, and our evidence corpus (`corpus/evidence.jsonl`), which every check searches.
 - **Privacy:** PESEL, ID card, passport, phone, e-mail, account and card numbers are masked before the model. Checks
   are kept for 30 days and can be deleted per session.
+- **Screenshots and photos (#80):** the web page (a button, or a paste into the box) and `/sprawdz` with an
+  attached image take a PNG, JPEG or WebP up to 5 MB. One model call reads its text and any visible date;
+  the answer shows the read text under "Odczytany tekst" and checks it like pasted text. It also says what
+  an image check cannot tell: the text was read by a model, there is no search for earlier copies and no
+  check for edits, and the image is not stored (the check log keeps its SHA-256 and the masked text). A
+  date and camera from EXIF are shown as context only. `/czat` does not take images. Cost per image:
+  [cost.md](docs/submission/cost.md#image-checks-scenario-f-80).
 - **Two channels, one API:** the web page and the Discord command `/sprawdz` call the same
   `POST /api/checks`. The page `/czat` is a demo adapter of a messenger channel (WhatsApp, Messenger
   and the like): it sends the same request with `X-Channel: demo` and shows the answer as the bot's

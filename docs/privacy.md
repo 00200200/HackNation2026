@@ -70,6 +70,7 @@ Where masking runs:
 | Call site | Masked? | Why |
 |---|---|---|
 | Text sent to Claude for claim extraction (`verifier.verify_text`), pasted text and the text of a linked page | yes | A placeholder keeps the sentence, so claims still split. A claim about the personal data itself (for example "this account belongs to the charity") can no longer be checked from the number, which is the point. The claim and source sentence shown to the user carry the placeholder. |
+| An image sent with a check (`prawdowid/image_input.py`, #80) | the image: no; its text: yes, once read | Nothing can be masked before it is read, so the image goes to Anthropic as uploaded, with any metadata the file holds (a photo's EXIF can include the GPS position). The text the model reads is screened for instructions, then masked before the extraction model, the answer, the check log and any log line. Names in it stay, as in pasted text. |
 | Everything after extraction (`prawdowid/pipeline.py`, #11): web search, Google Fact Check, EUvsDisinfo, rerank, judge | yes, by construction | These steps take the claims and queries the model wrote from the masked text. Web search queries (`websearch.search_web`), Fact Check keys (`factcheck.keys_for`) and database queries (`cache.build_tsquery`) are masked again. |
 | Check log record (`checklog.record`) | yes | The question, the claims, the unchecked claims and the source URLs are masked again when the record is written, so a call site that forgets to mask cannot leak into the log. |
 | Evidence corpus (`corpus/evidence.jsonl`, `prawdowid/corpus_bm25.py`) | yes, at build time | `corpus.sources.base.make_doc` masks title, text, claim and rating (`corpus.schema.mask_personal`) before a record exists, and `make corpus-check` fails on anything `mask_personal_data` would still change. Public switchboard numbers are masked too. Git history keeps the pre-22.11 record with a named person's mobile number (#112/#113: history decision open). |
@@ -95,6 +96,14 @@ records of one session as stored. A check cut by the API's 60 s limit (the pipel
 normally ends it first), or one where verify raised, keeps its total latency, `error`, the notice
 and the pattern-only screening: the steps and model calls it had made are lost with the cancelled
 task.
+
+An image check (#80) stores no image: the file stays in the API's memory for the length of the
+check. The record adds `image` with the image's SHA-256 and the text read from it, masked (`text` is
+null when the image could not be read). The date taken and the camera from EXIF are shown in the
+answer and stored nowhere; nothing else from EXIF is read. The API's result cache (in memory, 30
+minutes, see `RESULT_CACHE_TTL_S` in `prawdowid/app.py`) keys an image check by the text and the
+image's SHA-256 and keeps its answer, read text included, like any other answer. A moderator case
+for an image sent without text and without claims keeps the masked read text as its question.
 
 ## Moderator cases
 
@@ -187,6 +196,7 @@ call with the id from the log.
 | Service | What it receives | When |
 |---|---|---|
 | Anthropic API (Claude) | Masked text to check; claims and evidence fragments (rerank, judge) | Every check. |
+| Anthropic API (Claude), image reading (#80) | The image as uploaded, before any masking, since nothing can be masked before it is read; the file's metadata goes with it | Image checks only. The model is `PRAWDOWID_IMAGE_MODEL`, by default the extraction model. |
 | Google Fact Check Tools API | Short keys for each claim: the claim, the names in it, quoted spans of the claim or its source sentence and its search queries, all from the masked text and masked again (`factcheck.keys_for`) | Every checkable claim, when `GOOGLE_FACTCHECK_API_KEY` is set. |
 | Tavily (`/search`, `tavily-python`) | Masked search queries | Every checkable claim, when `TAVILY_API_KEY` is set, and the corpus builder. |
 | EUvsDisinfo MCP server (`mcp.euvsd.info`) | Claim text | Every checkable claim, when `EUVSDISINFO_API_KEY` is set. |
@@ -196,3 +206,14 @@ call with the id from the log.
 
 The region where each provider processes the data is UNCONFIRMED: we have not checked their data
 residency terms for this demo.
+
+Images sent to Anthropic (#80). Anthropic's vision guide says Claude does not parse or receive image
+metadata and that uploaded images cannot be deleted, and points to its retention page
+([vision](https://platform.claude.com/docs/en/build-with-claude/vision), FAQ, fetched 2026-11-22).
+That page says conversation content (prompts and outputs; an image is part of the prompt) is not
+retained by default, except for the Covered Models (Fable and Mythos), which keep it 30 days; flagged content may
+be kept up to 2 years; retained data is not used for training without express permission
+([API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention),
+fetched 2026-11-22). The default image model, Claude Sonnet 5.5, is not a Covered Model. Which
+retention arrangement our Anthropic account has is UNCONFIRMED: the account settings are not visible
+from this repository.

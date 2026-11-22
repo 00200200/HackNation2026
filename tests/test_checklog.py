@@ -26,6 +26,7 @@ FIELDS = {
     "error",
     "message",
     "page",
+    "image",
     "steps_ms",
     "model_calls",
     "cost_usd",

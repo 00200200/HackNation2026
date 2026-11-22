@@ -119,6 +119,16 @@ a { color: var(--red-deep); }
 .chip:hover { border-color: var(--red); color: var(--red-deep); }
 .chip[aria-disabled="true"] { opacity: .6; cursor: progress; }
 
+/* Image input (scenario F): the button under the box, the preview under it; neutral, never a verdict colour */
+.attach { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; margin: .8rem 0 0; }
+.attach-btn { display: inline-flex; align-items: center; gap: .45rem; }
+.attach-icon { width: 1.25rem; height: 1.25rem; flex: none; }
+.attach-note { font-size: .92rem; color: var(--muted); }
+.preview { display: flex; align-items: center; gap: .9rem; margin: .8rem 0 0; font-size: .92rem; }
+.preview[hidden] { display: none; }
+.preview img { width: 5rem; height: 5rem; flex: none; object-fit: cover; border-radius: .6rem; border: 1px solid var(--line); background: var(--soft); }
+.preview figcaption { min-width: 0; overflow-wrap: anywhere; }
+
 .pane-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
 .pane-title { margin: 0; font-size: 1.1rem; font-weight: 800; letter-spacing: -.01em; }
 .pane-pill { font-size: .8rem; font-weight: 700; padding: .2rem .65rem; border-radius: 999px; background: #fff;
@@ -204,6 +214,11 @@ body.checked .results { flex: 1 0 auto; }
 .assessment p:last-child { margin-bottom: 0; }
 .assessment b { color: var(--navy); font-weight: 700; }
 .premises { margin: 0; padding-left: 1.2rem; color: var(--muted); font-size: .95rem; }
+
+/* Text read from an image: what was checked, not a source, so a grey rule instead of the red one */
+.image-read { padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+.read-text { margin: 0 0 .6rem; padding: .75rem 1rem; border-left: 3px solid #a59c9d; border-radius: 0 .6rem .6rem 0;
+  background: var(--soft); white-space: pre-line; }
 
 .unknown { margin: 1rem 0 0; background: var(--pink-bg); color: var(--dark-red); border: 1px dashed #efb3bf; border-radius: .9rem; padding: .9rem 1rem; }
 .unknown-title { margin: 0; font-size: 1rem; font-weight: 800; }
