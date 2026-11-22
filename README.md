@@ -42,6 +42,7 @@ sprawdzić ..."). A source that answered with nothing is no outage.
 
 - **The model reads, the code decides.** Claude (through PydanticAI) splits the text into claims
   and labels quotes. The verdict comes from rules in `judge.decide()`.
+- **Evidence chain:** each source says whether it confirms the claim, contradicts it or adds context (`stance`). The side comes only from a judge label whose quote was found verbatim. The web page, `/czat` and Discord group the quotes under "Potwierdza", "Przeczy" and "Uzupełnia kontekst", put both sides of a conflict next to each other on a wide screen, and list what the rules did not count under "Nie wpływa na ocenę".
 - **Sources per claim, in parallel:** Google Fact Check Tools (fact-checkers' ratings), EUvsDisinfo as context only, the www.gov.pl site search,
   Tavily web search restricted to allowlisted domains, and our evidence corpus (`corpus/evidence.jsonl`), which every check searches.
 - **Privacy:** PESEL, ID card, passport, phone, e-mail, account and card numbers are masked before the model. Checks

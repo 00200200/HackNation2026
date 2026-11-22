@@ -13,6 +13,7 @@ from pydantic_ai.usage import RequestUsage
 
 from prawdowid import (
     corpus_bm25,
+    discord_bot,
     factcheck,
     judge,
     pipeline,
@@ -946,3 +947,51 @@ def test_a_rating_on_a_review_page_decides_without_a_fact_check_hit(monkeypatch)
     assert claim.verdict is Verdict.MISLEADING
     [source] = claim.sources
     assert (source.rating, str(source.url)) == ("Manipulacja", REVIEW_PAGE)
+
+
+def test_sources_on_both_sides_reach_the_answer_and_the_discord_reply(
+    monkeypatch, factcheck_answers
+):
+    """#78, scenario C: both sides of a conflict keep their stance from the judge through
+    `verify()` to the JSON every channel reads and to the bot's groups."""
+    pages = {
+        "https://www.gov.pl/web/mf/wypieki": ("MF", "Podatek od wypieków obowiązuje."),
+        "https://ec.europa.eu/taxation/wypieki": (
+            "KE",
+            "UE nie nakłada podatku od wypieków.",
+        ),
+    }
+    sides = {"MF": "supports", "KE": "refutes"}
+
+    async def search(query, **kwargs):
+        documents = [
+            document(url).model_copy(update={"publisher": who, "text": text})
+            for url, (who, text) in pages.items()
+        ]
+        return websearch.WebSearch(documents=documents)
+
+    def labels(prompt):
+        found = []
+        for doc_id in dict.fromkeys(re.findall(r"doc_id: (\S+)", prompt)):
+            for url, (who, text) in pages.items():
+                if rerank.canonical_url(doc_id) == rerank.canonical_url(url):
+                    found.append(
+                        {"doc_id": doc_id, "stance": sides[who], "quote": text}
+                    )
+        return judge.Labels(labels=found).model_dump_json()
+
+    monkeypatch.setattr(websearch, "search_web", search)
+    with (
+        rerank.agent.override(model=model(every_fragment)),
+        judge.agent.override(model=model(labels, "claude-sonnet-5-5")),
+    ):
+        result = verify("tekst", claims(1))
+    [claim] = result.model_dump(mode="json")["claims"]
+    assert claim["verdict"] == "insufficient_evidence"
+    assert {s["publisher"]: s["stance"] for s in claim["sources"]} == {
+        "MF": "potwierdza",
+        "KE": "przeczy",
+    }
+    listed = discord_bot.render(result).split("**Źródła:**", 1)[1]
+    assert listed.index("__Potwierdza__") < listed.index(", MF, ")
+    assert listed.index(", MF, ") < listed.index("__Przeczy__") < listed.index(", KE, ")

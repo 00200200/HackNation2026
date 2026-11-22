@@ -12,7 +12,8 @@ fact-checking source, and whether a source shows, in its own verified words, tha
 material comes from another context. A source that only says the data cannot settle the claim is a
 limitation, never a verdict. The domain, author or popularity never decide on their own: every
 counted source needs a verified quote with a stance. Strength, premises and limitations come from
-the same facts.
+the same facts, and so does each source's side in the answer (`Source.stance`, the evidence chain):
+the side its counted label stands on, or none when the rules set the label aside.
 
 A fact-checker's ClaimReview record (from Google Fact Check, the corpus or the review page's own
 markup) counts only for the claim it reviews, which the model reports as `same_claim`. Its rating,
@@ -36,7 +37,7 @@ from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
 from prawdowid import justification
-from prawdowid.contract import SecurityEvent, Source, Verdict
+from prawdowid.contract import SecurityEvent, Source, SourceStance, Verdict
 from prawdowid.factcheck import CLAIM_PREFIX, RATING_PREFIX
 from prawdowid.factcheck import SOURCE_TYPE as FACT_CHECK
 from prawdowid.rerank import (
@@ -200,6 +201,14 @@ RATED_STANCE = {
     Verdict.CONFIRMED: Stance.SUPPORTS,
     Verdict.MISLEADING: Stance.CONTEXT,
     Verdict.INSUFFICIENT_EVIDENCE: Stance.GAP,
+}
+# The side a counted label puts its source on in the answer (`Source.stance`, #78). A rating comes
+# here already mapped by `RATED_STANCE`; a data gap takes no side, so it adds context.
+SIDES = {
+    Stance.SUPPORTS: SourceStance.SUPPORTS,
+    Stance.REFUTES: SourceStance.REFUTES,
+    Stance.CONTEXT: SourceStance.CONTEXT,
+    Stance.GAP: SourceStance.CONTEXT,
 }
 
 
@@ -585,6 +594,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         names = {e.source.publisher or str(e.source.url.host) for e in gaps}
         limitations.append(DATA_GAP.format(publishers=", ".join(sorted(names))))
     premises = [_premise(e) for e in evidence]
+    evidence = _placed(evidence, counted + gaps)
 
     if _conflicting(supports, refutes) and _conflicting(refutes, supports):
         return _judgement(
@@ -897,15 +907,41 @@ def _judgement(
     )
 
 
+def _placed(evidence: list[Evidence], counted: list[Evidence]) -> list[Evidence]:
+    """Each source with the side its verified label counted for in `decide` (`Source.stance`).
+    None for a label the rules set aside: a headline alone, a fact-checker's older rating or its
+    other text next to its rating, a publisher whose own conclusion is a data gap or that says
+    both. `counted` holds copies of the same labels, so it is compared by value."""
+    return [
+        e.model_copy(
+            update={
+                "source": e.source.model_copy(
+                    update={
+                        "stance": SIDES[e.label.stance]
+                        if e in counted and not e.title_only
+                        else None
+                    }
+                )
+            }
+        )
+        for e in evidence
+    ]
+
+
 def _one_per_document(evidence: list[Evidence]) -> list[Source]:
     """One source per document and stance: several labels on one page list its URL once. The one
-    carrying a fact-checker's rating wins: it is what `decide` may have decided on."""
+    carrying a fact-checker's rating wins: it is what `decide` may have decided on. Next, one that
+    `decide` counted wins over one it set aside, so the page keeps its side."""
     seen = {}
     for e in evidence:
         key = (e.label.doc_id, e.label.stance)
-        if key not in seen or (e.source.rating and not seen[key].rating):
+        if key not in seen or _weight(e.source) > _weight(seen[key]):
             seen[key] = e.source
     return list(seen.values())
+
+
+def _weight(source: Source) -> tuple[bool, bool]:
+    return bool(source.rating), source.stance is not None
 
 
 def _cited(evidence: list[Evidence], stance: str):

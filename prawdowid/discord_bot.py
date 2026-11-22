@@ -31,6 +31,7 @@ from prawdowid.contract import (
     IncidentMatch,
     MatchKind,
     Source,
+    SourceStance,
     Status,
     Verdict,
 )
@@ -112,6 +113,33 @@ def _source(s: Source, url_limit: int | None) -> list[str]:
     return lines
 
 
+# The evidence chain (#78): sources grouped by the side their verified quote stands on
+# (`Source.stance`), in the words and order of the web form and /czat. A source the verdict rules
+# set aside has no stance; an answer with no stance at all keeps one plain list.
+SIDES = {
+    SourceStance.SUPPORTS: "Potwierdza",
+    SourceStance.REFUTES: "Przeczy",
+    SourceStance.CONTEXT: "Uzupełnia kontekst",
+    None: "Nie wpływa na ocenę",
+}
+NOT_COUNTED_NOTE = (
+    "Na przykład sam nagłówek albo starsza ocena tego samego fact-checkera."
+)
+
+
+def _sources(sources: list[Source], url_limit: int | None) -> list[str]:
+    if not any(s.stance for s in sources):
+        return [line for s in sources for line in _source(s, url_limit)] or ["- brak"]
+    lines = []
+    for stance, name in SIDES.items():
+        if side := [s for s in sources if s.stance == stance]:
+            lines.append(f"__{name}__")
+            if stance is None:
+                lines.append(f"-# {NOT_COUNTED_NOTE}")
+            lines += [line for s in side for line in _source(s, url_limit)]
+    return lines
+
+
 def _page(p: CheckedPage, url_limit: int | None) -> list[str]:
     """The page behind a link: what was read, not evidence for its own claims."""
     meta = ", ".join(
@@ -162,7 +190,7 @@ def _claim(n: int, c: ClaimResult, url_limit: int | None) -> str:
         "**Przesłanki:**",
         *_bullets(c.premises),
         "**Źródła:**",
-        *([line for s in c.sources for line in _source(s, url_limit)] or ["- brak"]),
+        *_sources(c.sources, url_limit),
     ]
     if c.limitations:
         lines += ["**Ograniczenia:**", *_bullets(c.limitations)]

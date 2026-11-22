@@ -74,6 +74,22 @@ verdict (`judge.RATINGS`, ADR 0001); a review of another claim is context only.
 Sources: [rerank.py](../../prawdowid/rerank.py), [judge.py](../../prawdowid/judge.py),
 [factcheck.py](../../prawdowid/factcheck.py), [EUvsDisinfo](../../prawdowid/euvsdisinfo.py).
 
+Each source in the answer also says which side of the claim it stands on (the evidence chain,
+#78). `judge.decide()` sets `stance` to `potwierdza`, `przeczy` or `kontekst` from a label whose
+quote passed the verbatim check, and only when the verdict rules counted that label. A
+fact-checker's rating of the checked claim sets the side through `judge.RATINGS`: a false-type
+rating contradicts the claim, a true-type rating confirms it, and the other mapped ratings add
+context. A review of another claim, a data gap and plain context from EUvsDisinfo or the corpus add
+context. A headline alone, an older rating by the same fact-checker, a fact-checker's other text
+next to its rating and a publisher that says both get `null`, so no channel puts them on a side.
+The web page groups the quotes under "Potwierdza", "Przeczy" and "Uzupełnia kontekst", each with
+publisher and date. Both sides of a conflict sit next to each other on a wide screen and stack on a
+phone. Sources the rules did not count are listed under "Nie wpływa na ocenę". `/czat` and the
+Discord bot use the same groups in the same words, and an answer with no stance at all keeps the
+plain list. Sources: [contract.py](../../prawdowid/contract.py), [judge.py](../../prawdowid/judge.py),
+[app.js](../../frontend/public/app.js), [czat.js](../../frontend/public/czat.js),
+[Discord](../../prawdowid/discord_bot.py).
+
 Incident matching against the organiser's incident base ([PR #38](https://github.com/00200200/HackNation2026/pull/38),
 `prawdowid/incidents.py`) is merged into `main`: a match on URL, flagged domain or text similarity
 is shown as neutral context next to the claims and never touches the verdict. It is, per the PR's

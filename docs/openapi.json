@@ -1033,6 +1033,17 @@
               }
             ],
             "title": "Rating"
+          },
+          "stance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceStance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The side this source stands on, from a quote found verbatim in it: 'potwierdza' (confirms the claim), 'przeczy' (contradicts it) or 'kontekst' (adds context, a data gap or a fact-checker's review of another claim). A fact-checker's rating of this claim gives its side through the rating. null when the verdict rules did not count the source: a headline alone, an older rating by the same fact-checker, or a source that says both."
           }
         },
         "type": "object",
@@ -1081,6 +1092,16 @@
           "catalogue"
         ],
         "title": "SourceList"
+      },
+      "SourceStance": {
+        "type": "string",
+        "enum": [
+          "potwierdza",
+          "przeczy",
+          "kontekst"
+        ],
+        "title": "SourceStance",
+        "description": "Which side of the claim a source stands on, for the evidence chain (#78)."
       },
       "Status": {
         "type": "string",

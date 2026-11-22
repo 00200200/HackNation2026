@@ -53,6 +53,14 @@ class ClaimKind(StrEnum):
     QUOTED = "quoted"
 
 
+class SourceStance(StrEnum):
+    """Which side of the claim a source stands on, for the evidence chain (#78)."""
+
+    SUPPORTS = "potwierdza"
+    REFUTES = "przeczy"
+    CONTEXT = "kontekst"
+
+
 class Source(BaseModel):
     title: str
     publisher: str
@@ -69,6 +77,16 @@ class Source(BaseModel):
     # A fact-checker's rating of the checked claim (`textualRating` of its ClaimReview record).
     # Channels show it as the fact-checker's rating, never as a quote from its page.
     rating: str | None = None
+    # Set only by `judge.decide()`, from a label whose quote was found verbatim in this source.
+    stance: SourceStance | None = Field(
+        None,
+        description="The side this source stands on, from a quote found verbatim in it: "
+        "'potwierdza' (confirms the claim), 'przeczy' (contradicts it) or 'kontekst' (adds "
+        "context, a data gap or a fact-checker's review of another claim). A fact-checker's "
+        "rating of this claim gives its side through the rating. null when the verdict rules "
+        "did not count the source: a headline alone, an older rating by the same "
+        "fact-checker, or a source that says both.",
+    )
 
 
 class ModelCall(BaseModel):

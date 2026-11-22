@@ -98,6 +98,61 @@ function sourceItem(s, i) {
       snippet ? " " : null, meta));
 }
 
+// The evidence chain (#78): sources grouped by the side their verified quote stands on (`stance`, set by
+// judge.decide() in the API). The heading names the side in words; the icon and the colour only help. A source
+// the verdict rules set aside has no stance. An answer with no stance at all keeps one plain list, as before.
+// The same groups, in the same order, as /czat and the Discord bot.
+const SIDES = [
+  ["potwierdza", "Potwierdza"],
+  ["przeczy", "Przeczy"],
+  ["kontekst", "Uzupełnia kontekst"],
+  [null, "Nie wpływa na ocenę"],
+];
+const NOT_COUNTED_NOTE = "Na przykład sam nagłówek albo starsza ocena tego samego fact-checkera.";
+const SIDE_ICONS = { potwierdza: "M5 12.5l4.5 4.5L19 7.5", przeczy: "M7 7l10 10M17 7L7 17", kontekst: "M12 6v12M6 12h12" };
+let sideCount = 0;
+
+function sideOf(s) {
+  return SIDES.some(([key]) => key && key === s.stance) ? s.stance : null;
+}
+
+function sideIcon(key) {
+  if (!SIDE_ICONS[key]) return null;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", SIDE_ICONS[key]);
+  svg.append(path);
+  const icon = el("span", { className: "side-icon" }, svg);
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
+}
+
+function sourcesBlock(sources) {
+  if (!sources.length) return el("p", { className: "empty", textContent: "Brak źródła przy tej ocenie." });
+  if (!sources.some(sideOf)) return el("ol", { className: "sources" }, ...sources.map(sourceItem));
+  // One numbering across the groups, so [n] still names one source of the claim.
+  let n = 0;
+  const groups = {};
+  for (const [key, title] of SIDES) {
+    const items = sources.filter((s) => sideOf(s) === key);
+    if (!items.length) continue;
+    const id = `strona-${++sideCount}`;
+    const list = el("ol", { className: "sources", start: n + 1 }, ...items.map((s) => sourceItem(s, n++)));
+    list.setAttribute("aria-labelledby", id);
+    groups[key ?? "none"] = el("div", { className: `side side-${key ?? "none"}` },
+      el("h4", { className: "side-title", id }, sideIcon(key), title),
+      key ? null : el("p", { className: "side-note", textContent: NOT_COUNTED_NOTE }),
+      list);
+  }
+  // Both sides of a conflict next to each other (one under the other on a narrow screen).
+  const sides = groups.potwierdza && groups.przeczy
+    ? el("div", { className: "sides" }, groups.potwierdza, groups.przeczy)
+    : groups.potwierdza ?? groups.przeczy;
+  return el("div", { className: "chain" }, sides, groups.kontekst, groups.none);
+}
+
 // Claims from a quote: who said it, and what was said. Plain statements get no tag.
 const KIND_LABELS = { attribution: "Kto co powiedział", quoted: "Treść cytatu" };
 
@@ -137,9 +192,7 @@ function claimBlock(c) {
       VERDICT_MEANING[c.verdict] ? el("span", { className: "verdict-meaning", textContent: VERDICT_MEANING[c.verdict] }) : null),
     el("p", { className: "answer", textContent: answerText(c) }),
     el("h3", { className: "part", textContent: "Co mówią źródła" }),
-    c.sources.length
-      ? el("ol", { className: "sources" }, ...c.sources.map(sourceItem))
-      : el("p", { className: "empty", textContent: "Brak źródła przy tej ocenie." }),
+    sourcesBlock(c.sources),
     sourcesNote(),
     el("h3", { className: "part", textContent: "Nasza ocena" }),
     el("div", { className: "assessment" },
