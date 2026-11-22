@@ -41,9 +41,12 @@ from prawdowid.privacy import mask_personal_data
 log = logging.getLogger("prawdowid")
 
 MODEL = os.getenv("PRAWDOWID_MODEL") or "anthropic:claude-opus-5-5"
-# Below the API's 60 s limit on verify; covers every attempt, including SDK retries.
-MODEL_TIMEOUT_S = 45
-MODEL_MAX_RETRIES = 1
+# Per attempt. The SDK retries timeouts, 429, 5xx and connection errors with backoff; the check
+# deadline still caps every attempt together.
+MODEL_TIMEOUT_S = 20
+MODEL_MAX_RETRIES = 3
+# Extraction is a structured split; low effort spends less time thinking before the answer.
+MODEL_EFFORT = "low"
 
 # ponytail: page text is cut to the size of a pasted text, so one link costs what one text does.
 MAX_PAGE_CHARS = 5000
@@ -258,10 +261,11 @@ agent = Agent(
     output_type=NativeOutput(Extraction),
     instructions=INSTRUCTIONS,
     model_settings={
-        "request_timeout": MODEL_TIMEOUT_S,
+        "timeout": MODEL_TIMEOUT_S,
         "max_retries": MODEL_MAX_RETRIES,
+        "anthropic_effort": MODEL_EFFORT,
     },
-    # No second model request on invalid output: it would get a fresh 45 s and overrun the API limit.
+    # No second model request on invalid output: it would get a fresh attempt and overrun the API limit.
     retries={"output": 0},
     # Build the provider on first run, so a missing API key is a failed check, not a crash at import.
     defer_model_check=True,

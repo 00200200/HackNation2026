@@ -60,9 +60,13 @@ TYPOGRAPHY = str.maketrans(
 )
 
 MODEL = os.getenv("PRAWDOWID_JUDGE_MODEL") or "anthropic:claude-sonnet-5-5"
-MODEL_TIMEOUT_S = 20
-MODEL_MAX_RETRIES = 1  # one retry inside the SDK
-DEADLINE_S = 25  # whole judge call, retry included
+# Per attempt, so a retry after a timeout still fits in DEADLINE_S. The SDK retries timeouts,
+# 429, 5xx and connection errors with backoff.
+MODEL_TIMEOUT_S = 12
+MODEL_MAX_RETRIES = 3
+DEADLINE_S = 25  # whole judge call, retries included
+# Labels and quotes need no long thinking; the verdict is set in code.
+MODEL_EFFORT = "low"
 
 JUDGE_UNAVAILABLE = (
     "Nie udało się ocenić źródeł, bo model językowy nie odpowiedział, "
@@ -183,8 +187,9 @@ agent = Agent(
     output_type=NativeOutput(Labels),
     instructions=INSTRUCTIONS,
     model_settings={
-        "request_timeout": MODEL_TIMEOUT_S,
+        "timeout": MODEL_TIMEOUT_S,
         "max_retries": MODEL_MAX_RETRIES,
+        "anthropic_effort": MODEL_EFFORT,
     },
     retries={"output": 0},
     defer_model_check=True,

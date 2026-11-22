@@ -47,9 +47,12 @@ MAX_DOCUMENTS = int(os.getenv("PRAWDOWID_RERANK_MAX_DOCUMENTS") or 30)
 MAX_DOC_CHARS = int(os.getenv("PRAWDOWID_RERANK_MAX_DOC_CHARS") or 20_000)
 
 MODEL = os.getenv("PRAWDOWID_RERANK_MODEL") or "anthropic:claude-haiku-5-5"
-MODEL_TIMEOUT_S = 10
-MODEL_MAX_RETRIES = 1  # one retry inside the SDK
-DEADLINE_S = 20  # whole rerank call, retry included
+# Per attempt, so a retry after a timeout still fits in DEADLINE_S. The SDK retries timeouts,
+# 429, 5xx and connection errors with backoff.
+MODEL_TIMEOUT_S = 9
+MODEL_MAX_RETRIES = 3
+DEADLINE_S = 20  # whole rerank call, retries included
+MODEL_EFFORT = "low"  # ordering fragments needs no long thinking
 
 RERANK_UNAVAILABLE = (
     "Nie udało się uszeregować źródeł według trafności, "
@@ -92,8 +95,9 @@ agent = Agent(
     output_type=NativeOutput(RankedIds),
     instructions=INSTRUCTIONS,
     model_settings={
-        "request_timeout": MODEL_TIMEOUT_S,
+        "timeout": MODEL_TIMEOUT_S,
         "max_retries": MODEL_MAX_RETRIES,
+        "anthropic_effort": MODEL_EFFORT,
     },
     retries={"output": 0},
     defer_model_check=True,
