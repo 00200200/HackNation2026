@@ -18,7 +18,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from prawdowid import checklog
+from prawdowid import checklog, faults
 from prawdowid.contract import CheckResult, Status, Verdict
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
@@ -127,16 +127,21 @@ async def create_check(
     # Why a check ended in a technical error, for the check log; None when verify returned.
     error = None
     key = cache_key(body.input)
-    cached = _results.get(key)
+    # Eval traffic only (scenario J): honoured with the secret eval token, ignored for everyone
+    # else. A faulted run neither reads nor fills the result cache: a stored answer would hide
+    # the simulated outage, and an answer computed with a dependency "down" is not the real one.
+    fault = faults.requested(request.headers)
+    cached = None if fault else _results.get(key)
     try:
         if cached:
             result = cached.model_copy(deep=True)
             # Lets a client (the eval) tell a stored answer from a fresh run, e.g. for latency.
             response.headers["X-Cache"] = "hit"
         else:
-            async with asyncio.timeout(VERIFY_TIMEOUT_S):
-                result = await verify(body.input)
-            if _cacheable(result):
+            with faults.simulate(fault):
+                async with asyncio.timeout(VERIFY_TIMEOUT_S):
+                    result = await verify(body.input)
+            if not fault and _cacheable(result):
                 _results[key] = result.model_copy(deep=True)
     except Exception as exc:
         log.exception("verify failed")

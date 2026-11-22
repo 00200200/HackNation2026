@@ -45,6 +45,15 @@ def predicted_verdict(resp: dict) -> str:
     return (claim or {}).get("verdict", "")
 
 
+def checked(resp: dict) -> bool:
+    """Some claim went through the sources: a factual verdict or an abstention. Neither
+    `nie sprawdzono` (out of time, a source down) nor `nie podlega weryfikacji` (an opinion, which
+    never reaches the sources) shows that the retrieval worked."""
+    return resp.get("status", "ok") == "ok" and any(
+        c.get("verdict") in (*FACTUAL, ABSTAIN) for c in resp.get("claims") or []
+    )
+
+
 def macro_f1(gold: list[str], pred: list[str]) -> float | None:
     classes = sorted(set(gold))
     if not classes:

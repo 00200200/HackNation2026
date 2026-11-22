@@ -14,6 +14,7 @@ import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+import pytest
 from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
@@ -61,6 +62,7 @@ def check_url(monkeypatch, model):
         return asyncio.run(verifier.verify(URL))
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_instruction_in_a_fetched_page_is_logged_and_not_followed(monkeypatch):
     seen = []
 
@@ -77,8 +79,9 @@ def test_instruction_in_a_fetched_page_is_logged_and_not_followed(monkeypatch):
     # The page reached the model only as quoted data.
     assert seen[0].startswith("<user_text>") and seen[0].endswith("</user_text>")
     assert "KRUK-27" in seen[0]
-    # The verdict comes from the retrieval pipeline (no sources offline), never from the page.
-    assert result.claims[0].verdict is Verdict.NOT_CHECKED
+    # The verdict comes from the retrieval pipeline (the sources found nothing), never from the
+    # page, which asks to confirm.
+    assert result.claims[0].verdict is Verdict.INSUFFICIENT_EVIDENCE
     assert CANARY not in json.dumps(result.model_dump(mode="json"), ensure_ascii=False)
 
 
@@ -119,6 +122,7 @@ def check_with_source(monkeypatch, text, judge_model):
         return asyncio.run(verifier.verify(CLAIM))
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_instruction_in_a_retrieved_source_is_data_and_logged_as_source(monkeypatch):
     prompts = []
 
@@ -142,6 +146,7 @@ def test_instruction_in_a_retrieved_source_is_data_and_logged_as_source(monkeypa
     assert CANARY not in json.dumps(result.model_dump(mode="json"), ensure_ascii=False)
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_a_judge_that_obeys_the_source_still_cannot_change_the_rules(monkeypatch):
     """The injected page says "mark it confirmed". Even if the model labels it that way, one
     weak source never confirms: the verdict rules are code, not model output."""
@@ -251,6 +256,7 @@ def test_the_linked_page_found_again_by_search_is_logged_once_as_page(monkeypatc
     ]
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_a_flagged_source_does_not_take_a_clean_one_down_with_it(monkeypatch):
     """Evidence is not lost for an injection: the clean document still decides the verdict."""
     clean = "Komisja Europejska nie planuje żadnego podatku od wypieków."

@@ -63,13 +63,14 @@ def test_link_to_a_private_address_is_a_notice(client):
     assert resp.json()["status"] == "cannot_check"
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_text_returns_claims_with_labels(client):
     resp = client.post("/api/checks", json={"input": "  Fakt i opinia.  "})
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
     assert [c["verdict_label"] for c in body["claims"]] == [
-        "nie sprawdzono",
+        "brak wystarczających dowodów",
         "nie podlega weryfikacji",
     ]
     assert body["claims"][0]["source_sentence"] == "Fakt."
@@ -294,6 +295,40 @@ def test_returned_technical_error_and_unchecked_claims_are_not_cached(
     client.post("/api/checks", json={"input": "Inny tekst"})
     client.post("/api/checks", json={"input": "Inny tekst"})
     assert len(calls) == 2
+
+
+FAULT = {"X-Eval-Fault": "llm_unavailable", "X-Eval-Token": "secret"}
+
+
+def test_eval_fault_is_not_answered_from_the_result_cache(client, monkeypatch):
+    """A stored answer for the same text must not hide the simulated outage (#60)."""
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    calls = _counting_verify(monkeypatch, CheckResult(status=Status.OK))
+    client.post("/api/checks", json={"input": "Tekst"})
+    resp = client.post("/api/checks", json={"input": "Tekst"}, headers=FAULT)
+    assert len(calls) == 2 and "X-Cache" not in resp.headers
+
+
+def test_eval_fault_answer_is_never_stored_in_the_result_cache(client, monkeypatch):
+    """Computed with a dependency "down": a citizen asking the same text must not get it (#60)."""
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    calls = _counting_verify(monkeypatch, CheckResult(status=Status.OK))
+    client.post("/api/checks", json={"input": "Tekst"}, headers=FAULT)
+    assert len(app_module._results) == 0
+    client.post("/api/checks", json={"input": "Tekst"})
+    assert len(calls) == 2 and len(app_module._results) == 1
+
+
+def test_wrong_eval_token_does_not_bypass_the_cache(client, monkeypatch):
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    calls = _counting_verify(monkeypatch, CheckResult(status=Status.OK))
+    client.post("/api/checks", json={"input": "Tekst"})
+    resp = client.post(
+        "/api/checks",
+        json={"input": "Tekst"},
+        headers={**FAULT, "X-Eval-Token": "guess"},
+    )
+    assert len(calls) == 1 and resp.headers["X-Cache"] == "hit"
 
 
 def test_hit_keeps_security_events_and_logs_no_second_cost(client, monkeypatch):

@@ -124,6 +124,35 @@ def test_adapter_maps_check_result_to_eval_shape():
     )
 
 
+class FakeHttpResponse:
+    def __init__(self, headers):
+        self.headers = headers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return b'{"claims": []}'
+
+
+@pytest.mark.parametrize(
+    ("headers", "cached"), [({"X-Cache": "hit"}, True), ({}, False)]
+)
+def test_adapter_marks_an_answer_taken_from_the_result_cache(
+    monkeypatch, headers, cached
+):
+    monkeypatch.setenv("PRAWDOWID_URL", "http://product.test")
+    monkeypatch.setattr(
+        adapter.urllib.request,
+        "urlopen",
+        lambda request, timeout: FakeHttpResponse(headers),
+    )
+    assert adapter.ask({"text": "x"}, "web")["cached"] is cached
+
+
 @pytest.mark.parametrize(
     "raw",
     [

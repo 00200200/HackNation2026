@@ -188,9 +188,9 @@ def test_failed_search_is_retried_once_then_a_limitation():
     assert len(calls) == 2
 
 
-def test_no_allowlisted_hit_is_a_limitation():
+def test_no_allowlisted_hit_is_found_nothing_not_a_failure():
     result = run(provider_returning("https://example.com/x"), {})
-    assert result.limitation == SEARCH_UNAVAILABLE
+    assert result.limitation is None and not result.failed and not result.documents
 
 
 @pytest.mark.parametrize(

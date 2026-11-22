@@ -94,6 +94,22 @@ def to_eval_shape(raw: dict) -> dict:
     return shaped
 
 
+def fault_headers(payload: dict) -> dict:
+    """Headers that make the product simulate `payload["simulate"]` (scenario J), none without it.
+
+    The product honours them only with its own PRAWDOWID_EVAL_TOKEN, which must be set here too.
+    """
+    fault = payload.get("simulate")
+    if not fault:
+        return {}
+    token = os.environ.get("PRAWDOWID_EVAL_TOKEN")
+    if not token:
+        raise RuntimeError(
+            f"case simulates {fault!r}: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+        )
+    return {"X-Eval-Fault": fault, "X-Eval-Token": token}
+
+
 def ask(payload: dict, channel: str) -> dict:
     base = os.environ.get("PRAWDOWID_URL")
     if not base:
@@ -101,8 +117,9 @@ def ask(payload: dict, channel: str) -> dict:
             "PRAWDOWID_URL is not set, e.g. http://127.0.0.1:8000 (make dev)"
         )
     text = payload.get("text") or payload.get("url", "")
+    faults = fault_headers(payload)
     if channel == "discord":
-        return to_eval_shape(asyncio.run(_ask_discord(base, text)))
+        return to_eval_shape(asyncio.run(_ask_discord(base, text, faults)))
     body = json.dumps({"input": text}).encode()
     request = urllib.request.Request(
         f"{base.rstrip('/')}/api/checks",
@@ -111,13 +128,20 @@ def ask(payload: dict, channel: str) -> dict:
             "Content-Type": "application/json",
             "X-Eval-Run": "1",
             "X-Channel": channel,
+            **faults,
         },
     )
     with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
-        return to_eval_shape(json.loads(response.read().decode()))
+        shaped = to_eval_shape(json.loads(response.read().decode()))
+        # Read by `evals.run.call`: an answer from the product's result cache says nothing about
+        # how long a check takes. The Discord client does not expose headers.
+        shaped["cached"] = response.headers.get("X-Cache") == "hit"
+    return shaped
 
 
-async def _ask_discord(base: str, text: str) -> dict:
-    async with httpx2.AsyncClient(base_url=base, timeout=TIMEOUT_S) as client:
+async def _ask_discord(base: str, text: str, headers: dict) -> dict:
+    async with httpx2.AsyncClient(
+        base_url=base, timeout=TIMEOUT_S, headers=headers
+    ) as client:
         check = await ask_api(text, client)
     return check.model_dump(mode="json")

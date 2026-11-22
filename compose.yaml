@@ -14,11 +14,18 @@ services:
       # same relative path resolves under /app in the container, where ./incidents is mounted.
       PRAWDOWID_INCIDENTS_PATH: ${PRAWDOWID_INCIDENTS_PATH:-}
       PYDANTIC_AI_NO_BANNER: "1"
-      # The image runs as nobody and /app is read-only to it; the check log and source cache live in /tmp.
-      PRAWDOWID_CHECK_LOG: /tmp/prawdowid/checks.jsonl
+      # The image runs as nobody and /app is read-only to it, so the writable paths are set below.
+      # The check log is the audit trail and the 30-day retention store (docs/privacy.md): it sits
+      # on a named volume, so a redeploy (container recreated) keeps it. The source cache is
+      # rebuilt on demand and stays in /tmp.
+      PRAWDOWID_CHECK_LOG: /var/lib/prawdowid/checks.jsonl
       PRAWDOWID_CACHE: /tmp/prawdowid/docs.jsonl
+      # Eval fault switch (docs/eval-notes.md): honoured only with this secret; leave it unset on
+      # the public demo.
+      PRAWDOWID_EVAL_TOKEN: ${PRAWDOWID_EVAL_TOKEN:-}
     volumes:
       - ./incidents:/app/incidents:ro
+      - checklog:/var/lib/prawdowid
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
       interval: 10s
@@ -70,4 +77,5 @@ services:
         restart: true
 
 volumes:
+  checklog:
   sourcedb_data:

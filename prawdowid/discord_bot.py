@@ -32,6 +32,7 @@ from prawdowid.contract import (
     MatchKind,
     Source,
     Status,
+    Verdict,
 )
 from prawdowid.privacy import MaskingFilter
 
@@ -141,7 +142,8 @@ def _claim(n: int, c: ClaimResult, url_limit: int | None) -> str:
     lines = [
         *_field(f"### {n}. ", c.claim, "### "),
         *_field(f"-# {kind}W tekście: ", c.source_sentence, "-# "),
-        f"Ocena: **{c.verdict_label}**",
+        # "nie sprawdzono" is no verdict: it must not read like one.
+        f"{'Bez oceny' if c.verdict is Verdict.NOT_CHECKED else 'Ocena'}: **{c.verdict_label}**",
         *_field("**Uzasadnienie:** ", c.reasoning),
         *_field("**Siła dowodów:** ", c.strength),
         "**Przesłanki:**",

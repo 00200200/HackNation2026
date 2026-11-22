@@ -75,6 +75,16 @@ def supports_all(prompt: str) -> str:
 
 
 @pytest.fixture
+def factcheck_answers(monkeypatch):
+    """Fact Check is up and finds nothing, so the claim's verdict is not blamed on an outage."""
+
+    async def search_claims(claim, **kwargs):
+        return pipeline.factcheck.FactCheckLookup()
+
+    monkeypatch.setattr(pipeline.factcheck, "search_claims", search_claims)
+
+
+@pytest.fixture
 def models():
     with (
         rerank.agent.override(model=model(every_fragment)),
@@ -106,6 +116,7 @@ def verify(text: str, extraction: Extraction):
 
 
 def test_five_claims_with_fast_sources_finish_under_budget(monkeypatch, models):
+    monkeypatch.setattr(verifier, "MAX_CHECKED_CLAIMS", 5)  # the default is 3
     seen = fake_search(monkeypatch, delay=0.2)
     started = time.perf_counter()
     result = verify("tekst", claims(5))
@@ -260,7 +271,9 @@ def test_injection_in_a_source_reaches_the_check_result(monkeypatch):
     assert all(c.verdict is Verdict.CONFIRMED for c in result.claims)
 
 
-def test_euvsdisinfo_match_alone_gives_no_verdict(monkeypatch, models):
+def test_euvsdisinfo_match_alone_gives_no_verdict(
+    monkeypatch, models, factcheck_answers
+):
     """A known-narrative match is context: one EUvsDisinfo case never decides the verdict."""
     case = pipeline.euvsdisinfo.EuvsdisinfoHit(
         kind="claim_review",
@@ -365,7 +378,7 @@ def test_slow_link_fetch_is_cut_by_the_check_budget(monkeypatch):
     assert result.cost_usd == 0.0
 
 
-def test_retry_judge_failure_keeps_the_first_pass(monkeypatch):
+def test_retry_judge_failure_keeps_the_first_pass(monkeypatch, factcheck_answers):
     claim = "Polska wstąpiła do UE w 2004 roku."
     fake_search(monkeypatch)
     calls = []

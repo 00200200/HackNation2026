@@ -29,6 +29,25 @@ def check_log(monkeypatch, tmp_path):
     return path
 
 
+@pytest.fixture
+def quiet_sources(monkeypatch):
+    """Every source answers and finds nothing (no outage): a check ends in a verdict, not a
+    technical error, without any network."""
+    from prawdowid import euvsdisinfo, factcheck, websearch
+
+    def empty(model):
+        async def search(*args, **kwargs):
+            return model()
+
+        return search
+
+    monkeypatch.setattr(factcheck, "search_claims", empty(factcheck.FactCheckLookup))
+    monkeypatch.setattr(
+        euvsdisinfo, "search_cases", empty(euvsdisinfo.EuvsdisinfoLookup)
+    )
+    monkeypatch.setattr(websearch, "search_web", empty(websearch.WebSearch))
+
+
 @pytest.fixture(autouse=True)
 def empty_result_cache():
     """The API's result cache is module state: no answer may leak from one test into another."""

@@ -79,8 +79,8 @@ nano .env      # paste the keys after ANTHROPIC_API_KEY=, TAVILY_API_KEY= and th
 
 The evidence keys matter as much as the model key: without `TAVILY_API_KEY` (web search, the only
 search provider), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` every source lookup fails,
-`/health` still answers, and every checkable claim ends as "nie sprawdzono". `compose.yaml`
-forwards all three to the backend.
+`/health` still answers, and a check ends as a technical error ("Nie mogę teraz sprawdzić ..."),
+never as a verdict. `compose.yaml` forwards all three to the backend.
 
 The database password is generated on the server and never leaves it; hex keeps it safe inside
 the `DATABASE_URL` that Compose builds for the backend. `COMPOSE_FILE` makes every

@@ -24,7 +24,7 @@ from pydantic_ai import (
 from pydantic_ai.exceptions import AgentRunError, ContentFilterError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
-from prawdowid import justification, pipeline
+from prawdowid import faults, justification, pipeline
 from prawdowid.contract import (
     CheckedPage,
     CheckResult,
@@ -161,7 +161,7 @@ def positive_int_env(name: str, default: int) -> int:
 # Hyperparameters. Defaults are a first guess for the 30 s median, not tuned yet.
 # Most central claims checked in full; the rest are listed as not checked. Only these carry a
 # source sentence, reason and queries, to keep the output short on long texts.
-MAX_CHECKED_CLAIMS = positive_int_env("PRAWDOWID_MAX_CHECKED_CLAIMS", 5)
+MAX_CHECKED_CLAIMS = positive_int_env("PRAWDOWID_MAX_CHECKED_CLAIMS", 3)
 # Search queries the model writes per checked claim, for retrieval.
 QUERIES_PER_CLAIM = positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 3)
 
@@ -427,6 +427,11 @@ async def verify_text(
         )
     )
     check = to_check_result(result.output, checks)
+    outage = [c for c in checks if c]
+    if outage and all(c.outage for c in outage):
+        # Every claim that could be checked hit an outage: a technical error, no claims shown.
+        message = outage[0].judgement.limitations[0]
+        check = CheckResult(status=Status.TECHNICAL_ERROR, message=message)
     claim_costs = [c.cost_usd for c in checks if c]
     check.cost_usd = None if None in [cost, *claim_costs] else cost + sum(claim_costs)
     check.steps_ms = {"extract": extract_ms}
@@ -448,6 +453,10 @@ async def _extract(
     text: str, location: str, deadline: float
 ) -> AgentRunResult[Extraction] | CheckResult:
     """Step 1, or the notice to show when the model fails."""
+    if faults.active(faults.LLM_UNAVAILABLE):  # eval traffic only, see faults.py
+        return failed(
+            text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=0.0, location=location
+        )
     try:
         # Masked before the model: placeholders keep the sentence, so claims still split (docs/privacy.md).
         # The extraction shares the check's budget: its own 45 s would overrun it.

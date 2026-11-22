@@ -93,7 +93,11 @@ def call(case: dict, channel: str) -> dict:
         adapter.wait_turn()  # rate limit; not counted as latency
         start = time.monotonic()
         try:
-            response, error = adapter.ask(case_input(case), channel), None
+            # A case's `simulate` fault travels with the input; the adapter turns it into headers.
+            payload = dict(case_input(case))
+            if case.get("simulate"):
+                payload["simulate"] = case["simulate"]
+            response, error = adapter.ask(payload, channel), None
         except (
             OSError,
             ValueError,
@@ -117,6 +121,8 @@ def call(case: dict, channel: str) -> dict:
         "response": response,
         "seconds": time.monotonic() - start,
         "error": error,
+        # Answered from the product's result cache: no check ran, so there is no latency to read.
+        "cached": bool(response.pop("cached", False)),
     }
 
 
@@ -129,8 +135,17 @@ def run_case(case: dict) -> dict:
     return {"case": case, "runs": runs, "repeat": repeat}
 
 
+def errors(row: dict) -> list[str]:
+    """Every failed call of the case, the repeat included."""
+    return [
+        run["error"]
+        for run in [*row["runs"], row["repeat"] or {"error": None}]
+        if run["error"]
+    ]
+
+
 def failed(row: dict) -> bool:
-    return any(run["error"] for run in [*row["runs"], row["repeat"] or {"error": None}])
+    return bool(errors(row))
 
 
 def expected_label(case: dict) -> str:
@@ -138,17 +153,26 @@ def expected_label(case: dict) -> str:
     return case.get("expected_verdict") or f"status:{case.get('expected_status', 'ok')}"
 
 
+def answered_as_expected(expected: str, response: dict) -> bool:
+    """The main run gave the expected verdict or status. A case without a label expects `status:ok`
+    (the URL cases) and then some claim must have been checked: an answer whose claims all ran out
+    of time (`nie sprawdzono`) or are opinions shows that the flow ran, not that it works."""
+    if expected == "status:ok":
+        return metrics.checked(response)
+    return metrics.predicted_verdict(response) == expected
+
+
 def progress(row: dict, done: int, total: int, elapsed: float) -> str:
     case, runs = row["case"], row["runs"]
     expected = expected_label(case)
     predicted = [metrics.predicted_verdict(run["response"]) for run in runs]
-    ok = not failed(row) and all(p == expected for p in predicted)
+    ok = not failed(row) and answered_as_expected(expected, runs[0]["response"])
     eta = elapsed / done * (total - done)
     return (
         f"[{done}/{total}] {case.get('id')} {'ok' if ok else 'FAIL'} "
         f"verdict={'/'.join(predicted)} expected={expected} "
         f"{sum(run['seconds'] for run in runs):.1f}s ETA {eta / 60:.1f}min"
-        + "".join(f" error={run['error']}" for run in runs if run["error"])
+        + "".join(f" error={error}" for error in errors(row))
     )
 
 
@@ -282,8 +306,10 @@ def score(rows: list[dict], corpus: dict[str, str] | None) -> tuple[dict, list[d
                 if r["case"].get("canary") and not unmeasured(r)
             ]
         ),
+        # The first run of each case, unless the product answered it from its result cache: the
+        # other channels and a re-run inside the cache's lifetime are not checks.
         "median_latency_s": metrics.median(
-            [run["seconds"] for r in rows for run in r["runs"]]
+            [r["runs"][0]["seconds"] for r in rows if not r["runs"][0].get("cached")]
         ),
         "end_to_end": metrics.rate(
             [
@@ -343,7 +369,11 @@ def score(rows: list[dict], corpus: dict[str, str] | None) -> tuple[dict, list[d
             ],
             "status": [run["response"].get("status", "ok") for run in r["runs"]],
             "seconds": [round(run["seconds"], 2) for run in r["runs"]],
-            "errors": [run["error"] for run in r["runs"] if run["error"]],
+            "errors": errors(r),
+            "correct": not failed(r)
+            and answered_as_expected(
+                expected_label(r["case"]), r["runs"][0]["response"]
+            ),
         }
         for r in rows
     ]
@@ -353,15 +383,8 @@ def score(rows: list[dict], corpus: dict[str, str] | None) -> tuple[dict, list[d
 def summarize(per_case: list[dict]) -> dict:
     """Pass/fail counts per scenario and per case-set (FC-* vs A-J ids)."""
 
-    def correct(row: dict) -> bool:
-        return (
-            not row["errors"]
-            and bool(row["predicted"])
-            and row["predicted"][0] == row["expected_label"]
-        )
-
     def bucket(rows: list[dict]) -> dict:
-        return {"cases": len(rows), "correct": sum(correct(r) for r in rows)}
+        return {"cases": len(rows), "correct": sum(r["correct"] for r in rows)}
 
     by_scenario: dict[str, list[dict]] = {}
     for row in per_case:
@@ -513,6 +536,12 @@ def main() -> int:
         warnings.append(f"no cases for scenarios {', '.join(missing)}")
     if skipped:
         warnings.append(f"skipped, not scored: {', '.join(c['id'] for c in skipped)}")
+    if cached := [r for r in rows if r["runs"][0].get("cached")]:
+        warnings.append(
+            f"median_latency_s leaves out {len(cached)} of {len(rows)} cases whose first answer came "
+            "from the product's result cache (X-Cache: hit): what is left is not a sample of real "
+            "checks; restart the backend or wait 30 minutes before a run that measures latency"
+        )
     if dropped := [r["case"]["id"] for r in rows if unmeasured(r)]:
         warnings.append(
             f"injection not tested (no answer to judge), left out of injection_resistance: {', '.join(dropped)}"

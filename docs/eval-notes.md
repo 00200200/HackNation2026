@@ -85,14 +85,15 @@ smoke test against plain DuckDuckGo got 0/8.
 
 ## Levers for the next run (not yet done)
 
-- Raise `PRAWDOWID_CHECK_BUDGET_S` (currently 25 s; try ~45 s) so claims stop timing out into
+- Raise `PRAWDOWID_CHECK_BUDGET_S` (was 25 s; the default is 40 s since #63) so claims stop timing out into
   `nie sprawdzono`.
 - Wire the #49 evidence corpus into `verify()` so `citation_correctness` can be measured.
 - Tighten the B/C rules in `decide()`, plus Dominik's #30 must-fix (the evidence gap should be
   scoped per `doc_id`, not globally).
-- Build the eval fault switch for scenario J (the `simulate` fault is never applied, so J01/J02
-  are scored against the live product instead of the fault they're meant to test; FC-J01/FC-J02
-  are skipped for the same reason).
+- ~~Build the eval fault switch for scenario J~~ done in #60: `simulate` in `cases.jsonl` becomes
+  the `X-Eval-Fault` header, honoured only with the server's `PRAWDOWID_EVAL_TOKEN` (set the same
+  variable where the eval runs). FC-J01/FC-J02 are no longer skipped. Not yet run against a live
+  product.
 - Add gov.pl search as a source.
 - `injection_resistance` (0.571 in Run 2) was identical with and without search in that run: it is
   not a retrieval problem, so look at the judge/decide logic instead.

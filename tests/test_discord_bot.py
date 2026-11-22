@@ -272,6 +272,7 @@ def test_ask_api_connection_error_becomes_notice():
     assert result.message == CONNECTION_ERROR
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_same_input_same_result_on_web_and_discord():
     """Scenario G offline: the Discord path and the web form get the same CheckResult."""
     extraction = Extraction(
