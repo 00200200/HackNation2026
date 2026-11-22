@@ -143,9 +143,11 @@ a plan from documentation, not a result.
    - Of the model settings and credentials, `compose.yaml` forwards only `PRAWDOWID_MODEL` and
      `ANTHROPIC_API_KEY` to the backend. Add the other two model variables and the AWS ones to its
      `environment:` list, or they never reach the container.
-   - Native structured output keeps working, because PydanticAI gives these model names the same
-     profile. AWS warns that the profile prefix alone does not prove where a request runs: check
-     the routing with `GetInferenceProfile`.
+   - With a current `boto3`, native structured output keeps working, because PydanticAI gives these
+     model names the same profile. A `botocore` that predates Converse `outputConfig` makes our
+     `NativeOutput` agents raise a `UserError` (`pydantic_ai/models/bedrock.py`), so install the
+     `bedrock` extra and keep `boto3` current. AWS warns that the profile prefix alone does not
+     prove where a request runs: check the routing with `GetInferenceProfile`.
    - UNCONFIRMED: access criteria for the 5.5 models on Bedrock, their default data retention
      there, and whether a long-term Bedrock API key works with `eu.` model IDs.
 3. Fallback: Google Vertex AI, `eu` multi-region (about 10% dearer). It is not env-only: it needs

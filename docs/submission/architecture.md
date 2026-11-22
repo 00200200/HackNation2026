@@ -172,10 +172,13 @@ Latest tracked result: [evals/results/latest.json](../../evals/results/latest.js
 `95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `dirty: false`, `mode: "quick"`, `n_cases: 9`,
 `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J`; `FC-J01`/`FC-J02`
 skipped (need a product eval fault switch, not built). This is a quick regression run, not the full
-jury-sized evaluation, even though the saved `coverage_ok` flag is true, and it **predates** PR #40
-(this docs change) landing on `main`: no eval has been run on the merged commit, by user decision
-(`HN_SKIP_EVAL=1`) — **a fresh eval on the merged commit is pending**. The following values and
-targets are copied exactly from that file:
+jury-sized evaluation, even though the saved `coverage_ok` flag is true. It also predates the
+judge, the retrieval pipeline and the check log. At that commit (`prawdowid/` is identical in
+`e9a7f86` on `main`) `verifier.to_check_result` returned a constant `insufficient_evidence` for
+every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py` did not exist. Every value
+below describes that stub, not the current pipeline. No eval has been run on the merged commit
+(skipped with `HN_SKIP_EVAL=1`); a fresh one is pending ([#16](https://github.com/00200200/HackNation2026/issues/16)).
+The following values and targets are copied exactly from that file:
 
 | Metric | value | target | pass |
 |---|---|---|---|

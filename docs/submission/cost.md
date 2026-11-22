@@ -6,8 +6,12 @@ The only monetary and measured latency inputs below come from
 `2026-11-21T19:10:57+00:00`, product commit
 `95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `mode: "quick"`, `n_cases: 9`, `dirty: false`.
 The run has `overall_pass: false`; it is not evidence of production quality or capacity. It also
-predates PR #40 (this docs change) landing on `main`: no eval has run on the merged commit, by
-user decision (`HN_SKIP_EVAL=1`) — a fresh eval on the merged commit is pending.
+predates the judge, the retrieval pipeline and the check log. At that commit (`prawdowid/` is
+identical in `e9a7f86` on `main`) `verifier.to_check_result` returned a constant
+`insufficient_evidence` for every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py`
+did not exist. The cost and latency below therefore cover claim extraction only, not the current
+pipeline. No eval has run on the merged commit (skipped with `HN_SKIP_EVAL=1`); a fresh one is
+pending ([#16](https://github.com/00200200/HackNation2026/issues/16)).
 
 ## Estimate for 1,000 checks
 
@@ -23,7 +27,9 @@ Rounded display estimate = USD 18.22 for 1,000 checks
 ```
 
 This assumes the same request mix and retrieval conditions as the saved run. It prices model
-usage, including extraction, rerank and judge, through PydanticAI/genai-prices. Missing usage or
+usage through PydanticAI/genai-prices. In the saved run that is claim extraction only: the rerank
+and judge calls were added later, are not in the figure, and the cost of the current pipeline is
+UNCONFIRMED. Missing usage or
 an unpriced/interrupted request can produce `cost_usd: null`; failed calls may still be billed
 ([verifier.py](../../prawdowid/verifier.py), [pipeline.py](../../prawdowid/pipeline.py)).
 It excludes hosting, network, search/MCP fees, Discord operation and tax; those amounts are
@@ -53,7 +59,8 @@ or an ongoing operator subsidy. A free-to-user deployment budget remains UNCONFI
 ## Latency and load
 
 Saved `metrics.median_latency_s.value`: exactly `3.8964525419287384` seconds
-([latest.json](../../evals/results/latest.json)). The eval spaces requests and excludes that wait
+([latest.json](../../evals/results/latest.json)). It covers claim extraction only, not retrieval
+or the judge (see the top of this file). The eval spaces requests and excludes that wait
 from latency ([adapter.py](../../evals/adapter.py)); this is not a concurrency benchmark.
 No simultaneous-user capacity, tail latency, saturation point or cost under load is measured:
 UNCONFIRMED. We do not extrapolate throughput from this median.
