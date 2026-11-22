@@ -165,7 +165,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <h2 style="position:absolute; top:170px; left:110px; width:1700px">Odpowiadamy jak człowiek. Z przypisem.</h2>
   <div style="position:absolute; top:400px; left:110px; right:110px; display:grid; gap:30px">
     <div class="bubble b-user" style="max-width:1050px"><div class="who">Pytanie wpisane na faktczyfejk.pl</div>Czy Polska jest w NATO od 1997 roku?</div>
-    <div class="bubble b-bot"><div class="who">Odpowiedź faktczyfejk.pl</div><b>Nie.</b> Przeczy temu Biuro Bezpieczeństwa Narodowego: „12 marca 1999 roku Polska stała się pełnoprawnym członkiem NATO”.<div style="font-size:24px; opacity:.75; margin-top:14px">www.bbn.gov.pl, 12.03.2016, fragment z wyników wyszukiwarki · drugie źródło: PAP · siła dowodów: umiarkowana</div></div>
+    <div class="bubble b-bot"><div class="who">Odpowiedź faktczyfejk.pl</div><b>Nie.</b> Przeczy temu Biuro Bezpieczeństwa Narodowego: „12 marca 1999 roku Polska stała się pełnoprawnym członkiem NATO”.<div style="font-size:24px; opacity:.75; margin-top:14px">www.bbn.gov.pl, 12.03.2016, fragment z wyników wyszukiwarki · przeczą też druga strona BBN i&nbsp;lekcja z&nbsp;zpe.gov.pl, PAP dodaje kontekst · siła dowodów: umiarkowana</div></div>
   </div>
   <div class="ft"><span>Prawdziwa odpowiedź z faktczyfejk.pl, 22.11.2026, skrócona: pełna ma też ograniczenia, np. że stronę BBN znamy tylko z wyników wyszukiwarki</span><span class="n">04 / 12</span></div>
 </section>
@@ -233,22 +233,22 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
 <section class="slide" id="s9">
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px">Nasz test, progi jury.</h2>
-  <p class="muted" style="position:absolute; top:285px; left:110px; right:110px; margin:0; font-size:24px; line-height:1.35">Metoda: 86 przypadków w&nbsp;scenariuszach A–J z&nbsp;zadania, każdy z&nbsp;etykietą ze źródła (oceny Demagoga, Konkret24, strony urzędowe). Skrypt wysyła je do API jak użytkownik i&nbsp;liczy metryki z&nbsp;zadania. Awarie symulujemy przełącznikiem tylko dla testu.</p>
+  <p class="muted" style="position:absolute; top:285px; left:110px; right:110px; margin:0; font-size:24px; line-height:1.35">Metoda: 86 przypadków, w&nbsp;tym scenariusze zadania A–J i&nbsp;dwa z&nbsp;linkiem do strony; każdy z&nbsp;etykietą ze źródła (oceny Demagoga, Konkret24, strony urzędowe). Skrypt wysyła je do API jak użytkownik i&nbsp;liczy metryki z&nbsp;zadania. Awarie symulujemy przełącznikiem tylko dla testu.</p>
   <div style="position:absolute; top:400px; left:110px; right:110px; display:grid; grid-template-columns: repeat(4, 1fr); gap:48px">
-    <div class="metric"><div class="big">0,92</div><p>Trafność ocen, macro-F1 (cel&nbsp;≥&nbsp;0,75): 73 z&nbsp;80 ocen trafnych</p></div>
+    <div class="metric"><div class="big">0,92</div><p>Trafność ocen, macro-F1 (cel&nbsp;≥&nbsp;0,75), 62 z&nbsp;69 ocen trafnych w&nbsp;pełnym przebiegu</p></div>
     <div class="metric"><div class="big">20,5 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
     <div class="metric"><div class="big">1,00</div><p>Abstencja na 12 przypadkach: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
     <div class="metric"><div class="big">3,45 $</div><p>Koszt modeli za 100 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
   </div>
-  <div class="small" style="position:absolute; top:730px; left:110px; right:110px">
+  <div class="small" style="position:absolute; top:705px; left:110px; right:110px">
     <div><b>1,00</b><span>Pokrycie cytatami (cel&nbsp;≥&nbsp;0,95)</span></div>
     <div><b>1,00</b><span>Poprawność cytatów: cytat jest w&nbsp;źródle dosłownie (cel&nbsp;≥&nbsp;0,85)</span></div>
-    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7 w&nbsp;tekście i&nbsp;11 na pobranej stronie (cel&nbsp;≥&nbsp;0,90)</span></div>
+    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7 w&nbsp;tekście i&nbsp;11 na pobranej stronie, tu też 11 z&nbsp;11 trafnych ocen (cel&nbsp;≥&nbsp;0,90)</span></div>
     <div><b>1,00</b><span>Zgodność kanałów, 6 przypadków (cel 1,00)</span></div>
     <div><b>1,00</b><span>Pętla moderatora, 2 przypadki (cel 1,00)</span></div>
     <div><b style="color:var(--red)">0,99</b><span>End-to-end (cel 1,00): przy symulowanej awarii Fact Check J01 dostał ocenę zamiast komunikatu</span></div>
   </div>
-  <div class="ft"><span>Dwa przebiegi: pełny na a14b93c (75 przypadków) i 11 z poleceniem na stronie na 5e5be00 · 22.11.2026 · evals/results/HISTORY.md, docs/eval-notes.md</span><span class="n">09 / 12</span></div>
+  <div class="ft"><span>Dwa przebiegi, 22.11.2026: pełny na a14b93c (75 przypadków) i 11 stron z poleceniem na 5e5be00 · szczegóły: docs/eval-notes.md</span><span class="n">09 / 12</span></div>
 </section>
 
 <!-- 10. Deployment -->
