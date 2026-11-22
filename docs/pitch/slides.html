@@ -203,7 +203,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="card"><h3>Stronniczość źródeł</h3><p>Teksty jednego wydawcy, z tym samym cytatem albo od tej samej agencji liczymy jako jedno potwierdzenie.</p><p class="rest">Zostaje: listę domen wybrał zespół, bez niezależnego audytu.</p></div>
     <div class="card"><h3>Prywatność</h3><p>PESEL, dowód, paszport, telefon, e-mail, konta i karty maskujemy, zanim tekst trafi do modelu i do logów.</p><p class="rest">Zostaje: imion i adresów nie maskujemy.</p></div>
     <div class="card"><h3>Prompt injection</h3><p>Wzorce w kodzie i flaga modelu wyłapują ukryte polecenia. Traktujemy je jak dane i zapisujemy zdarzenie.</p><p class="rest">Zostaje: wzorce znają tylko typowe sformułowania, a w teście był jeden przypadek.</p></div>
-    <div class="card"><h3>Dostępność</h3><p>Gdy źródło padnie albo skończy się czas, pokazujemy „nie sprawdzono” albo błąd techniczny, nigdy ocenę.</p><p class="rest">Zostaje: nie ma zapasowego dostawcy ani zmierzonej przepustowości.</p></div>
+    <div class="card"><h3>Dostępność</h3><p>Gdy źródło padnie albo skończy się czas, a reszta dowodów nie wystarcza, pokazujemy „nie sprawdzono”. Gdy to dotyczy każdego twierdzenia, pokazujemy błąd techniczny, nie ocenę.</p><p class="rest">Zostaje: nie ma zapasowego dostawcy ani zmierzonej przepustowości.</p></div>
     <div class="card"><h3>Nadużycia</h3><p>Jeden adres IP może wysłać najwyżej 10 sprawdzeń na minutę.</p><p class="rest">Zostaje: limit na adres IP nie zatrzyma wielu klientów naraz ani nie ogranicza wydatków.</p></div>
   </div>
   <div class="ft"><span>Pełna lista z miejscami w kodzie: docs/submission/risks.md</span><span class="n">07 / 12</span></div>

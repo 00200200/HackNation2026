@@ -260,7 +260,13 @@ def _candidates(found: dict) -> list[Source]:
     webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
     pages = [d.to_source(fragment=d.text) for w in webs for d in w.documents]
     # A page fetched in this check beats its stored copy: rerank keeps the first source per URL.
-    live = {rerank.canonical_url(str(p.url)) for p in pages}
+    # A snippet is no copy of the page: the stored full text stays beside it.
+    live = {
+        rerank.canonical_url(str(d.url))
+        for w in webs
+        for d in w.documents
+        if not d.snippet_only
+    }
     sources = [
         h.source
         for name in ("factcheck", "euvsdisinfo", "corpus")

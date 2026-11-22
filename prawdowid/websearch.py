@@ -41,7 +41,7 @@ from tavily.errors import TimeoutError as TavilyTimeoutError
 from prawdowid import link, safefetch
 from prawdowid.cache import Document, save_document
 from prawdowid.privacy import mask_personal_data
-from prawdowid.search_cache import cached_tavily_search
+from prawdowid.search_cache import cached_tavily_search, is_limit
 
 log = logging.getLogger("prawdowid")
 
@@ -105,6 +105,10 @@ SAVE_BUDGET_S = 10  # saving every fetched page to the source store
 
 SEARCH_UNAVAILABLE = (
     "Wyszukiwarka internetowa nie odpowiedziała, więc nie szukaliśmy źródeł w sieci."
+)
+SEARCH_LIMIT = (
+    "Wyszukiwarka internetowa osiągnęła swój limit (limit wyszukiwarki), "
+    "więc nie szukaliśmy źródeł w sieci."
 )
 NOTHING_FETCHED = (
     "Wyszukiwarka znalazła strony, ale żadnej nie udało się pobrać i odczytać, "
@@ -229,8 +233,8 @@ async def search_web(
     hits = await _search(
         mask_personal_data(query), domains, limit * 2 if skip_hosts else limit, provider
     )
-    if hits is None:
-        return WebSearch(limitation=SEARCH_UNAVAILABLE, failed=True)
+    if isinstance(hits, str):
+        return WebSearch(limitation=hits, failed=True)
     by_url = {h.url: h for h in hits if allowed(h.url)}
     if (
         not by_url
@@ -277,9 +281,9 @@ async def _save_all(docs: list[Document]) -> None:
 
 async def _search(
     query: str, domains: Sequence[str], limit: int, provider: SearchProvider
-) -> list[SearchHit] | None:
-    """Provider call in a thread, with one retry while SEARCH_BUDGET_S lasts. None when every
-    attempt failed or the budget ran out."""
+) -> list[SearchHit] | str:
+    """Provider call in a thread, with one retry while SEARCH_BUDGET_S lasts. The limitation text
+    when every attempt failed or the budget ran out; a provider limit has its own (no retry)."""
     try:
         async with asyncio.timeout(SEARCH_BUDGET_S):
             for attempt in range(1, ATTEMPTS + 1):
@@ -292,9 +296,11 @@ async def _search(
                     )
                 except (SearchUnavailable, TimeoutError) as exc:
                     log.warning("web search attempt %d failed: %r", attempt, exc)
+                    if is_limit(exc):  # the limit does not clear within this check
+                        return SEARCH_LIMIT
     except TimeoutError:
         log.warning("web search unavailable: over %g s", SEARCH_BUDGET_S)
-    return None
+    return SEARCH_UNAVAILABLE
 
 
 def _allowed(url: str) -> bool:
@@ -450,7 +456,13 @@ async def _get_page(url: str, client: httpx2.AsyncClient) -> safefetch.Page:
             )
         except (safefetch.Blocked, httpx2.InvalidURL) as exc:
             # Too many redirects, a malformed URL or another port: unreadable.
-            raise Unread(str(exc), _REFUSALS.get(type(exc), UNREADABLE)) from exc
+            reason = _REFUSALS.get(type(exc), UNREADABLE)
+            if (
+                isinstance(exc, safefetch.TooLarge)
+                and _status_reason(exc.status) is None
+            ):
+                reason = None  # a gone or walled page, however large its body
+            raise Unread(str(exc), reason) from exc
         except httpx2.HTTPError as exc:  # network, timeout, non-public address
             log.warning("fetch attempt %d %s failed: %r", attempt, url, exc)
             problem = repr(exc)

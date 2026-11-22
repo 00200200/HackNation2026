@@ -993,3 +993,21 @@ def test_review_of_this_claim_decides_next_to_one_of_another_claim():
     )
     assert j.verdict is Verdict.FALSE
     assert [s.rating for s in j.sources] == [None, "Fałsz"]
+
+
+def test_the_source_with_the_deciding_rating_survives_deduplication():
+    from types import SimpleNamespace
+
+    from prawdowid.judge import _one_per_document
+
+    body = A.source
+    rated = body.model_copy(update={"rating": "Fałsz"})
+
+    def ev(source):
+        return SimpleNamespace(
+            label=SimpleNamespace(doc_id="d", stance="refutes"), source=source
+        )
+
+    assert _one_per_document([ev(body), ev(rated)]) == [rated]
+    assert _one_per_document([ev(rated), ev(body)]) == [rated]
+    assert _one_per_document([ev(body)]) == [body]

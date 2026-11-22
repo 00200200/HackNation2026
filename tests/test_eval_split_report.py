@@ -77,3 +77,15 @@ def test_old_format_rows_without_expected_label():
 def test_format_report_prints_both_rows():
     out = split_report.format_report(REPORT)
     assert "FC-*" in out and "rest" in out and "abcdef1" in out
+
+
+def test_harness_errors_are_left_out_of_the_split_report():
+    cases = [
+        row("A01", "potwierdzone", "potwierdzone"),
+        {**row("A02", "potwierdzone", ERR), "harness_error": True},
+    ]
+    text = split_report.format_report({"cases": cases})
+    assert "1.000" in text.splitlines()[-1]
+    assert (
+        split_report.group_metrics(split_report.split(cases[:1])["rest"])["cases"] == 1
+    )

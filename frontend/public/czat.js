@@ -107,7 +107,9 @@ function bubble(kind, ...children) {
 
 function sourceItem(s, i) {
   const url = safeUrl(s.url);
+  // snippet_only: the page could not be read, so the quote is the search engine's extract of it.
   const meta = [
+    s.snippet_only ? `fragment z wyników wyszukiwarki; ${s.snippet_only}` : null,
     s.publisher,
     s.published_at ? plDate(s.published_at) : "bez daty publikacji",
     url ? host(url) : null,
@@ -116,7 +118,10 @@ function sourceItem(s, i) {
     el("p", { className: "src-head" }, el("span", { className: "ref", textContent: `[${i + 1}]` }), " ",
       url ? el("a", { ...LINK, href: url, textContent: s.title }) : s.title),
     el("p", { className: "src-meta", textContent: meta }),
-    s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null);
+    // A fact-checker's rating is shown as the rating, never as a quote from its page.
+    s.rating
+      ? el("p", { className: "rating" }, el("b", { textContent: "Ocena fact-checkera: " }), s.rating)
+      : s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null);
 }
 
 function claimBubble(n, c) {
@@ -298,7 +303,7 @@ function fieldError(message) {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  if (busy) return;
+  if (busy || deleting) return;
   const text = input.value.trim();
   if (!text || chars(text) > MAX_CHARS) {
     fieldError(text ? `Treść jest za długa. Limit to ${MAX_CHARS} znaków.` : "Wpisz tekst do sprawdzenia.");
@@ -332,7 +337,7 @@ input.addEventListener("keydown", (event) => {
 
 // A quick reply is sent as the user's own message. Focus moves to the composer as after sending.
 examples.forEach((chip) => chip.addEventListener("click", () => {
-  if (busy) return;
+  if (busy || deleting) return;
   fieldError("");
   if (ENTER_SENDS.matches) input.focus();
   converse(chip.dataset.example);

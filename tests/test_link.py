@@ -720,3 +720,8 @@ def test_url_secrets_never_reach_any_log_record(caplog):
         page, _ = fetch("http://news.example/a?token=SECRET", {"93.184.216.34": http()})
     assert page.url.endswith("token=REDACTED")
     assert "SECRET" not in caplog.text and "news.example" in caplog.text
+
+
+def test_hidden_text_keeps_a_polish_comment_of_a_page_without_a_declared_encoding():
+    body = "<html><body><!-- Zażółć gęślą jaźń --><p>x</p></body></html>".encode()
+    assert "Zażółć gęślą jaźń" in extract_worker.hidden_text(body)

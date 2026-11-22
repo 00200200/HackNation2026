@@ -11,6 +11,7 @@ import json
 import os
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -45,6 +46,7 @@ PASSTHROUGH = (
     "unpriced_requests",
     "moderator_case_id",
     "incident_matches",
+    "page",
 )
 
 
@@ -141,6 +143,21 @@ def confirm_fault(payload: dict, applied: str | None) -> None:
         )
 
 
+class _SameOriginRedirects(urllib.request.HTTPRedirectHandler):
+    """The default handler forwards every header, X-Eval-Token included, to the redirect target."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        old, new = urllib.parse.urlsplit(req.full_url), urllib.parse.urlsplit(newurl)
+        if (old.scheme, old.netloc) != (new.scheme, new.netloc):
+            return (
+                None  # the 3xx surfaces as an HTTPError instead of leaving the origin
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_opener = urllib.request.build_opener(_SameOriginRedirects)
+
+
 def ask(payload: dict, channel: str) -> dict:
     base = os.environ.get("PRAWDOWID_URL")
     if not base:
@@ -166,7 +183,13 @@ def ask(payload: dict, channel: str) -> dict:
             **faults,
         },
     )
-    with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+    try:
+        response = _opener.open(request, timeout=TIMEOUT_S)
+    except urllib.error.HTTPError as exc:
+        # A 429 or 5xx without the echo is not a product answer: the fault never ran.
+        confirm_fault(payload, exc.headers.get(APPLIED_HEADER))
+        raise
+    with response:
         confirm_fault(payload, response.headers.get(APPLIED_HEADER))
         shaped = to_eval_shape(json.loads(response.read().decode()))
         # Read by `evals.run.call`: an answer from the product's result cache says nothing about

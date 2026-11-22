@@ -56,7 +56,11 @@ class RobotsUnreachable(Blocked):
 
 
 class TooLarge(Blocked):
-    """The body is over the caller's byte cap."""
+    """The body is over the caller's byte cap. `status` is the HTTP status it came with."""
+
+    def __init__(self, message: str, status: int = 200):
+        super().__init__(message)
+        self.status = status
 
 
 @dataclass
@@ -180,7 +184,7 @@ async def get(
             async for chunk in resp.aiter_bytes():
                 body += chunk
                 if len(body) > max_bytes:
-                    raise TooLarge(f"{url} is over {max_bytes} bytes")
+                    raise TooLarge(f"{url} is over {max_bytes} bytes", resp.status_code)
             return Page(
                 url=str(resp.url),
                 status=resp.status_code,

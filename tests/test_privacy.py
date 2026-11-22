@@ -573,3 +573,15 @@ def test_a_long_url_keeps_its_numeric_path_component():
     assert mask_personal_data(url) == url
     assert mask_personal_data(f"tel. {url}") == f"tel. {url}"
     assert mask_personal_data("tel. 600123456 /x") == "tel. [telefon] /x"
+
+
+def test_a_phone_number_after_a_passport_number_is_masked():
+    assert (
+        mask_personal_data("Paszport AB1234567 600 123 456")
+        == "Paszport [numer paszportu] [telefon]"
+    )
+
+
+@pytest.mark.parametrize("label", ["karta nr", "kartą numer", "card no.", "Visa nr"])
+def test_a_card_number_after_a_card_label_is_masked(label):
+    assert mask_personal_data(f"{label} 4111111111111111") == f"{label} [numer karty]"

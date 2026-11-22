@@ -284,7 +284,12 @@ def test_page_fixture_case_runs_only_with_a_public_base_url(tmp_path, monkeypatc
 
     def ask(payload, channel):
         asked.append(payload)
-        return {"claims": [{"verdict": "potwierdzone"}], "security_events": [1]}
+        sha = hashlib.sha256((run.FIXTURE_DIR / "E05.html").read_bytes()).hexdigest()
+        return {
+            "claims": [{"verdict": "potwierdzone"}],
+            "security_events": [1],
+            "page": {"sha256": sha},
+        }
 
     monkeypatch.delenv(run.FIXTURE_BASE_ENV, raising=False)
     report, _ = run_eval(tmp_path, monkeypatch, cases=[case], ask=ask)

@@ -673,6 +673,18 @@ def test_a_page_fetched_now_replaces_its_stored_copy_in_the_candidates():
     )  # the page's text, not the stored one
 
 
+def test_a_snippet_of_a_page_leaves_its_stored_full_copy_in_the_candidates():
+    snippet = document("https://www.gov.pl/a").model_copy(
+        update={"snippet_only": "strona zablokowana"}
+    )
+    found = {
+        "web": [websearch.WebSearch(documents=[snippet])],
+        "corpus": corpus_bm25.EvidenceLookup(hits=[corpus_hit("https://www.gov.pl/a")]),
+    }
+    urls = [str(s.url) for s in pipeline._candidates(found)]
+    assert urls == ["https://www.gov.pl/a", "https://www.gov.pl/a"]
+
+
 def test_an_euvsdisinfo_record_in_the_corpus_is_context_only():
     hit = corpus_hit("https://euvsdisinfo.eu/report/x")
     found = {"web": [], "corpus": corpus_bm25.EvidenceLookup(hits=[hit])}

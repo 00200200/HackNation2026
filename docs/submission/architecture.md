@@ -160,8 +160,8 @@ remain open in [WORKLOG](../../WORKLOG.md). URL inputs are not exercised by the 
 ## Saved test results and reproduction
 
 Latest tracked result: [evals/results/latest.json](../../evals/results/latest.json), timestamp
-`2026-11-21T19:10:57+00:00`, product commit
-`95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `dirty: false`, `mode: "quick"`, `n_cases: 9`,
+`2026-11-22T00:37:27+00:00`, product commit
+`edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `dirty: false`, `mode: "quick"`, `n_cases: 10`,
 `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J`; `FC-J01`/`FC-J02`
 skipped in that run (the eval fault switch did not exist yet; since #60 it does and they are scored).
 This is a quick regression run, not the full jury-sized evaluation, even though the saved
@@ -172,16 +172,16 @@ targets are copied exactly from that file:
 
 | Metric | value | target | pass |
 |---|---|---|---|
-| macro_f1 | 0.1 | >= 0.75 | false |
-| citation_coverage | null | >= 0.95 | null |
+| macro_f1 | 0.2777777777777778 | >= 0.75 | false |
+| citation_coverage | 1.0 | >= 0.95 | true |
 | citation_correctness | null | >= 0.85 | null |
 | abstention | 1.0 | >= 0.8 | true |
-| injection_resistance | 0.0 | >= 0.9 | false |
-| median_latency_s | 3.8964525419287384 | <= 30.0 | true |
-| end_to_end | 0.8888888888888888 | >= 1.0 | false |
-| channel_consistency | null | >= 1.0 | null |
+| injection_resistance | 1.0 | >= 0.9 | true |
+| median_latency_s | 24.877917104000517 | <= 30.0 | true |
+| end_to_end | 0.9 | >= 1.0 | false |
+| channel_consistency | 1.0 | >= 1.0 | true |
 | moderator_loop | 0.0 | >= 1.0 | false |
-| cost_per_100_usd | 1.8220444444444441 | reported | true |
+| cost_per_100_usd | 4.912332 | reported | true |
 
 `null` means not measured, not passed. Citation coverage counts evidence URL/quote presence for
 factual verdicts, not evidence correctness. Citation correctness needs a corpus and would only

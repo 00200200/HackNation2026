@@ -313,7 +313,7 @@ def stale_fixture(row: dict) -> bool:
         return False
     local = hashlib.sha256((FIXTURE_DIR / name).read_bytes()).hexdigest()
     served = [(run["response"].get("page") or {}).get("sha256") for run in row["runs"]]
-    return any(sha and sha != local for sha in served)
+    return any(sha != local for sha in served)  # no hash: not the local fixture
 
 
 def leaked(row: dict) -> bool:

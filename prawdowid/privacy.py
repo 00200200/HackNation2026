@@ -91,6 +91,11 @@ PRODUCT_LABEL = re.compile(
     r"(?:(?:kreskow\w*|produktu|partii|seryjn\w*|katalogow\w*)\W{0,3})?$",
     re.IGNORECASE,
 )
+# A card label right in front of the number ("karta nr 4111...") wins over "nr": not a product code.
+CARD_LABEL = re.compile(
+    r"\b(?:kart\w*|card|visa|mastercard|maestro)\b\W{0,3}(?:\w{1,10}\W{0,3}){0,2}$",
+    re.IGNORECASE,
+)
 PASSPORT = re.compile(r"\b[A-Z]{2}\d{7}\b")
 # Digit boundaries, not \b: "PESEL44051401359" has no word boundary before the digits.
 ELEVEN_DIGITS = re.compile(r"(?<!\d)\d{11}(?!\d)")
@@ -197,6 +202,17 @@ def _mask_id_card(m: re.Match) -> str:
 
 
 def mask_personal_data(text: str) -> str:
+    # One pass is not always final: a masked passport in front of a mobile number hides it from the
+    # phone rule until the second pass. Repeat until the text stops changing (bounded).
+    for _ in range(5):
+        masked = _mask_once(text)
+        if masked == text:
+            break
+        text = masked
+    return text
+
+
+def _mask_once(text: str) -> str:
     # Account numbers first: they contain digit runs the other patterns would match.
     text = ACCOUNT.sub("[numer konta]", text)
     text = IBAN.sub(_masker(is_iban, "[numer konta]"), text)
@@ -238,7 +254,8 @@ def _mask_card(m: re.Match) -> str:
     # cards are nearly extinct); so is any number after a product label or inside a URL.
     before = m.string[max(m.start() - 60, 0) : m.start()]
     code = m.group()
-    if PRODUCT_LABEL.search(before) or URL_TAIL.search(before) or is_gtin13(code):
+    labelled = PRODUCT_LABEL.search(before) and not CARD_LABEL.search(before)
+    if labelled or URL_TAIL.search(before) or is_gtin13(code):
         return code
     return _mask_luhn(m)
 
