@@ -1,8 +1,8 @@
 """Known-claim lookup in Google Fact Check Tools (claims:search).
 
 Fact-checkers that publish ClaimReview markup may already have reviewed a claim. Each review comes
-back as a `Source` candidate for reranking. Its `textualRating` is only a signal kept next to the
-source: the verdict is still set in code. A missing key, quota error or outage is a limitation,
+back as a `Source` candidate for reranking. Its `textualRating` is only a signal kept on the
+source for the judge: the verdict is still set in code. A missing key, quota error or outage is a limitation,
 never a verdict.
 
 Docs: https://developers.google.com/fact-check/tools/api/reference/rest/v1alpha1/claims/search
@@ -16,6 +16,7 @@ from datetime import UTC, date, datetime
 import httpx2
 from pydantic import BaseModel, ValidationError
 
+from prawdowid import faults
 from prawdowid.contract import Source
 
 log = logging.getLogger("prawdowid")
@@ -37,10 +38,8 @@ LOOKUP_UNAVAILABLE = (
 
 
 class FactCheckHit(BaseModel):
+    # Carries the review's `rating` and `reviewed_claim` for the judge.
     source: Source
-    # The fact-checker's own rating ("False", "Fałsz", ...). A signal, never a verdict.
-    rating: str | None
-    reviewed_claim: str | None
 
 
 class FactCheckLookup(BaseModel):
@@ -56,6 +55,9 @@ async def search_claims(
     client: httpx2.AsyncClient | None = None,
 ) -> FactCheckLookup:
     """Look the claim up. `language=None` sends no language filter."""
+    if faults.active.get() == faults.FACTCHECK_DOWN:  # eval only, off in production
+        log.warning("factcheck unavailable: eval fault")
+        return FactCheckLookup(limitation=LOOKUP_UNAVAILABLE)
     key = os.getenv(KEY_ENV)
     if not key:
         log.warning("factcheck lookup skipped: %s is not set", KEY_ENV)
@@ -130,15 +132,15 @@ def _to_hit(found: dict, review: dict, fetched_at: datetime) -> FactCheckHit | N
             fetched_at=fetched_at,
             url=review["url"],
             source_type=SOURCE_TYPE,
-            # No excerpt of the review page yet; the reviewed claim stays in FactCheckHit.
+            # No excerpt of the review page yet; the reviewed claim is kept apart from it.
             fragment=None,
+            rating=review.get("textualRating"),
+            reviewed_claim=reviewed_claim,
         )
     except (KeyError, ValidationError):
         log.warning("factcheck review skipped: no usable url")
         return None
-    return FactCheckHit(
-        source=source, rating=review.get("textualRating"), reviewed_claim=reviewed_claim
-    )
+    return FactCheckHit(source=source)
 
 
 def _date(value: str | None) -> date | None:

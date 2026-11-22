@@ -59,8 +59,10 @@ smoke test against plain DuckDuckGo got 0/8.
 
 ## Levers for the next run (not yet done)
 
-- Raise `PRAWDOWID_CHECK_BUDGET_S` (currently 25 s; try ~45 s) so claims stop timing out into
-  `nie sprawdzono`.
+- Raise `PRAWDOWID_CHECK_BUDGET_S` (currently 25 s) so claims stop timing out into
+  `nie sprawdzono`. Measured 2026-11-22: 51/71 at 600 s (not shippable, the API allows 60 s);
+  at 25 s, 31–54 of 71 checks were cut while external services were slow. Pick a value under 60 s
+  and run a full eval at it on a committed commit.
 - Wire the #49 evidence corpus into `verify()` so `citation_correctness` can be measured.
 - Tighten the B/C rules in `decide()`, plus Dominik's #30 must-fix (the evidence gap should be
   scoped per `doc_id`, not globally).

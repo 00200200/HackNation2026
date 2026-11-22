@@ -16,7 +16,7 @@ Discord /sprawdz -> HTTP, X-Channel: discord +
     -> text, or guarded URL fetch and extraction
     -> claim extraction and search queries (PydanticAI / Anthropic)
     -> each checkable claim in parallel:
-         Google Fact Check + EUvsDisinfo MCP + Tavily / allowlisted pages
+         Google Fact Check + EUvsDisinfo MCP + Perplexity / allowlisted pages
          -> deduplicate and rerank fragments -> label and validate quotes
          -> judge.decide() -> shared CheckResult -> channel rendering
 
@@ -73,7 +73,7 @@ separate, already-populated source and does not substitute for the incident base
 
 | Role | Default model ID on `main` | Configuration / source |
 |---|---|---|
-| Extract claims and queries | `anthropic:claude-opus-5-5` | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
+| Extract claims and queries | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
 | Rerank fragments | `anthropic:claude-haiku-5-5` | `PRAWDOWID_RERANK_MODEL`, [rerank.py](../../prawdowid/rerank.py) |
 | Label evidence | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_JUDGE_MODEL`, [judge.py](../../prawdowid/judge.py) |
 
@@ -81,9 +81,11 @@ These are literal code defaults, not a statement about currently available publi
 Availability and the model overrides used in the saved eval are UNCONFIRMED: its JSON does not
 record them. All model calls use PydanticAI native structured output through the installed
 Anthropic provider. Alternative provider dependencies and credentials are not demonstrated.
-Web search (step 2b) is now **Tavily** (`tavily_search` in `prawdowid/websearch.py`), which
-replaced DuckDuckGo (#7, proposed as #20; wired as #45) because DuckDuckGo via `ddgs` returned no
-results from our machines and left retrieval empty. Retrieval providers and their terms are listed
+Web search (step 2b) is now the **Perplexity Search API** (`perplexity_search` in
+`prawdowid/websearch.py`, default since 2026-11-22), which replaced Tavily (#45), which had replaced
+DuckDuckGo (#7, #20) because `ddgs` returned no results from our machines. On 10 eval claims both found
+an allowlisted page for every claim; Perplexity answered in 0.5 s median against 2.7 s and returned
+more publication dates. Tavily and OpenAI's `web_search` stay selectable (`PRAWDOWID_SEARCH_PROVIDER`). Retrieval providers and their terms are listed
 in [sources.md](sources.md).
 
 ## Deployment, storage and data processing
@@ -93,7 +95,7 @@ in [sources.md](sources.md).
 [compose.yaml](../../compose.yaml) publishes only the frontend by default, with backend health
 checks. The Discord service and local PostgreSQL service are opt-in profiles. Compose now
 forwards the extraction model setting, Anthropic key, `GOOGLE_FACTCHECK_API_KEY`,
-`TAVILY_API_KEY`, `EUVSDISINFO_API_KEY` and `PRAWDOWID_INCIDENTS_PATH`, and already points the
+`PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `EUVSDISINFO_API_KEY` and `PRAWDOWID_INCIDENTS_PATH`, and already points the
 check log and source cache at a writable `/tmp` path for the non-root `nobody` user.
 
 The API runs without PostgreSQL. Step 2c, the own source store, is explicitly disabled in
@@ -113,7 +115,7 @@ and again in every log line, web search and own-store query (#17, #39, merged in
 Each check is kept 30 days as one masked record in the check log (`prawdowid/checklog.py`), which
 the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Input goes to
 Anthropic masked (a placeholder keeps the sentence shape so claims still split); masked claim text
-and queries go to Google, Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
+and queries go to Google, Perplexity and EUvsDisinfo when configured. Details and open gaps (Discord
 has no delete command, Docker stdout logs sit outside retention): [docs/privacy.md](../privacy.md).
 Browser traffic, fetched evidence, the host and Discord also process data. Exact provider
 processing locations and retention agreements are UNCONFIRMED. See [risks.md](risks.md) for code

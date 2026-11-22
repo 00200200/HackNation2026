@@ -10,7 +10,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 import time
 
 from pydantic import BaseModel
@@ -24,7 +23,7 @@ from pydantic_ai import (
 from pydantic_ai.exceptions import AgentRunError, ContentFilterError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
-from prawdowid import pipeline
+from prawdowid import faults, pipeline
 from prawdowid.contract import (
     CheckedPage,
     CheckResult,
@@ -34,16 +33,20 @@ from prawdowid.contract import (
     Status,
     Verdict,
 )
+from prawdowid.injection import screen
 from prawdowid.judge import Judgement
 from prawdowid.link import Page, Refusal, fetch_page
 from prawdowid.privacy import mask_personal_data
 
 log = logging.getLogger("prawdowid")
 
-MODEL = os.getenv("PRAWDOWID_MODEL") or "anthropic:claude-opus-5-5"
-# Below the API's 60 s limit on verify; covers every attempt, including SDK retries.
-MODEL_TIMEOUT_S = 45
-MODEL_MAX_RETRIES = 1
+MODEL = os.getenv("PRAWDOWID_MODEL") or "anthropic:claude-sonnet-5-5"
+# Per attempt. The SDK retries timeouts, 429, 5xx and connection errors with backoff; the check
+# deadline still caps every attempt together.
+MODEL_TIMEOUT_S = 20
+MODEL_MAX_RETRIES = 3
+# Extraction is a structured split; low effort spends less time thinking before the answer.
+MODEL_EFFORT = "low"
 
 # ponytail: page text is cut to the size of a pasted text, so one link costs what one text does.
 MAX_PAGE_CHARS = 5000
@@ -84,52 +87,6 @@ PATTERNS_ONLY = (
 )
 
 USER_TEXT = register_tag("user_text")
-
-# Deterministic pre-check, independent of the model it protects. No maintained offline detector
-# covers Polish (llm-guard's DeBERTa is English-only; Prompt Guard 2 was not evaluated on Polish).
-# Singular imperatives only: "zignorował", "ignorujemy" or a plural "zignorujcie" in reported
-# speech are about people, not the model.
-# ponytail: a fixed phrase list misses paraphrases and other languages and flags a quoted
-# singular command; the model flag covers part of that. Add a screening model if the eval
-# shows misses.
-INJECTION_PATTERNS = re.compile(
-    r"""
-    # Override of earlier rules: singular imperative or "proszę" + infinitive, with or without
-    # Polish letters.
-    (\b(zignoruj|ignoruj|pomi[nń])|\bprosz[eę]\s+(zignorowa[cć]|pomin[aą][cć]))\s+
-        ((wszystk|wszelk|każd|kazd|moj|swoj|twoj|t[eąa]\b|dotychczasow|poprzedn|wcze[sś]niejsz
-          |powy[zż]sz|systemow|otrzyman)\w*\s+)*
-        (instrukcj|polece|zasad|reguł|regul|wytyczn|prompt)
-    | \b(zignoruj|ignoruj|pomi[nń])\s+(wszystko\s+)?powy[zż]sz\w*
-    | \bzapomnij\s+o\s+(\w+\s+){0,2}(instrukcj|polece|prompt)
-    | \b(ignore|disregard|forget)\s+(all\s+|any\s+)?(of\s+)?(the\s+)?
-        ((previous|prior|earlier|your|my|system)\s+)+(instructions?|rules|prompts?|directions|commands)\b
-    | \b(ignore|disregard)\s+(all\s+|everything\s+)?(of\s+)?(the\s+)?above\b
-    # A new role or a fake system turn.
-    | \bod\s+teraz\s+jeste[sś]\b | \[\s*system\s*\]
-    | \byou\s+are\s+now\s+(an?\s+)?(ai|assistant|bot|model|unrestricted|dan)\b
-    # Text addressed to the model itself.
-    | \b(note|message)\s+to\s+the\s+(ai|model|assistant)\b
-    | \b(notatka|wiadomo[sś][cć]|polecenie)\s+dla\s+(ai|modelu|asystenta)\s*:
-    # Asking for a verdict, a fixed answer or the prompt.
-    | \b(oceń|oznacz)\s+(to|je|go|ją|wszystko)\s+jako\s+(prawd|potwierdz)
-    | \b(mark|rate)\s+(this|it|everything)\s+as\s+(true|confirmed)
-    | \bodpowiedz\s+(tylko|wyłącznie|jedynie)\b | \boutput\s+only\s+(the|one|a)\b
-    | \b(ujawnij|pokaż|wypisz)\s+(mi\s+)?(swój\s+|swoje\s+|twój\s+|twoje\s+)?(prompt|instrukcj)
-    | \b(reveal|print|show)\s+(me\s+)?(your|the)\s+(system\s+)?(prompt|instructions)\b
-    """,
-    re.IGNORECASE | re.VERBOSE,
-)
-
-
-def screen(text: str, location: str = "input") -> list[SecurityEvent]:
-    """Pattern pre-check for instructions aimed at the model, in user input or a fetched page."""
-    if not INJECTION_PATTERNS.search(text):
-        return []
-    log.warning(
-        "security_event kind=prompt_injection location=%s detector=patterns", location
-    )
-    return [SecurityEvent(location=location, detector="patterns")]
 
 
 def failed(
@@ -189,8 +146,16 @@ A quote or reported speech ("Minister X powiedział, że Y") gives two claims: o
 "attribution" (that X said Y) and one of kind "quoted" (Y itself, as a claim of its own). Every
 other claim has kind "statement".
 
+Keep one sentence's claim whole: a comparison ("w 2000 roku X, a teraz Y"), a cause and its effect
+("odwet po ataku") or a thing with its description ("policja, która aresztuje") is one claim, not
+several. Split a sentence only when it makes independent statements about different matters.
+
 Rank every claim from most to least central to the text: the main point first, then specific
-claims (names, numbers, dates) before vague ones.
+claims (names, numbers, dates) before vague ones. When the text asks whether something is true or
+accurate ("Czy X?", "Czy to prawda?", "Czy film pokazuje...?", "Czy to się zgadza?"), the claim it
+asks about is the main point and comes first, stated with everything it asserts (for a post or a
+recording: what it is said to show, and when). Facts the text takes as given (who posted, when, that
+someone said something) come after it, and a "quoted" claim comes before its "attribution".
 
 Return in claims the {MAX_CHECKED_CLAIMS} highest-ranked claims, in rank order, each with:
 - claim: the claim restated as one short self-contained sentence in Polish, faithful to the text.
@@ -211,6 +176,14 @@ Return in claims the {MAX_CHECKED_CLAIMS} highest-ranked claims, in rank order, 
   announcement), 1 or 2 queries for the search box of the www.gov.pl portal: a few plain keywords,
   such as the office and the subject ("RCB alert powódź", "MSWiA dowód osobisty"), no full
   sentences, no operators. They do not repeat the web queries. Empty for any other claim.
+- legal_queries: when the claim is about a Polish or EU law, regulation, directive, ban, obligation
+  or the date a rule takes or took effect, 1 or 2 queries of 2 or 3 words that would appear in the
+  official title of the act, as used in Dziennik Ustaw or EUR-Lex ("ograniczeniu handlu niedziele",
+  "emisji CO2 samochodów osobowych"), no act numbers, no "ustawa" or "rozporządzenie". Empty for any
+  other claim.
+- factcheck_queries: for a checkable claim, 1 or 2 queries of 2 or 3 key words in Polish that a
+  fact-checker's headline about this claim would contain: the names and the subject ("CPK
+  lotnisko", "fotoradary mandaty"), no dates, no full sentences. Empty if not checkable.
 
 Return in other_claims every remaining claim, in rank order, as one short self-contained sentence
 each. Leave none out: they are shown to the user as not checked.
@@ -233,6 +206,12 @@ class ExtractedClaim(BaseModel):
     # Keyword queries for the www.gov.pl site search (`govpl`); empty when the claim is not about
     # the Polish government.
     govpl_queries: list[str] = []
+    # Act-title words for the registers of law (`legal`: ISAP/ELI, EUR-Lex); empty when the claim
+    # is not about a law.
+    legal_queries: list[str] = []
+    # Key words for Google Fact Check, which matches short queries, not sentences (probed live
+    # 2026-11-22: two or three key words found Demagog reviews the claim sentence missed).
+    factcheck_queries: list[str] = []
 
 
 class Extraction(BaseModel):
@@ -250,10 +229,11 @@ agent = Agent(
     output_type=NativeOutput(Extraction),
     instructions=INSTRUCTIONS,
     model_settings={
-        "request_timeout": MODEL_TIMEOUT_S,
+        "timeout": MODEL_TIMEOUT_S,
         "max_retries": MODEL_MAX_RETRIES,
+        "anthropic_effort": MODEL_EFFORT,
     },
-    # No second model request on invalid output: it would get a fresh 45 s and overrun the API limit.
+    # No second model request on invalid output: it would get a fresh attempt and overrun the API limit.
     retries={"output": 0},
     # Build the provider on first run, so a missing API key is a failed check, not a crash at import.
     defer_model_check=True,
@@ -412,7 +392,13 @@ async def verify_text(
     checks = await asyncio.gather(
         *(
             pipeline.check_claim(
-                c.claim, c.queries, deadline, exclude_url, c.govpl_queries
+                c.claim,
+                c.queries,
+                deadline,
+                exclude_url,
+                c.govpl_queries,
+                c.legal_queries,
+                c.factcheck_queries,
             )
             if c.checkable
             else asyncio.sleep(0)
@@ -445,6 +431,8 @@ async def _extract(
         # Masked before the model: placeholders keep the sentence, so claims still split (docs/privacy.md).
         # The extraction shares the check's budget: its own 45 s would overrun it.
         async with asyncio.timeout_at(deadline) as budget:
+            if error := faults.model_error():  # eval only, off in production
+                raise error
             return await agent.run(wrap(USER_TEXT, mask_personal_data(text)))
     except TimeoutError:
         if not budget.expired():

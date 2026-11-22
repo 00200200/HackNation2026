@@ -56,6 +56,10 @@ class Source(BaseModel):
     url: HttpUrl
     source_type: str
     fragment: str | None = None
+    # Google Fact Check ClaimReview: the fact-checker's own rating ("Fałsz", "Manipulacja", ...)
+    # of `reviewed_claim`. Shown to the judge as a signal, never a verdict.
+    rating: str | None = None
+    reviewed_claim: str | None = None
 
 
 class ModelCall(BaseModel):
@@ -123,8 +127,9 @@ class SecurityEvent(BaseModel):
     # Where they were found: "input" (the user's text), "page" (the page a link points to) or
     # "source" (a retrieved evidence page).
     location: Literal["input", "page", "source"]
-    # "patterns": the fixed pre-check in code; "model": a model's own flag (extraction or judge).
-    detector: Literal["patterns", "model"]
+    # "patterns": our fixed phrase list in code; "defender": StackOne Defender's pattern tier on a
+    # retrieved page (`prawdowid/injection.py`); "model": a model's own flag (extraction or judge).
+    detector: Literal["patterns", "defender", "model"]
 
 
 class CheckResult(BaseModel):

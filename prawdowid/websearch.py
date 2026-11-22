@@ -1,9 +1,9 @@
 """Step 2b: web search on allowlisted domains, page fetch, text extraction and the source cache.
 
-The search provider is one function with the `SearchProvider` signature. It is Tavily's official
-`/search` endpoint through `tavily-python` (https://docs.tavily.com/documentation/api-reference/endpoint/search),
-restricted server-side to `ALLOWLIST` via `include_domains`. A Brave or Exa wrapper with the same
-signature replaces it in one place.
+The search provider is one function with the `SearchProvider` signature, picked by
+`PRAWDOWID_SEARCH_PROVIDER`: Perplexity's Search API by default (`perplexityai` SDK,
+https://docs.perplexity.ai/api-reference/search-post), Tavily's `/search` (`tavily-python`) or
+OpenAI's `web_search` tool. Each is restricted server-side to `ALLOWLIST`.
 
 A failed or empty search is a technical limit returned in `WebSearch.limitation`, never a verdict.
 """
@@ -15,9 +15,11 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
 from typing import NamedTuple, Protocol
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx2
+import openai
+import perplexity
 import requests
 import trafilatura
 from pydantic import BaseModel
@@ -67,6 +69,12 @@ ALLOWLIST = {
     "fakenews.pl": Domain("fact_check", "FakeNews.pl"),
     "sprawdzam.afp.com": Domain("fact_check", "AFP Sprawdzam"),
     "pap.pl": Domain("news", "Polska Agencja Prasowa"),
+    # Crisis and safety sources from the team's list (corpus/seeds.txt); gov.pl hosts fall under gov.pl.
+    "policja.pl": Domain("official", "Policja"),
+    "cert.pl": Domain("official", "CERT Polska (NASK)"),
+    "imgw.pl": Domain("official", "IMGW-PIB"),
+    "portalpasazera.pl": Domain("primary", "PKP Polskie Linie Kolejowe"),
+    "kgsok.pl": Domain("primary", "Straż Ochrony Kolei"),
 }
 
 SEARCH_TIMEOUT_S = 10
@@ -155,6 +163,75 @@ def tavily_search(query: str, *, domains: Sequence[str], limit: int) -> list[Sea
     ]
 
 
+OPENAI_SEARCH_MODEL = os.getenv("PRAWDOWID_OPENAI_SEARCH_MODEL") or "gpt-6.2-astra"
+_openai_client: openai.OpenAI | None = None
+
+
+def openai_search(query: str, *, domains: Sequence[str], limit: int) -> list[SearchHit]:
+    """OpenAI Responses API `web_search` tool, restricted to `domains` (at most 100, subdomains
+    included). https://developers.openai.com/api/docs/guides/tools-web-search
+
+    A model run, not a search index: it returns cited URLs and titles, no publication dates, so
+    `published_at` comes from the fetched page only. Cited pages come first, then other sources.
+    """
+    global _openai_client
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise SearchUnavailable("OPENAI_API_KEY not set")
+    if _openai_client is None:
+        # Retries live in `_search`. The whole search budget per call: a model run took 14–18 s
+        # (median, 2026-11-22), so this provider needs PRAWDOWID_WEB_SEARCH_BUDGET_S raised.
+        _openai_client = openai.OpenAI(
+            api_key=api_key, timeout=SEARCH_BUDGET_S, max_retries=0
+        )
+    try:
+        response = _openai_client.responses.create(
+            model=OPENAI_SEARCH_MODEL,
+            reasoning={"effort": "low"},
+            tools=[
+                {
+                    "type": "web_search",
+                    "filters": {"allowed_domains": list(domains)},
+                    "user_location": {"type": "approximate", "country": "PL"},
+                    "search_context_size": "low",
+                }
+            ],
+            tool_choice="required",
+            include=["web_search_call.action.sources"],
+            input=f"Find Polish web pages that confirm or refute this, and cite them: {query}",
+        )
+    except openai.APIError as exc:
+        raise SearchUnavailable(str(exc)) from exc
+    hits: dict[str, SearchHit] = {}
+    for item in response.output:
+        if item.type == "message":
+            for part in item.content:
+                for a in getattr(part, "annotations", None) or []:
+                    if a.type == "url_citation" and _untagged(a.url) not in hits:
+                        hits[_untagged(a.url)] = SearchHit(
+                            url=_untagged(a.url),
+                            title=a.title or "",
+                            snippet=part.text[a.start_index : a.end_index],
+                        )
+    for item in response.output:
+        if item.type == "web_search_call":
+            for s in getattr(item.action, "sources", None) or []:
+                url = _untagged(s.url)
+                hits.setdefault(url, SearchHit(url=url, title="", snippet=""))
+    return list(hits.values())[:limit]
+
+
+def _untagged(url: str) -> str:
+    """OpenAI appends `utm_source=openai` to cited URLs (seen live 2026-11-22), so the same page
+    came back twice: once cited, once as a plain source."""
+    parts = urlsplit(url)
+    pairs = parse_qsl(parts.query, keep_blank_values=True)
+    if ("utm_source", "openai") not in pairs:
+        return url  # untouched: re-encoding could change a URL the provider gave us
+    query = urlencode([p for p in pairs if p != ("utm_source", "openai")])
+    return urlunsplit(parts._replace(query=query))
+
+
 def _tavily_date(value: str | None) -> date | None:
     """Tavily sends either an RFC 2822 string or a plain ISO date, undocumented which."""
     if parsed := _date(value):
@@ -163,6 +240,54 @@ def _tavily_date(value: str | None) -> date | None:
         return parsedate_to_datetime(value).date()
     except (TypeError, ValueError):
         return None
+
+
+_perplexity_client: perplexity.Perplexity | None = None
+
+
+def perplexity_search(
+    query: str, *, domains: Sequence[str], limit: int
+) -> list[SearchHit]:
+    """Perplexity Search API, restricted to `domains` (at most 200; subdomains included, probed
+    2026-11-22: a `gov.pl` entry returned sejm.gov.pl and stat.gov.pl pages).
+    https://docs.perplexity.ai/api-reference/search-post
+    """
+    global _perplexity_client
+    api_key = os.getenv("PERPLEXITY_API_KEY")
+    if not api_key:
+        raise SearchUnavailable("PERPLEXITY_API_KEY not set")
+    if _perplexity_client is None:
+        # Retries live in `_search`, one layer only.
+        _perplexity_client = perplexity.Perplexity(
+            api_key=api_key, timeout=SEARCH_TIMEOUT_S, max_retries=0
+        )
+    try:
+        response = _perplexity_client.search.create(
+            query=query,
+            max_results=limit,
+            search_domain_filter=list(domains),
+            country="PL",
+            search_language_filter=["pl"],
+        )
+    except perplexity.APIError as exc:
+        raise SearchUnavailable(str(exc)) from exc
+    return [
+        SearchHit(
+            url=r.url, title=r.title, snippet=r.snippet, published_date=_date(r.date)
+        )
+        for r in response.results
+        if r.url
+    ]
+
+
+# Perplexity by default (user decision 2026-11-22): 0.5 s median against Tavily's 2.7 s on the
+# same 10 eval claims, both 10/10 with an allowlisted page. Tavily and OpenAI stay selectable.
+PROVIDERS: dict[str, SearchProvider] = {
+    "perplexity": perplexity_search,
+    "tavily": tavily_search,
+    "openai": openai_search,
+}
+PROVIDER = PROVIDERS[os.getenv("PRAWDOWID_SEARCH_PROVIDER") or "perplexity"]
 
 
 class WebSearch(BaseModel):
@@ -191,7 +316,7 @@ async def search_web(
     *,
     limit: int = 5,
     domains: Sequence[str] = tuple(ALLOWLIST),
-    provider: SearchProvider = tavily_search,
+    provider: SearchProvider = PROVIDER,
     transport: httpx2.AsyncBaseTransport | None = None,  # tests only
     save: bool = True,
     skip_hosts: frozenset[str] = frozenset(),
@@ -257,7 +382,7 @@ async def _search(
                         asyncio.to_thread(
                             provider, query, domains=domains, limit=limit
                         ),
-                        SEARCH_TIMEOUT_S + 5,
+                        max(SEARCH_TIMEOUT_S, SEARCH_BUDGET_S) + 5,
                     )
                 except (SearchUnavailable, TimeoutError) as exc:
                     log.warning("web search attempt %d failed: %r", attempt, exc)

@@ -38,7 +38,7 @@ back as `nie sprawdzono` with the reason.
 - **The model reads, the code decides.** Claude (through PydanticAI) splits the text into claims
   and labels quotes. The verdict comes from rules in `judge.decide()`.
 - **Sources per claim, in parallel:** Google Fact Check Tools (fact-checkers' ratings), EUvsDisinfo as context only, the www.gov.pl site search, and
-  Tavily web search restricted to allowlisted domains.
+  Perplexity web search restricted to allowlisted domains (Tavily or OpenAI selectable).
 - **Privacy:** PESEL, phone, e-mail, account and card numbers are masked before the model. Checks
   are kept for 30 days and can be deleted per session.
 - **Two channels, one API:** the web page and the Discord command `/sprawdz` call the same
@@ -76,15 +76,16 @@ domain's licence is confirmed, none today), one record per URL, dropped after 30
 Put these in `.env` in the repository root. The file is git-ignored and is not copied into the
 image. `make dev` loads it into the API environment. Compose reads it for interpolation but only
 forwards variables declared in `compose.yaml`: the backend gets `ANTHROPIC_API_KEY`,
-`PRAWDOWID_MODEL`, `GOOGLE_FACTCHECK_API_KEY`, `TAVILY_API_KEY`, `EUVSDISINFO_API_KEY` and
+`PRAWDOWID_MODEL`, `GOOGLE_FACTCHECK_API_KEY`, `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `OPENAI_API_KEY`,
+`PRAWDOWID_SEARCH_PROVIDER`, `PRAWDOWID_OPENAI_SEARCH_MODEL`, `EUVSDISINFO_API_KEY` and
 `PRAWDOWID_INCIDENTS_PATH`, and its check log and source cache already point at a writable `/tmp`
 path. Other tuning variables need an explicit Compose environment override.
 
 | Variable | Required | Default | What it does |
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | none | Anthropic API key. Without it every check returns `technical_error`. |
-| `PRAWDOWID_MODEL` | no | `anthropic:claude-opus-5-5` | PydanticAI model id (`provider:model`). |
-| `PRAWDOWID_CHECK_BUDGET_S` | no | `25` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. |
+| `PRAWDOWID_MODEL` | no | `anthropic:claude-sonnet-5-5` | PydanticAI model id (`provider:model`) for claim extraction. Sonnet since 2026-11-22: same accuracy as Opus in a full eval run with `PRAWDOWID_CHECK_BUDGET_S=600` (51/71 each), 3.0 s median extraction vs 4.3 s. |
+| `PRAWDOWID_CHECK_BUDGET_S` | no | `25` | Time budget for the whole check, in seconds. Claims still running at the end are `not_checked`. The best accuracy so far (51/71, macro_f1 0.763, 2026-11-22) was measured with `600`, which is not shippable (the API allows 60 s). At the default 25 s the runs that night had 31–54 of 71 checks cut while external services were slow, and failed every accuracy target: see `evals/results/HISTORY.md`. |
 | `PRAWDOWID_WEB_SEARCH_BUDGET_S` | no | `10` | Longest one web search query may take, retry included, before it counts as unavailable. |
 | `PRAWDOWID_PAGE_BUDGET_S` | no | `8` | Longest one page fetch may take (robots.txt and page); a slower page is skipped, the others are kept. |
 | `PRAWDOWID_GOVPL` | no | `1` | `0` switches off the www.gov.pl site search (`prawdowid/govpl.py`); its queries then go to web search, which searches www.gov.pl again. See [docs/sources.md](docs/sources.md). |
@@ -92,7 +93,11 @@ path. Other tuning variables need an explicit Compose environment override.
 | `DISCORD_BOT_TOKEN` | only for the Discord bot | none | Bot token from the Discord developer portal. Without it the bot refuses to start. |
 | `PRAWDOWID_API_URL` | no | `http://127.0.0.1:8000` | API the Discord bot calls (`http://backend:8000` in Docker). |
 | `GOOGLE_FACTCHECK_API_KEY` | no | none | Google API key with the Fact Check Tools API enabled. Without it the known-claim lookup is skipped and reported as unavailable. |
-| `TAVILY_API_KEY` | no | none | Tavily API key (`tavily-python`) for web search on allowlisted domains (step 2b). Without it the web search is skipped and reported as unavailable. |
+| `PERPLEXITY_API_KEY` | no | none | Perplexity API key (`perplexityai`) for the default web search on allowlisted domains (step 2b). Without it the web search is skipped and reported as unavailable. |
+| `TAVILY_API_KEY` | no | none | Tavily API key (`tavily-python`) for web search with `PRAWDOWID_SEARCH_PROVIDER=tavily`. Without it the web search is skipped and reported as unavailable. |
+| `PRAWDOWID_SEARCH_PROVIDER` | no | `perplexity` | Web search provider for step 2b, each restricted to the same allowlist: `perplexity` (Perplexity Search API, `perplexityai`), `tavily` (`tavily-python`) or `openai` (OpenAI Responses API `web_search` tool). OpenAI returns no publication dates and took a median of 14–18 s per query (2026-11-22), so it needs `PRAWDOWID_WEB_SEARCH_BUDGET_S` and `PRAWDOWID_CHECK_BUDGET_S` raised; it scored lower than Tavily in the full eval (see `evals/results/HISTORY.md`). |
+| `OPENAI_API_KEY` | with `PRAWDOWID_SEARCH_PROVIDER=openai` | none | OpenAI API key for the `openai` search provider. Without it the web search is skipped and reported as unavailable. |
+| `PRAWDOWID_OPENAI_SEARCH_MODEL` | no | `gpt-6.2-astra` | Model that runs the OpenAI `web_search` tool. |
 | `DOMAIN` | with `compose.prod.yaml` | none | Public domain Caddy gets the HTTPS certificate for (`compose.prod.yaml`, see `docs/deploy.md`). |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | with `compose.prod.yaml` | none | Database, user and password of the `db` service. `compose.prod.yaml` passes them to the backend as `DATABASE_URL`. `POSTGRES_PASSWORD` is also the password of the local `sourcedb` service (default `prawdowid`, port bound to 127.0.0.1 only), applied only when its `sourcedb_data` volume is created; see [deletion instructions](docs/sources.md). `make db-seed` refuses until the team approves sources for full-text storage; see [the prerequisite](docs/sources.md#full-text-seed-approval). |
 | `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database. The backend never needs it; `compose.prod.yaml` sets it for production's separate `db`, which has no source-store schema, so enabling step 2c in production needs this migration applied there first. Start the database with `make db` (127.0.0.1:5433). The corpus search (`prawdowid/corpus_search.py`) reads its own tables (`corpus_documents`, `corpus_chunks`) from the same database; `make index` builds them from `corpus/evidence.jsonl`. |
@@ -102,7 +107,7 @@ path. Other tuning variables need an explicit Compose environment override.
 | `PRAWDOWID_EMBEDDING_MODEL` | no | `intfloat/multilingual-e5-large` | Local embedding model for corpus search (fastembed). Changing it rebuilds the index on the next `make index`. |
 | `FASTEMBED_CACHE_PATH` | no | fastembed's temp dir | Where the embedding model files are kept (`/models` in the image). |
 
-The extraction call has a 45 s provider request timeout and at most one SDK retry, but shares
+The extraction call has a 20 s timeout per attempt and up to 3 SDK retries, but shares
 the 25 s whole-check deadline with URL fetching and per-claim checks, inside the API's 60 s
 limit. Extraction errors and a missing model key return `technical_error`; a
 model refusal returns `cannot_check`. Both carry a Polish message and no claims. Retrieval

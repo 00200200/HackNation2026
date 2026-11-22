@@ -32,7 +32,7 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 5. Wyszukiwanie i ocena
 
-- Równolegle: Google Fact Check Tools, Tavily i EUvsDisinfo MCP.
+- Równolegle: Google Fact Check Tools, Perplexity Search API i EUvsDisinfo MCP.
 - Fragmenty są porządkowane, a cytaty sprawdzane z pobranym tekstem. Reguły w kodzie ustalają ocenę.
 - EUvsDisinfo daje kontekst; własna baza PostgreSQL jest wyłączona.
   [Architektura](architecture.md), [źródła i prawa do wykorzystania](sources.md).

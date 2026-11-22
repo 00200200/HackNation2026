@@ -90,7 +90,8 @@ call with the id from the log.
 |---|---|---|
 | Anthropic API (Claude) | Masked text to check; claims and evidence fragments (rerank, judge) | Every check. |
 | Google Fact Check Tools API | Claim text | Every checkable claim, when `GOOGLE_FACTCHECK_API_KEY` is set. |
-| Tavily (`/search`, `tavily-python`) | Masked search queries | Every checkable claim, when `TAVILY_API_KEY` is set, and the corpus builder. |
+| Perplexity Search API (`perplexityai`) | Masked search queries | Every checkable claim, when `PERPLEXITY_API_KEY` is set (the default search provider), and the corpus builder. |
+| Tavily (`/search`, `tavily-python`) or OpenAI (`web_search` tool) | Masked search queries | Only with `PRAWDOWID_SEARCH_PROVIDER=tavily` or `openai`. |
 | EUvsDisinfo MCP server (`mcp.euvsd.info`) | Claim text | Every checkable claim, when `EUVSDISINFO_API_KEY` is set. |
 | The incident base (`prawdowid/incidents.py`) | The raw input and the final URL | Every check; local file, nothing leaves the server. |
 | The site a link points to | A request from our server | Link checks. The site sees our server's address, not the user's. |
