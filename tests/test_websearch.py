@@ -408,7 +408,7 @@ def test_a_pdf_over_the_page_cap_stands_as_its_snippet(monkeypatch):
 
 @pytest.mark.parametrize(
     ("status", "snippet"),
-    [(404, None), (410, None), (401, None), (402, None), (403, TOO_BIG)],
+    [(404, None), (410, None), (401, None), (402, None), (403, BLOCKED)],
 )
 def test_an_oversized_error_page_follows_the_status_rule(monkeypatch, status, snippet):
     monkeypatch.setattr(websearch, "MAX_PAGE_BYTES", 100)

@@ -5,9 +5,7 @@ The only monetary and measured latency inputs below come from
 [evals/results/latest.json](../../evals/results/latest.json), timestamp
 `2026-11-22T00:37:27+00:00`, product commit
 `edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `mode: "quick"`, `n_cases: 10`, `dirty: false`.
-The run has `overall_pass: false`; it is not evidence of production quality or capacity. It also
-predates PR #40 (this docs change) landing on `main`: no eval has run on the merged commit, by
-user decision (`HN_SKIP_EVAL=1`) — a fresh eval on the merged commit is pending.
+The run has `overall_pass: false`; it is not evidence of production quality or capacity.
 
 ## Estimate for 1,000 checks
 
@@ -66,13 +64,13 @@ from the linked code, not from a cost assumption:
 - API: `10/minute` per client IP, with HTTP `429` and a Polish notice; outer verification timeout
   `60` seconds ([app.py](../../prawdowid/app.py)). Discord users share the bot's API client IP;
   there is no per-Discord-user quota ([discord_bot.py](../../prawdowid/discord_bot.py)).
-- Extraction defaults to `5` claims and `3` queries per checkable claim
+- Extraction defaults to `3` checked claims and `3` queries per checkable claim
   ([verifier.py](../../prawdowid/verifier.py)). Claims and retrieval calls fan out with
   `asyncio.gather` and `asyncio.TaskGroup`; there is no global queue, concurrency semaphore or daily spend cap
   ([pipeline.py](../../prawdowid/pipeline.py)).
-- The nominal whole-check budget is `25` seconds, EUvsDisinfo's pipeline cap is `5` seconds and a
+- The nominal whole-check budget is `40` seconds, EUvsDisinfo's pipeline cap is `5` seconds and a
   retry needs at least `18` seconds remaining ([pipeline.py](../../prawdowid/pipeline.py)).
-  Extraction has a `45` second provider request timeout, but shares the `25` second whole-check
+  Extraction has a `45` second provider request timeout, but shares the `40` second whole-check
   deadline with URL fetching and claim checks ([verifier.py](../../prawdowid/verifier.py)).
   These are configured cancellation limits, not a measured capacity guarantee.
 - Web queries are capped at `10` seconds including retry, page fetches at `8` seconds

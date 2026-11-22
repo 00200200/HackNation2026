@@ -54,6 +54,8 @@ class FaultNotApplied(RuntimeError):
     """A fault case whose simulated fault the product did not confirm. The answer is a healthy
     run, so scoring it would blame the product for a harness or deployment gap."""
 
+    retryable = False  # set when the answer was a 429 or 5xx: one more try may reach the product
+
 
 _last_call = 0.0
 _turn = threading.Lock()  # concurrent cases still start one by one
@@ -187,7 +189,11 @@ def ask(payload: dict, channel: str) -> dict:
         response = _opener.open(request, timeout=TIMEOUT_S)
     except urllib.error.HTTPError as exc:
         # A 429 or 5xx without the echo is not a product answer: the fault never ran.
-        confirm_fault(payload, exc.headers.get(APPLIED_HEADER))
+        try:
+            confirm_fault(payload, exc.headers.get(APPLIED_HEADER))
+        except FaultNotApplied as missing:
+            missing.retryable = exc.code == 429 or exc.code >= 500
+            raise
         raise
     with response:
         confirm_fault(payload, response.headers.get(APPLIED_HEADER))

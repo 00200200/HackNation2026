@@ -725,3 +725,11 @@ def test_url_secrets_never_reach_any_log_record(caplog):
 def test_hidden_text_keeps_a_polish_comment_of_a_page_without_a_declared_encoding():
     body = "<html><body><!-- Zażółć gęślą jaźń --><p>x</p></body></html>".encode()
     assert "Zażółć gęślą jaźń" in extract_worker.hidden_text(body)
+
+
+def test_hidden_text_survives_an_xml_prolog_with_an_encoding():
+    body = (
+        b'<?xml version="1.0" encoding="UTF-8"?><html><body>'
+        b"<!-- ukryte polecenie --><p>x</p></body></html>"
+    )
+    assert "ukryte polecenie" in extract_worker.hidden_text(body)

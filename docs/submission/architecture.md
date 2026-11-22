@@ -162,12 +162,10 @@ remain open in [WORKLOG](../../WORKLOG.md). URL inputs are not exercised by the 
 Latest tracked result: [evals/results/latest.json](../../evals/results/latest.json), timestamp
 `2026-11-22T00:37:27+00:00`, product commit
 `edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `dirty: false`, `mode: "quick"`, `n_cases: 10`,
-`coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J`; `FC-J01`/`FC-J02`
-skipped in that run (the eval fault switch did not exist yet; since #60 it does and they are scored).
-This is a quick regression run, not the full jury-sized evaluation, even though the saved
-`coverage_ok` flag is true, and it **predates** PR #40
-(this docs change) landing on `main`: no eval has been run on the merged commit, by user decision
-(`HN_SKIP_EVAL=1`) — **a fresh eval on the merged commit is pending**. The following values and
+`coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J, U`; `E05` and `E06` were skipped in that run (no
+`PRAWDOWID_FIXTURE_BASE`, so no public URL for their fixture pages). The run is of `integration/r2`,
+after PR #40 was merged. This is a quick regression run, not the full jury-sized evaluation, even
+though the saved `coverage_ok` flag is true. The following values and
 targets are copied exactly from that file:
 
 | Metric | value | target | pass |

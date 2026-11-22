@@ -139,7 +139,15 @@ def call(case: dict, channel: str) -> dict:
                 payload["simulate"] = case["simulate"]
             response, error = adapter.ask(payload, channel), None
         except adapter.FaultNotApplied as exc:
-            # Not the product's failure and not worth a retry: the case was never run faulted.
+            if attempt == 1 and exc.retryable:
+                print(
+                    f"retry {case.get('id')} {channel} after {exc}; "
+                    f"waiting {RETRY_BACKOFF_S:.0f}s",
+                    flush=True,
+                )
+                time.sleep(RETRY_BACKOFF_S)
+                continue
+            # Not the product's failure: the case was never run faulted, even on the last try.
             return {
                 "channel": channel,
                 "response": {"status": "technical_error"},

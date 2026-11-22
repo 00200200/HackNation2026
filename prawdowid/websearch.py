@@ -457,11 +457,9 @@ async def _get_page(url: str, client: httpx2.AsyncClient) -> safefetch.Page:
         except (safefetch.Blocked, httpx2.InvalidURL) as exc:
             # Too many redirects, a malformed URL or another port: unreadable.
             reason = _REFUSALS.get(type(exc), UNREADABLE)
-            if (
-                isinstance(exc, safefetch.TooLarge)
-                and _status_reason(exc.status) is None
-            ):
-                reason = None  # a gone or walled page, however large its body
+            if isinstance(exc, safefetch.TooLarge) and exc.status >= 400:
+                # An error page, however large its body: the status decides (None: gone or walled).
+                reason = _status_reason(exc.status)
             raise Unread(str(exc), reason) from exc
         except httpx2.HTTPError as exc:  # network, timeout, non-public address
             log.warning("fetch attempt %d %s failed: %r", attempt, url, exc)

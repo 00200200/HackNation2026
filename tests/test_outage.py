@@ -234,6 +234,20 @@ def test_every_claim_hitting_an_outage_is_a_technical_error(monkeypatch):
     )  # the extraction call is priced
 
 
+def test_a_search_limit_with_every_claim_in_outage_is_named_in_the_technical_error(
+    monkeypatch,
+):
+    fact_check(monkeypatch, down=True)
+    web(
+        monkeypatch,
+        lambda q: websearch.WebSearch(limitation=websearch.SEARCH_LIMIT, failed=True),
+    )
+    result = verify()
+    assert result.status is Status.TECHNICAL_ERROR
+    assert "awaria techniczna" in result.message
+    assert "limit wyszukiwarki" in result.message
+
+
 def test_a_claim_without_outage_keeps_the_answer_ok(monkeypatch):
     """Only claims that hit an outage are blamed on it; one real abstention keeps status ok."""
     fact_check(monkeypatch, down=False)

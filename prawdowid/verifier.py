@@ -446,7 +446,11 @@ async def verify_text(
     outage = [c for c in checks if c]
     if outage and all(c.outage for c in outage):
         # Every claim that could be checked hit an outage: a technical error, no claims shown.
-        message = outage[0].judgement.limitations[0]
+        limitations = outage[0].judgement.limitations
+        message = limitations[0]
+        # Name the quota, not only the outage.
+        if pipeline.websearch.SEARCH_LIMIT in limitations:
+            message = f"{message} {pipeline.websearch.SEARCH_LIMIT}"
         check = CheckResult(status=Status.TECHNICAL_ERROR, message=message)
     claim_checks = [c for c in checks if c]
     check.cost_usd = (cost or 0.0) + sum(c.cost_usd for c in claim_checks)
