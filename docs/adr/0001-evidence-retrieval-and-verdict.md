@@ -107,7 +107,12 @@ about the present (for example days for weather and safety warnings, the date of
   Częściowy fałsz to `wprowadzające w błąd`, Nieweryfikowalne to `brak wystarczających dowodów`. The mapping is
   provisional and checked on the eval set. The rating comes from Google Fact Check, the corpus or, since #127, the
   ClaimReview markup of a review page we read (a Fact Check hit for the same page wins), and is looked up with case and
-  diacritics folded (Demagog also writes "Falsz"). Of one fact-checker's ratings of the same claim the newest counts
+  diacritics folded (Demagog also writes "Falsz"). A fact-checker's own verdict sentence on the page or in its search
+  snippet ("…wypowiedź oceniamy jako fałsz", "…uznajemy za nieweryfikowalną") counts as its rating when the stance
+  step marks it as the fact-checker's own conclusion (22.11, after the round-4 full run: three of the four FC-D misses
+  were such pages without markup). A fact-checker's Nieweryfikowalne, or its own conclusion that the data cannot settle
+  the claim, decides `brak wystarczających dowodów` unless another fact-checker takes a side or a reliable source
+  published after that finding does: an older or undated page never turns the gap into a verdict. Of one fact-checker's ratings of the same claim the newest counts
   (a later review updates an earlier one); two fact-checkers whose ratings disagree are a disagreement (above).
 - `potwierdzone`: verified matching supporting citations from at least two independent publishers, or from one
   official source when it is not stale. With one source the strength is "low" or "medium" and the answer says that only

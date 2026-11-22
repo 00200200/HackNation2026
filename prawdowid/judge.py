@@ -103,6 +103,10 @@ NOT_ENOUGH = (
 DATA_GAP = (
     "Źródło wskazuje, że dostępne dane nie pozwalają tego sprawdzić: {publishers}."
 )
+CHECKER_GAP = (
+    "Fact-checker ({publishers}) uznał, że dostępne dane nie pozwalają tego rozstrzygnąć, a żadne "
+    "nowsze wiarygodne źródło tego nie zmienia. Dlatego nie wydajemy oceny."
+)
 COUNTER_EVIDENCE = "Część źródeł mówi co innego: {publishers}."
 ARCHIVAL = (
     "Materiał archiwalny z {date}: {publisher}. Sprawdź, czy nadal jest aktualny."
@@ -174,7 +178,8 @@ class Stance(StrEnum):
 # A fact-checker's rating of the claim itself, as our verdict (ADR 0001, section 3; provisional,
 # checked on the eval set). A rating is looked up by its words in lower case with diacritics folded
 # (`_rating_key`): Demagog also writes "Falsz". A rating not listed is read by the judge as worded.
-# "Nieweryfikowalne" gives no verdict: a data gap.
+# "Nieweryfikowalne" is a data gap: it decides "brak wystarczających dowodów" unless another
+# fact-checker takes a side (`decide`).
 RATINGS = {
     "fałsz": Verdict.FALSE,
     "nieprawda": Verdict.FALSE,
@@ -533,9 +538,17 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     it replaces the model's reading of the publisher's evidence, and after the conflict row it
     decides over every other reading. Of one publisher's ratings of this claim the newest (by
     `published_at`) counts, the older ones are only listed; two publishers whose ratings disagree
-    are the first row of the table. "Nieweryfikowalne" is a gap.
+    are the first row of the table. "Nieweryfikowalne" is a gap. A fact-checker's own verdict
+    sentence ("…oceniamy jako fałsz") is its rating, as its ClaimReview record's would be
+    (`_stated`).
+
+    A fact-checker's own conclusion that the data cannot settle this claim (its "Nieweryfikowalne")
+    decides "brak wystarczających dowodów" after the conflict row (ADR 0001), unless a
+    fact-checker's rating or own conclusion takes a side, or a reliable source published after
+    that finding does (a later finding updates an earlier one): an older or undated source never
+    turns the fact-checker's gap into a verdict.
     """
-    evidence = [_reviewed(e) for e in evidence]
+    evidence = [_reviewed(_stated(e)) for e in evidence]
     # A publisher's newest rating of this claim is its verdict (a later review updates an earlier
     # one); its older ratings and the model's reading of its other text are moot.
     ratings = [e for e in evidence if _rated(e)]
@@ -605,6 +618,29 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     # A fact-checker's rating of this very claim decides: no other reading overrides it.
     if rated := {_rated(e) for e in counted} & {verdict for verdict, _, _ in rows}:
         rows = [row for row in rows if row[0] in rated]
+    # A fact-checker that found the data cannot settle the claim decides, unless a fact-checker,
+    # or a reliable source published after that finding, takes a side.
+    checker_gap = [
+        e
+        for e in considered
+        if e.source.source_type == FACT_CHECK
+        and e.label.own_conclusion
+        and e.label.stance is Stance.GAP
+    ]
+    if checker_gap:
+        found_on = max(_reviewed_on(e) for e in checker_gap)
+        side = _body_only(supports + refutes)
+        if not rated and not any(
+            (e.source.source_type == FACT_CHECK and e.label.own_conclusion)
+            or (_reliable(e) and _reviewed_on(e) > found_on)
+            for e in side
+        ):
+            rows = []
+            if side or context:
+                publishers = sorted(
+                    {e.source.publisher or str(e.source.url.host) for e in checker_gap}
+                )
+                limitations.append(CHECKER_GAP.format(publishers=", ".join(publishers)))
     for verdict, side, other in rows:
         if (_confirms if verdict is Verdict.CONFIRMED else _enough)(side):
             if other:
@@ -696,6 +732,68 @@ def _rating_key(rating: str) -> str:
 
 
 FOLDED_RATINGS = {_rating_key(rating): verdict for rating, verdict in RATINGS.items()}
+
+# A fact-checker's verdict sentence in its own words, as Demagog and Pravda write it ("…wypowiedź
+# oceniamy jako fałsz", "…uznajemy za nieweryfikowalną"): the rating a ClaimReview record carries,
+# stated on a page without that markup or in a search snippet. A negated verb states no rating.
+VERDICT_SENTENCE = re.compile(
+    r"(?<!\bnie )\b(?:oceniamy|oceniliśmy|uznajemy|uznaliśmy|uważamy)\b(?:\s+\S+){0,4}?\s+"
+    r"(?:jako|za)\s+(?P<rating>(?:częściow\w*\s+)?(?:fałsz|prawd|manipulacj|nieweryfikowaln)\w*)",
+    re.IGNORECASE,
+)
+# The rating a stated word stands for, by its folded stem and an optional second stem.
+STATED_RATINGS = (
+    ("czesciow", "falsz", "Częściowy fałsz"),
+    ("czesciow", "", "Częściowa prawda"),
+    ("falsz", "", "Fałsz"),
+    ("prawd", "", "Prawda"),
+    ("manipulacj", "", "Manipulacja"),
+    ("nieweryfikowaln", "", "Nieweryfikowalne"),
+)
+
+
+def _stated_rating(text: str) -> str | None:
+    """The rating a verdict sentence in `text` states ("Fałsz"), None when it states none."""
+    if not (m := VERDICT_SENTENCE.search(text)):
+        return None
+    word = _rating_key(m["rating"])
+    return next(
+        rating
+        for stem, second, rating in STATED_RATINGS
+        if word.startswith(stem) and second in word
+    )
+
+
+def _stated(e: Evidence) -> Evidence:
+    """A fact-checker's own conclusion that states its rating (`VERDICT_SENTENCE`) is its rating of
+    this claim, as a ClaimReview record's would be (ADR 0001): many of its pages carry no markup,
+    and a page blocked to our server is known only from its search snippet. The answer names the
+    rating, the quote stays the page's own sentence, and the label takes the rating's stance."""
+    if (
+        e.review
+        or e.rating
+        or e.title_only
+        or e.source.source_type != FACT_CHECK
+        or not e.label.own_conclusion
+        or not (rating := _stated_rating(e.source.fragment or ""))
+    ):
+        return e
+    label = e.label.model_copy(
+        update={
+            "stance": RATED_STANCE[FOLDED_RATINGS[_rating_key(rating)]],
+            "same_claim": True,
+            "missing_context": None,
+            "context_quote": None,
+        }
+    )
+    return e.model_copy(
+        update={
+            "label": label,
+            "rating": rating,
+            "source": e.source.model_copy(update={"rating": rating}),
+            "context_span": None,
+        }
+    )
 
 
 def _other_claim(e: Evidence) -> bool:
