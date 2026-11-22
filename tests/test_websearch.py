@@ -1,5 +1,6 @@
 import asyncio
 import io
+import json
 import os
 import time
 from datetime import UTC, date, datetime, timedelta
@@ -13,7 +14,7 @@ from tavily import BadRequestError, InvalidAPIKeyError, UsageLimitExceededError
 from tavily.errors import ForbiddenError
 from tavily.errors import TimeoutError as TavilyTimeoutError
 
-from prawdowid import cache, safefetch, websearch
+from prawdowid import cache, factcheck, safefetch, websearch
 from prawdowid.privacy import mask_personal_data
 from prawdowid.websearch import (
     ALLOWLIST,
@@ -785,3 +786,121 @@ def test_robots_txt_section_for_our_bot_applies():
     result = run(provider_returning("https://www.gov.pl/p"), routes, seen=seen)
     assert result.documents == []
     assert "https://www.gov.pl/p" not in seen
+
+
+# --- #127: a fact-checker's own rating, from the ClaimReview markup of a page we read ---
+
+REVIEW_PAGE = "https://demagog.org.pl/fake_news/sankcje-wobec-rosji/"
+REVIEW_ROUTE = "demagog.org.pl/fake_news/sankcje-wobec-rosji/"
+REVIEWED = "UE zniosła sankcje wobec Rosji."
+RATING = factcheck.review_fragment("Fałsz", REVIEWED)
+
+
+def claim_review(url=REVIEW_PAGE, rating="Fałsz", **more):
+    review = {
+        "@context": "https://schema.org",
+        "@type": "ClaimReview",
+        "claimReviewed": REVIEWED,
+        "reviewRating": {"@type": "Rating", "alternateName": rating},
+        **more,
+    }
+    return {**review, "url": url} if url else review
+
+
+def marked_up(*blocks) -> str:
+    """The test page with JSON-LD blocks (dicts or lists as JSON, strings as written)."""
+    scripts = "".join(
+        '<script type="application/ld+json">'
+        f"{b if isinstance(b, str) else json.dumps(b)}</script>"
+        for b in blocks
+    )
+    return PAGE.replace("</head>", f"{scripts}</head>")
+
+
+def read_review_page(body, url=REVIEW_PAGE, route=REVIEW_ROUTE):
+    [doc] = run(provider_returning(url), {route: html(body)}).documents
+    assert "gazu skroplonego" in doc.text  # the page text is read as before
+    return doc
+
+
+@pytest.mark.parametrize(
+    "blocks",
+    [
+        [claim_review()],
+        [[{"@type": "Organization", "name": "Demagog"}, claim_review()]],
+        [
+            {
+                "@context": "https://schema.org",
+                "@graph": [{"@type": "WebPage"}, claim_review()],
+            }
+        ],
+        [claim_review(url=None)],  # no url: a review on its own page
+        [claim_review(url="http://www.demagog.org.pl/fake_news/sankcje-wobec-rosji")],
+        [claim_review(**{"@type": ["ClaimReview", "Review"]})],
+        # A block that does not parse, before one that does.
+        ['{"@type": "ClaimReview", "reviewRating": ', claim_review()],
+    ],
+    ids=[
+        "object",
+        "list",
+        "graph",
+        "no-url",
+        "url-written-another-way",
+        "type-list",
+        "broken-block",
+    ],
+)
+def test_a_fact_checkers_rating_is_read_from_its_page(blocks, isolated):
+    doc = read_review_page(marked_up(*blocks))
+    assert doc.reviews == [RATING]
+    # Kept, like the page text, only under a licence: none is confirmed.
+    [stored] = cache.load_documents(isolated)
+    assert stored.reviews == [] and stored.text == ""
+
+
+@pytest.mark.parametrize(
+    "blocks",
+    [
+        [claim_review(url="https://demagog.org.pl/fake_news/inna-wypowiedz/")],
+        [claim_review(url="https://[demagog.org.pl/fake_news")],
+        ['{"@type": "ClaimReview", "reviewRating": '],
+        [claim_review(rating="")],
+        [{**claim_review(), "reviewRating": {"ratingValue": 1}}],
+        [{**claim_review(), "@type": "Review"}],
+        [],
+    ],
+    ids=[
+        "another-page",
+        "malformed-url",
+        "broken",
+        "blank-rating",
+        "no-rating-name",
+        "not-a-claim-review",
+        "none",
+    ],
+)
+def test_markup_that_is_no_rating_of_this_page_gives_none(blocks):
+    assert read_review_page(marked_up(*blocks)).reviews == []
+
+
+def test_ratings_are_read_only_from_a_fact_checkers_html_page(monkeypatch):
+    official = read_review_page(
+        marked_up(claim_review(url=None)), "https://www.gov.pl/p", "www.gov.pl/p"
+    )
+    assert official.source_type == "official" and official.reviews == []
+
+    def never(page_html, page_url):
+        raise AssertionError("a PDF has no markup to read")
+
+    monkeypatch.setattr(websearch, "_claim_reviews", never)
+    text = "Raport z kontroli wydatkow na obrone cywilna w latach 2023-2025. " * 5
+    url = "https://demagog.org.pl/raport.pdf"
+    routes = {"demagog.org.pl/raport.pdf": typed(pdf(text), "application/pdf")}
+    [doc] = run(provider_returning(url), routes).documents
+    assert doc.source_type == "fact_check" and doc.reviews == []
+
+
+def test_markup_is_read_from_a_page_that_declares_its_encoding():
+    page = '<?xml version="1.0" encoding="utf-8"?>' + marked_up(claim_review())
+    assert websearch._claim_reviews(page, REVIEW_PAGE) == [RATING]
+    assert websearch._claim_reviews("", REVIEW_PAGE) == []

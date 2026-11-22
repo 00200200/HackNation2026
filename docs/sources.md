@@ -57,8 +57,9 @@ What we store (`prawdowid/cache.py`): metadata of every page we read (URL, title
 type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo;
 never a search snippet of a page we could not read (only the search cache above keeps the provider's
 snippet, for its TTL).
-Full page text is stored only for a domain whose licence is confirmed (`licence` in `ALLOWLIST`);
-today none is, so no page text is archived. The pipeline uses the live text in memory for the
+Full page text, and the ratings read from a fact-checker's markup (below), are stored only for a
+domain whose licence is confirmed (`licence` in `ALLOWLIST`); today none is, so no page text is
+archived. The pipeline uses the live text in memory for the
 current check only. Records older than 30 days (`RETENTION_DAYS`, by `fetched_at`) are never loaded
 and are dropped on every save, a new fetch of the same URL replaces the old record, `delete_document(url)` deletes one
 record and deleting the file deletes all. Until licences are confirmed the cache cannot serve as
@@ -76,6 +77,21 @@ page itself must still answer 200: we never get around a 401, 403, 429 or a bot 
 another user agent. HTML is read with trafilatura, PDF with the link input's pypdf worker
 (`prawdowid/extract_worker.py`, a child process with page and memory ceilings); both stop at the
 same 2 MB cap and the same 8 s per page (`PAGE_BUDGET_S`).
+
+### A fact-checker's rating on its own page (#127)
+
+Fact-checkers publish their rating as schema.org `ClaimReview` markup (JSON-LD), the same data
+Google Fact Check Tools serves. On every HTML page of a `fact_check` domain we read, the markup is
+parsed with lxml (`websearch._claim_reviews`): JSON-LD as one object, a list or an `@graph`; a
+review whose `url` is another page is left out, and a block that does not parse is skipped. The
+rating (`reviewRating.alternateName`) and the reviewed claim (`claimReviewed`) become a rating
+fragment exactly like a Fact Check hit (`factcheck.review_fragment`), placed before the page text,
+so the judge reads the rating first and `judge.decide` maps it through `judge.RATINGS` only when
+the review is of the checked claim (`same_claim`). When Fact Check returned a hit for the same
+page, that hit wins and the markup adds nothing. Of the Demagog pages cited in the full eval of
+2026-11-22 that answered, 52 of 55 carried the markup (#127); it matters because Fact Check often
+returns no review for the claim sentence (#100). Official pages and PDFs are not searched for
+markup.
 
 ### Search snippets of pages we cannot read (#95)
 
@@ -96,16 +112,20 @@ than the original publication. Rules:
   `snippet_only` with the reason all the way to the answer: web and Discord show "fragment z
   wyników wyszukiwarki; <reason>", premises and the justification say so, and the verdict lists
   it as a limitation.
-- It counts for the side it supports like a fetched page of the same type (a fact-checker's
-  snippet can decide alone), but never makes the evidence "silna": that needs a reliable source we
-  read ourselves and that carries a date.
+- It refutes, adds context or stands in a conflict like a fetched page of the same type, alone
+  too when that type is reliable. To confirm, it stands alone only as a fact-checker's own
+  conclusion (#127): any other snippet (an official figure, a fact-checker relaying someone
+  else's number) needs a second independent origin, because without the rest of the page we
+  cannot see which year, place or study the sentence is about, and the answer says why the claim
+  is not confirmed (`judge.SNIPPET_ALONE`). A snippet never makes the evidence "silna": that needs
+  a reliable source we read ourselves and that carries a date.
 - No snippet either for a page that robots.txt disallows (the site opted out of crawlers, so we
   do not use a search engine's copy), that is gone (404, 410), that redirects off the allowlist,
   or that sits behind a login or payment wall (401, 402): its content is not public, and the brief
   rules out paid databases.
 
 This uses only what the search API returns. Michał approved the rule on 2026-11-22 (`WORKLOG.md`,
-Decisions).
+Decisions); the confirmation rule above refines it the same day (#127).
 
 Our own database (step 2c: local PostgreSQL, tables `documents` and `chunks`,
 schema in `db/migrations/`, compose service `sourcedb`, profile `sourcedb`, volume `sourcedb_data`) is **disabled in the pipeline** until the team
@@ -188,7 +208,9 @@ narrative. It is context: the verdict rules never count it as a reliable source 
 Reachability from our server (OVHcloud VPS, measured 2026-11-22 00:50 CET, our user agent and a
 browser one): `konkret24.tvn24.pl`, `sprawdzam.afp.com` and `demagog.org.pl` (Cloudflare) answer
 403 to every request, robots.txt included, so only their search snippets reach the judge;
-`oko.press` and `pravda.org.pl` answer 200. From a home IP konkret24's robots.txt allows bots on its articles (GPTBot is kept off the whole
+`oko.press` and `pravda.org.pl` answer 200. That does not hold all the time for Demagog: in the
+full eval on VPS staging later that night (#127) its review pages were fetched and read in full,
+so its rating markup is read when the page answers and its snippet stands in when it does not. From a home IP konkret24's robots.txt allows bots on its articles (GPTBot is kept off the whole
 site; every bot only off `/_e/p/playlist/*` and `*?page=*`), so this is an IP-level block, not
 an opt-out. AFP's robots.txt answers 403 from a home IP too
 (Akamai, 2026-11-22), so its crawler policy could not be read; its terms restrict automated

@@ -14,10 +14,11 @@ limitation, never a verdict. The domain, author or popularity never decide on th
 counted source needs a verified quote with a stance. Strength, premises and limitations come from
 the same facts.
 
-A fact-checker's ClaimReview record (from Google Fact Check or the corpus) counts only for the
-claim it reviews, which the model reports as `same_claim`. Its rating, mapped in code (`RATINGS`,
-ADR 0001), is that fact-checker's verdict; the answer shows it as the rating from the record
-(`Source.rating`), never as a quote from the review page, because the rating line is our wording.
+A fact-checker's ClaimReview record (from Google Fact Check, the corpus or the review page's own
+markup) counts only for the claim it reviews, which the model reports as `same_claim`. Its rating,
+mapped in code (`RATINGS`, ADR 0001), is that fact-checker's verdict; the answer shows it as the
+rating from the record (`Source.rating`), never as a quote from the review page, because the
+rating line is our wording.
 """
 
 import asyncio
@@ -38,7 +39,7 @@ from prawdowid import justification
 from prawdowid.contract import SecurityEvent, Source, Verdict
 from prawdowid.factcheck import CLAIM_PREFIX, RATING_PREFIX
 from prawdowid.factcheck import SOURCE_TYPE as FACT_CHECK
-from prawdowid.rerank import RELIABLE_TYPES, Fragment, Ranking
+from prawdowid.rerank import RELIABLE_TYPES, Fragment, Ranking, canonical_url
 
 log = logging.getLogger("prawdowid")
 
@@ -66,6 +67,10 @@ TYPOGRAPHY = str.maketrans(
         "\u00a0": " ",
     }
 )
+
+# Format characters with no visible form: soft hyphen, zero-width space and joiners, word joiner,
+# byte order mark. Folded away like typography: they carry no word, digit or sign.
+INVISIBLE = frozenset("\u00ad\u200b\u200c\u200d\u2060\ufeff")
 
 MODEL = os.getenv("PRAWDOWID_JUDGE_MODEL") or "anthropic:claude-sonnet-5-5"
 MODEL_TIMEOUT_S = 20
@@ -100,6 +105,11 @@ UNDATED = "Źródło bez daty publikacji: {publisher}."
 SNIPPET_ONLY = (
     "{publisher}: źródło znamy tylko z fragmentu w wynikach wyszukiwarki, bo {reason}."
 )
+SNIPPET_ALONE = (
+    "{publishers}: tylko fragment z wyników wyszukiwarki potwierdza to twierdzenie, a bez "
+    "reszty strony nie widać, czego ten fragment dotyczy. Żeby uznać je za potwierdzone, "
+    "potrzebujemy drugiego niezależnego źródła."
+)
 
 CLAIM = register_tag("claim")
 FRAGMENT = register_tag("fragment")
@@ -131,11 +141,12 @@ Return in labels one entry for every fragment that bears on the claim, and none 
 A fragment that only repeats the claim in order to check or debunk it does not support it: label
 it by what the fragment concludes.
 
-A fragment starting with "Ocena fact-checkera: <rating>. Sprawdzane twierdzenie: <claim>" is a
-fact-checker's review of the claim after "Sprawdzane twierdzenie". Set same_claim to true only when
-that reviewed claim makes the same assertion as the claim you are given, about the same people,
-events and numbers, in any wording (the review's title also shows what was checked). Then quote the
-whole rating line, set own_conclusion to true and label it by the rating: "refutes" when the rating
+A fragment whose text starts with the line "Ocena fact-checkera: <rating>." and, after a blank
+line, "Sprawdzane twierdzenie: <claim>" is a fact-checker's review of that claim. Set same_claim to
+true only when that reviewed claim makes the same assertion as the claim you are given, about the
+same people, events and numbers, in any wording (the review's title also shows what was checked).
+Then quote the first line, "Ocena fact-checkera: <rating>.", as it stands, without the reviewed
+claim, set own_conclusion to true and label it by the rating: "refutes" when the rating
 says false, "supports" when it says true, "context" for any other rating. A review of a different
 statement, even by the same person or on the same topic, has same_claim false and stance
 "context". Never quote the reviewed claim. A review's title alone never shows its rating.
@@ -155,14 +166,17 @@ class Stance(StrEnum):
 
 
 # A fact-checker's rating of the claim itself, as our verdict (ADR 0001, section 3; provisional,
-# checked on the eval set). Keys are the rating's words in lower case (`_rating_key`). A rating not
-# listed is read by the judge as worded. "Nieweryfikowalne" gives no verdict: a data gap.
+# checked on the eval set). A rating is looked up by its words in lower case with diacritics folded
+# (`_rating_key`): Demagog also writes "Falsz". A rating not listed is read by the judge as worded.
+# "Nieweryfikowalne" gives no verdict: a data gap.
 RATINGS = {
     "fałsz": Verdict.FALSE,
     "nieprawda": Verdict.FALSE,
     "false": Verdict.FALSE,
     "manipulacja": Verdict.MISLEADING,
     "częściowa prawda": Verdict.MISLEADING,
+    "częściowy fałsz": Verdict.MISLEADING,
+    "partly false": Verdict.MISLEADING,
     "wprowadza w błąd": Verdict.MISLEADING,
     "wprowadzające w błąd": Verdict.MISLEADING,
     "brak kontekstu": Verdict.MISLEADING,
@@ -255,7 +269,17 @@ async def judge(claim: str, ranking: Ranking, today: date | None = None) -> Judg
         log.warning("judge unavailable model=%s error=%r", MODEL, exc)
         return _insufficient("brak", limitations + [JUDGE_UNAVAILABLE])
     labels = result.output.labels
-    evidence = verify_quotes(labels, ranking.fragments)
+    evidence = []
+    for label in labels:
+        if kept := verify_quotes([label], ranking.fragments):
+            evidence += kept
+        else:  # which rule dropped it: the check log keeps no quote
+            log.info(
+                "judge dropped quote reason=%s host=%s words=%d",
+                _why_dropped(label, ranking.fragments),
+                urlsplit(_cited_id(label) or "").netloc,
+                len(_words(label.quote)),
+            )
     if dropped := len(labels) - len(evidence):
         log.info("judge dropped quotes n=%d", dropped)
         limitations.append(QUOTES_DROPPED.format(n=dropped))
@@ -269,48 +293,107 @@ async def judge(claim: str, ranking: Ranking, today: date | None = None) -> Judg
 
 
 def verify_quotes(labels: list[Label], fragments: list[Fragment]) -> list[Evidence]:
-    """Labels whose quote appears verbatim (normalised) in a fragment of the cited document."""
+    """Labels whose quote appears verbatim (normalised) in a fragment of the cited document.
+
+    The cited doc_id is compared as `rerank.canonical_url` writes it, so a model that adds "www.",
+    an end slash or decodes "%2C" still names the same document. A ClaimReview record's rating
+    line is our wording, read by its structure (`_rating_quote`), never as page text.
+    """
     evidence = []
     for label in labels:
+        cited = _cited_id(label)
         for f in fragments:
-            if f.doc_id != label.doc_id:
+            if canonical_url(f.doc_id) != cited:
                 continue
-            if span := _find_in(label.quote, f.source):
+            label = label.model_copy(update={"doc_id": f.doc_id})
+            if rated := _rating_quote(label.quote, f.source):
+                span, rating, review = rated, rated, True
+            elif span := _find_in(label.quote, f.source):
                 if _only_reviewed_claim(label.quote, f.source):
                     continue  # the disputed statement is not the fact-checker's finding
                 review = (f.source.fragment or "").startswith(RATING_PREFIX)
                 rating = _rating(span, f.source) if review else None
-                # The document's own words are shown, never the model's copy of them; for a
-                # rating line, the rating in the record's wording.
-                shown = (
-                    {"fragment": rating, "rating": rating}
-                    if rating
-                    else {"fragment": span}
+            else:
+                continue
+            # The document's own words are shown, never the model's copy of them; for a
+            # rating line, the rating in the record's wording.
+            shown = (
+                {"fragment": rating, "rating": rating} if rating else {"fragment": span}
+            )
+            source = f.source.model_copy(update=shown)
+            # Anywhere in the document: it may sit in another of its fragments.
+            context = label.context_quote and next(
+                (
+                    c
+                    for g in fragments
+                    if g.doc_id == label.doc_id
+                    and (c := _find_in(label.context_quote, g.source))
+                ),
+                None,
+            )
+            evidence.append(
+                Evidence(
+                    label=label,
+                    source=source,
+                    text=_text(f.source),
+                    context_span=context or None,
+                    title_only=not rating
+                    and not find_quote(label.quote, _body(f.source)),
+                    review=review,
+                    rating=rating,
                 )
-                source = f.source.model_copy(update=shown)
-                # Anywhere in the document: it may sit in another of its fragments.
-                context = label.context_quote and next(
-                    (
-                        c
-                        for g in fragments
-                        if g.doc_id == label.doc_id
-                        and (c := _find_in(label.context_quote, g.source))
-                    ),
-                    None,
-                )
-                evidence.append(
-                    Evidence(
-                        label=label,
-                        source=source,
-                        text=_text(f.source),
-                        context_span=context or None,
-                        title_only=not find_quote(label.quote, _body(f.source)),
-                        review=review,
-                        rating=rating,
-                    )
-                )
-                break
+            )
+            break
     return evidence
+
+
+def _cited_id(label: Label) -> str | None:
+    """The doc_id the model wrote, as `rerank.canonical_url` writes it; None when it is no URL
+    at all ("https://[x"), so it names no document instead of failing the check."""
+    try:
+        return canonical_url(label.doc_id)
+    except ValueError:
+        return None
+
+
+def _why_dropped(label: Label, fragments: list[Fragment]) -> str:
+    """The rule a label failed, for the log only."""
+    doc_id = _cited_id(label)
+    cited = [f.source for f in fragments if canonical_url(f.doc_id) == doc_id]
+    if not cited:
+        return "no_such_doc_id"
+    if len(_words(label.quote)) < MIN_QUOTE_WORDS:
+        return "too_short"
+    if any(_find_in(label.quote, s) for s in cited):
+        return "reviewed_claim_only"
+    if any(
+        find_quote(label.quote, (s.fragment or "").replace("\n\n", "\n")) for s in cited
+    ):
+        return "across_blank_line"
+    return "not_in_fragment"
+
+
+def _rating_quote(quote: str, source: Source) -> str | None:
+    """The record's rating when the quote is its rating line (`factcheck.review_fragment`): the
+    rating word alone, the line with or without "Ocena fact-checkera:", or the line with the
+    start of the reviewed-claim line after it. The record is our two-line wording, not page
+    text, so neither the word minimum nor the blank line between its lines applies; a quote of
+    the reviewed claim alone, or with any word that is not in the record, is no rating."""
+    head, _, rest = (source.fragment or "").partition("\n\n")
+    if not head.startswith(RATING_PREFIX):
+        return None
+    rating = head.removeprefix(RATING_PREFIX).strip().rstrip(".").strip()
+    claim = rest.split("\n\n", 1)[0] if rest.startswith(CLAIM_PREFIX) else ""
+    record, own, quoted = _words(head) + _words(claim), _words(rating), _words(quote)
+    if not quoted or not own:
+        return None
+    start = len(_words(RATING_PREFIX))  # where the rating's words sit in the record
+    for i in range(start + 1):
+        if quoted == record[i : i + len(quoted)] and i + len(quoted) >= start + len(
+            own
+        ):
+            return rating or None
+    return None
 
 
 def _rating(span: str, source: Source) -> str | None:
@@ -348,6 +431,17 @@ def find_quote(quote: str, text: str) -> str | None:
     if len(re.findall(r"\w+", q)) < MIN_QUOTE_WORDS:
         return None
     folded, index = _fold(text)
+    # The copy as written first; then without the quote marks, ellipsis and sentence punctuation
+    # the model may add or drop at its ends ("Legia-Wisła." for a title without a full stop).
+    # Signs and "%" stay: they are part of a number.
+    core = re.sub(r'^(?:[\s"\'.,;:!?]|\.\.\.)+|(?:[\s"\'.,;:!?]|\.\.\.)+$', "", q)
+    return _match(q, text, folded, index) or (
+        _match(core, text, folded, index) if core != q else None
+    )
+
+
+def _match(q: str, text: str, folded: str, index: list[int]) -> str | None:
+    """`find_quote` for one folded copy of the quote."""
     # Where the quote's first and last letters or digits sit, past any edge punctuation.
     lead = re.search(r"\w", q).start()
     trail = len(q) - re.search(r"\w", q[::-1]).start()
@@ -355,6 +449,9 @@ def find_quote(quote: str, text: str) -> str | None:
         head = folded[: m.start() + lead]
         tail = folded[m.start() + trail :]
         if re.search(r"\w$", head) or re.match(r"\w", tail):
+            continue
+        # Words cut from a question are no statement: the source's "?" must be in the copy.
+        if re.match(r'[\s"\']*\?', tail) and "?" not in q[trail:]:
             continue
         # A quoted number may not be cut from a longer one: "-10", "10,5", "10 000", "10 %".
         # Only text outside the match counts: the quote's own "-" or "%" is part of the copy.
@@ -382,6 +479,8 @@ def _fold(text: str) -> tuple[str, list[int]]:
     """
     out, index = [], []
     for i, ch in enumerate(text):
+        if ch in INVISIBLE:
+            continue  # no model copies a soft hyphen or a zero-width space
         if unicodedata.combining(ch) and out:
             composed = unicodedata.normalize("NFC", out[-1] + ch)
             if len(composed) == 1:
@@ -410,24 +509,38 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     row, an allowlisted news agency's own finding (PAP, `own_conclusion`) against a reliable source
     type counts too; its report of what someone said does not. A search snippet of a page we could
     not read (`Source.snippet_only`) or an undated page counts like any fragment, with a
-    limitation, but never makes the strength "silna" (`_strength`).
+    limitation, but never makes the strength "silna" (`_strength`). To confirm (`_confirms`), a
+    snippet stands alone only as a fact-checker's own conclusion; any other snippet needs a second
+    independent origin, and the answer says so (`SNIPPET_ALONE`). For the other rows it counts as
+    above.
     Missing context counts only from a "context" or "refutes" label with a `context_quote` found
-    verbatim in the same document (`_grounded`). A "gap" label (the data cannot settle the claim)
-    never decides: it adds a limitation, and a publisher whose own conclusion is a gap counts for
-    no side (its quote of the claim confirms nothing).
+    verbatim in the same document (`_grounded`), and from a "context" label only when a
+    fact-checker gives it or the same document also supports or refutes the claim (`_scoped`): a
+    page that takes no side shows its own scope, not what the claim leaves out. A "gap" label (the
+    data cannot settle the claim) never decides: it adds a limitation, and a publisher whose own
+    conclusion is a gap counts for no side (its quote of the claim confirms nothing).
 
     A fact-checker's ClaimReview record (`_reviewed`) counts only for the claim it reviews. A
     review of another claim is context that names no missing context. A rating of this very claim
     in `RATINGS`, with its rating line verified, is that fact-checker's verdict (ADR 0001):
     it replaces the model's reading of the publisher's evidence, and after the conflict row it
-    decides over every other reading (two ratings: the first row of the table). "Nieweryfikowalne"
-    is a gap.
+    decides over every other reading. Of one publisher's ratings of this claim the newest (by
+    `published_at`) counts, the older ones are only listed; two publishers whose ratings disagree
+    are the first row of the table. "Nieweryfikowalne" is a gap.
     """
     evidence = [_reviewed(e) for e in evidence]
-    # Next to its rating of this claim, the model's reading of the publisher's other text is moot.
-    rating_publishers = {_publisher(e) for e in evidence if _rated(e)}
+    # A publisher's newest rating of this claim is its verdict (a later review updates an earlier
+    # one); its older ratings and the model's reading of its other text are moot.
+    ratings = [e for e in evidence if _rated(e)]
+    newest = {
+        p: max(_reviewed_on(e) for e in ratings if _publisher(e) == p)
+        for p in _publishers(ratings)
+    }
     considered = [
-        e for e in evidence if _rated(e) or _publisher(e) not in rating_publishers
+        e
+        for e in evidence
+        if _publisher(e) not in newest
+        or (_rated(e) and _reviewed_on(e) == newest[_publisher(e)])
     ]
     undecided = {
         _publisher(e)
@@ -435,6 +548,13 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         if e.label.stance is Stance.GAP and e.label.own_conclusion
     }
     decisive = [e for e in considered if _publisher(e) not in undecided]
+    sided = {
+        e.label.doc_id
+        for e in decisive
+        if e.label.stance in (Stance.SUPPORTS, Stance.REFUTES)
+    }
+    evidence = [_scoped(e, sided) for e in evidence]
+    decisive = [_scoped(e, sided) for e in decisive]
     supports = [e for e in decisive if e.label.stance is Stance.SUPPORTS]
     refutes = [e for e in decisive if e.label.stance is Stance.REFUTES]
     both = _publishers(supports) & _publishers(refutes)
@@ -479,7 +599,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
     if rated := {_rated(e) for e in counted} & {verdict for verdict, _, _ in rows}:
         rows = [row for row in rows if row[0] in rated]
     for verdict, side, other in rows:
-        if _enough(side):
+        if (_confirms if verdict is Verdict.CONFIRMED else _enough)(side):
             if other:
                 publishers = ", ".join(sorted(_publishers(other)))
                 limitations.append(COUNTER_EVIDENCE.format(publishers=publishers))
@@ -491,6 +611,16 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
                 limitations,
                 cited=_cited_for(verdict, side),
             )
+    if _enough(supports) and not _confirms(supports):
+        # In place of NOT_ENOUGH: the reliable source was there, only as a search snippet.
+        names = {
+            e.source.publisher or str(e.source.url.host)
+            for e in supports
+            if _reliable(e)
+        }
+        reason = [SNIPPET_ALONE.format(publishers=", ".join(sorted(names)))]
+    else:
+        reason = [] if gaps else [NOT_ENOUGH]
     # A review of another claim is not named as the reason: its rating is about something else.
     named = [e for e in evidence if not _other_claim(e)]
     return _judgement(
@@ -498,7 +628,7 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         "słaba" if evidence else "brak",
         premises,
         evidence,
-        limitations + ([] if gaps else [NOT_ENOUGH]),
+        limitations + reason,
         cited=_cited(gaps, "gap") + _cited(supports + refutes or named, "weak"),
     )
 
@@ -543,12 +673,22 @@ def _reviewed(e: Evidence) -> Evidence:
 def _rated(e: Evidence) -> Verdict | None:
     """The verdict a fact-checker's rating of this very claim maps to, None for anything else."""
     if e.rating and e.label.same_claim and e.source.source_type == FACT_CHECK:
-        return RATINGS.get(_rating_key(e.rating))
+        return FOLDED_RATINGS.get(_rating_key(e.rating))
     return None
 
 
+def _reviewed_on(e: Evidence) -> date:
+    """When a rating was given, for the newest-rating rule: an undated one counts as the oldest."""
+    return e.source.published_at or date.min
+
+
 def _rating_key(rating: str) -> str:
-    return " ".join(_words(rating))
+    """A rating's words in lower case with diacritics folded: "Fałsz" and "Falsz" are one key."""
+    plain = unicodedata.normalize("NFKD", " ".join(_words(rating)).replace("ł", "l"))
+    return "".join(ch for ch in plain if not unicodedata.combining(ch))
+
+
+FOLDED_RATINGS = {_rating_key(rating): verdict for rating, verdict in RATINGS.items()}
 
 
 def _other_claim(e: Evidence) -> bool:
@@ -576,6 +716,20 @@ def _one_side_per_publisher(supports, refutes, limitations):
     return supports, refutes, limitations
 
 
+def _scoped(e: Evidence, sided: set[str]) -> Evidence:
+    """A "context" label names what the claim leaves out only when a fact-checker gives it or its
+    document also supports or refutes the claim (`sided`, by doc_id). A page that takes no side
+    shows its own scope (another year, region or alert level): its context span is dropped, so it
+    stays plain context."""
+    if (
+        e.label.stance is not Stance.CONTEXT
+        or e.source.source_type == FACT_CHECK
+        or e.label.doc_id in sided
+    ):
+        return e
+    return e.model_copy(update={"context_span": None})
+
+
 def _grounded(e: Evidence) -> bool:
     """A "context" or "refutes" label naming missing context, with the words that establish it
     found verbatim in the document."""
@@ -600,6 +754,23 @@ def _conflicting(side: list[Evidence], other: list[Evidence]) -> bool:
 def _enough(evidence: list[Evidence]) -> bool:
     body = [e for e in evidence if not e.title_only]
     return any(_reliable(e) for e in body) or len(_origins(body)) >= 2
+
+
+def _confirms(evidence: list[Evidence]) -> bool:
+    """Enough to confirm: as `_enough`, but a search snippet of a page we could not read stands
+    alone only as a fact-checker's own conclusion. Any other snippet (an official figure, a
+    fact-checker reporting someone else's number) needs a second independent origin: without the
+    page around it we cannot see which year, place or study the sentence is about."""
+    body = [e for e in evidence if not e.title_only]
+    alone = any(
+        _reliable(e)
+        and (
+            not e.source.snippet_only
+            or (e.source.source_type == FACT_CHECK and e.label.own_conclusion)
+        )
+        for e in body
+    )
+    return alone or len(_origins(body)) >= 2
 
 
 def _only_reviewed_claim(quote: str, source: Source) -> bool:

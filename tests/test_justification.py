@@ -58,18 +58,22 @@ def test_false_cites_the_refuting_source_only():
 
 
 def test_misleading_states_the_missing_context_and_its_source():
+    # A fact-checker's context label: a page that takes no side names no missing context.
+    review = source(
+        "Demagog", "Nagranie pochodzi z powodzi w 2010 roku.", source_type="fact_check"
+    )
     verdict, text = decided(
         evidence(
-            MON,
+            review,
             Stance.CONTEXT,
-            missing_context="dotyczy tylko 2024 roku",
-            context_quote="Polska jest członkiem",
+            missing_context="nagranie jest z 2010 roku",
+            context_quote="z powodzi w 2010 roku",
         )
     )
     assert verdict is Verdict.MISLEADING
-    assert (
-        text
-        == "Twierdzenie pomija ważny kontekst: dotyczy tylko 2024 roku (MON, 3.07.2026: „Polska jest członkiem”)."
+    assert text == (
+        "Twierdzenie pomija ważny kontekst: nagranie jest z 2010 roku "
+        "(Demagog, 3.07.2026: „z powodzi w 2010 roku”)."
     )
 
 

@@ -11,7 +11,15 @@ from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
 
-from prawdowid import corpus_bm25, judge, pipeline, rerank, verifier, websearch
+from prawdowid import (
+    corpus_bm25,
+    factcheck,
+    judge,
+    pipeline,
+    rerank,
+    verifier,
+    websearch,
+)
 from prawdowid.cache import Document
 from prawdowid.contract import ClaimKind, Status, Verdict
 from prawdowid.verifier import ExtractedClaim, Extraction
@@ -867,3 +875,74 @@ def test_review_of_another_claim_leaves_the_claim_without_a_verdict(monkeypatch)
     assert claim.verdict is Verdict.INSUFFICIENT_EVIDENCE
     assert [s.rating for s in claim.sources] == [None]
     assert "Manipulacja" not in claim.reasoning
+
+
+# --- #127: a fact-checker's rating read from its page's ClaimReview markup ---
+
+REVIEW_PAGE = "https://demagog.org.pl/fake_news/podpis-pod-filmem/"
+
+
+def review_page(rating="Manipulacja") -> Document:
+    """A Demagog page web search read, with the rating its markup carries."""
+    return document(REVIEW_PAGE).model_copy(
+        update={
+            "title": "Film z protestów sprzed lat",
+            "publisher": "Demagog",
+            "source_type": "fact_check",
+            "domain": "demagog.org.pl",
+            "reviews": [factcheck.review_fragment(rating, f"{CAPTION}…")],
+        }
+    )
+
+
+def test_a_rating_from_a_review_page_leads_its_text_like_a_fact_check_hit():
+    found = {"web": [websearch.WebSearch(documents=[review_page()])]}
+    [first] = rerank.split_all(pipeline._candidates(found), None)
+    assert first.source.fragment == (
+        f"Ocena fact-checkera: Manipulacja.\n\nSprawdzane twierdzenie: {CAPTION}…"
+        f"\n\nWstęp. {QUOTE}"
+    )
+    # A Fact Check hit for the same page comes first and wins: one record, its rating first.
+    hit = factcheck._to_hit(
+        {"text": B01_CLAIM},
+        {**B01_REVIEW, "url": "http://www.demagog.org.pl/fake_news/podpis-pod-filmem"},
+        datetime.now(UTC),
+    )
+    found["factcheck"] = factcheck.FactCheckLookup(hits=[hit])
+    found["web"] = [websearch.WebSearch(documents=[review_page("Prawda")])]
+    [only] = rerank.split_all(pipeline._candidates(found), None)
+    assert only.source.fragment.startswith("Ocena fact-checkera: Manipulacja.")
+    assert "Prawda" not in only.source.fragment
+    assert only.source.fragment.endswith(f"Wstęp. {QUOTE}")  # the page text after it
+
+
+def test_a_rating_on_a_review_page_decides_without_a_fact_check_hit(monkeypatch):
+    recording_factcheck(monkeypatch)  # Fact Check answers and finds no review
+
+    async def search(query, **kwargs):
+        return websearch.WebSearch(documents=[review_page()])
+
+    monkeypatch.setattr(websearch, "search_web", search)
+    extraction = Extraction(
+        claims=[
+            ExtractedClaim(
+                claim=B01_CLAIM,
+                kind=ClaimKind.STATEMENT,
+                source_sentence=B01_SENTENCE,
+                checkable=True,
+                reason="Fakt.",
+                queries=["Berkowicz film protesty Francja"],
+            )
+        ],
+        other_claims=[],
+        unclear=False,
+    )
+    with (
+        rerank.agent.override(model=model(every_fragment)),
+        judge.agent.override(model=rating_judge(same_claim=True)),
+    ):
+        result = verify("tekst", extraction)
+    [claim] = result.claims
+    assert claim.verdict is Verdict.MISLEADING
+    [source] = claim.sources
+    assert (source.rating, str(source.url)) == ("Manipulacja", REVIEW_PAGE)

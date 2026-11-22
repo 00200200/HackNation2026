@@ -14,7 +14,9 @@ from prawdowid.judge import (
     JUDGE_UNAVAILABLE,
     NO_FRAGMENTS,
     NOT_ENOUGH,
+    QUOTES_DROPPED,
     SELF_CONTRADICTION,
+    SNIPPET_ALONE,
     SNIPPET_ONLY,
     Labels,
     agent,
@@ -746,13 +748,18 @@ def test_an_undated_official_page_counts_but_never_makes_the_evidence_strong():
 
 
 def claim_review(
-    rating, claim, title=REVIEW_TITLE, url=REVIEW_URL, publisher="Demagog"
+    rating,
+    claim,
+    title=REVIEW_TITLE,
+    url=REVIEW_URL,
+    publisher="Demagog",
+    published=date(2026, 10, 19),
 ):
     """A Fact Check hit as rerank passes it on (`factcheck.review_fragment`)."""
     source = Source(
         title=title,
         publisher=publisher,
-        published_at=date(2026, 10, 19),
+        published_at=published,
         fetched_at=datetime(2026, 11, 21, tzinfo=UTC),
         url=url,
         source_type="fact_check",
@@ -1011,3 +1018,206 @@ def test_the_source_with_the_deciding_rating_survives_deduplication():
     assert _one_per_document([ev(body), ev(rated)]) == [rated]
     assert _one_per_document([ev(rated), ev(body)]) == [rated]
     assert _one_per_document([ev(body)]) == [body]
+
+
+# --- #127: ratings read from review pages, a page that takes no side, a lone snippet ---
+
+
+@pytest.mark.parametrize(
+    "rating, verdict",
+    [
+        ("Falsz", Verdict.FALSE),  # Demagog's own spelling, without the ogonek
+        ("FAŁSZ.", Verdict.FALSE),
+        ("Częściowy fałsz", Verdict.MISLEADING),
+        ("Partly false", Verdict.MISLEADING),
+    ],
+)
+def test_a_rating_is_mapped_whatever_its_case_and_diacritics(rating, verdict):
+    # Read as plain context, an unmapped rating would decide nothing.
+    rated = claim_review(rating, CLAIM)
+    j = run([rated], answering(rating_label(rated, "context")))
+    assert j.verdict is verdict
+    assert j.sources[0].rating == rating.rstrip(".")
+
+
+@pytest.mark.parametrize(
+    "older, newer, verdict",
+    [
+        ("Fałsz", "Prawda", Verdict.CONFIRMED),
+        ("Prawda", "Fałsz", Verdict.FALSE),
+    ],
+)
+def test_a_publishers_newest_rating_of_the_claim_is_its_verdict(older, newer, verdict):
+    stance = {"Fałsz": "refutes", "Prawda": "supports"}
+    old = claim_review(
+        older, CLAIM, url="https://demagog.org.pl/a/", published=date(2025, 2, 21)
+    )
+    new = claim_review(
+        newer, CLAIM, url="https://demagog.org.pl/b/", published=date(2026, 11, 10)
+    )
+    j = run(
+        [old, new],
+        answering(rating_label(old, stance[older]), rating_label(new, stance[newer])),
+    )
+    assert j.verdict is verdict
+    assert CONFLICT not in j.limitations
+    assert SELF_CONTRADICTION.format(publishers="demagog") not in j.limitations
+    # The older rating is listed, but the answer rests on the newest one only.
+    assert [s.rating for s in j.sources] == [older, newer]
+    assert newer in j.justification and older not in j.justification
+
+
+def test_two_fact_checkers_whose_ratings_disagree_are_a_conflict_whatever_the_dates():
+    demagog = claim_review("Fałsz", CLAIM, published=date(2025, 2, 21))
+    konkret = claim_review(
+        "Prawda",
+        CLAIM,
+        url="https://konkret24.tvn24.pl/k/1",
+        publisher="Konkret24",
+        published=date(2026, 11, 10),
+    )
+    j = run(
+        [demagog, konkret],
+        answering(rating_label(demagog), rating_label(konkret, "supports")),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert CONFLICT in j.limitations
+
+
+# An official page about another scope of the same matter: it takes no side on the claim.
+DENMARK = "Od 2025 roku w Danii obowiązuje opłata od sprzedaży wypieków w sklepach."
+SCOPE = fragment("https://www.gov.pl/web/mf/oplaty", DENMARK, "MF", "official")
+
+
+def scope_label(stance="context"):
+    return label(
+        SCOPE,
+        stance,
+        DENMARK,
+        "Opłata dotyczy sklepów w Danii, nie domowych wypieków w całej UE.",
+        context_quote="w Danii obowiązuje opłata od sprzedaży wypieków",
+    )
+
+
+FINDING = fragment(
+    "https://demagog.org.pl/fake_news/wypieki/",
+    "Sprawdziliśmy: UE nie wprowadza podatku od domowych wypieków. "
+    "Sprawdziliśmy też: Polska wprowadza podatek od domowych wypieków od 2025 roku.",
+    "Demagog",
+    "fact_check",
+)
+
+
+@pytest.mark.parametrize(
+    "finding, verdict",
+    [
+        (
+            label(
+                FINDING,
+                "refutes",
+                "UE nie wprowadza podatku od domowych wypieków.",
+                own_conclusion=True,
+            ),
+            Verdict.FALSE,
+        ),
+        (
+            label(
+                FINDING,
+                "supports",
+                "Polska wprowadza podatek od domowych wypieków od 2025 roku.",
+                own_conclusion=True,
+            ),
+            Verdict.CONFIRMED,
+        ),
+    ],
+)
+def test_a_page_that_takes_no_side_names_no_missing_context(finding, verdict):
+    j = run([FINDING, SCOPE], answering(finding, scope_label()))
+    assert j.verdict is verdict
+    assert not any("Brakujący kontekst" in p for p in j.premises)
+
+
+def test_a_page_that_takes_no_side_alone_decides_nothing():
+    j = run([SCOPE], answering(scope_label()))
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert "Brakujący kontekst" not in j.premises[0]
+
+
+def test_a_missing_context_counts_from_a_page_that_also_takes_a_side():
+    refuting = label(
+        SCOPE, "refutes", "w Danii obowiązuje opłata od sprzedaży wypieków w sklepach"
+    )
+    for labels in ([scope_label("refutes")], [refuting, scope_label()]):
+        j = run([SCOPE], answering(*labels))
+        assert j.verdict is Verdict.MISLEADING
+        assert any("Brakujący kontekst" in p for p in j.premises)
+
+
+# --- a search snippet confirms alone only as a fact-checker's own conclusion ---
+
+TRUE_FINDING = "To prawda: podatek od wypieków obowiązuje w UE od 2025 roku."
+
+
+def test_a_lone_official_snippet_does_not_confirm():
+    official = snippet(GOV)
+    j = run([official], answering(label(official, "supports", GOV.source.fragment)))
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert SNIPPET_ONLY.format(reason=BLOCKED, publisher="MF") in j.limitations
+    # It says why, in place of "too few sources": one official source was there.
+    assert SNIPPET_ALONE.format(publishers="MF") in j.limitations
+    assert NOT_ENOUGH not in j.limitations
+
+
+def test_a_lone_official_snippet_still_refutes():
+    official = snippet(EC)
+    j = run([official], answering(label(official, "refutes", EC.source.fragment)))
+    assert j.verdict is Verdict.FALSE
+
+
+@pytest.mark.parametrize(
+    "own_conclusion, verdict",
+    [(True, Verdict.CONFIRMED), (False, Verdict.INSUFFICIENT_EVIDENCE)],
+)
+def test_a_fact_check_snippet_confirms_alone_only_as_its_own_conclusion(
+    own_conclusion, verdict
+):
+    fc = snippet(
+        fragment(
+            "https://konkret24.tvn24.pl/p",
+            f"Sprawdziliśmy. {TRUE_FINDING}",
+            "Konkret24",
+            "fact_check",
+        )
+    )
+    j = run(
+        [fc],
+        answering(label(fc, "supports", TRUE_FINDING, own_conclusion=own_conclusion)),
+    )
+    assert j.verdict is verdict
+    assert (SNIPPET_ALONE.format(publishers="Konkret24") in j.limitations) is (
+        not own_conclusion
+    )
+
+
+def test_two_snippets_from_two_publishers_confirm():
+    ec = fragment("https://ec.europa.eu/w", TRUE_FINDING, "KE", "official")
+    snippets = [snippet(GOV), snippet(ec)]
+    j = run(
+        snippets,
+        answering(
+            label(snippets[0], "supports", GOV.source.fragment),
+            label(snippets[1], "supports", TRUE_FINDING),
+        ),
+    )
+    assert j.verdict is Verdict.CONFIRMED
+    assert j.strength.startswith("umiarkowana: 2 niezależnych")
+
+
+def test_a_doc_id_that_is_no_url_is_dropped_not_a_failure():
+    broken = {
+        **label(GOV, "supports", GOV.source.fragment),
+        "doc_id": "https://[gov.pl/z",
+    }
+    j = run([GOV], answering(broken))
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert QUOTES_DROPPED.format(n=1) in j.limitations

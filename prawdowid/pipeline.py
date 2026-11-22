@@ -258,7 +258,15 @@ async def _retrieve(
 
 def _candidates(found: dict) -> list[Source]:
     webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
-    pages = [d.to_source(fragment=d.text) for w in webs for d in w.documents]
+    # A fact-checker's rating from its page's markup comes right before the page, as a Fact Check
+    # hit would: rerank keeps it first and the page text after it, and a Fact Check hit for the
+    # same page, which comes earlier, wins.
+    pages = [
+        d.to_source(fragment=fragment)
+        for w in webs
+        for d in w.documents
+        for fragment in [*d.reviews[:1], d.text]
+    ]
     # A page fetched in this check beats its stored copy: rerank keeps the first source per URL.
     # A snippet is no copy of the page: the stored full text stays beside it.
     live = {
