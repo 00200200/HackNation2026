@@ -2,10 +2,8 @@
 
 Opis zadania wymaga, żeby zespół ujawnił przypadki, których system nie obsługuje (sekcja 6). Ta lista mówi,
 co system robi w każdym z nich i co wtedy widzi użytkownik. Komunikaty są przepisane z kodu słowo w słowo.
-Stan na 22.11.2026: build demo, czyli gałąź `integration/r4`. `main` (`1aa173f`) jest jej przodkiem i nie ma zmian
-z [listy w README](../README.md#zmiany-czekające-na-scalenie). Po nowych commitach w `integration/r4` komunikaty trzeba
-sprawdzić ponownie.
-Gdzie `main` zachowuje się inaczej, wiersz to mówi. Numery `#n` to zadania w [repozytorium](https://github.com/00200200/HackNation2026/issues).
+Stan na 22.11.2026: gałąź `integration/r4`. Po nowych commitach komunikaty trzeba sprawdzić ponownie.
+Gdzie wiersz mówi o `main`, chodzi o `main` sprzed scalenia z `integration/r4` (`1aa173f`). Numery `#n` to zadania w [repozytorium](https://github.com/00200200/HackNation2026/issues).
 
 Gdy system nie może ocenić treści, nie pokazuje werdyktu. Strona wyświetla neutralną informację (bez kolorów
 werdyktów) z jednym z trzech tytułów i zdaniem "To nie jest ocena prawdziwości tej treści.":
