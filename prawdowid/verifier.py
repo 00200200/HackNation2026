@@ -211,6 +211,11 @@ Return in claims the {MAX_CHECKED_CLAIMS} highest-ranked claims, in rank order, 
   announcement), 1 or 2 queries for the search box of the www.gov.pl portal: a few plain keywords,
   such as the office and the subject ("RCB alert powódź", "MSWiA dowód osobisty"), no full
   sentences, no operators. They do not repeat the web queries. Empty for any other claim.
+- legal_queries: when the claim is about a Polish or EU law, regulation, directive, ban, obligation
+  or the date a rule takes or took effect, 1 or 2 queries of 2 or 3 words that would appear in the
+  official title of the act, as used in Dziennik Ustaw or EUR-Lex ("ograniczeniu handlu niedziele",
+  "emisji CO2 samochodów osobowych"), no act numbers, no "ustawa" or "rozporządzenie". Empty for any
+  other claim.
 
 Return in other_claims every remaining claim, in rank order, as one short self-contained sentence
 each. Leave none out: they are shown to the user as not checked.
@@ -233,6 +238,9 @@ class ExtractedClaim(BaseModel):
     # Keyword queries for the www.gov.pl site search (`govpl`); empty when the claim is not about
     # the Polish government.
     govpl_queries: list[str] = []
+    # Act-title words for the registers of law (`legal`: ISAP/ELI, EUR-Lex); empty when the claim
+    # is not about a law.
+    legal_queries: list[str] = []
 
 
 class Extraction(BaseModel):
@@ -412,7 +420,12 @@ async def verify_text(
     checks = await asyncio.gather(
         *(
             pipeline.check_claim(
-                c.claim, c.queries, deadline, exclude_url, c.govpl_queries
+                c.claim,
+                c.queries,
+                deadline,
+                exclude_url,
+                c.govpl_queries,
+                c.legal_queries,
             )
             if c.checkable
             else asyncio.sleep(0)

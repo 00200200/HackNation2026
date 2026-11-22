@@ -25,6 +25,28 @@ other `*.gov.pl` site (tested 2026-11-21). While filtering, web search asks Tavi
 results (10) and keeps the first 5 left, since www.gov.pl pages can fill most of a result list. Other `*.gov.pl` sites (Sejm, GUS, PKW, NIK) are not
 covered by the gov.pl search and stay in web search.
 
+## Registers of law (`prawdowid/legal.py`)
+
+Step 2 also searches the registers of Polish and EU law for a claim about a law, regulation,
+directive, ban or obligation: only when the extraction model fills `legal_queries` (1 or 2 queries of
+act-title words), and only while `PRAWDOWID_LEGAL` is `1` (the default; `0` switches it off).
+
+| What | Polish acts (Dziennik Ustaw, Monitor Polski) | EU acts |
+|---|---|---|
+| Search | `GET https://api.sejm.gov.pl/eli/acts/search?title=<stems>&limit=20` (Sejm ELI API, no key) | CELLAR SPARQL `GET https://publications.europa.eu/webapi/rdf/sparql`: full-text search on the Polish titles of EU legislation (CELEX sector 3), with the newest consolidated version of each act (no key) |
+| Ranking (in code) | The act itself or its consolidated text in force first, then other acts, then amendments, corrections and consolidated texts no longer in force; newest first in each group; 3 acts kept | Acts of Parliament and Council first, amendments and corrections last, newest first; 3 acts kept |
+| Record | A Polish sentence built in code from the record: title, status, promulgation, entry into force, repeal or expiry. Link: the ISAP page | The same, with the CELEX number and the newest consolidated version. Link: the EUR-Lex page |
+| Act text | The best act in force: its ELI text PDF (`/eli/acts/<ELI>/text.pdf`, pypdf, up to 400 pages, 5 MB) | The best act in force: the Polish XHTML of its newest consolidated version, else of the act as published, via CELLAR content negotiation (`/resource/celex/<CELEX>`, `Accept-Language: pol`) |
+| Passages | Up to 5 pieces of the text (an article, or a part of a long one of at most 1,500 characters led by its number), picked by how many of the claim's word stems they hold. Rare stems weigh more and numbers count five times. They are appended after the record under "Fragmenty tekstu" | same |
+| Bounds | 7 s per call, one retry, 10 s per register for the search, 8 s per register for the text. A slow or failed register keeps the other one's acts. Our usual User-Agent, robots.txt respected | same |
+| On failure | A limitation naming the register that did not answer (ISAP, EUR-Lex, or both), never a verdict. A text that fails leaves the record without passages, with no limitation | same |
+| robots.txt | `api.sejm.gov.pl`: `User-agent: * / Allow: /` (checked 2026-11-22) | `publications.europa.eu` redirects to `op.europa.eu/robots.txt`, which does not disallow these paths (checked 2026-11-22) |
+| Licence | The acts: normative acts are not protected by copyright (art. 4 pt 1 of the Polish copyright act). The API's own terms: **UNCONFIRMED**. `api.sejm.gov.pl` (read 2026-11-22) states no licence or reuse conditions. The Sejm's reuse page and ISAP could not be read by a script (captcha, redirect loop) | EUR-Lex [legal notice](https://eur-lex.europa.eu/content/legal-notice/legal-notice.html) (read 2026-11-22): "EUR-Lex metadata is dedicated to the public domain" (CC0), and legal documents may be reused under Decision 2011/833/EU. That notice does not name CELLAR. The Publications Office [copyright page](https://op.europa.eu/en/web/about-us/legal-notices/publications-office-of-the-european-union-copyright) sends questions about CELLAR reuse to op-copyright@publications.europa.eu, so the CELLAR terms are **UNCONFIRMED** |
+
+We read the registers through their APIs because the human pages are closed to scripts.
+`isap.sejm.gov.pl` and `orka.sejm.gov.pl` disallow robots, and EUR-Lex answers our User-Agent
+with a challenge (HTTP 202). We never work around either.
+
 ## Web search
 
 Web search (step 2b, `prawdowid/websearch.py`) only returns pages from the domains below. A host
