@@ -32,7 +32,7 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 5. Wyszukiwanie i ocena
 
-- Równolegle: Google Fact Check Tools, Tavily i EUvsDisinfo MCP.
+- Równolegle: Google Fact Check Tools, wyszukiwarka www.gov.pl, Tavily i EUvsDisinfo MCP; po scaleniu [PR #109](https://github.com/00200200/HackNation2026/pull/109) także nasz korpus dowodowy (BM25 w pamięci).
 - Fragmenty są porządkowane, a cytaty sprawdzane z pobranym tekstem. Reguły w kodzie ustalają ocenę.
 - EUvsDisinfo daje kontekst; własna baza PostgreSQL jest wyłączona.
   [Architektura](architecture.md), [źródła i prawa do wykorzystania](sources.md).
@@ -46,51 +46,64 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 7. Zapisany test
 
-- Szybki test regresji, nie pełny test: `n_cases: 9`, `dirty: false`, `coverage_ok: true`, `overall_pass: false`.
-- Commit produktu: `95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, sprzed scalenia #40 z `main`; świeży test po
-  scaleniu jeszcze nie uruchomiony (decyzja: `HN_SKIP_EVAL=1`).
-- Ten test poprzedza sędziego, potok wyszukiwania i dziennik sprawdzeń: weryfikator zwracał dla każdego
-  sprawdzalnego twierdzenia stałe `brak wystarczających dowodów`. Wartości na slajdach 8 i 9 opisują ten
-  szkielet, nie obecny produkt ([README, sekcja metryk](../../README.md#metryki-obowiązkowe-sekcja-6)).
-- Znacznik czasu: `2026-11-21T19:10:57+00:00`.
-- Źródło wszystkich wartości: [latest.json](../../evals/results/latest.json).
+- Szybki test regresji, nie pełny test: `n_cases: 10`, `dirty: false`, `coverage_ok: true`,
+  `overall_pass: false`. Po jednym przypadku ze scenariuszy A, B, C, D, E, G, H, I, J i U; E05 i E06
+  pominięte (brak publicznego adresu stron testowych).
+- Commit produktu: `edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, w [PR #109](https://github.com/00200200/HackNation2026/pull/109), jeszcze nie na `main`. Test objął
+  ekstrakcję, wyszukiwanie, reranking i sędziego; ekstrakcja działała na Opusie (według opisu commita
+  `83d6c65`, plik tego nie zapisuje).
+- Na `main` leży starszy test z commita `95e6177`, wykonany na szkielecie sprzed sędziego (weryfikator
+  zwracał stałe `brak wystarczających dowodów`). Jego wartości nie opisują produktu i nie są tu
+  cytowane ([eval-notes](../eval-notes.md), [README, sekcja metryk](../../README.md#metryki-obowiązkowe-sekcja-6)).
+- Znacznik czasu: `2026-11-22T00:37:27+00:00`.
+- Źródło wartości na slajdach 8 do 10: [latest.json](../../evals/results/latest.json) z PR #109.
 
 ## Slajd 8. Wyniki jakości
 
-- `macro_f1: 0.1`; `citation_coverage: null`; `abstention: 1.0` (wynik trywialny: stałe wstrzymanie się szkieletu).
-- `injection_resistance: 0.0`; `end_to_end: 0.8888888888888888`.
-- `citation_correctness: null`; `channel_consistency: null`: niezmierzone.
-- Wynik całości nie spełnia wymagań, a liczby opisują szkielet sprzed sędziego (slajd 7). Pokrycie
-  cytatami nie dowodzi poprawności interpretacji.
+- `macro_f1: 0.2777777777777778` (próg co najmniej 0.75, niespełniony): poprawny werdykt w 4 z 10 przypadków.
+- `citation_coverage: 1.0` (jeden przypadek, E01); `abstention: 1.0` (dwa przypadki, D01 i H01).
+- `injection_resistance: 1.0` (jeden przypadek, E01: wstrzyknięcie w tekście; wstrzyknięć w stronach nie
+  liczono); `channel_consistency: 1.0` (jeden przypadek, G01).
+- `end_to_end: 0.9` (próg 1.0, niespełniony): przypadek J01 (symulowana awaria Fact Check) dał `nie sprawdzono`
+  w odpowiedzi `ok` zamiast `technical_error` ([#101](https://github.com/00200200/HackNation2026/issues/101)). `moderator_loop: 0.0`: niezbudowany.
+  `citation_correctness: null`: niezmierzone.
+- Wynik całości nie spełnia wymagań, a każdy współczynnik opiera się na jednym lub dwóch przypadkach, więc
+  żaden nie jest dowodem. Pokrycie cytatami nie dowodzi poprawności interpretacji.
   [Dokładne wyniki i definicje](architecture.md#saved-test-results-and-reproduction),
   [plik pomiaru](../../evals/results/latest.json).
 
 ## Slajd 9. Czas i koszt
 
-- `median_latency_s: 3.8964525419287384`; `cost_per_100_usd: 1.8220444444444441`. Obie wartości obejmują
-  tylko ekstrakcję twierdzeń, bez wyszukiwania, rerankingu i sędziego (slajd 7).
-- Ekstrapolacja: `1.8220444444444441 / 100 * 1000 = 18.220444444444441 USD`, czyli około
-  `18.22 USD` za 1000 sprawdzeń samej ekstrakcji, przy tej samej mieszance zapytań. Koszt obecnego
-  potoku: UNCONFIRMED.
-- Źródło: [latest.json](../../evals/results/latest.json). Hosting, opłaty kanału i zachowanie pod
-  obciążeniem: UNCONFIRMED. [Założenia i rachunek](cost.md).
+- `median_latency_s: 24.877917104000517` (próg najwyżej 30 s) obejmuje cały potok: ekstrakcję, wyszukiwanie,
+  reranking i sędziego. Najwolniejszy przypadek, U01, trwał 37.4 s. `cost_per_100_usd: 4.912332` (wywołania
+  modeli, ekstrakcja na Opusie).
+- Ekstrapolacja: `4.912332 / 100 * 1000 = 49.12332 USD`, czyli około `49.12 USD` za 1000 sprawdzeń, przy tej
+  samej mieszance zapytań. Z Sonnetem jako modelem ekstrakcji około 3.96 USD za 100 i mediana 18.3 s według
+  opisu commita `83d6c65`; pliku tego przebiegu nie zapisano: UNCONFIRMED.
+- Źródło: [latest.json](../../evals/results/latest.json) z PR #109. Hosting, opłaty kanałów, wyszukiwanie i
+  zachowanie pod obciążeniem: UNCONFIRMED. [Założenia i rachunek](cost.md).
 
 ## Slajd 10. Bezpieczeństwo i prywatność
 
-- Kod oddziela dane od instrukcji, sprawdza obecność cytatów i ogranicza pobieranie podanych URL.
-- Maskowanie danych osobowych (e-mail, IBAN/NRB, karta, PESEL, telefon) działa przed modelem i w
-  każdym logu; dziennik sprawdzeń trzyma maskowany zapis 30 dni, sesję można usunąć (`DELETE
-  /api/sessions/{id}`, przycisk na stronie). Imiona i adresy nie są wykrywane.
+- Kod oddziela dane od instrukcji, sprawdza obecność cytatów i ogranicza pobieranie podanych URL. W [PR #109](https://github.com/00200200/HackNation2026/pull/109)
+  treść pobranych stron jest też sprawdzana pod kątem wstrzykniętych instrukcji ([#61](https://github.com/00200200/HackNation2026/issues/61),
+  [#62](https://github.com/00200200/HackNation2026/issues/62)).
+- Maskowanie danych osobowych (e-mail, IBAN/NRB, karta, PESEL, telefon; w PR #109 także numer dowodu i
+  paszportu) działa przed modelem i w każdym logu; dziennik sprawdzeń trzyma maskowany zapis 30 dni, sesję
+  można usunąć (`DELETE /api/sessions/{id}`, przycisk na stronie). Imiona i adresy nie są wykrywane.
   [Prywatność](../privacy.md).
-- Najnowszy zapisany test (szkielet sprzed sędziego, slajd 7) ma `injection_resistance: 0.0`, poniżej
-  progu. Wiersz z wcześniejszego przebiegu, odtworzony z relacji bez pliku JSON, pokazuje 1.0. Oba
-  obejmują jeden przypadek, to nie dowód odporności ([latest.json](../../evals/results/latest.json),
+- Test z PR #109 ma `injection_resistance: 1.0` na jednym przypadku (E01, wstrzyknięcie w tekście
+  wejściowym); wstrzyknięć w stronach (E05 do E15) nie oceniano, więc to nie dowód odporności. Starszy test
+  na `main` (szkielet z commita `95e6177`) pokazuje 0.0 ([latest.json](../../evals/results/latest.json),
   [HISTORY.md](../../evals/results/HISTORY.md)). Discord nie ma jeszcze komendy usuwania.
   [Ryzyka z odwołaniami do kodu](risks.md).
 
 ## Slajd 11. Ograniczenia
 
-- DuckDuckGo zastąpiono Tavily po problemach z wynikami; korpus demonstracyjny nadal nie jest zbudowany.
+- DuckDuckGo zastąpiono Tavily po problemach z wynikami. Nasz korpus dowodowy (1158 rekordów) jest
+  przeszukiwany w sprawdzeniu dopiero po scaleniu [PR #109](https://github.com/00200200/HackNation2026/pull/109) ([#74](https://github.com/00200200/HackNation2026/issues/74)); na `main` leży tylko w repozytorium.
+- Część opisanych funkcji jest w otwartych PR i jeszcze nie na `main`:
+  [lista w README](../../README.md#zmiany-czekające-na-scalenie).
 - Baza incydentów organizatora jest wpięta, ale pusta (plik od organizatora jeszcze nie dotarł).
 - Prawa do przechowywania wybranych treści wymagają rozstrzygnięcia; w Discordzie brak komendy usuwania sesji.
 - Nie pokazujemy rozpoznawania obrazów ani kolejki moderatora jako gotowych funkcji.

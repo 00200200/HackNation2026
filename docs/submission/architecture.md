@@ -16,7 +16,8 @@ Discord /sprawdz -> HTTP, X-Channel: discord +
     -> text, or guarded URL fetch and extraction
     -> claim extraction and search queries (PydanticAI / Anthropic)
     -> each checkable claim in parallel:
-         Google Fact Check + EUvsDisinfo MCP + Tavily / allowlisted pages
+         Google Fact Check + EUvsDisinfo MCP + www.gov.pl search + Tavily / allowlisted pages
+         + evidence corpus (BM25 over corpus/evidence.jsonl)
          -> deduplicate and rerank fragments -> label and validate quotes
          -> judge.decide() -> shared CheckResult -> channel rendering
 
@@ -73,7 +74,7 @@ separate, already-populated source and does not substitute for the incident base
 
 | Role | Default model ID on `main` | Configuration / source |
 |---|---|---|
-| Extract claims and queries | `anthropic:claude-opus-5-5` | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
+| Extract claims and queries | `anthropic:claude-sonnet-5-5` (was Opus until 22.11, #88) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
 | Rerank fragments | `anthropic:claude-haiku-5-5` | `PRAWDOWID_RERANK_MODEL`, [rerank.py](../../prawdowid/rerank.py) |
 | Label evidence | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_JUDGE_MODEL`, [judge.py](../../prawdowid/judge.py) |
 
@@ -124,9 +125,10 @@ retention, training use and links to the terms, is in
 |---|---|---|
 | Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
 | Tavily (web search) | Masked search queries, or the masked claim when the model wrote none or the first search found too little | United States. An EU endpoint exists for selected customers only |
-| Google Fact Check Tools | Masked claim text | Not stated for this API. Google's servers are worldwide |
+| Google Fact Check Tools | Masked claim text | Not stated for this API, UNCONFIRMED. Google's privacy policy says its servers are worldwide |
 | EUvsDisinfo MCP | Claim text, cut to 200 characters | Not stated, UNCONFIRMED |
 | www.gov.pl search | Search queries, or the claim when the model wrote none | Not stated, UNCONFIRMED |
+| Sites a pasted link points to | The URL as pasted, unmasked: a name or e-mail in its path or query string reaches the site | The site's own hosting |
 | OVHcloud VPS | Everything the app stores | Limburg, Germany |
 | Discord (bot, not deployed yet) | The typed command and our reply | United States |
 
@@ -136,8 +138,8 @@ through Amazon Bedrock EU inference profiles (for example `bedrock:eu.anthropic.
 That takes the variables, the `bedrock` dependency extra and the `environment:` list in
 `compose.yaml`, and is expected to need no prompt or code change (Bedrock ignores the retry
 setting the agents pass, so botocore's default retries apply). It has not been run. After it,
-web search (Tavily), Fact Check (Google) and the Discord channel still leave the EEA, and
-EUvsDisinfo and www.gov.pl state no location. Steps and open points:
+web search (Tavily) and the Discord channel still leave the EEA. Fact Check (Google), EUvsDisinfo
+and www.gov.pl state no location, so they stay UNCONFIRMED. Steps and open points:
 [docs/privacy.md](../privacy.md#migration-path-to-an-eu-processed-model).
 
 Browser traffic and fetched evidence also pass through other parties' systems. See
@@ -148,8 +150,8 @@ Browser traffic and fetched evidence also pass through other parties' systems. S
 | Limit | Default | Source |
 |---|---|---|
 | Input / checked page prefix | 5000 characters | [app.py](../../prawdowid/app.py), [verifier.py](../../prawdowid/verifier.py) |
-| Fully considered claims / queries per checkable claim | 5 / 3 | [verifier.py](../../prawdowid/verifier.py) |
-| Check budget / API timeout | 25 s / 60 s | [pipeline.py](../../prawdowid/pipeline.py), [app.py](../../prawdowid/app.py) |
+| Fully considered claims / queries per checkable claim | 3 / 3 | [verifier.py](../../prawdowid/verifier.py) |
+| Check budget / API timeout | 40 s / 60 s | [pipeline.py](../../prawdowid/pipeline.py), [app.py](../../prawdowid/app.py) |
 | Extraction call timeout | 45 s provider setting, bounded by the shared check deadline | [verifier.py](../../prawdowid/verifier.py) |
 | Web query / whole page fetch budget | 10 s / 8 s | [websearch.py](../../prawdowid/websearch.py) |
 | Link fetch | 10 s, 3 redirects, `2 * 1024 * 1024` bytes | [link.py](../../prawdowid/link.py) |
@@ -168,32 +170,47 @@ remain open in [WORKLOG](../../WORKLOG.md). URL inputs are not exercised by the 
 
 ## Saved test results and reproduction
 
-Latest tracked result: [evals/results/latest.json](../../evals/results/latest.json), timestamp
-`2026-11-21T19:10:57+00:00`, product commit
-`95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `dirty: false`, `mode: "quick"`, `n_cases: 9`,
-`coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J`; `FC-J01`/`FC-J02`
-skipped (need a product eval fault switch, not built). This is a quick regression run, not the full
-jury-sized evaluation, even though the saved `coverage_ok` flag is true. It also predates the
-judge, the retrieval pipeline and the check log. At that commit (`prawdowid/` is identical in
-`e9a7f86` on `main`) `verifier.to_check_result` returned a constant `insufficient_evidence` for
-every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py` did not exist. Every value
-below describes that stub, not the current pipeline. The repository holds no valid eval of the
-current pipeline (the eval gate was skipped with `HN_SKIP_EVAL=1` when PR #40 was pushed); a fresh
-full run is pending ([#16](https://github.com/00200200/HackNation2026/issues/16)).
-The following values and targets are copied exactly from that file:
+Two tracked runs exist, and which one [evals/results/latest.json](../../evals/results/latest.json)
+holds depends on whether [PR #109](https://github.com/00200200/HackNation2026/pull/109) is merged.
+
+- On `main` it is the quick run of `2026-11-21T19:10:57+00:00` at product commit `95e6177`, 9 cases.
+  It predates the judge, the retrieval pipeline and the check log. At that commit (`prawdowid/` is
+  identical in `e9a7f86` on `main`) `verifier.to_check_result` returned a constant
+  `insufficient_evidence` for every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py`
+  did not exist. Its values describe that stub, not the pipeline: do not quote them
+  ([eval-notes.md](../eval-notes.md)).
+- In PR #109 it is the quick run of `2026-11-22T00:37:27+00:00` at product commit
+  `edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `dirty: false`, `mode: "quick"`, `n_cases: 10`,
+  `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J, U`, one case
+  each; `E05` and `E06` skipped (no public URL for the fixture page). It ran on the VPS staging with
+  extraction on Opus (per the message of `83d6c65`, not recorded in the JSON). This is a quick regression run, not
+  the full jury-sized evaluation, even though the saved `coverage_ok` flag is true. A full run is
+  pending ([#16](https://github.com/00200200/HackNation2026/issues/16)).
+
+The following values and targets are copied exactly from the second file:
 
 | Metric | value | target | pass |
 |---|---|---|---|
-| macro_f1 | 0.1 | >= 0.75 | false |
-| citation_coverage | null | >= 0.95 | null |
+| macro_f1 | 0.2777777777777778 | >= 0.75 | false |
+| citation_coverage | 1.0 | >= 0.95 | true |
 | citation_correctness | null | >= 0.85 | null |
 | abstention | 1.0 | >= 0.8 | true |
-| injection_resistance | 0.0 | >= 0.9 | false |
-| median_latency_s | 3.8964525419287384 | <= 30.0 | true |
-| end_to_end | 0.8888888888888888 | >= 1.0 | false |
-| channel_consistency | null | >= 1.0 | null |
+| injection_resistance | 1.0 | >= 0.9 | true |
+| median_latency_s | 24.877917104000517 | <= 30.0 | true |
+| end_to_end | 0.9 | >= 1.0 | false |
+| channel_consistency | 1.0 | >= 1.0 | true |
 | moderator_loop | 0.0 | >= 1.0 | false |
-| cost_per_100_usd | 1.8220444444444441 | reported | true |
+| injection_verdict_correct | 1.0 | reported | true |
+| cost_per_100_usd | 4.912332 | reported | true |
+
+Each ratio rests on a handful of cases: `citation_coverage` on one claim (`E01`), `abstention` on two
+(`D01`, `H01`), `injection_resistance` on one (`E01`, an injection in the input text; no page
+injection was scored), `channel_consistency` on one (`G01`, whose second answer took 0.22 s and most
+likely came from the result cache). The slowest case, `U01`, took 37.4 s, above the 30 s target. The
+cost covers model calls only (extraction on Opus, rerank, judge), not search, hosting or the channel.
+On the same ten cases with only `PRAWDOWID_MODEL` changed to Sonnet, the commit message of `83d6c65`
+reports macro-F1 0.375, median 18.3 s and about USD 3.96 per 100 checks; that run's file was not
+saved, so it is UNCONFIRMED.
 
 `null` means not measured, not passed. Citation coverage counts evidence URL/quote presence for
 factual verdicts, not evidence correctness. Citation correctness needs a corpus and would only
