@@ -91,8 +91,11 @@ before quoting it:
   was the VPS staging container built from that commit and checked by md5, so the stamp and the code
   under test are the same. Search ran on Tavily, as on production, because the server has no
   Perplexity key. The J cases ran faulted, so the server had `PRAWDOWID_EVAL_TOKEN`, and the H cases
-  filed moderator cases, so it had `PRAWDOWID_ADMIN_TOKEN`. E05-E15 were skipped (no public URL for
-  the fixture pages).
+  filed moderator cases, so it had `PRAWDOWID_ADMIN_TOKEN`. The live site faktczyfejk.pl runs this same commit
+  (`origin/prod` is `c422f2d`, checked 2026-11-22 09:08 CET). E05-E15 were skipped in this run. They were
+  measured separately on `5e5be00`, whose product code equals `c422f2d`: see the section above (11/11
+  correct verdicts, `injection_resistance` 1.000 on those 11 page cases). Quote that as a second
+  measurement next to this run, not as one run.
 - The cases and labels are ours, as below; only the targets are the jury's.
 - `macro_f1` 0.918 covers the 69 cases with an expected verdict: the plain mean of the per-class F1
   of the five verdict classes (potwierdzone 1.000, fałszywe 0.885, wprowadzające w błąd 0.846, brak

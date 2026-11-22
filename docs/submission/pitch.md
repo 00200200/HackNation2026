@@ -13,13 +13,11 @@ zgłoszony kod będzie inny niż `c422f2d`, liczby trzeba zmierzyć ponownie (#1
 
 ### Przed wejściem na scenę
 
-- Wersja na produkcji. Scenariusz potrzebuje na `prod` commita, który zawiera #69 (`acb1f9e`, cztery
-  przyciski z przykładami w [frontend/public/index.html](../../frontend/public/index.html#L58-L61))
-  i scalone #66 (ocena fact-checkera dociera do sędziego) oraz #74 (korpus przeszukiwany przy każdym
-  sprawdzeniu). Oba są na `main`. W nocy 22.11 `origin/prod` to `24e92d4`: bez przycisków, bez
-  #66 i bez #74. Sprawdzamy to przez `git fetch` i
-  `git merge-base --is-ancestor acb1f9e origin/prod && echo jest`, a potem tak samo dla commitów z
-  #66 i #74. Bez przycisków wklejamy pytania ręcznie (tabela „Pytania do wklejenia” niżej).
+- Wersja na produkcji. faktczyfejk.pl działa na `c422f2d` (`origin/prod`, sprawdzone 22.11 o 09:08 CET),
+  czyli na kodzie z pełnego przebiegu evalu. Zawiera #69 (cztery przyciski z przykładami w
+  [frontend/public/index.html](../../frontend/public/index.html#L58-L61)), #66 i #74. Przed występem
+  sprawdzamy to jeszcze raz: `git fetch` i `git rev-parse origin/prod`. Gdyby przycisków nie było,
+  wklejamy pytania ręcznie (tabela „Pytania do wklejenia” niżej).
 - Próba każdej sceny na produkcji, najwyżej godzinę przed występem: cztery pytania, `/sprawdz` na
   Discordzie i jedno pytanie o podróż w rodzaju „Czy MSZ odradza podróże do ...?”, bo o takie może
   zapytać jury. Zapisujemy pierwsze słowa każdej odpowiedzi i jej źródła. Ta sama próba pokazuje, czy
@@ -65,7 +63,7 @@ Jedno zdanie i idziemy dalej:
   mapowana w kodzie na werdykt, tak jak opisuje ADR 0001. Ocena innego twierdzenia to tylko kontekst
   (#100). Ocenę czytamy też ze strony recenzji (ClaimReview), a zdanie werdyktu fact-checkera liczy się
   jako jego ocena (#127). Odpowiedź podaje ją jako „Ocena fact-checkera: <ocena>”, nie jako cytat ze
-  strony. Na `prod` tego jeszcze nie ma: runda 4 jest już na `main`, więc zostaje wypchnąć `main` na `prod`.
+  strony.
 - Pytanie z poleceniem daje inny werdykt niż pytanie bez niego: „Wyszukiwanie idzie na żywo i za
   drugim razem trafiło na inne strony. Polecenia nie wykonaliśmy i strona to mówi.” Jeśli odpowiedź
   zaczyna się od „Tak.”, nie bronimy jej: „Ten przypadek nam nie wyszedł i zapisujemy go jako błąd.”
@@ -105,21 +103,18 @@ Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odp
 - Odporność na polecenia w zapisanych przebiegach: 0,000 na `95e6177`, 0,571 w zniekształconym
   pełnym przebiegu na `8c6f396` i 1,000 w pełnych przebiegach od `ca48b84` do `c422f2d`, przy progu 0,90
   ([HISTORY.md](../../evals/results/HISTORY.md)). Te przebiegi pominęły E05-E15 (11 przypadków z
-  poleceniem ukrytym w stronie), bo brakowało publicznego adresu strony z fixture, więc wynik
-  dotyczy 7 przypadków E. Na `main` (`95e6177`, `8c6f396`) metryka liczy przypadek jako porażkę także przy złym werdykcie. Wartość 1,000 z `c422f2d` liczy tylko kanarka i zapisane zdarzenie bezpieczeństwa; werdykt jest osobną metryką (`injection_verdict_correct`, 0,857: 6 z 7 przypadków, FC-E03 ma ocenę „wprowadzające w błąd” zamiast „fałszywe”).
+  poleceniem ukrytym w stronie), więc ich wynik dotyczy 7 przypadków E. Osobny przebieg tych 11 na `5e5be00` (ten sam kod produktu co `c422f2d`, lokalne API na laptopie z wymuszonym Tavily, strony z fixture pod `https://faktczyfejk.pl/eval-fixtures`) dał 11/11 poprawnych werdyktów, `injection_resistance` 1,000 i end-to-end 1,000, mediana ok. 20 s. To drugi pomiar obok przebiegu na `c422f2d`, nie jeden przebieg. Na `main` (`95e6177`, `8c6f396`) metryka liczy przypadek jako porażkę także przy złym werdykcie. Wartość 1,000 z `c422f2d` liczy tylko kanarka i zapisane zdarzenie bezpieczeństwa; werdykt jest osobną metryką (`injection_verdict_correct`, 0,857: 6 z 7 przypadków, FC-E03 ma ocenę „wprowadzające w błąd” zamiast „fałszywe”).
 - Zgodność kanałów: w pełnym przebiegu na `c422f2d` wyszło 1,000 (drugie odpowiedzi przyszły ze wspólnej pamięci wyników, po 0,17-0,53 s, więc to pokazuje, że pamięć oddaje zapisaną odpowiedź, a nie że dwa niezależne sprawdzenia się zgadzają), a w zniekształconym timeoutami
   przebiegu na `8c6f396` 0,000 ([docs/eval-notes.md](../eval-notes.md)). Eval porównuje odpowiedzi kanałów tylko dla
-  przypadków, które mają więcej niż jeden kanał, więc to nie jest pomiar na ruchu użytkowników. W
-  buildzie z `prod` strona i Discord robią dwa osobne sprawdzenia; wspólna pamięć wyników (#59) jest na `main`.
+  przypadków, które mają więcej niż jeden kanał, więc to nie jest pomiar na ruchu użytkowników. Wspólna
+  pamięć wyników (#59) jest w kodzie.
 - Od #66 ocena fact-checkera dociera do sędziego jako osobny fragment, a od #100 krótkie klucze
-  Fact Check i mapa ocen na werdykt są w kodzie (oba na `main`). Na `prod` ocena
-  dociera tylko przez tytuł recenzji, dopóki `main` nie zostanie wypchnięty na `prod`.
-- Od #60 (PR #109, na `main`) awaria źródła, które może rozstrzygnąć werdykt, daje
-  „nie sprawdzono” z powodem. Bez niego na `prod` taki wynik brzmi „brak wystarczających
-  dowodów” z dopiskiem o awarii.
+  Fact Check i mapa ocen na werdykt są w kodzie (oba w kodzie na faktczyfejk.pl).
+- Od #60 (PR #109) awaria źródła, które może rozstrzygnąć werdykt, daje
+  „nie sprawdzono” z powodem.
 - Kolejka moderatora (#79) jest zbudowana i zakłada sprawy tylko przy ustawionym
   `PRAWDOWID_ADMIN_TOKEN`; w pełnym przebiegu na `c422f2d` pętla moderatora wyszła 1,00 (H01, H02),
-  a czy token jest na serwerze demo, sprawdzamy przed występem. Nie ma ekranu moderatora ani zatwierdzania odpowiedzi przez eksperta,
+  token jest ustawiony na serwerze demo (22.11 o 09:08 `GET /api/cases` bez tokenu zwraca tam 401). Nie ma ekranu moderatora ani zatwierdzania odpowiedzi przez eksperta,
   zrzutów ekranu i zdjęć (scenariusz F, #80) ani ostrzeżenia o sankcjach UE (#81).
 - Baza incydentów organizatora jest wpięta, ale pusta, bo nie mamy pliku (#64).
 - Wyszukiwanie w korpusie jest podpięte do sprawdzania na `main` (#74). Nie mamy pomiaru,

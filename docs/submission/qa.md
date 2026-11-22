@@ -2,7 +2,7 @@
 
 Dwadzieścia pytań, które jury może zadać po pitchu, z odpowiedziami opartymi wyłącznie na tym, co
 jest w repozytorium. Najpierw zdanie do powiedzenia na głos, potem szczegóły na dopytanie i linki.
-Stan: `main` w `c422f2d` (zawiera `integration/r4` i `integration/r3`), 22.11.2026; zdania o `prod` opisują starszy build, który działa na serwerze. Metryki pochodzą z
+Stan: `main` w `c422f2d` (zawiera `integration/r4` i `integration/r3`), 22.11.2026; faktczyfejk.pl działa na tym samym commicie (`origin/prod`). Metryki pochodzą z
 [evals/results/HISTORY.md](../../evals/results/HISTORY.md). Zanim zacytujesz którąś,
 przeczytaj [docs/eval-notes.md](../eval-notes.md). Numery z krzyżykiem to zgłoszenia w
 [repozytorium](https://github.com/00200200/HackNation2026/issues).
@@ -71,12 +71,12 @@ Krótko: my, według spisanych reguł, i obie listy są jawne. To wciąż nasz w
 fact-checkerów dopiero potwierdzamy.
 
 Szczegóły: list są dwie. Wyszukiwarka zwraca tylko strony z domen na liście `ALLOWLIST`: polskie
-urzędy, instytucje UE, NATO i WHO, trzech fact-checkerów (Konkret24, FakeNews.pl, AFP Sprawdzam) w starszym buildzie z `prod`, agencję PAP i EUvsDisinfo jako bazę znanych narracji. Każda domena ma typ: urzędowe, fact-checking,
+urzędy, instytucje UE, NATO i WHO, trzech fact-checkerów (Konkret24, FakeNews.pl, AFP Sprawdzam) oraz agencję PAP i EUvsDisinfo jako bazę znanych narracji. Każda domena ma typ: urzędowe, fact-checking,
 agencja prasowa albo baza narracji. Status IFCN albo EFCSN tych trzech fact-checkerów jest do
 potwierdzenia na listach obu sieci ([docs/sources.md](../sources.md)). Do korpusu przyjmujemy urzędy
 polskie i unijne oraz fact-checkerów, których status odczytaliśmy na stronie sieci, z datą odczytu.
 21.11 odczytaliśmy dwa: Pravda jest zweryfikowanym członkiem EFCSN do 23.02.2028, a Demagog do
-25.05.2027. Decyzja z 21.11 brzmiała: Demagoga bierzemy tylko przez Google Fact Check. Na `main` (#76) lista wyszukiwarki ma też demagog.org.pl, ale tylko jako fragmenty z wyszukiwarki, bo jego serwis odpowiada naszemu serwerowi 403, oraz pravda.org.pl i oko.press (media). Reszta tego pytania opisuje build z `prod`. Dowody od tego
+25.05.2027. Decyzja z 21.11 brzmiała: Demagoga bierzemy tylko przez Google Fact Check. Lista wyszukiwarki ma też demagog.org.pl, ale tylko jako fragmenty z wyszukiwarki, bo jego serwis odpowiada naszemu serwerowi 403, oraz pravda.org.pl i oko.press (media). Dowody od tego
 samego wydawcy, z tym samym cytatem albo z tej samej agencji prasowej liczą się jako jedno źródło.
 EUvsDisinfo nigdy sam nie rozstrzyga.
 
@@ -84,7 +84,7 @@ Słabe strony: listy to decyzja zespołu i nikt z zewnątrz nie badał ich róż
 fact-checkingowa korpusu to 15 rekordów Pravdy. Dwóch z trzech fact-checkerów z listy wyszukiwarki,
 Konkret24 i AFP Sprawdzam, blokuje nasz serwer (pytanie 6).
 
-Źródła: [prawdowid/websearch.py w starszym buildzie, `1aa173f`](https://github.com/00200200/HackNation2026/blob/1aa173f/prawdowid/websearch.py#L52), [na main](../../prawdowid/websearch.py), [docs/sources.md](../sources.md),
+Źródła: [prawdowid/websearch.py](../../prawdowid/websearch.py), [docs/sources.md](../sources.md),
 [corpus/catalog.yaml](../../corpus/catalog.yaml), [docs/corpus.md](../corpus.md), [risks.md](risks.md).
 
 ### 5. Jak dodajecie i wykluczacie źródła?
@@ -109,16 +109,14 @@ odświeżania na serwerze jeszcze nie ma (#90).
 
 ### 6. Polscy fact-checkerzy blokują wasz serwer. Co wtedy?
 
-Krótko: nie obchodzimy blokady. Na `main` bierzemy tylko to, co zwraca
-wyszukiwarka, i oznaczamy to jako fragment z wyników (#95). W starszym buildzie z `prod`, bez #95,
-takie trafienie wypada.
+Krótko: nie obchodzimy blokady. Bierzemy tylko to, co zwraca
+wyszukiwarka, i oznaczamy to jako fragment z wyników (#95).
 
 Szczegóły: w nocy 22.11 z naszego serwera konkret24.tvn24.pl, sprawdzam.afp.com i
 demagog.org.pl odpowiadały 403, i z naszym user agentem, i z przeglądarkowym, a oko.press i
 pravda.org.pl odpowiadały 200 (#95). Brief zabrania obchodzenia zabezpieczeń, a nasze pobieranie nigdy nie
-omija odpowiedzi 401, 403, 429 ani blokady botów. Dziś trafienie, którego strony nie da się pobrać,
-po prostu wypada w buildzie z `prod`, choć wyszukiwarka zwróciła jego fragment. Na `main` (#95) ten
-fragment zostaje, ale tylko gdy strona odmawia, nie odpowiada na czas, jest za duża albo nie da
+omija odpowiedzi 401, 403, 429 ani blokady botów. Trafienie, którego strony nie da się pobrać
+(#95), zostaje jako fragment z wyszukiwarki, ale tylko gdy strona odmawia, nie odpowiada na czas, jest za duża albo nie da
 się jej odczytać. Gdy robots.txt zabrania pobrania, strona zniknęła albo wymaga logowania lub
 płatności, nie bierzemy nawet fragmentu.
 
@@ -127,8 +125,7 @@ Zasadę na ten przypadek zatwierdził Michał 22.11.2026 ([WORKLOG](../../WORKLO
 przekroczony czas, za duży plik, nieobsługiwany typ), dowodem staje się tytuł i fragment zwrócone
 przez wyszukiwarkę. Odpowiedź oznacza go jako „fragment z wyników wyszukiwarki; strona nie pozwala
 na pobranie”. Cytat sprawdzamy na tym fragmencie jak na każdym innym. Pełnej treści takiej strony nie
-zapisujemy i nigdy nie pobieramy jej inną drogą. Stan: #95 jest na `main` i nie
-wszedł jeszcze na `prod`. Po stronie jakości: nie mierzyliśmy jeszcze, jak często taki fragment
+zapisujemy i nigdy nie pobieramy jej inną drogą. Po stronie jakości: nie mierzyliśmy jeszcze, jak często taki fragment
 wystarcza do cytatu.
 
 Źródła: [#95](https://github.com/00200200/HackNation2026/issues/95),
@@ -144,7 +141,7 @@ Szczegóły: brief zabrania rozstrzygania prawdziwości na podstawie statusu źr
 ADR 0001 proponuje notatkę z aktem prawnym i datą sprawdzenia, braną tylko z urzędowego źródła UE.
 Notatka nie zmienia werdyktu ani jego siły (#81). Media objęte sankcjami nie mogą dziś być dowodem,
 bo lista domen wyszukiwarki zawiera tylko urzędy, instytucje UE i międzynarodowe, fact-checkerów,
-PAP i EUvsDisinfo (na `main` także OKO.press jako media).
+PAP i EUvsDisinfo (także OKO.press jako media).
 
 Źródła: [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md), sekcje 5 i 6,
 [prawdowid/websearch.py](../../prawdowid/websearch.py),
@@ -153,28 +150,24 @@ PAP i EUvsDisinfo (na `main` także OKO.press jako media).
 ### 8. Co, jeśli tekst albo strona źródłowa zawiera polecenia dla modelu?
 
 Krótko: traktujemy je jak dane. Nie wykonujemy ich, mówimy o tym użytkownikowi i zapisujemy
-zdarzenie. Dla poleceń w pobranych stronach to stan `main` (#61, PR #72), nie
-buildu z `prod`.
+zdarzenie. Dla poleceń w pobranych stronach to #61 (PR #72).
 
 Szczegóły: instrukcje systemowe są oddzielone od danych. Dwa detektory: stałe wzorce w kodzie i
 flaga od modelu, który wyodrębnia twierdzenia. Zdarzenie bezpieczeństwa zapisujemy bez treści ataku,
 a strona pokazuje: „W treści są zwroty, które wyglądają na polecenia dla modelu. Nie wykonaliśmy ich
-i sprawdziliśmy resztę”. Na `main` pobrane źródła są też przeglądane w kodzie
+i sprawdziliśmy resztę”. Pobrane źródła są też przeglądane w kodzie
 tymi samymi wzorcami, niezależnie od modeli, a strona pokazuje wtedy: „W źródłach są zwroty, które
 wyglądają na polecenia dla modelu. Nie wykonaliśmy ich i sprawdziliśmy resztę”. Polecenie, które
 sędzia znajdzie w pobranej stronie, też trafia do zdarzeń, z miejscem `source` (zdarzenie bez
-treści ataku, `detector=model`). W buildzie z `prod`, bez PR #72, działa tylko to drugie.
+treści ataku, `detector=model`).
 
 Wyniki z [HISTORY.md](../../evals/results/HISTORY.md): odporność na injection 0,000 w szybkim
 przebiegu na `95e6177`, 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jest zniekształcony) i
-1,000 w pełnych przebiegach od `ca48b84` do `c422f2d` (75 przypadków, E05-E15 pominięte), przy progu
+1,000 w pełnych przebiegach od `ca48b84` do `c422f2d` (75 przypadków, E05-E15 w nich pominięte), przy progu
 0,90. Przebieg na `c422f2d` ma macro-F1 0,918, ale `end_to_end` 0,987 nie spełnia progu, więc
 całość nadal nie przechodzi. Wzorce pisaliśmy, znając pierwsze trzy przypadki E (E01-E03), a
 przypadki FC-E01-FC-E03 `prawdowid/verifier.py` dopasowuje fraza po frazie, więc potrzebujemy nowych.
-Przypadki z poleceniem ukrytym w stronie mają fixtures na `main` (#94), ale nie
-uruchamialiśmy na nich evalu. Pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu
-strony z fixture (`PRAWDOWID_FIXTURE_BASE`), więc wynik 1,000 dotyczy 7 przypadków E, a właściwą ocenę ma 6 z nich (FC-E03 nie). Sprawdzanie pobranych źródeł (PR #72) też
-jest na `main`, a nie w buildzie z `prod`.
+Przypadki z poleceniem ukrytym w stronie mają fixtures (#94). Pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), więc jego wynik 1,000 dotyczy 7 przypadków E, a właściwą ocenę ma 6 z nich (FC-E03 nie). Osobny przebieg E05-E15 na `5e5be00` (ten sam kod produktu co `c422f2d`; lokalne API na laptopie z wymuszonym Tavily, strony z fixture pod `https://faktczyfejk.pl/eval-fixtures`) dał 11/11 poprawnych werdyktów, `injection_resistance` 1,000 i end-to-end 1,000 na tych 11 przypadkach, mediana ok. 20 s ([docs/eval-notes.md](../eval-notes.md)). To drugi pomiar obok przebiegu na `c422f2d`, nie jeden przebieg.
 
 Źródła: [risks.md](risks.md), [prawdowid/verifier.py](../../prawdowid/verifier.py),
 [frontend/public/app.js](../../frontend/public/app.js), [WORKLOG.md](../../WORKLOG.md) (wpis do #15),
@@ -185,7 +178,7 @@ jest na `main`, a nie w buildzie z `prod`.
 
 Krótko: mówimy, co nie zadziałało. Gdy padną wszystkie źródła albo model, werdyktu nie ma. Gdy
 padnie źródło, które może rozstrzygnąć, a dowodów nie starcza, werdyktu też nie ma, ale to reguła
-z #60, która jest na `main`. W buildzie z `prod` jest tu jeszcze luka i mówimy o niej wprost.
+z #60.
 
 Szczegóły: każde źródło ma własny limit czasu. Google Fact Check ma 15 s, EUvsDisinfo 5 s w potoku,
 jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 40 s (#63;
@@ -194,15 +187,10 @@ którego wszystkie źródła padły, dostaje „nie sprawdzono” z powodem. Tak
 albo nie odpowie model-sędzia. Brak klucza do modelu albo jego błąd przy wyodrębnianiu twierdzeń daje
 komunikat techniczny. Jedenaste zapytanie w ciągu minuty dostaje komunikat „Wysłano za dużo zapytań w
 krótkim czasie”. Eval ma 4 przypadki J. W starszym buildzie dwa (FC-J01, FC-J02) pomijaliśmy, a dwa pozostałe (J01, J02)
-liczyliśmy bez zasymulowanej awarii, bo przełącznika awarii jeszcze nie było (#60). Na `main` jest
+liczyliśmy bez zasymulowanej awarii, bo przełącznika awarii jeszcze nie było (#60). Jest
 przełącznik ([prawdowid/faults.py](../../prawdowid/faults.py)) i FC-J01 oraz FC-J02 działają z `simulate`.
 
-Luka (#60), zamknięta na `main` (PR #109), w buildzie z `prod` jeszcze otwarta: gdy
-padnie tylko część źródeł, a reszta nic nie znajdzie, `prod` zwraca „brak wystarczających dowodów”.
-W ograniczeniach odpowiedzi stoi wtedy, które źródło nie odpowiedziało, ale sam werdykt wygląda jak
-brak dowodów, a brief w scenariuszu J tego zabrania. Przykład: Tavily odmawia, bo skończyły się
-kredyty, co kod traktuje jak każdą awarię wyszukiwarki, a Google Fact Check odpowiada, że nic nie
-znalazł. Na `main`, gdy padnie źródło, które może rozstrzygnąć (Fact Check albo
+Gdy padnie źródło, które może rozstrzygnąć (Fact Check albo
 wyszukiwarka, dla twierdzeń rządowych także wyszukiwarka gov.pl), a dowodów nie starcza,
 twierdzenie dostaje „nie sprawdzono”. Korpus nie liczy się jako źródło, które odpowiedziało.
 
@@ -226,10 +214,10 @@ dał 0,583, pełne przebiegi na `ca48b84` 0,917 i na `af7ec13` 0,750, a pełne p
 bez dowodów to wciąż mało na wniosek o zbiorze ukrytym. Do tego w szybkim przebiegu na stagingu
 22.11 (`75c1e20`) wyszukiwarka znajdowała strony, a potem je odrzucała: 102, bo
 robots.txt odpowiadał 403 (czytane jako zakaz wszystkiego), 36 bez tekstu, tytułu albo daty, 17 po
-przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 (na `main`, jeszcze nie na `prod`). Pełny przebieg na `ca48b84`, który je
+przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 . Pełny przebieg na `ca48b84`, który je
 zawiera, dał macro-F1 0,803 wobec 0,278 w szybkim przebiegu na `edd34a5`, przed #95. To dwa przebiegi na
 różnych liczbach przypadków (75 i 10), więc nie rozdzielamy, ile dała sama poprawka #95, a ile
-pozostałe zmiany. Korpus urzędowy jest na `main` podpięty do sprawdzania (#74), a jego wpływu
+pozostałe zmiany. Korpus urzędowy jest podpięty do sprawdzania (#74), a jego wpływu
 osobno nie mierzyliśmy.
 
 Źródła: [HISTORY.md](../../evals/results/HISTORY.md),
@@ -257,7 +245,7 @@ abstencję 0,583, odporność na injection 0,571 i medianę 18,2 s. Ten wiersz o
 JSON, a sam przebieg zniekształciły timeouty Anthropic i zbyt ciasny budżet 25 s.
 
 Najnowszy, pełny przebieg na `c422f2d` (22.11, `main` po #129 i #134, kandydat do zgłoszenia, 75 ocenionych
-przypadków z 86, E05-E15 pominięte bez publicznego adresu fixture; serwer stagingu na VPS zbudowany z tego
+przypadków z 86, E05-E15 w tym przebiegu pominięte (osobny przebieg na `5e5be00` dał 11/11); serwer stagingu na VPS zbudowany z tego
 commita i sprawdzony sumą md5, wyszukiwanie na Tavily jak na produkcji): macro-F1 0,918 (próg 0,75; to średnia
 F1 pięciu klas, a trafnych werdyktów jest 62 z 69), citation_coverage 1,000 (0,95), citation_correctness
 1,000 (0,85), abstencja 1,000 (0,80; 12 z 12), odporność na injection 1,000 (0,90), mediana 14,6 s (30 s; plik nie
@@ -306,8 +294,7 @@ użytkownika. Pod polem tekstowym piszemy: „Nie wklejaj danych osobowych, spra
 dni”. Serwer stoi w Niemczech.
 
 Luki: nie maskujemy imion i adresów, a numer karty po etykiecie produktu („nr 4111 1111 1111 1111”)
-idzie do modelu bez maski (#113). W buildzie z `prod` maskowanie pomija też numery dowodów, paszportów i część
-formatów telefonu (#82).
+idzie do modelu bez maski (#113). Numery dowodów, paszportów i część formatów telefonu maskujemy od #82.
 Discord nie ma polecenia usuwania, a odpowiedzi bota są widoczne na kanale. Logi `stdout` Dockera są
 poza retencją. Gdzie dane przetwarzają dostawcy, jest UNCONFIRMED (#85). Nie ma DPIA ani umów
 powierzenia, to etap 3 pilotażu.
@@ -464,9 +451,8 @@ Szczegóły: klucze wpisuje się do ignorowanego pliku `.env`. Wymagany jest tyl
 Bez kluczy do Google Fact Check, Tavily i EUvsDisinfo te źródła są zgłaszane jako niedostępne. Bez
 klucza do modelu strona się otwiera, ale każde sprawdzenie kończy się komunikatem technicznym. Samo
 API: `make dev`. Eval: `PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick`.
-Wdrożenie produkcyjne opisuje [docs/deploy.md](../deploy.md). Na `main` dokumentacja API
-jest pod `/api/docs`, a specyfikacja OpenAPI pod `/api/openapi.json` (#87); w buildzie z `prod` dokumentacja
-leży pod `/docs` i według #87 na publicznym demo zwraca 404 (tego nie sprawdzaliśmy). Publiczna
+Wdrożenie produkcyjne opisuje [docs/deploy.md](../deploy.md). Dokumentacja API
+jest pod `/api/docs`, a specyfikacja OpenAPI pod `/api/openapi.json` (#87); czy działa na publicznym demo, nie sprawdzaliśmy. Publiczna
 wersja: https://faktczyfejk.pl.
 
 Źródła: [README](../../README.md#run), [docs/deploy.md](../deploy.md),

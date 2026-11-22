@@ -207,7 +207,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="card"><h3>Halucynacje</h3><p>Cytat jest dowodem tylko wtedy, gdy kod znajdzie go w źródle słowo w słowo.</p><p class="rest">Zostaje: cytat może być w źródle i mimo to nie wspierać twierdzenia.</p></div>
     <div class="card"><h3>Stronniczość źródeł</h3><p>Teksty jednego wydawcy, z tym samym cytatem albo od tej samej agencji liczymy jako jedno potwierdzenie.</p><p class="rest">Zostaje: listę domen wybrał zespół, bez niezależnego audytu.</p></div>
     <div class="card"><h3>Prywatność</h3><p>PESEL, dowód, paszport, telefon, e-mail, konta i karty maskujemy, zanim tekst trafi do modelu i do logów.</p><p class="rest">Zostaje: imion i adresów nie maskujemy.</p></div>
-    <div class="card"><h3>Prompt injection</h3><p>Wzorce w kodzie i flaga modelu wyłapują ukryte polecenia. Traktujemy je jak dane i zapisujemy zdarzenie.</p><p class="rest">Zostaje: wzorce znają tylko typowe sformułowania, a we wszystkich 7 przypadkach testu polecenie było we wklejonym tekście.</p></div>
+    <div class="card"><h3>Prompt injection</h3><p>Wzorce w kodzie i flaga modelu wyłapują ukryte polecenia. Traktujemy je jak dane i zapisujemy zdarzenie.</p><p class="rest">Zostaje: wzorce znają tylko typowe sformułowania.</p></div>
     <div class="card"><h3>Dostępność</h3><p>Gdy dowodów brak, bo padło źródło zdolne rozstrzygnąć albo czas minął przed odpowiedzią, pokazujemy <span class="nw">„nie sprawdzono”</span> albo błąd techniczny.</p><p class="rest">Zostaje: nie ma zapasowego dostawcy ani zmierzonej przepustowości.</p></div>
     <div class="card"><h3>Nadużycia</h3><p>Jeden adres IP może wysłać najwyżej 10 sprawdzeń na minutę.</p><p class="rest">Zostaje: limit na adres IP nie zatrzyma wielu klientów naraz ani nie ogranicza wydatków.</p></div>
   </div>
@@ -220,7 +220,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <h2 style="position:absolute; top:170px; left:110px; width:640px">Strona działa dziś.</h2>
   <div class="status" style="position:absolute; top:400px; left:110px; width:620px">
     <p><span class="tag t-on">działa</span><br><b>Strona WWW</b>: faktczyfejk.pl, bez konta, za darmo.</p>
-    <p><span class="tag t-off">czeka na wdrożenie</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, to samo API co strona. Podpisuje ocenę fact-checkera i&nbsp;fragment z&nbsp;wyszukiwarki.</p>
+    <p><span class="tag t-on">działa</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, to samo API co strona. Podpisuje ocenę fact-checkera i&nbsp;fragment z&nbsp;wyszukiwarki.</p>
     <p><span class="tag t-off">kod gotowy</span><br><b>Discord /sprawdz</b>: to samo API. Wdrożenie czeka, a bot nie był jeszcze uruchomiony na prawdziwym Discordzie.</p>
   </div>
   <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; box-shadow:0 30px 80px rgba(29,18,21,.25); border:1px solid var(--line)">
@@ -240,7 +240,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="small" style="position:absolute; top:700px; left:110px; right:110px">
     <div><b>1,00</b><span>Pokrycie cytatami, przy ocenach merytorycznych (cel&nbsp;≥&nbsp;0,95)</span></div>
     <div><b>1,00</b><span>Poprawność cytatów: tylko czy cytat z&nbsp;korpusu jest w&nbsp;źródle dosłownie, nie czy wspiera twierdzenie (cel&nbsp;≥&nbsp;0,85)</span></div>
-    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7&nbsp;przypadków we wklejonym tekście, 3&nbsp;z&nbsp;nich nasze wzorce znają dosłownie (cel&nbsp;≥&nbsp;0,90)</span></div>
+    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7&nbsp;przypadków we wklejonym tekście (3&nbsp;znane naszym wzorcom), a&nbsp;w&nbsp;osobnym przebiegu 11&nbsp;z&nbsp;11 na stronach z&nbsp;linku (cel&nbsp;≥&nbsp;0,90)</span></div>
     <div><b>1,00</b><span>Zgodność kanałów: 6&nbsp;przypadków przez API i&nbsp;drugi kanał; drugi dostał wynik z&nbsp;pamięci podręcznej (cel 1,00)</span></div>
     <div><b style="color:var(--red)">0,99</b><span>End-to-end (cel 1,00): nie przeszedł tylko J01 (symulowana awaria Fact Check)</span></div>
     <div><b>1,00</b><span>Pętla moderatora: 2&nbsp;przypadki, powtórzone pytanie trafia do tej samej sprawy (cel 1,00)</span></div>
@@ -265,7 +265,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px">Co dalej.</h2>
   <div class="grid3" style="position:absolute; top:400px; left:110px; right:110px">
-    <div class="card"><h3>Pętla moderatora</h3><p>W teście działa: powtórzone pytanie bez odpowiedzi trafia do tej samej sprawy. Dalej: token moderatora na faktczyfejk.pl, ekran spraw i zatwierdzanie odpowiedzi przez eksperta.</p></div>
+    <div class="card"><h3>Pętla moderatora</h3><p>W teście powtórzone pytanie bez odpowiedzi trafia do tej samej sprawy, a na faktczyfejk.pl kolejka jest już włączona. Dalej: ekran spraw i zatwierdzanie odpowiedzi przez eksperta.</p></div>
     <div class="card"><h3>Trafniejsze oceny</h3><p>W ostatnim teście 4 z&nbsp;7 błędnych ocen to „nie wiem” tam, gdzie oczekiwaliśmy oceny. Do tego korpus odświeżany według harmonogramu.</p></div>
     <div class="card"><h3>Baza incydentów MSZ</h3><p>Dopasowanie do znanych narracji, zawsze jako kontekst, nigdy jako werdykt.</p></div>
   </div>
