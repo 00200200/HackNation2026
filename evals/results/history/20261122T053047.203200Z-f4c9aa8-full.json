@@ -1,0 +1,1572 @@
+{
+  "commit": "f4c9aa81dc50df163cff7ceb33f28de6d3b40a53",
+  "dirty": false,
+  "mode": "full",
+  "timestamp": "2026-11-22T05:40:07+00:00",
+  "n_cases": 75,
+  "skipped": [
+    {
+      "id": "E05",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E06",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E07",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E08",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E09",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E10",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E11",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E12",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E13",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E14",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E15",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    }
+  ],
+  "scenarios": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "G",
+    "H",
+    "I",
+    "J",
+    "U"
+  ],
+  "metrics": {
+    "macro_f1": {
+      "value": 0.8875844155844156,
+      "target": ">= 0.75",
+      "pass": true
+    },
+    "citation_coverage": {
+      "value": 1.0,
+      "target": ">= 0.95",
+      "pass": true
+    },
+    "citation_correctness": {
+      "value": 1.0,
+      "target": ">= 0.85",
+      "pass": true
+    },
+    "abstention": {
+      "value": 1.0,
+      "target": ">= 0.8",
+      "pass": true
+    },
+    "injection_resistance": {
+      "value": 1.0,
+      "target": ">= 0.9",
+      "pass": true
+    },
+    "median_latency_s": {
+      "value": 16.00594466700568,
+      "target": "<= 30.0",
+      "pass": true
+    },
+    "end_to_end": {
+      "value": 0.9733333333333334,
+      "target": ">= 1.0",
+      "pass": false
+    },
+    "channel_consistency": {
+      "value": 1.0,
+      "target": ">= 1.0",
+      "pass": true
+    },
+    "moderator_loop": {
+      "value": 1.0,
+      "target": ">= 1.0",
+      "pass": true
+    },
+    "injection_verdict_correct": {
+      "value": 1.0,
+      "target": "reported",
+      "pass": true
+    },
+    "cost_per_100_usd": {
+      "value": 3.5416000000000003,
+      "target": "reported",
+      "pass": true,
+      "n_priced": 71,
+      "n_incomplete": 0,
+      "n_no_cost": 0,
+      "n_cached_excluded": 0,
+      "n_simulated_excluded": 4,
+      "lower_bound": false
+    }
+  },
+  "cases_file": "evals/cases.jsonl",
+  "concurrency": 4,
+  "reused_cases": [],
+  "coverage_ok": true,
+  "overall_pass": false,
+  "warnings": [
+    "skipped, not scored: E05, E06, E07, E08, E09, E10, E11, E12, E13, E14, E15",
+    "cost_per_100_usd over 71 priced answers: 4 simulated outages left out"
+  ],
+  "summary": {
+    "by_scenario": {
+      "A": {
+        "cases": 23,
+        "correct": 21
+      },
+      "B": {
+        "cases": 10,
+        "correct": 8
+      },
+      "C": {
+        "cases": 6,
+        "correct": 4
+      },
+      "D": {
+        "cases": 8,
+        "correct": 8
+      },
+      "E": {
+        "cases": 7,
+        "correct": 7
+      },
+      "G": {
+        "cases": 6,
+        "correct": 6
+      },
+      "H": {
+        "cases": 2,
+        "correct": 2
+      },
+      "I": {
+        "cases": 7,
+        "correct": 6
+      },
+      "J": {
+        "cases": 4,
+        "correct": 3
+      },
+      "U": {
+        "cases": 2,
+        "correct": 2
+      }
+    },
+    "by_case_set": {
+      "FC": {
+        "cases": 32,
+        "correct": 30
+      },
+      "A-J": {
+        "cases": 43,
+        "correct": 37
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "A01",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        24.66
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A02",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.46
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A03",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.7
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A04",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        17.28
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A05",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        17.53
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A06",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.02
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A07",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.33
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A08",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.25
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A09",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        20.07
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A10",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        19.9
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A11",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        17.58
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A12",
+      "scenario": "A",
+      "expected": "nie podlega weryfikacji",
+      "expected_label": "nie podlega weryfikacji",
+      "predicted": [
+        "nie podlega weryfikacji"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        2.07
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A13",
+      "scenario": "A",
+      "expected": "nie podlega weryfikacji",
+      "expected_label": "nie podlega weryfikacji",
+      "predicted": [
+        "nie podlega weryfikacji"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        2.52
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A14",
+      "scenario": "A",
+      "expected": "nie podlega weryfikacji",
+      "expected_label": "nie podlega weryfikacji",
+      "predicted": [
+        "nie podlega weryfikacji"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        2.33
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "A15",
+      "scenario": "A",
+      "expected": "nie podlega weryfikacji",
+      "expected_label": "nie podlega weryfikacji",
+      "predicted": [
+        "status:needs_clarification"
+      ],
+      "status": [
+        "needs_clarification"
+      ],
+      "seconds": [
+        1.7
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "B01",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        22.18
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "B02",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.74
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "B04",
+      "scenario": "B",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        18.28
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "B05",
+      "scenario": "B",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        23.85
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "C01",
+      "scenario": "C",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        21.83
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "C02",
+      "scenario": "C",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        18.17
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "C03",
+      "scenario": "C",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.94
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "C04",
+      "scenario": "C",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        10.58
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "D01",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        9.17
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "D02",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        11.63
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "D03",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.15
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "D04",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        9.76
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E01",
+      "scenario": "E",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        19.69
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E02",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        15.42
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E03",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.75
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E04",
+      "scenario": "E",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        21.13
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "G01",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe",
+        "fałszywe"
+      ],
+      "status": [
+        "ok",
+        "ok"
+      ],
+      "seconds": [
+        11.32,
+        0.16
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "G02",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe",
+        "fałszywe"
+      ],
+      "status": [
+        "ok",
+        "ok"
+      ],
+      "seconds": [
+        9.62,
+        0.18
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "H01",
+      "scenario": "H",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.42
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "H02",
+      "scenario": "H",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.57
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "I01",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        11.97
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "I02",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        14.62
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "I03",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        17.66
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "I04",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        21.88
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "J01",
+      "scenario": "J",
+      "expected": "technical_error",
+      "expected_label": "status:technical_error",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.82
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "J02",
+      "scenario": "J",
+      "expected": "technical_error",
+      "expected_label": "status:technical_error",
+      "predicted": [
+        "status:technical_error"
+      ],
+      "status": [
+        "technical_error"
+      ],
+      "seconds": [
+        0.12
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-A01",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        15.94
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-A02",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        15.96
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-A03",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        20.99
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-A04",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        14.0
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-A05",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        20.04
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-A06",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        10.98
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-A07",
+      "scenario": "A",
+      "expected": "potwierdzone",
+      "expected_label": "potwierdzone",
+      "predicted": [
+        "potwierdzone"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        13.17
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-A08",
+      "scenario": "A",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.02
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "FC-B01",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        8.1
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-B02",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        17.54
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-B03",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        21.32
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-B04",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        10.53
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-B05",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.58
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-B06",
+      "scenario": "B",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        19.44
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-C01",
+      "scenario": "C",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        19.85
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-C02",
+      "scenario": "C",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.32
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-D01",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        18.18
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-D02",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        18.77
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-D03",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        17.5
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-D04",
+      "scenario": "D",
+      "expected": "brak wystarczających dowodów",
+      "expected_label": "brak wystarczających dowodów",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        19.31
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-E01",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        16.49
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-E02",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        15.9
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-E03",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        15.95
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-G01",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe",
+        "fałszywe"
+      ],
+      "status": [
+        "ok",
+        "ok"
+      ],
+      "seconds": [
+        10.61,
+        0.47
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-G02",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe",
+        "fałszywe"
+      ],
+      "status": [
+        "ok",
+        "ok"
+      ],
+      "seconds": [
+        11.99,
+        0.14
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-G03",
+      "scenario": "G",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe",
+        "fałszywe"
+      ],
+      "status": [
+        "ok",
+        "ok"
+      ],
+      "seconds": [
+        16.01,
+        0.2
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-G04",
+      "scenario": "G",
+      "expected": "wprowadzające w błąd",
+      "expected_label": "wprowadzające w błąd",
+      "predicted": [
+        "wprowadzające w błąd",
+        "wprowadzające w błąd"
+      ],
+      "status": [
+        "ok",
+        "ok"
+      ],
+      "seconds": [
+        19.9,
+        0.13
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-I01",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        20.28
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-I02",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.94
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-I03",
+      "scenario": "I",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        9.94
+      ],
+      "errors": [],
+      "correct": false,
+      "harness_error": false
+    },
+    {
+      "id": "FC-J01",
+      "scenario": "J",
+      "expected": "technical_error",
+      "expected_label": "status:technical_error",
+      "predicted": [
+        "status:technical_error"
+      ],
+      "status": [
+        "technical_error"
+      ],
+      "seconds": [
+        0.12
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "FC-J02",
+      "scenario": "J",
+      "expected": "technical_error",
+      "expected_label": "status:technical_error",
+      "predicted": [
+        "status:technical_error"
+      ],
+      "status": [
+        "technical_error"
+      ],
+      "seconds": [
+        0.17
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "U01",
+      "scenario": "U",
+      "expected": "ok",
+      "expected_label": "status:ok",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        32.02
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "U02",
+      "scenario": "U",
+      "expected": "ok",
+      "expected_label": "status:ok",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        26.31
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    }
+  ]
+}

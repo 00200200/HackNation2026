@@ -140,13 +140,15 @@ async def check_claim(
     try:
         async with asyncio.timeout_at(deadline):
             await _retrieve(claim, searched, gov, steps, found, factcheck_keys)
-            candidates = _candidates(found)
+            candidates = _candidates(found, claim)
             judgement = await _judge(claim, candidates, exclude_url, steps, runs)
     except TimeoutError:
         # A model request cut mid-flight is counted as unpriced; cost 0 when only search was cut.
         timed_out = _time_limit(found)
         # The pattern pre-check needs no model: pages already found are still screened.
-        timed_out.security_events = _source_events(_candidates(found), exclude_url)
+        timed_out.security_events = _source_events(
+            _candidates(found, claim), exclude_url
+        )
         return _done(claim, timed_out, runs, steps)
     # Instructions in retrieved pages: the pattern pre-check on every
     # candidate (rerank may drop it before the judge sees it) and the judge's own flag.
@@ -158,7 +160,9 @@ async def check_claim(
     # The corpus is a file on our disk and says nothing about the outside sources: when all of
     # them failed, it counts only if it settled the claim, else the claim is not checked.
     outside = {name: lookup for name, lookup in found.items() if name != "corpus"}
-    every_source_failed = set(outside) <= set(limits) and not _candidates(outside)
+    every_source_failed = set(outside) <= set(limits) and not _candidates(
+        outside, claim
+    )
     if every_source_failed and (
         not candidates or judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
     ):
@@ -223,15 +227,15 @@ async def _retrieve(
         # Step 2c (`cache.search_documents`, #19) plugs in here when it is back in the pipeline.
 
 
-def _candidates(found: dict) -> list[Source]:
+def _candidates(found: dict, claim: str) -> list[Source]:
     webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
     govpl = found.get("govpl", websearch.WebSearch()).documents
     web = [d for w in found["web"] for d in w.documents]
     # rerank keeps the first MAX_DOCUMENTS URLs, so the narrow lookups (gov.pl, the fact-checkers'
     # reviews) come before the general web pages, whatever order the searches finished in. A
     # fact-checker's rating from its page's markup comes right before the page, as a Fact Check
-    # hit would: rerank keeps it first and the page text after it, and a Fact Check hit for the
-    # same page, which comes earlier, wins.
+    # hit would: rerank keeps it first and the page text after it, and a Fact Check hit with a
+    # rating for the same page, which comes earlier, wins.
     ordered = [
         *govpl,
         *(d for d in web if d.source_type == "fact_check"),
@@ -240,7 +244,7 @@ def _candidates(found: dict) -> list[Source]:
     pages = [
         d.to_source(fragment=fragment)
         for d in ordered
-        for fragment in [*d.reviews[:1], d.text]
+        for fragment in [*_closest_review(d.reviews, claim), d.text]
     ]
     # A page fetched in this check beats its stored copy: rerank keeps the first source per URL.
     # A snippet is no copy of the page: the stored full text stays beside it.
@@ -259,6 +263,19 @@ def _candidates(found: dict) -> list[Source]:
     ]
     # The corpus comes before the web: past MAX_DOCUMENTS the web's tail is cut, not its hits.
     return [_context_only(s) for s in [*sources, *pages]]
+
+
+def _closest_review(reviews: list[str], claim: str) -> list[str]:
+    """Of a page's ratings, the one whose reviewed claim shares most words with ours (the first
+    on a tie): rerank keeps one record per page, and `factcheck.search_keys` picks among the
+    reviews of one URL the same way."""
+    words = set(factcheck.WORD.findall(claim.casefold()))
+
+    def shared(review: str) -> int:
+        reviewed = review.partition(factcheck.CLAIM_PREFIX)[2]
+        return len(words & set(factcheck.WORD.findall(reviewed.casefold())))
+
+    return [max(reviews, key=shared)] if reviews else []
 
 
 def _source_events(

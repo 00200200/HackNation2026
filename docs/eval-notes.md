@@ -5,7 +5,7 @@ Read this together with [`evals/results/HISTORY.md`](../evals/results/HISTORY.md
 draws wrong conclusions about product quality. **Rule: check the commit and the notes column
 before concluding anything from a number.**
 
-The three oldest rows in HISTORY.md are reconstructed from memory of runs made before this
+Three rows in HISTORY.md (marked RECONSTRUCTED) are reconstructed from memory of runs made before this
 history mechanism existed: there is no JSON for them (no `evals/results/history/*.json` file), the
 numbers come from whoever ran them, and nothing beyond what is written below is confirmed.
 
@@ -86,6 +86,17 @@ submission description and slide 9 quote it. It was run from a local worktree at
 - The JSON records the harness commit, not the server. The J cases ran with their fault applied,
   so the server had `PRAWDOWID_EVAL_TOKEN` (VPS staging only, per WORKLOG); which code it ran is
   UNCONFIRMED.
+
+## Quick run on `95e6177` (`latest.json` on `main`): pre-judge stub
+
+The 9-case quick run of 2026-11-21T19:10:57Z ran on code that had no judge, no retrieval pipeline
+and no check log. `verifier.to_check_result` returned a constant `insufficient_evidence` with
+`NO_SOURCES` for every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py` were not in
+`prawdowid/`. So its abstention 1.000 is a constant, its median 3.90 s and USD 1.82 per 100 checks
+cover claim extraction only, and its macro_f1 0.100, injection_resistance 0.000 and end_to_end
+0.889 describe the stub. None of it measures the current pipeline. `prawdowid/` is identical in
+`e9a7f86` on `main`, so `git show e9a7f86:prawdowid/verifier.py` shows it; `95e6177` itself exists
+only on `origin/LukiLenkiewicz/issue4-link-input`.
 
 ## Run 2 (2026-11-21 ~20:44 UTC, commit `8c6f396`, full, 71 cases) — the one most likely to be misread
 

@@ -9,6 +9,7 @@ from pydantic_ai.models.function import FunctionModel
 from prawdowid import factcheck
 from prawdowid.contract import SecurityEvent, Source, Verdict
 from prawdowid.judge import (
+    CHECKER_GAP,
     CONFLICT,
     DATA_GAP,
     JUDGE_UNAVAILABLE,
@@ -18,7 +19,9 @@ from prawdowid.judge import (
     SELF_CONTRADICTION,
     SNIPPET_ALONE,
     SNIPPET_ONLY,
+    SUPERSEDED,
     Labels,
+    _stated_rating,
     agent,
     find_quote,
     judge,
@@ -1062,9 +1065,55 @@ def test_a_publishers_newest_rating_of_the_claim_is_its_verdict(older, newer, ve
     assert j.verdict is verdict
     assert CONFLICT not in j.limitations
     assert SELF_CONTRADICTION.format(publishers="demagog") not in j.limitations
-    # The older rating is listed, but the answer rests on the newest one only.
+    # The older rating is listed, but the answer rests on the newest one only and says so.
     assert [s.rating for s in j.sources] == [older, newer]
     assert newer in j.justification and older not in j.justification
+    assert (
+        SUPERSEDED.format(
+            publisher="Demagog",
+            new=newer,
+            new_date="2026-11-10",
+            old=older,
+            old_date="2025-02-21",
+        )
+        in j.limitations
+    )
+
+
+def test_an_older_rating_in_the_same_words_needs_no_note():
+    old = claim_review(
+        "Fałsz", CLAIM, url="https://demagog.org.pl/a/", published=date(2025, 2, 21)
+    )
+    undated = claim_review(
+        "Falsz", CLAIM, url="https://demagog.org.pl/b/", published=None
+    )
+    new = claim_review(
+        "Fałsz", CLAIM, url="https://demagog.org.pl/c/", published=date(2026, 11, 10)
+    )
+    j = run(
+        [old, undated, new], answering(*(rating_label(f) for f in (old, undated, new)))
+    )
+    assert j.verdict is Verdict.FALSE
+    assert not any("liczy się nowsza ocena" in limit for limit in j.limitations)
+    # A different rating without a date is the oldest one, and is named as such.
+    confirmed = claim_review(
+        "Prawda", CLAIM, url="https://demagog.org.pl/d/", published=None
+    )
+    j = run(
+        [confirmed, new],
+        answering(rating_label(confirmed, "supports"), rating_label(new)),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert (
+        SUPERSEDED.format(
+            publisher="Demagog",
+            new="Fałsz",
+            new_date="2026-11-10",
+            old="Prawda",
+            old_date="bez daty",
+        )
+        in j.limitations
+    )
 
 
 def test_two_fact_checkers_whose_ratings_disagree_are_a_conflict_whatever_the_dates():
@@ -1221,3 +1270,202 @@ def test_a_doc_id_that_is_no_url_is_dropped_not_a_failure():
     j = run([GOV], answering(broken))
     assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
     assert QUOTES_DROPPED.format(n=1) in j.limitations
+
+
+# A fact-checker's own verdict sentence and its data-gap finding (FC-E03, C02, FC-D01, FC-D02 of
+# the 22.11 full run: a page without ClaimReview markup, or a search snippet of one).
+VERDICT_FALSE = "Dlatego tę wypowiedź oceniamy jako fałsz."
+STATED_FALSE = fragment(
+    "https://demagog.org.pl/s",
+    f"Analiza danych. {VERDICT_FALSE}",
+    "Demagog",
+    "fact_check",
+)
+BORDER = "Chodzi wyłącznie o granicę polsko-białoruską, a nie o całą Polskę."
+BORDER_CONTEXT = fragment(
+    "https://konkret24.tvn24.pl/b", f"Wyjaśniamy. {BORDER}", "Konkret24", "fact_check"
+)
+NO_DATA = "Dlatego wypowiedź uważamy za nieweryfikowalną."
+CHECKER_NO_DATA = fragment(
+    "https://demagog.org.pl/n", f"Brakuje danych. {NO_DATA}", "Demagog", "fact_check"
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "rating"),
+    [
+        ("jego wypowiedź oceniamy jako fałsz.", "Fałsz"),
+        ("Wypowiedź uznajemy za fałszywą, ponieważ dane mówią co innego.", "Fałsz"),
+        (
+            "Dlatego fragment „w Polsce nie przyjmujemy wniosków” oceniamy jako fałsz.",
+            "Fałsz",
+        ),
+        ("Wypowiedź oceniamy jako prawdziwą.", "Prawda"),
+        ("tę wypowiedź oceniamy jako manipulację.", "Manipulacja"),
+        ("Wypowiedź Bosaka uznajemy za nieweryfikowalną.", "Nieweryfikowalne"),
+        ("Wypowiedź oceniamy jako częściową prawdę.", "Częściowa prawda"),
+        ("Nie uznajemy jej za prawdę, ale też nie za fałsz.", None),
+        ("Fałsz. Tak twierdzi poseł.", None),
+        ("Wypowiedź oceniamy jako prawdopodobnie fałszywą.", None),
+        ("Część uznajemy za prawdziwą, a całość oceniamy jako manipulację.", None),
+        ("Wypowiedź uznajemy nie za fałsz, lecz za manipulację.", None),
+        ("Dane uznajemy za wiarygodne. Za prawdziwe uważamy też inne.", None),
+        ("Wypowiedź oceniamy jako częściową manipulację.", None),
+        ("Dlatego nie\u00a0uznajemy jej za prawdziwą.", None),
+        (
+            "Tę wypowiedź oceniamy jako fałsz, a poprzednią też oceniliśmy jako fałsz.",
+            "Fałsz",
+        ),
+    ],
+)
+def test_a_verdict_sentence_states_its_rating(text, rating):
+    assert _stated_rating(text) == rating
+
+
+def test_a_fact_checkers_verdict_sentence_decides_like_its_rating():
+    j = run(
+        [STATED_FALSE, BORDER_CONTEXT],
+        answering(
+            label(STATED_FALSE, "refutes", VERDICT_FALSE, own_conclusion=True),
+            label(
+                BORDER_CONTEXT,
+                "refutes",
+                BORDER,
+                missing_context="Ograniczenie dotyczy tylko granicy.",
+                context_quote="wyłącznie o granicę polsko-białoruską",
+                own_conclusion=True,
+            ),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert f"Demagog (fact_check, 2026-11-21) przeczy: „{VERDICT_FALSE}”" in j.premises
+    demagog = next(s for s in j.sources if s.publisher == "Demagog")
+    assert (demagog.rating, demagog.fragment) == (None, VERDICT_FALSE)
+
+
+def test_a_stated_manipulation_rating_is_misleading_and_named_as_the_rating():
+    verdict = "Ze względu na to, że przeinaczył fakty, tę wypowiedź oceniamy jako manipulację."
+    page = fragment("https://demagog.org.pl/m", verdict, "Demagog", "fact_check")
+    j = run([page], answering(label(page, "refutes", verdict, own_conclusion=True)))
+    assert j.verdict is Verdict.MISLEADING
+    assert j.justification.startswith("Fact-checker ocenił to twierdzenie jako mylące")
+    assert "oceniamy jako manipulację" in j.justification
+
+
+def test_a_verdict_sentence_counts_only_as_the_fact_checkers_own_conclusion():
+    j = run(
+        [STATED_FALSE, GOV],
+        answering(
+            label(STATED_FALSE, "context", VERDICT_FALSE),
+            label(GOV, "supports", GOV.source.fragment),
+        ),
+    )
+    assert j.verdict is Verdict.CONFIRMED
+
+
+def test_a_fact_checkers_data_gap_decides_over_other_sources():
+    j = run(
+        [CHECKER_NO_DATA, GOV],
+        answering(
+            label(CHECKER_NO_DATA, "gap", NO_DATA, own_conclusion=True),
+            label(GOV, "supports", GOV.source.fragment),
+        ),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    assert CHECKER_GAP.format(publishers="Demagog") in j.limitations
+    assert NOT_ENOUGH not in j.limitations
+    assert (
+        f"Demagog (fact_check, 2026-11-21) wskazuje brak danych: „{NO_DATA}”"
+        in j.premises
+    )
+
+
+def test_a_fact_checkers_data_gap_outranks_another_fact_checkers_context():
+    j = run(
+        [CHECKER_NO_DATA, BORDER_CONTEXT],
+        answering(
+            label(CHECKER_NO_DATA, "gap", NO_DATA, own_conclusion=True),
+            label(
+                BORDER_CONTEXT,
+                "context",
+                BORDER,
+                missing_context="Dane dotyczą innej wypowiedzi.",
+                context_quote="wyłącznie o granicę polsko-białoruską",
+            ),
+        ),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+
+
+def test_a_data_gap_gives_way_when_another_fact_checker_takes_a_side():
+    j = run(
+        [CHECKER_NO_DATA, FC],
+        answering(
+            label(CHECKER_NO_DATA, "gap", NO_DATA, own_conclusion=True),
+            label(FC, "refutes", NO_PROPOSAL, own_conclusion=True),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert CHECKER_GAP.format(publishers="Demagog") not in j.limitations
+
+
+@pytest.mark.parametrize(
+    ("published", "found_on", "verdict"),
+    [
+        (date(2024, 12, 6), TODAY, Verdict.INSUFFICIENT_EVIDENCE),
+        (None, TODAY, Verdict.INSUFFICIENT_EVIDENCE),
+        (date(2026, 11, 22), TODAY, Verdict.CONFIRMED),
+        (date(2026, 11, 22), None, Verdict.INSUFFICIENT_EVIDENCE),
+    ],
+)
+def test_only_a_newer_reliable_source_overrides_a_fact_checkers_data_gap(
+    published, found_on, verdict
+):
+    gov = GOV.model_copy(
+        update={"source": GOV.source.model_copy(update={"published_at": published})}
+    )
+    gap = CHECKER_NO_DATA.model_copy(
+        update={
+            "source": CHECKER_NO_DATA.source.model_copy(
+                update={"published_at": found_on}
+            )
+        }
+    )
+    j = run(
+        [gap, gov],
+        answering(
+            label(gap, "gap", NO_DATA, own_conclusion=True),
+            label(gov, "supports", GOV.source.fragment),
+        ),
+    )
+    assert j.verdict is verdict
+
+
+@pytest.mark.parametrize("stance", ["supports", "context"])
+def test_a_stated_false_counts_only_for_the_side_the_judge_read(stance):
+    """A "fałsz" of an opposite statement supports a negated claim; a related review is context."""
+    j = run(
+        [STATED_FALSE],
+        answering(label(STATED_FALSE, stance, VERDICT_FALSE, own_conclusion=True)),
+    )
+    expected = (
+        Verdict.CONFIRMED if stance == "supports" else Verdict.INSUFFICIENT_EVIDENCE
+    )
+    assert j.verdict is expected
+
+
+def test_a_fact_checkers_data_gap_decides_even_when_not_marked_its_own_conclusion():
+    j = run(
+        [CHECKER_NO_DATA, BORDER_CONTEXT],
+        answering(
+            label(CHECKER_NO_DATA, "gap", NO_DATA),
+            label(
+                BORDER_CONTEXT,
+                "context",
+                BORDER,
+                missing_context="Szacunek dotyczy innego roku.",
+                context_quote="wyłącznie o granicę polsko-białoruską",
+            ),
+        ),
+    )
+    assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE

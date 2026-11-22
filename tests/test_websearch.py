@@ -836,6 +836,7 @@ def read_review_page(body, url=REVIEW_PAGE, route=REVIEW_ROUTE):
         ],
         [claim_review(url=None)],  # no url: a review on its own page
         [claim_review(url="http://www.demagog.org.pl/fake_news/sankcje-wobec-rosji")],
+        [claim_review(url="/fake_news/sankcje-wobec-rosji/")],  # read against the page
         [claim_review(**{"@type": ["ClaimReview", "Review"]})],
         # A block that does not parse, before one that does.
         ['{"@type": "ClaimReview", "reviewRating": ', claim_review()],
@@ -846,6 +847,7 @@ def read_review_page(body, url=REVIEW_PAGE, route=REVIEW_ROUTE):
         "graph",
         "no-url",
         "url-written-another-way",
+        "relative-url",
         "type-list",
         "broken-block",
     ],
@@ -862,6 +864,7 @@ def test_a_fact_checkers_rating_is_read_from_its_page(blocks, isolated):
     "blocks",
     [
         [claim_review(url="https://demagog.org.pl/fake_news/inna-wypowiedz/")],
+        [claim_review(url="/fake_news/inna-wypowiedz/")],
         [claim_review(url="https://[demagog.org.pl/fake_news")],
         ['{"@type": "ClaimReview", "reviewRating": '],
         [claim_review(rating="")],
@@ -871,6 +874,7 @@ def test_a_fact_checkers_rating_is_read_from_its_page(blocks, isolated):
     ],
     ids=[
         "another-page",
+        "relative-url-of-another-page",
         "malformed-url",
         "broken",
         "blank-rating",

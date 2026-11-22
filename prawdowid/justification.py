@@ -46,7 +46,8 @@ def explain(
     """One or two sentences for the verdict.
 
     `stances` is the verified evidence the verdict rests on, as (source, stance, missing context),
-    the stance being "supports", "refutes", "context", "gap" or "weak" (too little to decide).
+    the stance being "supports", "refutes", "context", "rated" (a stated rating), "gap" or "weak"
+    (too little to decide).
     The caller filters it with the verdict rules; `conflict` says they found two sides.
     """
     items = list(stances)
@@ -80,7 +81,8 @@ def explain(
 
 def _misleading(items: list[tuple[Source, str, str | None]]) -> str:
     # The rules need a fact-checker's rating of the claim or a missing context found in a source.
-    if rated := [s for s, _, _ in items if s.rating]:
+    # "rated": a fact-checker's verdict sentence that states its rating, quoted as the page wrote it.
+    if rated := [s for s, stance, _ in items if s.rating or stance == "rated"]:
         return RATED_MISLEADING.format(cited=_cite(rated))
     grounded = [(s, ctx) for s, _, ctx in items if ctx]
     if not grounded:

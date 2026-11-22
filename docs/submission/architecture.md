@@ -110,7 +110,7 @@ Availability is UNCONFIRMED. The saved eval's JSON does not record its models; t
 below says what it ran on. All model calls use PydanticAI native structured output through the
 installed Anthropic provider. Another provider needs its PydanticAI extra (only
 `pydantic-ai-slim[anthropic,mcp]` is installed, [pyproject.toml](../../pyproject.toml)), its key
-and an image rebuild; none is demonstrated. Compose forwards only `PRAWDOWID_MODEL`, so changing
+and an image rebuild; none is demonstrated. The EU-processed option is described under "Deployment, storage and data processing" below. Compose forwards only `PRAWDOWID_MODEL`, so changing
 the rerank or judge model on the server also needs a line in [compose.yaml](../../compose.yaml).
 Web search (step 2b) is now **Tavily** (`tavily_search` in `prawdowid/websearch.py`), which
 replaced DuckDuckGo (#7, proposed as #20; wired as #45) because DuckDuckGo via `ddgs` returned no
@@ -149,12 +149,33 @@ the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Inp
 Anthropic masked (a placeholder keeps the sentence shape so claims still split); masked claim text
 and queries go to Google, Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
 has no delete command, Docker stdout logs sit outside retention): [docs/privacy.md](../privacy.md).
-Browser traffic, fetched evidence, the host and Discord also process data. On this branch
-provider processing locations are UNCONFIRMED; a processor table with the providers' own statements
-(Anthropic: global routing, storage in the US; Tavily: US; Google Fact Check and EUvsDisinfo: not
-stated) is in `docs/privacy.md` of [PR #124](https://github.com/00200200/HackNation2026/pull/124),
-not merged yet. Retention agreements are UNCONFIRMED. See [risks.md](risks.md) for code
-references and [sources.md](sources.md) for storage limits.
+Who processes what, from each provider's own terms read on 22.11.2026. The full table, with
+retention, training use and links to the terms, is in
+[docs/privacy.md](../privacy.md#where-data-is-processed).
+
+| Processor | Receives | Processes in |
+|---|---|---|
+| Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
+| Tavily (web search) | Masked search queries: the model's queries, the claim sentence and one search of it restricted to fact-checker domains (#106) | United States. An EU endpoint exists for selected customers only |
+| Google Fact Check Tools | Masked claim text and up to 8 short queries per claim, each masked (#100) | Not stated for this API, UNCONFIRMED. Google's privacy policy says its servers are worldwide |
+| EUvsDisinfo MCP | Claim text, cut to 200 characters | Not stated, UNCONFIRMED |
+| www.gov.pl search | Search queries, or the claim when the model wrote none | Not stated, UNCONFIRMED |
+| Sites a pasted link points to | The URL as pasted, unmasked: a name or e-mail in its path or query string reaches the site | The site's own hosting |
+| OVHcloud VPS | Everything the app stores | Limburg, Germany |
+| Discord (bot; #59 says it is not deployed, not checked) | The typed command and our reply | United States |
+
+Migration path: the three model steps are chosen by `PRAWDOWID_MODEL`, `PRAWDOWID_RERANK_MODEL`
+and `PRAWDOWID_JUDGE_MODEL` (PydanticAI model strings). The same Claude models can run in the EU
+through Amazon Bedrock EU inference profiles (for example `bedrock:eu.anthropic.claude-sonnet-5-5`).
+That takes the variables, the `bedrock` dependency extra and the `environment:` list in
+`compose.yaml`, and is expected to need no prompt or code change (Bedrock ignores the retry
+setting the agents pass, so botocore's default retries apply). It has not been run. After it,
+web search (Tavily) and the Discord channel still leave the EEA. Fact Check (Google), EUvsDisinfo
+and www.gov.pl state no location, so they stay UNCONFIRMED. Steps and open points:
+[docs/privacy.md](../privacy.md#migration-path-to-an-eu-processed-model).
+
+Browser traffic and fetched evidence also pass through other parties' systems. See
+[risks.md](risks.md) for code references and [sources.md](sources.md) for storage limits.
 
 Moderator cases (scenario H, [cases.py](../../prawdowid/cases.py), #79): after the verdicts,
 `POST /api/checks` files a check that needs a person. That means a claim that ended `brak
@@ -174,6 +195,7 @@ It has not run on the live server yet; the server's `.env` needs the variable fi
 ([deploy.md](../deploy.md)).
 
 ## Default limits, not performance measurements
+
 
 | Limit | Default | Source |
 |---|---|---|

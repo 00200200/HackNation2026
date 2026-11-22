@@ -112,7 +112,7 @@ def test_step_2_of_a_check_finds_the_profile_of_the_country(monkeypatch, stored)
     asyncio.run(pipeline._retrieve(claim, ["MSZ Izrael podróże"], None, steps, found))
     top = found["corpus"].hits[0].source
     assert top.title.startswith("Izrael")
-    assert top in pipeline._candidates(found)
+    assert top in pipeline._candidates(found, claim)
     assert isinstance(steps["corpus"], int)
 
 
