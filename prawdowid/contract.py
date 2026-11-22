@@ -8,12 +8,17 @@ from pydantic import BaseModel, Field, HttpUrl, computed_field, model_validator
 
 
 class Verdict(StrEnum):
+    """Outcome for one claim.
+
+    `not_checked` is not a verdict: the time limit ran out, every source failed, or the
+    judge model did not answer, and the claim's limitations say which.
+    """
+
     CONFIRMED = "confirmed"
     FALSE = "false"
     MISLEADING = "misleading"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
     NOT_VERIFIABLE = "not_verifiable"
-    # Not a verdict: the time limit ran out or every source failed. Limitations say which.
     NOT_CHECKED = "not_checked"
 
     @property
@@ -55,11 +60,15 @@ class Source(BaseModel):
     fetched_at: datetime
     url: HttpUrl
     source_type: str
+    # The source's own words that the verdict rests on. With `rating` set, it is that rating in
+    # the wording of the fact-checker's ClaimReview record, not text of the review page.
     fragment: str | None = None
-    # Google Fact Check ClaimReview: the fact-checker's own rating ("Fałsz", "Manipulacja", ...)
-    # of `reviewed_claim`. Shown to the judge as a signal, never a verdict.
+    # Set when we could not read the page ourselves: the text is the search provider's extract of
+    # it, and `fetched_at` is when we searched. Says why, in Polish ("strona nie pozwala na pobranie").
+    snippet_only: str | None = None
+    # A fact-checker's rating of the checked claim (`textualRating` of its ClaimReview record).
+    # Channels show it as the fact-checker's rating, never as a quote from its page.
     rating: str | None = None
-    reviewed_claim: str | None = None
 
 
 class ModelCall(BaseModel):
@@ -127,9 +136,20 @@ class SecurityEvent(BaseModel):
     # Where they were found: "input" (the user's text), "page" (the page a link points to) or
     # "source" (a retrieved evidence page).
     location: Literal["input", "page", "source"]
-    # "patterns": our fixed phrase list in code; "defender": StackOne Defender's pattern tier on a
-    # retrieved page (`prawdowid/injection.py`); "model": a model's own flag (extraction or judge).
-    detector: Literal["patterns", "defender", "model"]
+    # "patterns": the fixed pre-check in code; "model": a model's own flag (extraction or judge).
+    detector: Literal["patterns", "model"]
+
+
+class ModeratorCase(BaseModel):
+    """The moderator's case this question was added to (scenario H, prawdowid/cases.py). Set only
+    after the case was written, so a channel says the question went to the moderator's queue only
+    when it did."""
+
+    id: int
+    # "created": this question opened the case; "updated": it joined an open one.
+    status: Literal["created", "updated"]
+    # Questions in the case within the retention period, this one included.
+    count: int
 
 
 class CheckResult(BaseModel):
@@ -143,10 +163,28 @@ class CheckResult(BaseModel):
     security_events: list[SecurityEvent] = []
     # Limits of the check as a whole, e.g. injection detection ran on patterns only.
     limitations: list[str] = []
-    # Model tokens plus paid API calls for this answer; None when it cannot be known.
-    cost_usd: float | None = None
+    # Priced sum of the model requests answered for this answer (tokens only: search credits are
+    # not priced), always a number. `unpriced_requests` counts requests that may be billed but
+    # have no price (cut, failed, unpriced model); above 0, cost_usd is a lower bound.
+    cost_usd: float = Field(
+        0.0,
+        description="Priced sum of the model requests answered for this answer, in USD (search "
+        "credits excluded). A lower bound when unpriced_requests is above 0.",
+    )
+    unpriced_requests: int = Field(
+        0,
+        description="Model requests that may be billed but have no price (cut, failed or refused, "
+        "or an unpriced model). Above 0, cost_usd is a lower bound.",
+    )
     # Shown next to the claims, also on a notice (a refused link): never sets or changes a verdict.
     incident_matches: list[IncidentMatch] = []
+    moderator_case: ModeratorCase | None = Field(
+        None,
+        description="The moderator case this question was stored in: a claim without enough "
+        "evidence, a security event, or an unconfirmed claim on a high-risk topic. null when "
+        "nothing was stored: the check needed no person, no moderator queue is set up on this "
+        "server, or the case store failed. A channel then says nothing about a moderator.",
+    )
     # Check log only (prawdowid/checklog.py): never sent to a channel.
     steps_ms: dict[str, int] = Field(default={}, exclude=True)
     model_calls: list[ModelCall] = Field(default=[], exclude=True)

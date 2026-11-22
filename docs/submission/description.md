@@ -2,29 +2,47 @@
 
 Nazwa zespołu: TEAM_NAME
 
-Tytuł: Prawdowid: sprawdź twierdzenie i zobacz źródła
+Tytuł: faktczyfejk.pl: sprawdź, zanim podasz dalej
 
 ## Opis do formularza
 
-<!-- description:start -->
-Prawdowid pomaga sprawdzić twierdzenia z tekstu lub strony internetowej. Użytkownik wkleja treść albo link, a usługa wyodrębnia twierdzenia i szuka materiałów, które mogą je potwierdzić lub podważyć. Wynik jest po polsku. Pokazuje ocenę, przesłanki i ograniczenia oraz odnośniki do źródeł z cytatami, jeśli udało się je znaleźć.
+Na https://faktczyfejk.pl wklejasz tekst albo link, bez konta i za darmo, i dostajesz po polsku ocenę twierdzeń z uzasadnieniem, ograniczeniami i źródłami. Myśleliśmy o osobie słabo znającej technologię i o analityku MSZ, który musi wiedzieć, skąd wzięła się ocena.
 
-Projekt odpowiada na zadanie MSZ dotyczące weryfikacji informacji. Chcemy pomóc osobom, które przed udostępnieniem wiadomości potrzebują sprawdzić jej podstawy. To planowana grupa odbiorców; badania użytkowników nie są potwierdzone w repozytorium.
+Ocen jest pięć: potwierdzone, fałszywe, wprowadzające w błąd, brak wystarczających dowodów i nie podlega weryfikacji. Osobno, nigdy jako ocenę, pokazujemy „nie sprawdzono”, błąd techniczny, stronę, której nie da się sprawdzić (paywall, logowanie), i prośbę o doprecyzowanie. „Nie sprawdzono” z powodem dostaje twierdzenie, gdy nie odpowie model, czas minie przed oceną albo padnie źródło zdolne rozstrzygnąć (Fact Check, wyszukiwarka, w sprawach rządu gov.pl), a innych dowodów brak. Awaria przy wszystkich twierdzeniach daje komunikat techniczny.
 
-Formularz WWW i komenda Discord /sprawdz korzystają z tego samego API. Obsługa Discorda jest w kodzie, ale połączenie z prawdziwym serwerem nie zostało potwierdzone testem. Model językowy dzieli tekst na twierdzenia, porządkuje materiały i ocenia znaczenie fragmentów. Ostateczna ocena wynika z reguł w kodzie i cytatów znalezionych w pobranych materiałach. Cytat potwierdza obecność tekstu w źródle; jego poprawna interpretacja nadal może wymagać sprawdzenia przez człowieka.
+Claude dzieli tekst na twierdzenia, a trzy najważniejsze sprawdzamy w pełni. Dla każdego równolegle przeszukujemy Google Fact Check Tools, wyszukiwanie w sieci (Perplexity, a bez jego klucza Tavily) na wybranych domenach, www.gov.pl, EUvsDisinfo (tylko kontekst) i własny korpus: 1158 dokumentów z 11 domen, m.in. gov.pl, CERT Polska i Sejm. Ocenę fact-checkera tego samego twierdzenia kod przekłada na naszą skalę. Gdy strona blokuje nasz serwer, bierzemy fragment z wyników wyszukiwarki; blokad nie obchodzimy. Model wskazuje cytaty, a kod sprawdza je słowo w słowo w źródle i wyznacza werdykt według reguł.
 
-Źródeł szukamy przez Google Fact Check Tools oraz Perplexity Search API. Wyszukiwanie ograniczamy do domen wybranych przez zespół. EUvsDisinfo przez MCP dostarcza kontekstu znanych narracji dezinformacyjnych, a baza incydentów organizatora pokazuje ewentualne dopasowanie jako neutralną notatkę. Samo podobieństwo do takiej narracji nie rozstrzyga prawdziwości. Własna baza PostgreSQL jest przygotowana, lecz wyłączona z procesu sprawdzania do czasu wyboru materiałów z potwierdzonymi prawami do wykorzystania.
+Przy źródle widać tytuł, wydawcę, datę publikacji, link i dosłowny cytat, jeśli go mamy. Strona WWW i Discord (jeszcze nie /czat) podpisują ocenę fact-checkera i fragment z wyszukiwarki, a strona podaje też datę pobrania. Stare materiały oznaczamy jako archiwalne. Na /zrodla są źródła z licencjami i odrzucone, z powodem.
 
-Dane osobowe (e-mail, numer konta, PESEL, telefon) są maskowane przed modelem i w każdym logu. Zapis sprawdzenia trzymamy 30 dni, a użytkownik może usunąć swoją sesję. Brak dowodów i awaria usługi mają osobne komunikaty. Opinie są oznaczane jako niepodlegające weryfikacji, a twierdzenia poza zakresem sprawdzenia są wymieniane jako niesprawdzone. Podany link nie jest dowodem dla własnych twierdzeń.
+Wzorce w kodzie i flaga modelu wyłapują polecenia ukryte w tekście, na stronie z linku i w źródłach. Traktujemy je jak dane i zapisujemy zdarzenie bezpieczeństwa. PESEL, numery dowodu i paszportu, telefon, e-mail, numery kont i kart maskujemy przed modelem i logami. Każde sprawdzenie zostawia zamaskowany wpis w dzienniku (pytanie, źródła, wynik, czasy, koszt) na 30 dni; na stronie i w /czat można go usunąć. Zamaskowane logi kontenerów są poza retencją i usuwaniem.
 
-Prototyp ma istotne braki: baza incydentów organizatora jest jeszcze pusta, nie zbudowaliśmy korpusu demonstracyjnego, a część wymaganych metryk nie została zmierzona. Wyniki, koszty i ryzyka opisujemy w repozytorium. Priorytetem pozostaje budowa korpusu, odporność na polecenia ukryte w treści oraz pełna ochrona danych przed pokazem publicznym.
-<!-- description:end -->
+Kanały to strona WWW i adapter demonstracyjny komunikatora pod /czat, oba na tym samym API. Kod bota Discord (/sprawdz) czeka na wdrożenie. Serwer stoi w Niemczech (OVHcloud). Poza EOG trafia zamaskowany tekst do Anthropic i zapytania do wyszukiwarki (Perplexity albo Tavily), a Google, EUvsDisinfo i gov.pl nie podają, gdzie przetwarzają dane. Model każdego kroku ustawia zmienna środowiskowa.
 
-Liczba znaków opisu: 2309 (ze spacjami i znakami nowej linii, bez znaczników,
-tytułu, nazwy zespołu i tej adnotacji). Limit formularza: 4000 znaków
-([issue #18](https://github.com/00200200/HackNation2026/issues/18)).
+Pełny przebieg naszego testu (commit ca48b84, 75 przypadków, evals/results/HISTORY.md): macro-F1 0,80 przy celu 0,75 (42 etykiety to oceny Demagoga, które produkt może przejąć), pokrycie cytatami 1,0, poprawność cytatów 1,0 (tylko obecność cytatu z korpusu w źródle, nie wsparcie twierdzenia), poprawna abstencja 0,92 (12), odporność na wstrzyknięcia 1,0 (7, we wklejonym tekście, 3 z nich nasze wzorce znają dosłownie), mediana czasu 17,8 s, zgodność kanałów 1,0 (6, drugi kanał dostał wynik z pamięci podręcznej), end-to-end 0,97. Koszt modeli: 4,27 USD za 100 sprawdzeń, bez opłat za wyszukiwarkę. Pominęliśmy 11 przypadków z poleceniem na stronie (brak publicznego adresu).
 
-Podstawa opisu: [architektura i dokładne wyniki testu](architecture.md),
-[źródła](sources.md), [ryzyka](risks.md), [koszty](cost.md).
-Stan integracji i testów na żywo: [WORKLOG](../../WORKLOG.md).
-Nazwa TEAM_NAME wymaga uzupełnienia przez zespół. PDF i film pozostają pracą człowieka.
+End-to-end nie przeszły J01 (przy symulowanej awarii Fact Check produkt dał oceny z innych źródeł, z dopiskiem o awarii, zamiast komunikatu technicznego) i A15 (opinia dostała prośbę o doprecyzowanie zamiast „nie podlega weryfikacji”). Pętla moderatora (scenariusz H) weszła do kodu po tym przebiegu (#79), więc tu ma wynik 0. Spośród 15 pomyłek 5 to „wprowadzające w błąd” zamiast „fałszywe”. Baza incydentów jest pusta (brak pliku organizatora), 259 dokumentów korpusu nie ma daty, a fact-checkerów reprezentuje w nim 15 tekstów Pravdy. Nie obsługujemy zrzutów ekranu i nie maskujemy imion ani adresów.
+
+## Przed wysłaniem (nie wklejać do formularza)
+
+Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka: 3802 znaki
+(`len()`, znaki nowej linii jako LF), 3816 z CRLF, 3993 bajty UTF-8 z CRLF; limit 4000 znaków
+([issue #18](https://github.com/00200200/HackNation2026/issues/18)). Liczby z pełnego przebiegu:
+[evals/results/history/20261122T021757.182695Z-ca48b84-full.json](../../evals/results/history/20261122T021757.182695Z-ca48b84-full.json)
+i ostatni wiersz [HISTORY.md](../../evals/results/HISTORY.md); 42 etykiety z ocen Demagoga, pamięć
+podręczna drugiego kanału i trzy przypadki wstrzyknięć znane wzorcom:
+[eval-notes.md](../eval-notes.md). Szczegóły: [architektura](architecture.md),
+[źródła](sources.md), [ryzyka](risks.md), [koszty](cost.md), [prywatność](../privacy.md),
+[korpus](../corpus.md).
+
+- Wpisać nazwę zespołu w miejsce TEAM_NAME.
+- Sprawdzić, czy https://faktczyfejk.pl działa na kodzie `integration/r3`: 22.11 o 04:30 `/czat`
+  i `/zrodla` zwracały 404, a `prod` bierze tylko commity z `main` ([deploy.md](../deploy.md)).
+  Od tego zależą też trasa fact-checkera, podpisy fragmentów z wyszukiwarki i maskowanie numeru
+  dowodu i paszportu. Gdy `/czat` zadziała, na slajdzie 8 zmienić jego znacznik na „działa” i
+  wyrenderować PDF i PPTX (polecenia w `docs/pitch/slides.html`). Jeśli nie zdążymy, usunąć
+  `/czat` i `/zrodla` z opisu.
+- Wkleić tekst do formularza i sprawdzić jego licznik.
+- Upublicznić repozytorium albo podać inny link (22.11 było prywatne).
+- Scalić PR #124 (tabela miejsc przetwarzania) albo przeformułować zdanie o EOG.
+- Gdy bot Discord (#73) albo podpisy źródeł w `/czat` zadziałają, poprawić akapit o kanałach i
+  źródłach oraz slajd 8.

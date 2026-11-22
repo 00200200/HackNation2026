@@ -1,4 +1,5 @@
 // Web channel: send the input to the API and render CheckResult. No verification logic here.
+// SOURCE_TYPES, el, plural, plDate and safeUrl come from common.js, loaded first.
 const form = document.getElementById("check-form");
 const input = document.getElementById("input");
 const submit = document.getElementById("submit");
@@ -16,16 +17,6 @@ const NOTICE_TITLES = {
   technical_error: "Nie udało się sprawdzić",
   cannot_check: "Nie możemy tego sprawdzić",
   needs_clarification: "Doprecyzuj, co chcesz sprawdzić",
-};
-const PLURAL = new Intl.PluralRules("pl-PL");
-// Values used by the corpus branch and the web-search PR; anything else is shown as sent.
-const SOURCE_TYPES = {
-  official: "źródło oficjalne",
-  fact_checker: "serwis fact-checkingowy",
-  fact_check: "serwis fact-checkingowy",
-  incident_base: "baza incydentów dezinformacji",
-  disinfo_database: "baza znanych narracji dezinformacyjnych",
-  news: "serwis informacyjny",
 };
 // First words of the answer, in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić…"),
 // picked from the verdict set in code. The reasons stay in the sources and limitations.
@@ -55,31 +46,9 @@ const ENTER_SENDS = window.matchMedia("(hover: hover) and (pointer: fine)");
 let busy = false;
 let errorFrame = 0;
 
-function el(tag, attrs = {}, ...children) {
-  const node = document.createElement(tag);
-  Object.assign(node, attrs);
-  node.append(...children.filter((c) => c !== null && c !== undefined && c !== false));
-  return node;
-}
-
 // The API counts characters, not UTF-16 units: an emoji is one character.
 function chars(text) {
   return [...text].length;
-}
-
-function plural(n, one, few, many) {
-  const form = PLURAL.select(n);
-  return `${n} ${form === "one" ? one : form === "few" ? few : many}`;
-}
-
-function plDate(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("pl-PL", { timeZone: "Europe/Warsaw" });
-}
-
-function safeUrl(url) {
-  return /^https?:\/\//.test(url ?? "") ? url : null;
 }
 
 // Anything that is not a verdict: neutral look, never the colours of a verdict.
@@ -89,6 +58,14 @@ function notice(title, text, note) {
     el("strong", { textContent: title }),
     text ? el("span", { textContent: text }) : null,
     note ? el("p", { className: "note", textContent: note }) : null);
+}
+
+// A fact-checker's rating comes from its ClaimReview record: shown as the rating, never as a quote.
+function sourceText(s) {
+  if (s.rating) {
+    return el("p", { className: "rating" }, el("b", { textContent: "Ocena fact-checkera: " }), s.rating);
+  }
+  return s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null;
 }
 
 function sourceItem(s, i) {
@@ -101,19 +78,24 @@ function sourceItem(s, i) {
   const year = s.published_at ? Number(String(s.published_at).slice(0, 4)) : null;
   const age = s.published_at ? (Date.now() - Date.parse(`${s.published_at}T00:00:00Z`)) / DAY_MS : NaN;
   const archival = Boolean(year) && age > ARCHIVAL_DAYS;
+  // snippet_only: we could not read the page, so the quote is the search engine's extract of it
+  // and fetched_at is when we searched. It holds the reason, e.g. "strona nie pozwala na pobranie".
+  const snippet = Boolean(s.snippet_only);
   const meta = [
     host,
     s.published_at ? `opublikowano ${plDate(s.published_at)}` : "bez daty publikacji",
-    s.fetched_at ? `pobrano ${plDate(s.fetched_at)}` : null,
+    s.fetched_at ? `${snippet ? "wyszukano" : "pobrano"} ${plDate(s.fetched_at)}` : null,
     SOURCE_TYPES[s.source_type] ?? s.source_type,
   ].filter(Boolean).join(", ");
   return el("li", { className: "source" },
-    s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null,
+    sourceText(s),
     el("p", { className: "source-head" }, el("span", { className: "ref", textContent: `[${i + 1}]` }), " ",
       s.publisher ? el("b", { textContent: s.publisher }) : null, s.publisher ? ", " : null, title),
     el("p", { className: "source-meta" },
       archival ? el("span", { className: "archival", textContent: `materiał archiwalny, ${year}` }) : null,
-      archival ? " " : null, meta));
+      archival ? " " : null,
+      snippet ? el("span", { className: "snippet", textContent: `fragment z wyników wyszukiwarki; ${s.snippet_only}` }) : null,
+      snippet ? " " : null, meta));
 }
 
 // Claims from a quote: who said it, and what was said. Plain statements get no tag.
@@ -139,6 +121,13 @@ function answerText(c) {
   return [ANSWER_LEAD[c.verdict] ?? `${c.verdict_label}.`, named].filter(Boolean).join(" ");
 }
 
+// Under every claim's sources: what we search and why. A new tab, so the answer stays where it was.
+function sourcesNote() {
+  return el("p", { className: "sources-note" },
+    el("a", { href: "/zrodla", target: "_blank", rel: "noopener" }, "Jak dobieramy źródła",
+      el("span", { className: "sr-only", textContent: " (otwiera się w nowej karcie)" })));
+}
+
 function claimBlock(c) {
   return el("div", { className: "claim" },
     el("h2", { className: "claim-text", textContent: `„${c.claim}”` }),
@@ -151,9 +140,10 @@ function claimBlock(c) {
     c.sources.length
       ? el("ol", { className: "sources" }, ...c.sources.map(sourceItem))
       : el("p", { className: "empty", textContent: "Brak źródła przy tej ocenie." }),
+    sourcesNote(),
     el("h3", { className: "part", textContent: "Nasza ocena" }),
     el("div", { className: "assessment" },
-      el("p", { className: "explain" }, el("b", { textContent: "Wyjaśnienie modelu: " }), c.reasoning),
+      el("p", { className: "explain" }, el("b", { textContent: "Uzasadnienie: " }), c.reasoning),
       el("p", { className: "strength" }, el("b", { textContent: "Siła dowodów: " }), c.strength),
       c.premises.length ? el("ul", { className: "premises" }, ...c.premises.map((p) => el("li", { textContent: p }))) : null),
     c.limitations.length
@@ -218,28 +208,41 @@ function summary(claims) {
 
 // Measured time, and the model cost the API reports for this answer (models only; search credits excluded).
 const USD = new Intl.NumberFormat("pl-PL", { style: "currency", currency: "USD", maximumFractionDigits: 4 });
-function costLine(seconds, cost) {
-  return typeof cost === "number" ? `w ${seconds} s, koszt modelu ${USD.format(cost)}` : `w ${seconds} s`;
+// unpriced > 0: some requests have no price, so the sum is only a lower bound ("co najmniej").
+function costLine(seconds, cost, unpriced) {
+  if (typeof cost !== "number") return `w ${seconds} s`;
+  return `w ${seconds} s, koszt modelu ${unpriced > 0 ? "co najmniej " : ""}${USD.format(cost)}`;
+}
+
+// Scenario H: the API sets moderator_case only once the case is stored, so this is never said about
+// a hand-off that did not happen. Same words as the Discord bot (prawdowid/discord_bot.py).
+const MODERATOR_NOTE = "Zgłoszenie trafiło do kolejki moderatora";
+// After "Usuń moje sprawdzenia" took the session's questions out of the moderator cases.
+const DELETED_AND_WITHDRAWN = "Usunęliśmy sprawdzenia z tej sesji i wycofaliśmy zgłoszenia z kolejki moderatora.";
+
+function moderatorNote(c) {
+  return c ? el("p", { className: "note moderator", textContent: `${MODERATOR_NOTE} (sprawa ${c.id}).` }) : null;
 }
 
 function render(check, seconds) {
   const warning = incidentWarning(check.incident_matches);
+  const moderator = moderatorNote(check.moderator_case);
   // Statuses other than "ok" are notices, never verdicts.
   if (check.status !== "ok") {
     const main = notice(NOTICE_TITLES[check.status] ?? "Brak oceny", check.message, NOT_A_VERDICT);
     const limits = check.limitations?.length
       ? el("ul", {}, ...check.limitations.map((l) => el("li", { textContent: l })))
       : null;
-    if (!check.security_events?.length && !limits && !warning) return main;
+    if (!check.security_events?.length && !limits && !warning && !moderator) return main;
     return el("div", {},
       check.security_events?.length ? notice("Polecenia dla modelu", SECURITY_NOTE_ONLY) : null,
-      main, limits, warning);
+      main, limits, warning, moderator);
   }
   const unchecked = check.unchecked_claims ?? [];
   if (!check.claims.length && !unchecked.length) {
     const empty = notice("Nie znaleźliśmy zdania do sprawdzenia",
       "Wklej fragment z konkretnym faktem, na przykład datą, liczbą albo nazwą instytucji.");
-    return warning ? el("div", {}, empty, warning) : empty;
+    return warning || moderator ? el("div", {}, empty, warning, moderator) : empty;
   }
   const events = check.security_events ?? [];
   return el("article", { className: "card" },
@@ -248,13 +251,14 @@ function render(check, seconds) {
     el("div", { className: "card-head" },
       el("div", {},
         el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
-          el("span", { className: "took", textContent: costLine(seconds, check.cost_usd) })),
+          el("span", { className: "took", textContent: costLine(seconds, check.cost_usd, check.unpriced_requests) })),
         summary(check.claims)),
       copyButton(check)),
     check.page ? pageNote(check.page) : null,
     warning,
     ...check.claims.map(claimBlock),
-    unchecked.length ? uncheckedList(unchecked) : null);
+    unchecked.length ? uncheckedList(unchecked) : null,
+    moderator);
 }
 
 // The page behind a link: what was read, not evidence for its own claims.
@@ -409,10 +413,12 @@ deleteSession.addEventListener("click", async () => {
       signal: AbortSignal.timeout(10000),
     });
     if (!resp.ok) throw new Error(String(resp.status));
+    // How many of the session's questions left the moderator cases: a case note in an earlier answer no longer holds.
+    const { withdrawn } = await resp.json().catch(() => ({}));
     storeSession(null);
     deleteSession.hidden = true;
     input.focus();
-    sessionStatus.textContent = "Usunęliśmy sprawdzenia z tej sesji.";
+    sessionStatus.textContent = withdrawn > 0 ? DELETED_AND_WITHDRAWN : "Usunęliśmy sprawdzenia z tej sesji.";
   } catch {
     sessionStatus.textContent = "Nie udało się usunąć sprawdzeń. Spróbuj ponownie za chwilę.";
   } finally {

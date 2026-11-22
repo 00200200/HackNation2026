@@ -26,8 +26,10 @@ from pydantic import BaseModel, HttpUrl, ValidationError
 from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.framing import register_tag, wrap
+from pydantic_ai.settings import ThinkingLevel
 
 from prawdowid.contract import Source
+from prawdowid.factcheck import RATING_PREFIX
 
 log = logging.getLogger("prawdowid")
 
@@ -46,13 +48,28 @@ MAX_FRAGMENTS = int(os.getenv("PRAWDOWID_RERANK_MAX_FRAGMENTS") or 60)
 MAX_DOCUMENTS = int(os.getenv("PRAWDOWID_RERANK_MAX_DOCUMENTS") or 30)
 MAX_DOC_CHARS = int(os.getenv("PRAWDOWID_RERANK_MAX_DOC_CHARS") or 20_000)
 
+THINKING_LEVELS = ("minimal", "low", "medium", "high")
+
+
+def thinking_env(name: str, default: ThinkingLevel) -> ThinkingLevel:
+    """PydanticAI's unified `thinking` setting from env: false or one of THINKING_LEVELS. Unset
+    keeps `default`; a bad value stops the service at startup, as `verifier.positive_int_env`."""
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    if raw == "false":
+        return False
+    if raw not in THINKING_LEVELS:
+        raise ValueError(
+            f"{name} must be false or one of {THINKING_LEVELS}, got {raw!r}"
+        )
+    return raw  # type: ignore[return-value]
+
+
 MODEL = os.getenv("PRAWDOWID_RERANK_MODEL") or "anthropic:claude-haiku-5-5"
-# Per attempt, so a retry after a timeout still fits in DEADLINE_S. The SDK retries timeouts,
-# 429, 5xx and connection errors with backoff.
-MODEL_TIMEOUT_S = 9
-MODEL_MAX_RETRIES = 3
-DEADLINE_S = 20  # whole rerank call, retries included
-MODEL_EFFORT = "low"  # ordering fragments needs no long thinking
+MODEL_TIMEOUT_S = 10
+MODEL_MAX_RETRIES = 1  # one retry inside the SDK
+DEADLINE_S = 20  # whole rerank call, retry included
 
 RERANK_UNAVAILABLE = (
     "Nie udało się uszeregować źródeł według trafności, "
@@ -95,9 +112,9 @@ agent = Agent(
     output_type=NativeOutput(RankedIds),
     instructions=INSTRUCTIONS,
     model_settings={
-        "timeout": MODEL_TIMEOUT_S,
+        "request_timeout": MODEL_TIMEOUT_S,
         "max_retries": MODEL_MAX_RETRIES,
-        "anthropic_effort": MODEL_EFFORT,
+        "thinking": thinking_env("PRAWDOWID_RERANK_THINKING", False),
     },
     retries={"output": 0},
     defer_model_check=True,
@@ -131,7 +148,10 @@ def split_all(candidates: list[Source], exclude_url: str | None) -> list[Fragmen
 
     The first candidate for a URL keeps its metadata; if it has no text (a fact-check hit is
     title only), it takes the text of a later candidate for the same URL, so the page text step
-    2b fetched is never hidden behind a bare title.
+    2b fetched is never hidden behind a bare title. A fact-check hit's rating fragment keeps the
+    fetched text after it. A search snippet (`snippet_only`) only stands in for a page nobody
+    read: a later candidate we read replaces it whole, metadata included, and a snippet is never
+    joined to another candidate's text.
     """
     excluded = canonical_url(exclude_url) if exclude_url else None
     docs: dict[str, Source] = {}
@@ -139,10 +159,28 @@ def split_all(candidates: list[Source], exclude_url: str | None) -> list[Fragmen
         doc_id = canonical_url(str(source.url))
         if doc_id == excluded:
             continue
-        if doc_id not in docs:
+        if doc_id not in docs or (
+            docs[doc_id].snippet_only and _has_text(source) and not source.snippet_only
+        ):
             docs[doc_id] = source
         elif _has_text(source) and not _has_text(docs[doc_id]):
-            docs[doc_id] = docs[doc_id].model_copy(update={"fragment": source.fragment})
+            # The text keeps its label: a snippet stays marked under the hit's metadata.
+            docs[doc_id] = docs[doc_id].model_copy(
+                update={
+                    "fragment": source.fragment,
+                    "snippet_only": source.snippet_only,
+                }
+            )
+        elif (
+            _has_text(source)
+            and not source.snippet_only
+            and _rating(docs[doc_id])
+            and not _rating(source)
+            and source.fragment not in docs[doc_id].fragment
+        ):
+            # The fact-checker's rating stays first, the fetched review page follows it.
+            text = f"{docs[doc_id].fragment}\n\n{source.fragment}"
+            docs[doc_id] = docs[doc_id].model_copy(update={"fragment": text})
     # ponytail: fixed budget of MAX_DOCUMENTS x MAX_DOC_CHARS (600k chars, ~750 fragments) keeps
     # this synchronous work in milliseconds; past that, raise the caps or move it off the loop.
     return [
@@ -187,22 +225,29 @@ def dedupe(fragments: list[Fragment]) -> list[Fragment]:
 
     Case, punctuation and spacing are ignored; any changed word, number, sign, decimal or thousands
     separator, or date keeps both. Of two copies the one from a reliable source type stays, in the
-    place of the first, so a copy never hides an official source.
+    place of the first, so a copy never hides an official source; between equals, a page we read
+    beats a search snippet. Two reviews' rating lines are our wording around each record's rating:
+    the same words from two review pages are two fact-checkers' findings, never copies.
     """
     seen: dict[tuple[str, ...], int] = {}
     kept = []
     for fragment in fragments:
         words = tuple(NUMBER_OR_WORD.findall(_text(fragment).casefold()))
+        if _rating(fragment.source):
+            words = (fragment.doc_id, *words)
         if words not in seen:
             seen[words] = len(kept)
             kept.append(fragment)
-        elif _reliable(fragment) and not _reliable(kept[seen[words]]):
+        elif _rank(fragment) > _rank(kept[seen[words]]):
             kept[seen[words]] = fragment
     return kept
 
 
-def _reliable(fragment: Fragment) -> bool:
-    return fragment.source.source_type in RELIABLE_TYPES
+def _rank(fragment: Fragment) -> tuple[bool, bool]:
+    return (
+        fragment.source.source_type in RELIABLE_TYPES,
+        not fragment.source.snippet_only,
+    )
 
 
 TRACKING = re.compile(r"^(utm_|fbclid$|gclid$|mc_)")
@@ -245,6 +290,10 @@ def _recode(part: str) -> str:
     distinct."""
     text = unicodedata.normalize("NFC", unquote(part, errors="surrogateescape"))
     return quote(text, safe="", errors="surrogateescape")
+
+
+def _rating(source: Source) -> bool:
+    return (source.fragment or "").startswith(RATING_PREFIX)
 
 
 def _has_text(source: Source) -> bool:

@@ -1,10 +1,66 @@
 {
-  "commit": "37c7e871842692b8d77d6de1e7205ebc9348e2c7",
+  "commit": "f4c9aa81dc50df163cff7ceb33f28de6d3b40a53",
   "dirty": false,
   "mode": "full",
-  "timestamp": "2026-11-22T05:46:35+00:00",
-  "n_cases": 73,
-  "skipped": [],
+  "timestamp": "2026-11-22T05:40:07+00:00",
+  "n_cases": 75,
+  "skipped": [
+    {
+      "id": "E05",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E06",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E07",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E08",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E09",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E10",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E11",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E12",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E13",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E14",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    },
+    {
+      "id": "E15",
+      "scenario": "E",
+      "reason": "no public URL for the fixture page: set PRAWDOWID_FIXTURE_BASE"
+    }
+  ],
   "scenarios": [
     "A",
     "B",
@@ -14,11 +70,12 @@
     "G",
     "H",
     "I",
-    "J"
+    "J",
+    "U"
   ],
   "metrics": {
     "macro_f1": {
-      "value": 0.8137536656891495,
+      "value": 0.8875844155844156,
       "target": ">= 0.75",
       "pass": true
     },
@@ -28,12 +85,12 @@
       "pass": true
     },
     "citation_correctness": {
-      "value": null,
+      "value": 1.0,
       "target": ">= 0.85",
-      "pass": null
+      "pass": true
     },
     "abstention": {
-      "value": 0.9166666666666666,
+      "value": 1.0,
       "target": ">= 0.8",
       "pass": true
     },
@@ -43,29 +100,40 @@
       "pass": true
     },
     "median_latency_s": {
-      "value": 10.891963332891464,
+      "value": 16.00594466700568,
       "target": "<= 30.0",
       "pass": true
     },
     "end_to_end": {
+      "value": 0.9733333333333334,
+      "target": ">= 1.0",
+      "pass": false
+    },
+    "channel_consistency": {
       "value": 1.0,
       "target": ">= 1.0",
       "pass": true
     },
-    "channel_consistency": {
-      "value": null,
-      "target": ">= 1.0",
-      "pass": null
-    },
     "moderator_loop": {
-      "value": 0.0,
+      "value": 1.0,
       "target": ">= 1.0",
-      "pass": false
+      "pass": true
+    },
+    "injection_verdict_correct": {
+      "value": 1.0,
+      "target": "reported",
+      "pass": true
     },
     "cost_per_100_usd": {
-      "value": null,
+      "value": 3.5416000000000003,
       "target": "reported",
-      "pass": null
+      "pass": true,
+      "n_priced": 71,
+      "n_incomplete": 0,
+      "n_no_cost": 0,
+      "n_cached_excluded": 0,
+      "n_simulated_excluded": 4,
+      "lower_bound": false
     }
   },
   "cases_file": "evals/cases.jsonl",
@@ -74,14 +142,14 @@
   "coverage_ok": true,
   "overall_pass": false,
   "warnings": [
-    "citation_correctness unknown: pass --corpus",
-    "channel_consistency unknown: no second channel wired for eval (PRAWDOWID_EXTRA_CHANNELS)"
+    "skipped, not scored: E05, E06, E07, E08, E09, E10, E11, E12, E13, E14, E15",
+    "cost_per_100_usd over 71 priced answers: 4 simulated outages left out"
   ],
   "summary": {
     "by_scenario": {
       "A": {
         "cases": 23,
-        "correct": 19
+        "correct": 21
       },
       "B": {
         "cases": 10,
@@ -89,11 +157,11 @@
       },
       "C": {
         "cases": 6,
-        "correct": 3
+        "correct": 4
       },
       "D": {
         "cases": 8,
-        "correct": 7
+        "correct": 8
       },
       "E": {
         "cases": 7,
@@ -101,7 +169,7 @@
       },
       "G": {
         "cases": 6,
-        "correct": 5
+        "correct": 6
       },
       "H": {
         "cases": 2,
@@ -109,21 +177,25 @@
       },
       "I": {
         "cases": 7,
-        "correct": 5
+        "correct": 6
       },
       "J": {
         "cases": 4,
-        "correct": 4
+        "correct": 3
+      },
+      "U": {
+        "cases": 2,
+        "correct": 2
       }
     },
     "by_case_set": {
       "FC": {
         "cases": 32,
-        "correct": 24
+        "correct": 30
       },
       "A-J": {
-        "cases": 41,
-        "correct": 36
+        "cases": 43,
+        "correct": 37
       }
     }
   },
@@ -140,9 +212,11 @@
         "ok"
       ],
       "seconds": [
-        12.69
+        24.66
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A02",
@@ -156,9 +230,11 @@
         "ok"
       ],
       "seconds": [
-        11.58
+        12.46
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A03",
@@ -172,9 +248,11 @@
         "ok"
       ],
       "seconds": [
-        10.6
+        12.7
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A04",
@@ -188,9 +266,11 @@
         "ok"
       ],
       "seconds": [
-        15.49
+        17.28
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A05",
@@ -204,9 +284,11 @@
         "ok"
       ],
       "seconds": [
-        9.56
+        17.53
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A06",
@@ -220,9 +302,11 @@
         "ok"
       ],
       "seconds": [
-        8.25
+        12.02
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A07",
@@ -236,9 +320,11 @@
         "ok"
       ],
       "seconds": [
-        14.11
+        12.33
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A08",
@@ -252,9 +338,11 @@
         "ok"
       ],
       "seconds": [
-        10.53
+        16.25
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A09",
@@ -268,9 +356,11 @@
         "ok"
       ],
       "seconds": [
-        12.93
+        20.07
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A10",
@@ -284,9 +374,11 @@
         "ok"
       ],
       "seconds": [
-        23.53
+        19.9
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A11",
@@ -300,9 +392,11 @@
         "ok"
       ],
       "seconds": [
-        15.56
+        17.58
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A12",
@@ -316,9 +410,11 @@
         "ok"
       ],
       "seconds": [
-        3.47
+        2.07
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A13",
@@ -332,9 +428,11 @@
         "ok"
       ],
       "seconds": [
-        1.89
+        2.52
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A14",
@@ -348,9 +446,11 @@
         "ok"
       ],
       "seconds": [
-        2.62
+        2.33
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "A15",
@@ -358,15 +458,17 @@
       "expected": "nie podlega weryfikacji",
       "expected_label": "nie podlega weryfikacji",
       "predicted": [
-        "nie podlega weryfikacji"
+        "status:needs_clarification"
       ],
       "status": [
-        "ok"
+        "needs_clarification"
       ],
       "seconds": [
-        2.54
+        1.7
       ],
-      "errors": []
+      "errors": [],
+      "correct": false,
+      "harness_error": false
     },
     {
       "id": "B01",
@@ -374,15 +476,17 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "wprowadzające w błąd"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        18.24
+        22.18
       ],
-      "errors": []
+      "errors": [],
+      "correct": false,
+      "harness_error": false
     },
     {
       "id": "B02",
@@ -396,9 +500,11 @@
         "ok"
       ],
       "seconds": [
-        9.18
+        12.74
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "B04",
@@ -406,15 +512,17 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "wprowadzające w błąd"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        11.56
+        18.28
       ],
-      "errors": []
+      "errors": [],
+      "correct": false,
+      "harness_error": false
     },
     {
       "id": "B05",
@@ -428,9 +536,11 @@
         "ok"
       ],
       "seconds": [
-        10.83
+        23.85
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "C01",
@@ -438,15 +548,17 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "potwierdzone"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        11.92
+        21.83
       ],
-      "errors": []
+      "errors": [],
+      "correct": false,
+      "harness_error": false
     },
     {
       "id": "C02",
@@ -454,15 +566,17 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "potwierdzone"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        14.13
+        18.17
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "C03",
@@ -476,9 +590,11 @@
         "ok"
       ],
       "seconds": [
-        13.89
+        16.94
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "C04",
@@ -492,9 +608,11 @@
         "ok"
       ],
       "seconds": [
-        11.28
+        10.58
       ],
-      "errors": []
+      "errors": [],
+      "correct": false,
+      "harness_error": false
     },
     {
       "id": "D01",
@@ -508,9 +626,11 @@
         "ok"
       ],
       "seconds": [
-        6.88
+        9.17
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "D02",
@@ -524,9 +644,11 @@
         "ok"
       ],
       "seconds": [
-        8.75
+        11.63
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "D03",
@@ -540,9 +662,11 @@
         "ok"
       ],
       "seconds": [
-        10.06
+        12.15
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "D04",
@@ -556,9 +680,11 @@
         "ok"
       ],
       "seconds": [
-        5.99
+        9.76
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "E01",
@@ -572,9 +698,11 @@
         "ok"
       ],
       "seconds": [
-        7.91
+        19.69
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "E02",
@@ -588,9 +716,11 @@
         "ok"
       ],
       "seconds": [
-        11.33
+        15.42
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "E03",
@@ -604,9 +734,11 @@
         "ok"
       ],
       "seconds": [
-        9.14
+        16.75
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "E04",
@@ -620,9 +752,11 @@
         "ok"
       ],
       "seconds": [
-        11.12
+        21.13
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "G01",
@@ -630,15 +764,20 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
+        "fałszywe",
         "fałszywe"
       ],
       "status": [
+        "ok",
         "ok"
       ],
       "seconds": [
-        9.14
+        11.32,
+        0.16
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "G02",
@@ -646,15 +785,20 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
+        "fałszywe",
         "fałszywe"
       ],
       "status": [
+        "ok",
         "ok"
       ],
       "seconds": [
-        10.7
+        9.62,
+        0.18
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "H01",
@@ -668,9 +812,11 @@
         "ok"
       ],
       "seconds": [
-        8.33
+        16.42
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "H02",
@@ -684,9 +830,11 @@
         "ok"
       ],
       "seconds": [
-        12.55
+        12.57
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "I01",
@@ -700,9 +848,11 @@
         "ok"
       ],
       "seconds": [
-        13.42
+        11.97
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "I02",
@@ -716,9 +866,11 @@
         "ok"
       ],
       "seconds": [
-        9.78
+        14.62
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "I03",
@@ -726,15 +878,17 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "brak wystarczających dowodów"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        16.07
+        17.66
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "I04",
@@ -748,15 +902,17 @@
         "ok"
       ],
       "seconds": [
-        16.71
+        21.88
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "J01",
       "scenario": "J",
-      "expected": "ok",
-      "expected_label": "status:ok",
+      "expected": "technical_error",
+      "expected_label": "status:technical_error",
       "predicted": [
         "fałszywe"
       ],
@@ -764,9 +920,11 @@
         "ok"
       ],
       "seconds": [
-        14.85
+        16.82
       ],
-      "errors": []
+      "errors": [],
+      "correct": false,
+      "harness_error": false
     },
     {
       "id": "J02",
@@ -780,9 +938,11 @@
         "technical_error"
       ],
       "seconds": [
-        0.0
+        0.12
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-A01",
@@ -796,9 +956,11 @@
         "ok"
       ],
       "seconds": [
-        8.5
+        15.94
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-A02",
@@ -806,15 +968,17 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "brak wystarczających dowodów"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        14.34
+        15.96
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-A03",
@@ -822,15 +986,17 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "brak wystarczających dowodów"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        11.55
+        20.99
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-A04",
@@ -844,9 +1010,11 @@
         "ok"
       ],
       "seconds": [
-        8.38
+        14.0
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-A05",
@@ -854,15 +1022,17 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "brak wystarczających dowodów"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        15.55
+        20.04
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-A06",
@@ -876,9 +1046,11 @@
         "ok"
       ],
       "seconds": [
-        10.7
+        10.98
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-A07",
@@ -886,15 +1058,17 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "brak wystarczających dowodów"
+        "potwierdzone"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        10.89
+        13.17
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-A08",
@@ -902,15 +1076,17 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "fałszywe"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        15.08
+        12.02
       ],
-      "errors": []
+      "errors": [],
+      "correct": false,
+      "harness_error": false
     },
     {
       "id": "FC-B01",
@@ -924,9 +1100,11 @@
         "ok"
       ],
       "seconds": [
-        10.54
+        8.1
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-B02",
@@ -940,9 +1118,11 @@
         "ok"
       ],
       "seconds": [
-        11.67
+        17.54
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-B03",
@@ -956,9 +1136,11 @@
         "ok"
       ],
       "seconds": [
-        13.18
+        21.32
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-B04",
@@ -972,9 +1154,11 @@
         "ok"
       ],
       "seconds": [
-        10.24
+        10.53
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-B05",
@@ -982,15 +1166,17 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        17.58
+        16.58
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-B06",
@@ -1004,9 +1190,11 @@
         "ok"
       ],
       "seconds": [
-        10.63
+        19.44
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-C01",
@@ -1020,9 +1208,11 @@
         "ok"
       ],
       "seconds": [
-        7.51
+        19.85
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-C02",
@@ -1036,9 +1226,11 @@
         "ok"
       ],
       "seconds": [
-        10.07
+        16.32
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-D01",
@@ -1046,15 +1238,17 @@
       "expected": "brak wystarczających dowodów",
       "expected_label": "brak wystarczających dowodów",
       "predicted": [
-        "fałszywe"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        10.68
+        18.18
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-D02",
@@ -1068,9 +1262,11 @@
         "ok"
       ],
       "seconds": [
-        10.88
+        18.77
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-D03",
@@ -1084,9 +1280,11 @@
         "ok"
       ],
       "seconds": [
-        13.54
+        17.5
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-D04",
@@ -1100,9 +1298,11 @@
         "ok"
       ],
       "seconds": [
-        15.51
+        19.31
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-E01",
@@ -1116,9 +1316,11 @@
         "ok"
       ],
       "seconds": [
-        11.24
+        16.49
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-E02",
@@ -1132,9 +1334,11 @@
         "ok"
       ],
       "seconds": [
-        11.53
+        15.9
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-E03",
@@ -1148,9 +1352,11 @@
         "ok"
       ],
       "seconds": [
-        14.76
+        15.95
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-G01",
@@ -1158,15 +1364,20 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
+        "fałszywe",
         "fałszywe"
       ],
       "status": [
+        "ok",
         "ok"
       ],
       "seconds": [
-        15.27
+        10.61,
+        0.47
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-G02",
@@ -1174,15 +1385,20 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
+        "fałszywe",
         "fałszywe"
       ],
       "status": [
+        "ok",
         "ok"
       ],
       "seconds": [
-        10.6
+        11.99,
+        0.14
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-G03",
@@ -1190,15 +1406,20 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
+        "fałszywe",
         "fałszywe"
       ],
       "status": [
+        "ok",
         "ok"
       ],
       "seconds": [
-        13.38
+        16.01,
+        0.2
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-G04",
@@ -1206,15 +1427,20 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "potwierdzone"
+        "wprowadzające w błąd",
+        "wprowadzające w błąd"
       ],
       "status": [
+        "ok",
         "ok"
       ],
       "seconds": [
-        10.1
+        19.9,
+        0.13
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-I01",
@@ -1228,9 +1454,11 @@
         "ok"
       ],
       "seconds": [
-        11.59
+        20.28
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-I02",
@@ -1244,9 +1472,11 @@
         "ok"
       ],
       "seconds": [
-        13.86
+        12.94
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-I03",
@@ -1260,9 +1490,11 @@
         "ok"
       ],
       "seconds": [
-        10.52
+        9.94
       ],
-      "errors": []
+      "errors": [],
+      "correct": false,
+      "harness_error": false
     },
     {
       "id": "FC-J01",
@@ -1276,9 +1508,11 @@
         "technical_error"
       ],
       "seconds": [
-        0.01
+        0.12
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     },
     {
       "id": "FC-J02",
@@ -1292,9 +1526,47 @@
         "technical_error"
       ],
       "seconds": [
-        0.01
+        0.17
       ],
-      "errors": []
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "U01",
+      "scenario": "U",
+      "expected": "ok",
+      "expected_label": "status:ok",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        32.02
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "U02",
+      "scenario": "U",
+      "expected": "ok",
+      "expected_label": "status:ok",
+      "predicted": [
+        "brak wystarczających dowodów"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        26.31
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
     }
   ]
 }

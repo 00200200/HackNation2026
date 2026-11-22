@@ -224,6 +224,7 @@ def test_unreachable_host_is_a_technical_error():
     assert refusal.technical
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_link_goes_through_the_same_verify_as_text(monkeypatch):
     net = FakeNet({"93.184.216.34": http()})
     real_fetch = link.fetch_page
@@ -304,6 +305,7 @@ def test_article_about_logging_in_is_not_a_paywall():
     assert page.title == "Rząd przyjął projekt"
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_long_page_is_cut_and_says_so(monkeypatch):
     long_page = link.Page(
         url="http://news.example/a",
@@ -718,3 +720,16 @@ def test_url_secrets_never_reach_any_log_record(caplog):
         page, _ = fetch("http://news.example/a?token=SECRET", {"93.184.216.34": http()})
     assert page.url.endswith("token=REDACTED")
     assert "SECRET" not in caplog.text and "news.example" in caplog.text
+
+
+def test_hidden_text_keeps_a_polish_comment_of_a_page_without_a_declared_encoding():
+    body = "<html><body><!-- Zażółć gęślą jaźń --><p>x</p></body></html>".encode()
+    assert "Zażółć gęślą jaźń" in extract_worker.hidden_text(body)
+
+
+def test_hidden_text_survives_an_xml_prolog_with_an_encoding():
+    body = (
+        b'<?xml version="1.0" encoding="UTF-8"?><html><body>'
+        b"<!-- ukryte polecenie --><p>x</p></body></html>"
+    )
+    assert "ukryte polecenie" in extract_worker.hidden_text(body)

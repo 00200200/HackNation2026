@@ -103,16 +103,32 @@ about the present (for example days for weather and safety warnings, the date of
   thing, the verdict is `brak wystarczających dowodów` and both sides are shown. Source type never settles a
   disagreement; it only lowers strength.
 - A fact-checker's own rating is reported with attribution and its exact wording ("Demagog ocenił to jako częściową
-  prawdę"), and maps to our classes: Prawda to `potwierdzone`, Fałsz to `fałszywe`, Manipulacja and Częściowa prawda to
-  `wprowadzające w błąd`, Nieweryfikowalne to `brak wystarczających dowodów`. The mapping is provisional and checked on
-  the eval set.
+  prawdę"), and maps to our classes: Prawda to `potwierdzone`, Fałsz to `fałszywe`, Manipulacja, Częściowa prawda and
+  Częściowy fałsz to `wprowadzające w błąd`, Nieweryfikowalne to `brak wystarczających dowodów`. The mapping is
+  provisional and checked on the eval set. The rating comes from Google Fact Check, the corpus or, since #127, the
+  ClaimReview markup of a review page we read (a Fact Check hit with a rating for the same page wins; the page's text
+  after the rating is read as the page's own, not as the rating), and is looked up with case and diacritics folded
+  (Demagog also writes "Falsz"). A fact-checker's own verdict sentence on the page or in its search snippet
+  ("…wypowiedź oceniamy jako fałsz", "…uznajemy za nieweryfikowalną") counts as its rating when the stance step marks it
+  as the fact-checker's own conclusion. A fact-checker's Nieweryfikowalne, or any of its sentences the stance step
+  labels a data gap, decides `brak wystarczających dowodów` unless a fact-checker's own conclusion takes a side or a
+  reliable source published after that finding does: an older or undated page never turns the gap into a verdict (22.11, after the
+  round-4 full run, where FC-D01, FC-D02 and FC-D03 lost Demagog's "nieweryfikowalne" to other sources). Of one
+  fact-checker's ratings of the same claim the newest counts (a later review updates an earlier one), and an older
+  rating in other words is listed with a note naming the newer one; two fact-checkers whose ratings disagree are a
+  disagreement (above).
 - `potwierdzone`: verified matching supporting citations from at least two independent publishers, or from one
   official source when it is not stale. With one source the strength is "low" or "medium" and the answer says that only
-  one source confirms it.
+  one source confirms it. A search snippet of a page we could not read confirms alone only when it is a fact-checker's
+  own conclusion; any other snippet needs a second independent publisher, and the answer says why (#127). Refuting
+  rules do not change for snippets.
 - `fałszywe`: a verified refuting citation from an official source or a fact-checker whose reviewed claim the stance
   step matched to ours, and no verified supporting citation.
 - `wprowadzające w błąd`: verified supporting citations exist, but the stance step marks a time or place mismatch, or
-  the only support is stale while the claim presents it as current (scenarios B and archival material).
+  the only support is stale while the claim presents it as current (scenarios B and archival material). A mismatch
+  named on a context citation counts only from a fact-checker or from a source that also supports or refutes the
+  claim: a page that takes no side shows its own scope (another year, region or alert level), not what the claim
+  leaves out (#127).
 - No verified citation: `brak wystarczających dowodów`.
 
 Strength is computed in code and returned with its premises, using the fields that already exist in the contract
@@ -184,7 +200,7 @@ verified citations; the UI shows it first.
 | Service | Used for | Key | Where data goes | On failure |
 |---|---|---|---|---|
 | LLM through PydanticAI (default `anthropic:claude-opus-5-5`; Mistral on `api.eu.mistral.ai` is an EU option) | steps 3, 6, 7 | yes | provider's region; to be stated per chosen model | `technical_error` |
-| Google Fact Check Tools API | step 4 | yes (Google Cloud project) | Google; only the masked claim text is sent | listed in `limitations` |
+| Google Fact Check Tools API | step 4 | yes (Google Cloud project) | Google; the masked claim and short keys from it (names, quoted spans of the claim or its source sentence, its search queries), masked again | listed in `limitations` |
 | EUvsDisinfo MCP server | step 4, section 5 | token from the organiser | EUvsDisinfo service; only the masked claim text is sent | listed in `limitations` |
 | Live official APIs (e.g. IMGW) | step 4 | no | public endpoints; only the query is sent | listed in `limitations` |
 | Fallback search API | step 9 | yes | not chosen yet | skipped, listed in `limitations` |

@@ -21,7 +21,7 @@ there. No CI service is involved, and a failed deploy is retried on the next run
 | `caddy/Caddyfile` | HTTPS sites: `DOMAIN` and `www`, doc2json.pl and `www` |
 | `deploy/pull-deploy.sh` | deploys `origin/prod` when it moves |
 | `deploy/faktczyfejk-deploy.service`, `.timer` | run the script every minute as `ubuntu` |
-| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*` (never committed; deploys leave it alone) |
+| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*`, `PRAWDOWID_ADMIN_TOKEN`, for the bot `COMPOSE_PROFILES`, `DISCORD_BOT_TOKEN` (never committed; deploys leave it alone) |
 
 ## What you need
 
@@ -72,22 +72,36 @@ Back on the server, clone `prod` and write the configuration:
 sudo install -d -o ubuntu -g ubuntu /opt/faktczyfejk
 git clone --branch prod git@github.com:00200200/HackNation2026.git /opt/faktczyfejk
 cd /opt/faktczyfejk
-printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nPERPLEXITY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" > .env
+printf 'DOMAIN=faktczyfejk.pl\nCOMPOSE_FILE=compose.yaml:compose.prod.yaml\nANTHROPIC_API_KEY=\nPRAWDOWID_MODEL=\nPERPLEXITY_API_KEY=\nTAVILY_API_KEY=\nGOOGLE_FACTCHECK_API_KEY=\nEUVSDISINFO_API_KEY=\nPOSTGRES_DB=prawdowid\nPOSTGRES_USER=prawdowid\nPOSTGRES_PASSWORD=%s\nPRAWDOWID_ADMIN_TOKEN=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 32)" > .env
 chmod 600 .env
-nano .env      # paste the keys after ANTHROPIC_API_KEY=, PERPLEXITY_API_KEY= and the others you have
+nano .env      # paste the keys after ANTHROPIC_API_KEY=, PERPLEXITY_API_KEY= (or TAVILY_API_KEY=) and the others you have
 ```
 
-The evidence keys matter as much as the model key: without `PERPLEXITY_API_KEY` (web search; the
-default provider since 2026-11-22, `PRAWDOWID_SEARCH_PROVIDER=tavily` with `TAVILY_API_KEY` is the
-alternative), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` every source lookup fails,
-`/health` still answers, and every checkable claim ends as "nie sprawdzono". `compose.yaml`
-forwards all three to the backend.
+The evidence keys matter as much as the model key: without both `PERPLEXITY_API_KEY` and `TAVILY_API_KEY` (web search; Tavily is only the fallback), `GOOGLE_FACTCHECK_API_KEY` and `EUVSDISINFO_API_KEY` the keyed lookups fail and
+`/health` still answers. The www.gov.pl site search (no key) and the local corpus still run, and a
+decisive verdict from either is kept; otherwise the claim is `nie sprawdzono` and an answer where every
+claim ended that way is a technical error ("Nie mogę teraz sprawdzić ..."). So a successful check does
+not show the keys are set: verify the provider configuration separately.
+`compose.yaml` forwards these keys to the backend.
 
 The database password is generated on the server and never leaves it; hex keeps it safe inside
 the `DATABASE_URL` that Compose builds for the backend. `COMPOSE_FILE` makes every
 `docker compose` command in `/opt/faktczyfejk` load both Compose files. Empty `PRAWDOWID_MODEL`
 means the default model. `get.docker.com` is Docker's install script; Docker recommends its apt
 repository for long-lived production hosts: https://docs.docker.com/engine/install/ubuntu/.
+
+`PRAWDOWID_ADMIN_TOKEN` is generated the same way as the password. It switches on the moderator
+queue (scenario H, [privacy.md](privacy.md#moderator-cases)) and is the bearer token that reads it,
+so give it only to the moderator the administrator names. With it empty, no check is filed and no
+answer mentions a moderator, so the eval's `moderator_loop` fails. In `/opt/faktczyfejk`:
+
+```bash
+# Only on a server set up before the queue existed: add the token and restart the backend.
+printf 'PRAWDOWID_ADMIN_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env && docker compose up -d
+# Read the queue: a JSON list, the most asked case first.
+TOKEN=$(sed -n 's/^PRAWDOWID_ADMIN_TOKEN=//p' .env)
+curl -fsS -H "Authorization: Bearer $TOKEN" https://DOMAIN/api/cases
+```
 
 If you turn on the provider's firewall, allow 22/tcp, 80/tcp, 443/tcp and 443/udp, and on a
 stateless one (OVHcloud Edge Network Firewall) also "TCP established", or the server's own outgoing
@@ -177,6 +191,85 @@ and run one check. On the server,
 `docker compose logs frontend | grep 'POST /api/checks' | tail -n 3` must show your public IPv4
 address, not a `172.x` one: that is the address the backend rate limit counts.
 
+## 7. Discord bot (optional second channel)
+
+The `discord` service in `compose.yaml` runs `python -m prawdowid.discord_bot` from the same image
+as the backend and calls `http://backend:8000/api/checks` with `X-Channel: discord`. It needs only
+two lines in the server's `.env`: `COMPOSE_PROFILES=discord` and `DISCORD_BOT_TOKEN`. No compose
+change, no extra key (it never talks to Anthropic itself), no open port. Nobody has run it against
+real Discord yet (UNCONFIRMED until step E below passes), and the token is created by a person,
+never by an agent or a script.
+
+**A. Create the application and the bot** (Discord account, the account that owns the bot):
+
+1. Open https://discord.com/developers/applications, **New Application**, name it (for example
+   "Prawdowid"), accept the terms.
+2. **General Information**: copy the **Application ID**. It is the `client_id` of the invite link.
+3. **Bot** tab: **Reset Token**, copy it once. Treat it like a password: it goes only into the
+   server's `.env`, never into the repository, a chat or a ticket. Leave all three **Privileged
+   Gateway Intents** off: the bot only answers slash commands and reads no messages. Switch
+   **Public Bot** on if people outside your own account are to add it.
+
+**B. Invite link.** Replace `APPLICATION_ID` with the number from step A.2:
+
+```
+https://discord.com/oauth2/authorize?client_id=APPLICATION_ID&scope=bot%20applications.commands&permissions=34816
+```
+
+Scopes: `bot` and `applications.commands` (the slash command). Permissions `34816` = Send Messages
+(2048) + Attach Files (32768); the bot attaches `odpowiedz.md` when an answer is too long for five
+messages. Open the link while signed in to Discord, choose a server where you have **Manage
+Server**, authorise. Use a test server first.
+
+**C. Server `.env`.** On the server, in `/opt/faktczyfejk`:
+
+```bash
+nano .env      # add the two lines below, keep the rest
+```
+
+```
+COMPOSE_PROFILES=discord
+DISCORD_BOT_TOKEN=paste-the-token-here
+```
+
+`.env` stays `chmod 600` and is never committed; deploys leave it alone.
+
+**D. Start it and read the log.** Do this by hand before the next promotion to `prod` (see the
+warning below):
+
+```bash
+cd /opt/faktczyfejk
+docker compose up -d --build discord
+docker compose logs --tail 30 discord
+```
+
+The log must show the bot logging in and connecting to the gateway, and no `LoginFailure` or
+traceback. `docker compose ps` must list `discord` as `running`. A wrong token ends the process
+with `LoginFailure: Improper token`; Docker then restarts the container three times (`restart: on-failure:3`) and gives up.
+
+**E. Test in Discord.** In the test server run `/sprawdz tekst:Warszawa jest stolicą Polski.` The
+first answer can take up to a minute. A new slash command can need a minute, or a restart of the
+Discord client (Ctrl+R), before it shows up. Check `docker compose logs backend | tail` for a
+line with `channel=discord`. Then run the same sentence in the web form: the verdict and sources
+must be identical when you ask within 30 minutes (the result cache returns the stored answer for the same text; it is empty after a restart or deploy, and an answer with a claim marked `nie sprawdzono` is not stored, so then a second run may differ).
+Only after that may the README and `docs/submission/description.md` say the bot was tested, and
+the invite link go into both.
+
+**Apply a change to the token or the profile:** edit `.env`, then `docker compose up -d` in
+`/opt/faktczyfejk` (a changed token recreates `discord`). **Switch the bot off:** remove the two
+lines and run `docker compose --profile discord rm -sf discord`.
+
+Warning: `deploy/pull-deploy.sh` runs `docker compose up -d --wait`. With `COMPOSE_PROFILES=discord`
+a bot that exits (missing or wrong token) makes that command fail, so a promotion to `prod` stops
+before the Caddy reload and the HTTPS check, is not recorded as deployed, and is retried every
+minute. The web channel keeps serving the new containers meanwhile. So put a verified token in
+`.env` first (D), and remove the profile line if the bot is not wanted any more.
+
+Limits of this channel: the bot calls the backend from its container, so all Discord users share
+one rate limit of 10 checks per minute (the backend counts per IP address); the 11th request in
+a minute is answered with the rate-limit notice in Discord. The bot sends no `X-Session-Id`, so a
+Discord user cannot delete their checks through the web form's "delete my data" (`docs/privacy.md`).
+
 ## Logs and status
 
 On the server, in `/opt/faktczyfejk`:
@@ -262,7 +355,9 @@ site block to `caddy/Caddyfile`, and point the domain's `A` records at the serve
 
 - Web server, API, database and logs: OVHcloud VPS in Limburg, Germany.
 - Corpus search embeddings: computed on the same server with a local model; no external service.
-- The text of each check goes to the Anthropic API for claim extraction.
+- The text of each check goes to the Anthropic API for claim extraction. The other processors
+  (Perplexity or Tavily, Google, EUvsDisinfo, www.gov.pl, and Discord when the bot runs, which #59 says it does not yet), their locations and the migration path to
+  an EU-processed model: [privacy.md](privacy.md#where-data-is-processed).
 
 ## Try the production setup locally
 

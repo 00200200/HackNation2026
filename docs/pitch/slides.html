@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>faktczyfejk – HackNation 2026</title>
+<!--
+  Render from this folder with Chrome 157 (the PDF metadata records HeadlessChrome/157 and Skia/PDF m157):
+  PDF:  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --no-pdf-header-footer
+          --allow-file-access-from-files --print-to-pdf=faktczyfejk-pitch.pdf "file://$PWD/slides.html"
+  PPTX: one screenshot per slide, N = 1..12, with the same Chrome and
+          --hide-scrollbars --allow-file-access-from-files --window-size=1920,1080 --screenshot=sN.png "file://$PWD/slides.html?s=N"
+        and the notes, the JSON list in <body data-notes> of
+          --headless --allow-file-access-from-files --dump-dom "file://$PWD/slides.html?notes"
+        then python-pptx 1.0.2, no project dependency (uvx --with python-pptx==1.0.2 python): the default template,
+        16:9 (12192000 x 6858000 EMU), layout 6 (blank), one full-slide picture per slide, that slide's text as its notes.
+        22.11 (second pass) the whole deck was rebuilt that way.
+-->
+<style>
+/* Figtree, SIL Open Font License 1.1 (OFL.txt in this folder), the same file as frontend/public/fonts/. */
+@font-face { font-family: "Figtree"; src: url("Figtree.woff2") format("woff2"); font-weight: 300 900; }
+@page { size: 1920px 1080px; margin: 0; }
+:root {
+  --red: #8a1c2f; --red-deep: #74172a; --ink: #1d1215; --muted: #5a4a4d; --line: #e7e5e5; --soft: #f6f5f5;
+  --weave: repeating-linear-gradient(0deg, rgba(0,0,0,.06) 0 1px, transparent 1px 3px),
+           repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #ddd; }
+body { font-family: "Figtree", sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.slide { width: 1920px; height: 1080px; position: relative; overflow: hidden; page-break-after: always; break-after: page; background: #fff; padding: 0 110px; }
+.slide.red { background-color: var(--red); background-image: var(--weave); color: #fff; }
+body.one .slide { display: none; } body.one .slide.on { display: block; }
+
+/* header and footer on every slide */
+.hd { position: absolute; top: 52px; left: 110px; right: 110px; display: flex; justify-content: space-between; align-items: center; font-size: 24px; font-weight: 700; }
+.hd .brand { display: flex; align-items: center; gap: 14px; }
+.hd .brand svg { width: 46px; height: 46px; }
+.hd .ev { text-align: right; line-height: 1.25; }
+.hd .ev span { display: block; font-weight: 500; opacity: .8; font-size: 20px; }
+.ft { position: absolute; bottom: 44px; left: 110px; right: 110px; display: flex; justify-content: space-between; font-size: 20px; color: var(--muted); }
+.red .ft { color: rgba(255,255,255,.75); }
+.ft .n { font-variant-numeric: tabular-nums; }
+
+h1, h2 { margin: 0; letter-spacing: -.035em; }
+h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
+.lede { font-size: 34px; line-height: 1.35; font-weight: 500; max-width: 1150px; }
+.muted { color: var(--muted); }
+.red .muted { color: rgba(255,255,255,.8); }
+
+/* giant word with outlined copies */
+.giant { font-weight: 900; letter-spacing: -.05em; line-height: .84; white-space: nowrap; }
+.giant .o { color: transparent; -webkit-text-stroke: 3px rgba(255,255,255,.6); }
+.giant .o2 { color: transparent; -webkit-text-stroke: 3px rgba(255,255,255,.3); }
+.giant.ink .o { -webkit-text-stroke-color: rgba(138,28,47,.55); }
+.giant.ink .o2 { -webkit-text-stroke-color: rgba(138,28,47,.25); }
+
+/* white magnifier */
+.lens { position: absolute; right: 110px; bottom: 110px; width: 210px; color: #fff; filter: drop-shadow(0 14px 24px rgba(0,0,0,.3)); }
+
+/* pills and chips */
+.pill { display: inline-block; padding: 12px 26px; border: 2px solid rgba(255,255,255,.75); border-radius: 999px; font-size: 26px; font-weight: 600; margin: 0 12px 12px 0; }
+.chip { display: inline-block; padding: 10px 26px; border-radius: 999px; font-weight: 800; font-size: 30px; }
+.c-ok { background: #127a4b; color: #fff; } .c-false { background: #b0162f; color: #fff; }
+.c-mis { background: #fdf0dc; color: #8a4106; } .c-nei { background: #e3e6eb; color: #2e3848; }
+.c-nv { background: #fff; color: #2e3848; box-shadow: inset 0 0 0 3px #8a93a3; }
+
+.card { background: var(--soft); border-radius: 28px; padding: 40px 44px; }
+.red .card { background: rgba(255,255,255,.1); }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+.card h3 { margin: 0 0 14px; font-size: 38px; letter-spacing: -.02em; }
+.card p { margin: 0; font-size: 26px; line-height: 1.35; color: var(--muted); }
+.red .card p { color: rgba(255,255,255,.82); }
+.card .k { font-size: 22px; font-weight: 800; letter-spacing: .02em; color: var(--red); margin-bottom: 12px; }
+.card .rest { margin-top: 16px; font-size: 22px; }
+.red .card .rest { color: rgba(255,255,255,.68); }
+.risks .card { padding: 30px 36px; }
+.users .card { padding: 48px 52px; }
+.users .card p { font-size: 28px; }
+.nw { white-space: nowrap; }
+
+.bubble { max-width: 980px; border-radius: 36px; padding: 34px 42px; font-size: 34px; line-height: 1.35; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
+.bubble .who { font-size: 22px; font-weight: 700; opacity: .75; margin-bottom: 8px; }
+.b-user { background: #fff; color: var(--ink); border-bottom-right-radius: 10px; margin-left: auto; }
+.b-bot { background: var(--ink); color: #fff; border-bottom-left-radius: 10px; }
+
+.big { white-space: nowrap; font-size: 128px; font-weight: 900; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+.metric { border-top: 4px solid var(--ink); padding-top: 22px; }
+.metric p { margin: 12px 0 0; font-size: 26px; color: var(--muted); line-height: 1.3; }
+.small { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 48px; row-gap: 24px; }
+.small div { border-top: 2px solid var(--line); padding-top: 12px; display: flex; align-items: baseline; gap: 18px; }
+.small b { font-size: 44px; font-weight: 900; letter-spacing: -.03em; font-variant-numeric: tabular-nums; min-width: 96px; }
+.small span { font-size: 22px; line-height: 1.3; color: var(--muted); }
+
+.status { display: grid; gap: 30px; }
+.status p { margin: 0; font-size: 28px; line-height: 1.35; color: var(--muted); }
+.status b { color: var(--ink); }
+.tag { display: inline-block; font-size: 20px; font-weight: 800; padding: 6px 16px; border-radius: 999px; margin-bottom: 8px; }
+.t-on { background: #127a4b; color: #fff; } .t-off { background: #e3e6eb; color: #2e3848; }
+
+.flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 22px; align-items: stretch; }
+.step { border: 2px solid var(--line); border-radius: 26px; padding: 30px 28px; position: relative; }
+.step .k { font-size: 22px; font-weight: 800; color: var(--red); }
+.step h3 { margin: 10px 0 10px; font-size: 32px; line-height: 1.1; letter-spacing: -.02em; }
+.step p { margin: 0; font-size: 22px; line-height: 1.35; color: var(--muted); }
+.step.code { background: var(--red); background-image: var(--weave); border-color: var(--red); color: #fff; }
+.step.code .k, .step.code p { color: rgba(255,255,255,.85); }
+
+/* Modern magnifier: a glass lens over the giant word that really enlarges it, thin white rim, capsule handle */
+.glass { position: absolute; border-radius: 50%; overflow: hidden;
+  background-color: #9a2236; background-image: var(--weave);
+  box-shadow: inset 0 0 0 9px rgba(255,255,255,.96), inset 0 0 0 11px rgba(0,0,0,.12), inset 0 18px 40px rgba(0,0,0,.28), 0 30px 70px rgba(0,0,0,.38); }
+.glass .inner { position: absolute; color: #fff; }
+.glass::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(120% 80% at 30% 18%, rgba(255,255,255,.32), rgba(255,255,255,.06) 38%, transparent 55%),
+              radial-gradient(60% 40% at 72% 85%, rgba(255,255,255,.12), transparent 70%); }
+.handle { position: absolute; width: 58px; height: 250px; border-radius: 29px; transform-origin: top center;
+  background: linear-gradient(90deg, #e9e2e2, #ffffff 45%, #d8cfd0); box-shadow: 0 24px 50px rgba(0,0,0,.35); }
+.handle::before { content: ""; position: absolute; left: 13px; top: -26px; width: 32px; height: 40px; border-radius: 10px; background: #f4efef; }
+</style>
+</head>
+<body>
+
+<!-- 1. Title -->
+<section class="slide red" id="s1">
+  <div class="hd"><div class="brand"><svg viewBox="0 0 200 200"><rect width="200" height="200" rx="44" fill="#fff"/><path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#8A1C2F" stroke-width="27" stroke-linejoin="round"/><rect x="86.5" y="154" width="27" height="28" fill="#8A1C2F"/><g transform="translate(98 60) rotate(-12) scale(0.95)"><path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#1D1215"/><path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#1D1215"/><path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#1D1215"/><path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#1D1215"/></g></svg>faktczyfejk.pl</div>
+    <div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <div style="position:absolute; top:170px; left:110px; right:110px; display:flex; justify-content:space-between; font-size:22px; font-weight:700; letter-spacing:.02em; opacity:.85">
+    <span>MICHAŁ FURGAŁA</span><span>ŁUKASZ LENKIEWICZ</span><span>DOMINIK GALUS</span></div>
+  <div class="giant" style="position:absolute; left:100px; top:290px; font-size:330px">
+    <div>faktczyfejk</div><div class="o">faktczyfejk</div><div class="o2">faktczyfejk</div></div>
+  <div style="position:absolute; left:110px; bottom:110px; display:flex; align-items:center; gap:28px"><p style="margin:0; font-size:44px; font-weight:700; letter-spacing:-.01em; background-color:var(--red); background-image:var(--weave); padding-right:8px">Sprawdź, zanim podasz dalej.</p><span style="font-size:40px; font-weight:800; background:#fff; color:var(--red); border-radius:999px; padding:10px 34px">faktczyfejk.pl</span></div>
+  <div class="handle" style="left:1519px; top:554px; transform: rotate(-45deg)"></div>
+  <div class="glass" style="left:1195px; top:230px; width:400px; height:400px"><div class="inner giant" style="left:-1095px; top:60px; font-size:330px; transform: scale(1.4); transform-origin:1295px 140px">faktczyfejk</div></div>
+</section>
+
+<!-- 2. Problem -->
+<section class="slide" id="s2">
+  <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <div style="position:absolute; top:190px; left:110px; right:110px; display:grid; grid-template-columns: 1.15fr 1fr; gap:80px">
+    <p class="lede" style="font-size:50px; font-weight:700; line-height:1.18; margin:0">Fałszywa wiadomość z czatu rodzinnego idzie dalej, zanim ktokolwiek ją sprawdzi.</p>
+    <div style="display:grid; gap:22px">
+      <div class="card"><h3>Nie wiadomo, komu ufać</h3><p>Zrzut, link, „przekaż dalej”. Źródła nie widać.</p></div>
+      <div class="card"><h3>Sprawdzanie zajmuje czas</h3><p>Fact-checki są, ale trzeba wiedzieć, gdzie szukać.</p></div>
+      <div class="card"><h3>Chatbot też zmyśla</h3><p>Płynna odpowiedź to jeszcze nie dowód.</p></div>
+    </div>
+  </div>
+  <div class="giant" style="position:absolute; left:96px; bottom:-60px; font-size:360px; color:var(--red)">Problem</div>
+  <div class="ft" style="bottom:auto; top:1000px; justify-content:flex-end"><span class="n">02 / 12</span></div>
+</section>
+
+<!-- 3. Users -->
+<section class="slide" id="s3">
+  <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px">Dla kogo.</h2>
+  <div class="users" style="position:absolute; top:380px; left:110px; right:110px; display:grid; grid-template-columns: 1fr 1fr; gap:40px">
+    <div class="card"><div class="k">Obywatel, także o niskich kompetencjach cyfrowych</div><h3>Nie wie, czy podać wiadomość dalej</h3><p>Nie musi znać się na technologii: wkleja tekst albo link, bez konta i za darmo. Odpowiedź zaczyna się od „Tak.”, „Nie.” albo „Nie udało mi się potwierdzić tej informacji.”, a pod nią są źródła z cytatem, jeśli je znaleźliśmy, i to, czego nie ustaliliśmy. Ostatnie słowo ma czytelnik.</p></div>
+    <div class="card"><div class="k">Analityk lub moderator MSZ</div><h3>Chce wiedzieć, skąd wzięła się ocena</h3><p>Każde sprawdzenie trafia do dziennika: pytanie, źródła, wynik, czas, koszt i zdarzenia bezpieczeństwa. Pętlę moderatora dla powtarzających się pytań bez odpowiedzi dopiero budujemy.</p></div>
+  </div>
+  <div class="ft"><span>Odbiorcy według zadania MSZ (punkt 3) · badań z użytkownikami nie prowadziliśmy</span><span class="n">03 / 12</span></div>
+</section>
+
+<!-- 4. How we answer -->
+<section class="slide red" id="s4">
+  <div class="hd"><div class="brand">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px; width:1700px">Odpowiadamy jak człowiek. Z przypisem.</h2>
+  <div style="position:absolute; top:430px; left:110px; right:110px; display:grid; gap:30px">
+    <div class="bubble b-user" style="max-width:1050px"><div class="who">Wiadomość od użytkownika</div>Czy Wrocław był jedynym miastem w Polsce, w którym <span class="nw">65-latkowie</span> jeździli komunikacją miejską za darmo?</div>
+    <div class="bubble b-bot"><div class="who">Wzór odpowiedzi</div><b>Nie.</b> Według weryfikacji Demagoga Wrocław oferował takie przejazdy, ale nie był jedynym miastem.<div style="font-size:24px; opacity:.75; margin-top:14px">Źródło: Demagog, przez Google Fact Check Tools</div></div>
+  </div>
+  <div class="ft"><span>Pytanie pochodzi z przykładów organizatora, a odpowiedź jest wzorem w ich formacie: faktczyfejk.pl jej nie udzielił.</span><span class="n">04 / 12</span></div>
+</section>
+
+<!-- 5. Verdicts -->
+<section class="slide" id="s5">
+  <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px">Pięć ocen. I „nie wiem”, gdy brak dowodów.</h2>
+  <div style="position:absolute; top:360px; left:110px; right:110px; display:grid; grid-template-columns: 520px 1fr; row-gap:34px; align-items:center; font-size:32px">
+    <span><span class="chip c-ok">potwierdzone</span></span><span>„Tak.” Wiarygodne źródła mówią to samo.</span>
+    <span><span class="chip c-false">fałszywe</span></span><span>„Nie.” Źródła mówią coś przeciwnego.</span>
+    <span><span class="chip c-mis">wprowadzające w błąd</span></span><span>Fakty się zgadzają, ale bez kontekstu.</span>
+    <span><span class="chip c-nei">brak wystarczających dowodów</span></span><span>„Nie udało mi się potwierdzić tej informacji.”</span>
+    <span><span class="chip c-nv">nie podlega weryfikacji</span></span><span>Opinia, prognoza, pytanie bez faktu.</span>
+  </div>
+  <p class="muted" style="position:absolute; top:850px; left:110px; max-width:1500px; margin:0; font-size:26px; line-height:1.35; text-wrap:balance">Osobno i nigdy jako ocena: „nie sprawdzono” (awaria źródła albo koniec czasu), błąd techniczny, strona, której nie da się sprawdzić, i prośba o doprecyzowanie.</p>
+  <div class="ft"><span>Format odpowiedzi według przykładów organizatora</span><span class="n">05 / 12</span></div>
+</section>
+
+<!-- 6. How it works -->
+<section class="slide" id="s6">
+  <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px">Model czyta. Werdykt ustala kod.</h2>
+  <div class="flow" style="position:absolute; top:400px; left:110px; right:110px">
+    <div class="step"><div class="k">1</div><h3>Tekst albo link</h3><p>Link pobieramy bezpiecznie i traktujemy jak zwykłą treść.</p></div>
+    <div class="step"><div class="k">2</div><h3>Twierdzenia</h3><p>Model wyodrębnia zdania, które da się sprawdzić. Opinie odkłada.</p></div>
+    <div class="step"><div class="k">3</div><h3>Źródła równolegle</h3><p>Google Fact Check, gov.pl, nasz korpus 1158 dokumentów, wyszukiwarka po wybranych domenach. EUvsDisinfo tylko jako kontekst.</p></div>
+    <div class="step"><div class="k">4</div><h3>Cytat ze źródła</h3><p>Model wskazuje cytat, a kod sprawdza go dosłownie, zanim stanie się dowodem.</p></div>
+    <div class="step code"><div class="k">5</div><h3>Werdykt z reguł</h3><p>Ocenę wyznacza kod z dowodów. Brak dowodów to „nie wiem”.</p></div>
+  </div>
+  <div class="ft"><span>Architektura: docs/adr/0001, docs/submission/architecture.md</span><span class="n">06 / 12</span></div>
+</section>
+
+<!-- 7. Risks -->
+<section class="slide red" id="s7">
+  <div class="hd"><div class="brand">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px; width:1500px">Ryzyka i zabezpieczenia.</h2>
+  <div class="grid3 risks" style="position:absolute; top:320px; left:110px; right:110px">
+    <div class="card"><h3>Halucynacje</h3><p>Cytat jest dowodem tylko wtedy, gdy kod znajdzie go w źródle słowo w słowo.</p><p class="rest">Zostaje: cytat może być w źródle i mimo to nie wspierać twierdzenia.</p></div>
+    <div class="card"><h3>Stronniczość źródeł</h3><p>Teksty jednego wydawcy, z tym samym cytatem albo od tej samej agencji liczymy jako jedno potwierdzenie.</p><p class="rest">Zostaje: listę domen wybrał zespół, bez niezależnego audytu.</p></div>
+    <div class="card"><h3>Prywatność</h3><p>PESEL, dowód, paszport, telefon, e-mail, konta i karty maskujemy, zanim tekst trafi do modelu i do logów.</p><p class="rest">Zostaje: imion i adresów nie maskujemy.</p></div>
+    <div class="card"><h3>Prompt injection</h3><p>Wzorce w kodzie i flaga modelu wyłapują ukryte polecenia. Traktujemy je jak dane i zapisujemy zdarzenie.</p><p class="rest">Zostaje: wzorce znają tylko typowe sformułowania, a we wszystkich 7 przypadkach testu polecenie było we wklejonym tekście.</p></div>
+    <div class="card"><h3>Dostępność</h3><p>Gdy dowodów brak, bo padło źródło zdolne rozstrzygnąć albo czas minął przed odpowiedzią, pokazujemy <span class="nw">„nie sprawdzono”</span> albo błąd techniczny.</p><p class="rest">Zostaje: nie ma zapasowego dostawcy ani zmierzonej przepustowości.</p></div>
+    <div class="card"><h3>Nadużycia</h3><p>Jeden adres IP może wysłać najwyżej 10 sprawdzeń na minutę.</p><p class="rest">Zostaje: limit na adres IP nie zatrzyma wielu klientów naraz ani nie ogranicza wydatków.</p></div>
+  </div>
+  <div class="ft"><span>Pełna lista z miejscami w kodzie: docs/submission/risks.md</span><span class="n">07 / 12</span></div>
+</section>
+
+<!-- 8. Channels -->
+<section class="slide" id="s8">
+  <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px; width:640px">Strona działa dziś.</h2>
+  <div class="status" style="position:absolute; top:400px; left:110px; width:620px">
+    <p><span class="tag t-on">działa</span><br><b>Strona WWW</b>: faktczyfejk.pl, bez konta, za darmo.</p>
+    <p><span class="tag t-off">czeka na wdrożenie</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, to samo API co strona. Ocenę fact-checkera i&nbsp;fragment z&nbsp;wyszukiwarki pokazuje jeszcze bez podpisu.</p>
+    <p><span class="tag t-off">kod gotowy</span><br><b>Discord /sprawdz</b>: to samo API. Wdrożenie czeka, a bot nie był jeszcze uruchomiony na prawdziwym Discordzie.</p>
+  </div>
+  <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; box-shadow:0 30px 80px rgba(29,18,21,.25); border:1px solid var(--line)">
+  <div class="ft"><span>Zrzut strony głównej z kodu integration/r2, uruchomionej lokalnie 22.11.2026 · stan kanałów na 22.11.2026</span><span class="n">08 / 12</span></div>
+</section>
+
+<!-- 9. Results -->
+<section class="slide" id="s9">
+  <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px">Nasz test, progi jury.</h2>
+  <div style="position:absolute; top:330px; left:110px; right:110px; display:grid; grid-template-columns: repeat(4, 1fr); gap:48px">
+    <div class="metric"><div class="big">0,80</div><p>Trafność ocen, macro-F1 (cel&nbsp;≥&nbsp;0,75). 42&nbsp;etykiety to oceny Demagoga, które produkt może przejąć</p></div>
+    <div class="metric"><div class="big">17,8 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
+    <div class="metric"><div class="big">0,92</div><p>Abstencja na 12 przypadkach: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
+    <div class="metric"><div class="big">4,27 $</div><p>Koszt modeli za 100 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
+  </div>
+  <div class="small" style="position:absolute; top:700px; left:110px; right:110px">
+    <div><b>1,00</b><span>Pokrycie cytatami, przy ocenach merytorycznych (cel&nbsp;≥&nbsp;0,95)</span></div>
+    <div><b>1,00</b><span>Poprawność cytatów: tylko czy cytat z&nbsp;korpusu jest w&nbsp;źródle dosłownie, nie czy wspiera twierdzenie (cel&nbsp;≥&nbsp;0,85)</span></div>
+    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7&nbsp;przypadków we wklejonym tekście, 3&nbsp;z&nbsp;nich nasze wzorce znają dosłownie (cel&nbsp;≥&nbsp;0,90)</span></div>
+    <div><b>1,00</b><span>Zgodność kanałów: 6&nbsp;przypadków, API i&nbsp;klient API bota; bot dostał wynik z&nbsp;pamięci podręcznej (cel 1,00)</span></div>
+    <div><b style="color:var(--red)">0,97</b><span>End-to-end (cel 1,00): nie przeszły J01 (awaria Fact Check) i A15 (opinia)</span></div>
+    <div><b style="color:var(--red)">—</b><span>Pętla moderatora: zbudowana (#79), zmierzymy ją w kolejnym przebiegu</span></div>
+  </div>
+  <div class="ft"><span>Nasz zestaw, pełny przebieg, 75 przypadków · commit ca48b84 · 22.11.2026 · evals/results/HISTORY.md · pominięte: 11 z poleceniem na stronie (brak publicznego adresu)</span><span class="n">09 / 12</span></div>
+</section>
+
+<!-- 10. Deployment -->
+<section class="slide red" id="s10">
+  <div class="hd"><div class="brand">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px; width:1300px">Zbudowane pod wdrożenie.</h2>
+  <div class="grid3" style="position:absolute; top:430px; left:110px; right:110px">
+    <div class="card"><h3>Gdzie są dane</h3><p>Serwer w Niemczech (OVHcloud), HTTPS. Poza EOG: model (Anthropic) i wyszukiwarka (Tavily). Google, EUvsDisinfo i&nbsp;gov.pl nie podają, gdzie przetwarzają dane.</p></div>
+    <div class="card"><h3>Bez uzależnienia</h3><p>Model każdego kroku wybiera się zmienną środowiskową (PydanticAI). Inny dostawca wymaga jeszcze swojego pakietu i klucza. Każde źródło ma własny limit czasu.</p></div>
+    <div class="card"><h3>Źródła urzędowe</h3><p>Korpus 1158 dokumentów: gov.pl, CERT Polska, Policja, Sejm, IMGW, Odyseusz, GUS. Oceny <span class="nw">fact-checkerów</span> przez Google Fact Check Tools. Lista źródeł z&nbsp;licencjami jest na stronie&nbsp;/zrodla.</p></div>
+  </div>
+  <div class="ft"><span>docs/deploy.md, docs/corpus.md · miejsca przetwarzania: tabela dostawców w PR #124 · stan na 22.11.2026</span><span class="n">10 / 12</span></div>
+</section>
+
+<!-- 11. Next -->
+<section class="slide" id="s11">
+  <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <h2 style="position:absolute; top:170px; left:110px">Co dalej.</h2>
+  <div class="grid3" style="position:absolute; top:400px; left:110px; right:110px">
+    <div class="card"><h3>Pętla moderatora</h3><p>Gotowa w kodzie: powtarzające się pytania bez odpowiedzi trafiają jako jedna sprawa do moderatora, a odpowiedź mówi o przekazaniu dopiero po zapisaniu sprawy.</p></div>
+    <div class="card"><h3>Trafniejsze oceny</h3><p>W teście najczęściej myliliśmy „fałszywe” z „wprowadzającymi w&nbsp;błąd”. Do tego korpus odświeżany według harmonogramu.</p></div>
+    <div class="card"><h3>Baza incydentów MSZ</h3><p>Dopasowanie do znanych narracji, zawsze jako kontekst, nigdy jako werdykt.</p></div>
+  </div>
+  <div class="ft"><span>Plan na teraz i na czas po hackathonie</span><span class="n">11 / 12</span></div>
+</section>
+
+<!-- 12. Close -->
+<section class="slide red" id="s12">
+  <div class="hd"><div class="brand">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
+  <div style="position:absolute; top:250px; left:110px">
+    <h1 style="font-size:150px; font-weight:900; line-height:.95">Fakt ma<br>przypis.</h1>
+    <p style="font-size:40px; font-weight:600; margin:40px 0 0">Dziękujemy. Sprawdź sam: faktczyfejk.pl</p>
+    <p style="font-size:24px; margin:70px 0 0; font-weight:700; letter-spacing:.02em; opacity:.85">MICHAŁ FURGAŁA &nbsp;&nbsp; ŁUKASZ LENKIEWICZ &nbsp;&nbsp; DOMINIK GALUS</p>
+    <p style="font-size:24px; margin:16px 0 0; opacity:.8">Kod: github.com/00200200/HackNation2026</p>
+  </div>
+  <div style="position:absolute; right:150px; top:250px; background:#fff; border-radius:32px; padding:28px; text-align:center; color:var(--ink)">
+    <img src="qr.svg" alt="" style="width:400px; display:block">
+    <div style="font-size:26px; font-weight:800; margin-top:10px">faktczyfejk.pl</div>
+  </div>
+  <svg class="lens" viewBox="0 0 160 160" style="width:200px; bottom:60px; right:110px"><defs><radialGradient id="gl" cx="32%" cy="25%" r="75%"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".45" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></radialGradient><linearGradient id="hd" x1="0" x2="1"><stop offset="0" stop-color="#e9e2e2"/><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#d8cfd0"/></linearGradient></defs><g transform="rotate(-45 87 87)"><rect x="75" y="98" width="24" height="12" rx="4" fill="#f4efef"/><rect x="72" y="106" width="30" height="64" rx="15" fill="url(#hd)"/></g><circle cx="56" cy="56" r="44" fill="url(#gl)" stroke="#fff" stroke-width="7"/></svg>
+</section>
+
+<script>
+  const q = new URLSearchParams(location.search), p = q.get("s");
+  if (p) { document.body.classList.add("one"); document.getElementById("s" + p).classList.add("on"); }
+  // ?notes: each slide's text, whitespace collapsed, for the PPTX notes (read with --dump-dom).
+  if (q.has("notes")) document.body.dataset.notes = JSON.stringify(
+    [...document.querySelectorAll(".slide")].map((s) => s.innerText.split(/\s+/).join(" ").trim()));
+</script>
+</body>
+</html>

@@ -6,10 +6,14 @@
 - The transport resolves each host itself, refuses non-public addresses (loopback, private,
   link-local, reserved, multicast) and connects to the address it checked, so DNS rebinding
   between the check and the connection is not possible.
-- Bodies are read up to a byte cap; over it the fetch is refused.
-- robots.txt (RFC 9309): 200 is parsed; 401/403 disallow everything; other 4xx allow everything;
-  429, 5xx, network errors and oversized files refuse for now and are not cached. Parsed files
-  are cached for 24 h.
+- Bodies are read up to a byte cap; over it the fetch is refused (`TooLarge`).
+- robots.txt (RFC 9309) through Protego, the parser the corpus build uses: it matches `*` and `$`
+  (2.2.3), which Python's `RobotFileParser` (3.13) ignores. 200 is parsed (`Disallowed` when it
+  says no). Any other 4xx, 401 and 403 included, means the file is unavailable and sets no rules
+  (2.3.1.3); `RobotFileParser.read()` would disallow everything on 401/403. 429, 5xx, network
+  errors and oversized files mean we do not fetch for now (2.3.1.4, `RobotsUnreachable`) and are
+  not cached. Read files are cached for 24 h. A page that itself answers 401 or 403 is still
+  never fetched around.
 """
 
 import asyncio
@@ -20,10 +24,10 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
-from urllib.robotparser import RobotFileParser
 
 import httpcore2
 import httpx2
+from protego import Protego
 
 log = logging.getLogger("prawdowid")
 
@@ -37,6 +41,26 @@ ROBOTS_TTL_S = 24 * 3600  # RFC 9309: do not cache longer than 24 h
 
 class Blocked(Exception):
     """Refused before or while fetching: never sent, or the answer is not usable. No retry."""
+
+
+class NotAllowed(Blocked):
+    """The URL, or a redirect hop, fails the caller's `allow(url)` check."""
+
+
+class Disallowed(Blocked):
+    """robots.txt disallows the URL."""
+
+
+class RobotsUnreachable(Blocked):
+    """robots.txt could not be read (RFC 9309: assume disallow until it can)."""
+
+
+class TooLarge(Blocked):
+    """The body is over the caller's byte cap. `status` is the HTTP status it came with."""
+
+    def __init__(self, message: str, status: int = 200):
+        super().__init__(message)
+        self.status = status
 
 
 @dataclass
@@ -140,27 +164,27 @@ async def get(
     allow: Callable[[str], bool],
     max_bytes: int,
     robots: bool = True,
-    headers: dict[str, str] | None = None,
 ) -> Page:
-    """GET `url`. `headers` (content negotiation, never credentials) go only to hops on the first
-    URL's host. Raises Blocked when refused, httpx2.HTTPError on network errors."""
-    first_host = urlsplit(url).hostname
+    """GET `url`. Raises Blocked when refused, httpx2.HTTPError on network errors."""
     for _ in range(MAX_REDIRECTS + 1):
         _check_url(url, allow)
         if robots and not await robots_allow(url, http, allow):
-            raise Blocked(f"{url} disallowed by robots.txt")
-        same_host = urlsplit(url).hostname == first_host
-        async with http.stream(
-            "GET", url, headers=headers if same_host else None
-        ) as resp:
+            raise Disallowed(f"{url} disallowed by robots.txt")
+        async with http.stream("GET", url) as resp:
             if resp.has_redirect_location:  # a 3xx without Location falls through
-                url = urljoin(str(resp.url), resp.headers["location"])
+                location = resp.headers["location"]
+                try:
+                    url = urljoin(str(resp.url), location)
+                except (
+                    ValueError
+                ) as exc:  # e.g. "https://[host/x": refuse this hop only
+                    raise Blocked(f"malformed redirect {location!r}") from exc
                 continue
             body = bytearray()
             async for chunk in resp.aiter_bytes():
                 body += chunk
                 if len(body) > max_bytes:
-                    raise Blocked(f"{url} is over {max_bytes} bytes")
+                    raise TooLarge(f"{url} is over {max_bytes} bytes", resp.status_code)
             return Page(
                 url=str(resp.url),
                 status=resp.status_code,
@@ -172,7 +196,10 @@ async def get(
 
 
 def _check_url(url: str, allow: Callable[[str], bool]) -> None:
+    """The allowlist first: a hop that leaves it is `NotAllowed` whatever its scheme or port."""
     try:
+        if not allow(url):
+            raise NotAllowed(f"{url} is not allowlisted")
         parts = urlsplit(url)
         port = parts.port
     except ValueError as exc:
@@ -182,21 +209,20 @@ def _check_url(url: str, allow: Callable[[str], bool]) -> None:
         DEFAULT_PORTS[parts.scheme],
     ):
         raise Blocked(f"{url}: only http(s) on the default port")
-    if not allow(url):
-        raise Blocked(f"{url} is not allowlisted")
 
 
-_robots: dict[str, tuple[RobotFileParser, float]] = {}
+_robots: dict[str, tuple[Protego, float]] = {}
 
 
 async def robots_allow(
     url: str, http: httpx2.AsyncClient, allow: Callable[[str], bool]
 ) -> bool:
+    """Whether robots.txt lets us fetch `url`. Raises RobotsUnreachable when it cannot be read."""
     parts = urlsplit(url)
     origin = f"{parts.scheme}://{parts.netloc}"
     cached = _robots.get(origin)
     if cached and time.monotonic() - cached[1] < ROBOTS_TTL_S:
-        return cached[0].can_fetch(USER_AGENT, url)
+        return cached[0].can_fetch(url, USER_AGENT)
     try:
         page = await get(
             f"{origin}/robots.txt",
@@ -207,14 +233,11 @@ async def robots_allow(
         )
     except (Blocked, httpx2.HTTPError, httpx2.InvalidURL) as exc:
         log.warning("robots.txt %s unreadable, not fetching: %r", origin, exc)
-        return False
+        raise RobotsUnreachable(f"robots.txt of {origin} unreadable") from exc
     if page.status == 429 or page.status >= 500:
         log.warning("robots.txt %s: HTTP %d, not fetching", origin, page.status)
-        return False
-    parser = RobotFileParser()
-    if page.status in (401, 403):
-        parser.disallow_all = True
-    else:
-        parser.parse(page.text().splitlines() if page.status == 200 else [])
-    _robots[origin] = (parser, time.monotonic())
-    return parser.can_fetch(USER_AGENT, url)
+        raise RobotsUnreachable(f"robots.txt of {origin}: HTTP {page.status}")
+    # Any other answer than 200 (4xx, 401 and 403 too): unavailable, no rules.
+    rules = Protego.parse(page.text() if page.status == 200 else "")
+    _robots[origin] = (rules, time.monotonic())
+    return rules.can_fetch(url, USER_AGENT)

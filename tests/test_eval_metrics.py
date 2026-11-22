@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from evals import adapter, metrics
+from evals import adapter, metrics, run
 
 
 def resp(verdict, evidence=None, status="ok"):
@@ -47,6 +47,19 @@ def test_citation_correctness_needs_verbatim_quote():
     bad = resp("potwierdzone", [{"url": "https://a.pl", "quote": "w 2004 roku"}])
     assert metrics.citation_correctness([good, bad], corpus) == 0.5
     assert metrics.citation_correctness([good], None) is None
+
+
+def test_citation_correctness_scores_only_corpus_urls():
+    corpus = {"https://a.pl": "Polska przystąpiła do NATO w 1999 roku."}
+    web = resp(
+        "potwierdzone", [{"url": "https://web.pl/x", "quote": "cytat ze strony"}]
+    )
+    good = resp(
+        "potwierdzone", [{"url": "https://a.pl", "quote": "przystąpiła do NATO"}]
+    )
+    # A web page outside the corpus is unmeasured, not wrong.
+    assert metrics.citation_correctness([web, good], corpus) == 1.0
+    assert metrics.citation_correctness([web], corpus) is None
 
 
 def test_check_handles_unknown_and_both_directions():
@@ -111,6 +124,55 @@ def test_adapter_maps_check_result_to_eval_shape():
     )
 
 
+class FakeHttpResponse:
+    def __init__(self, headers):
+        self.headers = headers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return b'{"claims": []}'
+
+
+@pytest.mark.parametrize(
+    ("headers", "cached"), [({"X-Cache": "hit"}, True), ({}, False)]
+)
+def test_adapter_marks_an_answer_taken_from_the_result_cache(
+    monkeypatch, headers, cached
+):
+    monkeypatch.setenv("PRAWDOWID_URL", "https://product.test")
+    monkeypatch.setattr(
+        adapter._opener,
+        "open",
+        lambda request, timeout: FakeHttpResponse(headers),
+    )
+    assert adapter.ask({"text": "x"}, "web")["cached"] is cached
+
+
+def test_demo_channel_sends_the_request_of_the_czat_page(monkeypatch):
+    """PRAWDOWID_EXTRA_CHANNELS=demo (#116): a scenario G case also runs as the /czat demo
+    adapter, the web request with X-Channel: demo; Discord runs only when it is listed too."""
+    sent = []
+
+    def urlopen(request, timeout):
+        sent.append(request)
+        return FakeHttpResponse({})
+
+    monkeypatch.setenv("PRAWDOWID_URL", "http://product.test")
+    monkeypatch.setattr(adapter._opener, "open", urlopen)
+    monkeypatch.setattr(adapter, "CHANNELS", {"web", "demo"})
+    monkeypatch.setattr(adapter, "wait_turn", lambda: None)
+    case = {"id": "G1", "input": {"text": "x"}, "channels": ["web", "discord", "demo"]}
+    row = run.run_case(case)
+    assert [r["channel"] for r in row["runs"]] == ["web", "demo"]
+    # urllib keeps header names capitalised this way.
+    assert [r.get_header("X-channel") for r in sent] == ["web", "demo"]
+
+
 @pytest.mark.parametrize(
     "raw",
     [
@@ -121,3 +183,138 @@ def test_adapter_maps_check_result_to_eval_shape():
 )
 def test_text_the_user_sees_reaches_the_canary_check(raw):
     assert "CANARY-7" in json.dumps(adapter.to_eval_shape(raw))
+
+
+def test_citation_correctness_matches_a_url_written_another_way():
+    corpus = {"https://www.a.pl/x/": "Polska przystąpiła do NATO w 1999 roku."}
+    good = resp(
+        "potwierdzone", [{"url": "http://a.pl/x", "quote": "przystąpiła do NATO"}]
+    )
+    assert metrics.citation_correctness([good], corpus) == 1.0
+
+
+def test_citation_correctness_keeps_every_text_of_one_canonical_url():
+    # Two corpus records, one canonical URL, different text: a quote from either is correct, and
+    # the order of the records does not matter.
+    records = [
+        ("https://www.a.pl/x/", "Polska przystąpiła do NATO w 1999 roku."),
+        ("http://a.pl/x", "Polska przystąpiła do UE w 2004 roku."),
+    ]
+    evidence = [
+        {"url": "https://a.pl/x", "quote": "przystąpiła do NATO"},
+        {"url": "https://a.pl/x", "quote": "przystąpiła do UE"},
+    ]
+    wrong = [{"url": "https://a.pl/x", "quote": "w 2010 roku"}]
+    for corpus in (dict(records), dict(reversed(records))):
+        assert (
+            metrics.citation_correctness([resp("potwierdzone", evidence)], corpus)
+            == 1.0
+        )
+        both = [resp("potwierdzone", evidence), resp("potwierdzone", wrong)]
+        assert metrics.citation_correctness(both, corpus) == pytest.approx(2 / 3)
+
+
+@pytest.mark.parametrize(
+    ("echo", "scored"),
+    [("factcheck_api_unavailable", True), (None, False), ("llm_unavailable", False)],
+)
+def test_a_fault_case_is_scored_only_when_the_product_echoes_the_fault(
+    monkeypatch, echo, scored
+):
+    monkeypatch.setenv("PRAWDOWID_URL", "https://product.test")
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    headers = {"X-Eval-Fault-Applied": echo} if echo else {}
+    monkeypatch.setattr(
+        adapter._opener,
+        "open",
+        lambda request, timeout: FakeHttpResponse(headers),
+    )
+    payload = {"text": "x", "simulate": "factcheck_api_unavailable"}
+    if scored:
+        assert adapter.ask(payload, "web")["claims"] == []
+    else:
+        with pytest.raises(adapter.FaultNotApplied, match="not applied"):
+            adapter.ask(payload, "web")
+
+
+@pytest.mark.parametrize(
+    ("echo", "scored"), [(None, False), ("factcheck_api_unavailable", True)]
+)
+def test_an_http_error_of_a_fault_case_is_classified_by_the_echo(
+    monkeypatch, echo, scored
+):
+    """A 429 or 5xx without the echo never ran faulted: harness error, not a retried product error."""
+    monkeypatch.setenv("PRAWDOWID_URL", "https://product.test")
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    headers = {"X-Eval-Fault-Applied": echo} if echo else {}
+
+    def refuse(request, timeout):
+        raise adapter.urllib.error.HTTPError(request.full_url, 503, "x", headers, None)
+
+    monkeypatch.setattr(adapter._opener, "open", refuse)
+    payload = {"text": "x", "simulate": "factcheck_api_unavailable"}
+    expected = adapter.urllib.error.HTTPError if scored else adapter.FaultNotApplied
+    with pytest.raises(expected):
+        adapter.ask(payload, "web")
+
+
+def test_the_eval_token_is_not_forwarded_to_another_origin():
+    handler = adapter._SameOriginRedirects()
+    request = adapter.urllib.request.Request(
+        "https://product.test/api/checks", headers={"X-Eval-Token": "secret"}
+    )
+    args = (request, None, 302, "Found", {})
+    assert handler.redirect_request(*args, "https://evil.test/x") is None
+    same = handler.redirect_request(*args, "https://product.test/other")
+    assert same is not None and same.get_header("X-eval-token") == "secret"
+
+
+@pytest.mark.parametrize(
+    ("status", "echo", "scored"),
+    [(200, "factcheck_api_unavailable", True), (200, None, False), (429, None, False)],
+)
+def test_the_discord_path_reads_the_fault_echo_of_the_response_behind_the_answer(
+    monkeypatch, status, echo, scored
+):
+    seen = {}
+
+    def handler(request):
+        seen["fault"] = request.headers.get("X-Eval-Fault")
+        headers = {"X-Eval-Fault-Applied": echo} if echo else {}
+        body = {"status": "ok", "claims": []} if status == 200 else {"detail": "slow"}
+        return adapter.httpx2.Response(status, json=body, headers=headers)
+
+    real = adapter.httpx2.AsyncClient
+    monkeypatch.setattr(
+        adapter.httpx2,
+        "AsyncClient",
+        lambda **kw: real(transport=adapter.httpx2.MockTransport(handler), **kw),
+    )
+    monkeypatch.setenv("PRAWDOWID_URL", "https://product.test")
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    payload = {"text": "x", "simulate": "factcheck_api_unavailable"}
+    if scored:
+        assert adapter.ask(payload, "discord")["claims"] == []
+    else:
+        with pytest.raises(adapter.FaultNotApplied, match="not applied"):
+            adapter.ask(payload, "discord")
+    assert (
+        seen["fault"] == "factcheck_api_unavailable"
+    )  # the headers reach the API call
+
+
+def test_a_fixture_page_case_needs_the_served_hash_through_the_adapter():
+    shaped = adapter.to_eval_shape({"claims": [], "page": {"sha256": "ab"}})
+    assert shaped["page"] == {"sha256": "ab"}
+    row = {
+        "case": {"canary": "C", "page_fixture": "E07.html"},
+        "runs": [{"response": {"claims": []}, "error": None}],
+        "repeat": None,
+    }
+    assert run.stale_fixture(row)  # no hash served: not the local fixture
+
+
+def test_a_fault_case_without_the_eval_token_is_not_sent(monkeypatch):
+    monkeypatch.delenv("PRAWDOWID_EVAL_TOKEN", raising=False)
+    with pytest.raises(adapter.FaultNotApplied, match="PRAWDOWID_EVAL_TOKEN"):
+        adapter.fault_headers({"simulate": "llm_unavailable"})

@@ -3,6 +3,8 @@
 The committed evidence corpus (`corpus/evidence.jsonl`, built without any key from an audited
 catalogue of official sources and fact-checkers, searched by `prawdowid/corpus_search.py`) is
 described separately in [`docs/corpus.md`](corpus.md). This page covers web search and its cache.
+The web channel's page `/zrodla` lists both for anyone, from `GET /api/sources`
+(`prawdowid/sources.py`), which reads the catalogue, the corpus, `ALLOWLIST` and the lookups below.
 
 ## www.gov.pl site search (`prawdowid/govpl.py`)
 
@@ -18,34 +20,12 @@ Step 2 also searches www.gov.pl itself, next to Fact Check, EUvsDisinfo and web 
 | robots.txt | `User-Agent: * / Allow: /` (checked 2026-11-21). |
 | Licence | Public sector information; re-use under the Polish act on open data and re-use of public sector information (ustawa z 11.08.2021) and the gov.pl terms: **UNCONFIRMED**, nobody has checked the gov.pl terms yet. We quote short passages with a link, as for every other source. |
 
-Web search leaves `www.gov.pl` (and bare `gov.pl`) pages to this lookup while it is on, so the same
+Web search (Perplexity or Tavily) leaves `www.gov.pl` (and bare `gov.pl`) pages to this lookup while it is on, so the same
 page is not searched twice. The filter is on the host in our code, not Tavily's `exclude_domains`:
 Tavily drops a `www.` prefix, so excluding `www.gov.pl` there also dropped `sejm.gov.pl` and every
-other `*.gov.pl` site (tested 2026-11-21). While filtering, web search asks Tavily for twice the
+other `*.gov.pl` site (tested 2026-11-21). While filtering, web search asks the provider for twice the
 results (10) and keeps the first 5 left, since www.gov.pl pages can fill most of a result list. Other `*.gov.pl` sites (Sejm, GUS, PKW, NIK) are not
 covered by the gov.pl search and stay in web search.
-
-## Registers of law (`prawdowid/legal.py`)
-
-Step 2 also searches the registers of Polish and EU law for a claim about a law, regulation,
-directive, ban or obligation: only when the extraction model fills `legal_queries` (1 or 2 queries of
-act-title words), and only while `PRAWDOWID_LEGAL` is `1` (the default; `0` switches it off).
-
-| What | Polish acts (Dziennik Ustaw, Monitor Polski) | EU acts |
-|---|---|---|
-| Search | `GET https://api.sejm.gov.pl/eli/acts/search?title=<stems>&limit=20` (Sejm ELI API, no key) | CELLAR SPARQL `GET https://publications.europa.eu/webapi/rdf/sparql`: full-text search on the Polish titles of EU legislation (CELEX sector 3), with the newest consolidated version of each act (no key) |
-| Ranking (in code) | The act itself or its consolidated text in force first, then other acts, then amendments, corrections and consolidated texts no longer in force; newest first in each group; 3 acts kept | Acts of Parliament and Council first, amendments and corrections last, newest first; 3 acts kept |
-| Record | A Polish sentence built in code from the record: title, status, promulgation, entry into force, repeal or expiry. Link: the ISAP page | The same, with the CELEX number and the newest consolidated version. Link: the EUR-Lex page |
-| Act text | The best act in force: its ELI text PDF (`/eli/acts/<ELI>/text.pdf`, pypdf, up to 200 pages, 5 MB) | The best act in force: the Polish XHTML of its newest consolidated version, else of the act as published, via CELLAR content negotiation (`/resource/celex/<CELEX>`, `Accept-Language: pol`) |
-| Passages | Up to 5 pieces of the text (an article, or a part of a long one of at most 1,500 characters led by its number), picked by how many of the claim's word stems they hold. Rare stems weigh more and numbers count five times. They are appended after the record under "Fragmenty tekstu" | same |
-| Bounds | 7 s per call, one retry, 10 s per register for the search, 8 s per register for the text. A slow or failed register keeps the other one's acts. Our usual User-Agent, robots.txt respected | same |
-| On failure | A limitation naming the register that did not answer (ISAP, EUR-Lex, or both), never a verdict. A text that fails leaves the record without passages, with no limitation | same |
-| robots.txt | `api.sejm.gov.pl`: `User-agent: * / Allow: /` (checked 2026-11-22) | `publications.europa.eu` redirects to `op.europa.eu/robots.txt`, which does not disallow these paths (checked 2026-11-22) |
-| Licence | The acts: normative acts are not protected by copyright (art. 4 pt 1 of the Polish copyright act). The API's own terms: **UNCONFIRMED**. `api.sejm.gov.pl` (read 2026-11-22) states no licence or reuse conditions. The Sejm's reuse page and ISAP could not be read by a script (captcha, redirect loop) | EUR-Lex [legal notice](https://eur-lex.europa.eu/content/legal-notice/legal-notice.html) (read 2026-11-22): "EUR-Lex metadata is dedicated to the public domain" (CC0), and legal documents may be reused under Decision 2011/833/EU. That notice does not name CELLAR. The Publications Office [copyright page](https://op.europa.eu/en/web/about-us/legal-notices/publications-office-of-the-european-union-copyright) sends questions about CELLAR reuse to op-copyright@publications.europa.eu, so the CELLAR terms are **UNCONFIRMED** |
-
-We read the registers through their APIs because the human pages are closed to scripts.
-`isap.sejm.gov.pl` and `orka.sejm.gov.pl` disallow robots, and EUR-Lex answers our User-Agent
-with a challenge (HTTP 202). We never work around either.
 
 ## Web search
 
@@ -53,21 +33,35 @@ Web search (step 2b, `prawdowid/websearch.py`) only returns pages from the domai
 matches its own entry or the closest parent entry (`nik.gov.pl` falls under `gov.pl`). The list
 lives in `ALLOWLIST`; `tests/test_websearch.py` fails when a domain there is missing here.
 
-Every cached document has a title, publisher, publication date (`published_at`, found by
-trafilatura/htmldate, mostly in page metadata; falls back to the search provider's own
-`published_date` when the page carries none; on a page without date metadata it can come from a
-date written on the page, so it may be wrong there; pages with no date anywhere are skipped) and
-retrieval time (`fetched_at`). The per-document list goes to `corpus/manifest.jsonl` when the
-corpus is built with `uv run python -m prawdowid.corpus`.
-**The corpus is not built yet:** it needs `TAVILY_API_KEY`, which no one on the team has set yet.
-Search provider is now the **Perplexity Search API** (`perplexityai`, see `WORKLOG.md` Decisions,
-2026-11-22); it replaced Tavily (`/search`, #7, #8), which had replaced DuckDuckGo (`ddgs`) after it
-returned no results from our machine on 2026-11-21.
+Every cached document has a title, publisher, retrieval time (`fetched_at`) and, when one can be
+found, a publication date (`published_at`, found by trafilatura/htmldate, mostly in page metadata;
+falls back to the search provider's own `published_date` when the page carries none; on a page
+without date metadata it can come from a date written on the page, so it may be wrong there). A
+page with no date anywhere is kept with an empty `published_at`: the answer says "bez daty
+publikacji", the verdict lists it as a limitation and an undated source never makes the evidence
+"silna" (#95). The per-document list goes to `corpus/manifest.jsonl` when the corpus is built with
+`uv run python -m prawdowid.corpus`.
+**The corpus is not built yet:** it needs a search key (`PERPLEXITY_API_KEY` or `TAVILY_API_KEY`), which no one on the team has set yet.
+Search provider is **Perplexity** (Search API, `perplexityai` SDK, restricted to the allowlist with
+`search_domain_filter`, country PL, language pl) when `PERPLEXITY_API_KEY` is set, otherwise
+**Tavily** (`/search`, official API, see `WORKLOG.md` Decisions, #7, #8; `PRAWDOWID_SEARCH_PROVIDER=tavily`
+forces it). The `/zrodla` page names the active provider. Tavily replaced DuckDuckGo (`ddgs`), which returned no results from our machine on 2026-11-21.
 
-What we store (`prawdowid/cache.py`): metadata of every page (URL, title, publisher, dates,
-type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo.
-Full page text is stored only for a domain whose licence is confirmed (`licence` in `ALLOWLIST`);
-today none is, so no page text is archived. The pipeline uses the live text in memory for the
+Tavily results are cached per query (Perplexity results are not cached) (`prawdowid/search_cache.py`, #110) so reruns and repeated
+questions spend no credits: key = casefolded, whitespace-folded masked query + sorted domains +
+limit; TTL `PRAWDOWID_SEARCH_CACHE_TTL_S` (default 24 h, at most `RETENTION_DAYS`, 0 = off); at most
+2,000 entries, persisted in `corpus/search_cache.jsonl`. Failures and limit answers (HTTP 429, 432,
+433; the SDK raises `UsageLimitExceededError` or `ForbiddenError`) are never cached; after a limit
+answer no call is made for 60 s. Calls and hits are logged per lookup and counted in
+`search_cache.STATS` and `search_cache.track()`.
+
+What we store (`prawdowid/cache.py`): metadata of every page we read (URL, title, publisher, dates,
+type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo;
+never a search snippet of a page we could not read (only the search cache above keeps the provider's
+snippet, for its TTL).
+Full page text, and the ratings read from a fact-checker's markup (below), are stored only for a
+domain whose licence is confirmed (`licence` in `ALLOWLIST`); today none is, so no page text is
+archived. The pipeline uses the live text in memory for the
 current check only. Records older than 30 days (`RETENTION_DAYS`, by `fetched_at`) are never loaded
 and are dropped on every save, a new fetch of the same URL replaces the old record, `delete_document(url)` deletes one
 record and deleting the file deletes all. Until licences are confirmed the cache cannot serve as
@@ -75,8 +69,72 @@ the eval corpus for citation correctness, which needs the text.
 
 How pages are fetched (`prawdowid/safefetch.py`): every hop, redirects included, must be on the
 allowlist, use http(s) on the default port, resolve only to public IP addresses (the connection
-goes to the checked address) and be allowed by that host's robots.txt. A robots.txt answering 429,
-5xx or not at all means we do not fetch. We never get around a 401, 403, 429 or a bot challenge.
+goes to the checked address) and be allowed by that host's robots.txt, read with Protego (the
+parser the corpus build uses), which matches the `*` and `$` of RFC 9309; Python's
+`RobotFileParser` ignores them, so a rule such as pap.pl's `Disallow: /aktualnosci/index*` did not
+apply before. A robots.txt answering 429, 5xx or not at all means we do not fetch. Following RFC
+9309 (2.3.1.3), a robots.txt answering any other 4xx, 401 and 403 included, is unavailable and
+sets no rules (`RobotFileParser.read()` would treat 401 and 403 as "disallow everything"). The
+page itself must still answer 200: we never get around a 401, 403, 429 or a bot challenge, and never retry with
+another user agent. HTML is read with trafilatura, PDF with the link input's pypdf worker
+(`prawdowid/extract_worker.py`, a child process with page and memory ceilings); both stop at the
+same 2 MB cap and the same 8 s per page (`PAGE_BUDGET_S`).
+
+### A fact-checker's rating on its own page (#127)
+
+Fact-checkers publish their rating as schema.org `ClaimReview` markup (JSON-LD), the same data
+Google Fact Check Tools serves. On every HTML page of a `fact_check` domain we read, the markup is
+parsed with lxml (`websearch._claim_reviews`): JSON-LD as one object, a list or an `@graph`; a
+review whose `url` is another page is left out (a relative `url` is read against the page's
+address), and a block that does not parse is skipped. The rating (`reviewRating.alternateName`) and
+the reviewed claim (`claimReviewed`) become a rating fragment exactly like a Fact Check hit
+(`factcheck.review_fragment`), placed before the page text, so the judge reads the rating first and
+`judge.decide` maps it through `judge.RATINGS` only when the review is of the checked claim
+(`same_claim`). When a page rates several statements, we use the one whose reviewed claim shares
+the most words with the checked claim, the rule `factcheck.search_keys` applies to several Fact
+Check reviews under one URL. The page text that follows the rating in the same fragment is still
+the page's own text: only a quote of the rating line (or of the review's title alone) counts as the
+rating, and a quote of the page text keeps the judge's label, as on a page without markup
+(`judge._in_record`). When Fact Check returned a hit with a rating for the same page, that hit wins
+and the markup adds nothing; a hit without a rating takes the markup's rating, shown under the
+hit's publisher and review date. The markup matters because Fact Check often returns no review for
+the claim sentence (#100). #127 reports that 52 of the 55 Demagog pages that answered in the full
+eval on `ca48b84` (2026-11-22) carried the markup; the run's results file keeps no per-page data,
+so that count is UNCONFIRMED here. Official pages and PDFs are not searched for markup.
+
+### Search snippets of pages we cannot read (#95)
+
+When our own fetch cannot use an allowlisted page (the site answers 403, 429 or another 4xx, a
+5xx or nothing after the retry, its robots.txt cannot be read, it is slower than 8 s, over 2 MB,
+of another type, or has no readable text), the hit stays as evidence built only from what the search API returned for it: the provider's
+title (the snippet rules below are from Tavily's docs; Perplexity's snippet length is UNCONFIRMED) and `content` (up to three passages of about 500 characters copied from the page, joined by
+`[...]`, per the [search API docs](https://docs.tavily.com/documentation/api-reference/endpoint/search),
+read 2026-11-22), with the type and publisher from the allowlist, the provider's
+`published_date` or none, and the time of the search as `fetched_at`. Tavily calls that date its
+best estimate of when the page was published or last updated, so for a snippet it can be later
+than the original publication. Rules:
+
+- Nothing more is fetched for such a page: no retry, no other user agent, no proxy, and not
+  Tavily's `raw_content` (the full page through a third party would be getting around the block).
+- It is never saved, in the JSONL cache or in the database (`cache.store_document` refuses it).
+- Quotes are checked against the snippet like against any fragment, and the source is marked
+  `snippet_only` with the reason all the way to the answer: web and Discord show "fragment z
+  wyników wyszukiwarki; <reason>", premises and the justification say so, and the verdict lists
+  it as a limitation.
+- It refutes, adds context or stands in a conflict like a fetched page of the same type, alone
+  too when that type is reliable. To confirm, it stands alone only as a fact-checker's own
+  conclusion (#127): any other snippet (an official figure, a fact-checker relaying someone
+  else's number) needs a second independent origin, because without the rest of the page we
+  cannot see which year, place or study the sentence is about, and the answer says why the claim
+  is not confirmed (`judge.SNIPPET_ALONE`). A snippet never makes the evidence "silna": that needs
+  a reliable source we read ourselves and that carries a date.
+- No snippet either for a page that robots.txt disallows (the site opted out of crawlers, so we
+  do not use a search engine's copy), that is gone (404, 410), that redirects off the allowlist,
+  or that sits behind a login or payment wall (401, 402): its content is not public, and the brief
+  rules out paid databases.
+
+This uses only what the search API returns. Michał approved the rule on 2026-11-22 (`WORKLOG.md`,
+Decisions); the confirmation rule above refines it the same day (#127).
 
 Our own database (step 2c: local PostgreSQL, tables `documents` and `chunks`,
 schema in `db/migrations/`, compose service `sourcedb`, profile `sourcedb`, volume `sourcedb_data`) is **disabled in the pipeline** until the team
@@ -134,15 +192,6 @@ republish pages.
 | `eur-lex.europa.eu` | EUR-Lex, Urząd Publikacji UE | official EU law | EUR-Lex legal notice, UNCONFIRMED |
 | `nato.int` | NATO | official NATO statements | UNCONFIRMED |
 | `who.int` | Światowa Organizacja Zdrowia | official health data | UNCONFIRMED |
-| `policja.pl` | Policja | national police news and warnings | UNCONFIRMED |
-| `cert.pl` | CERT Polska (NASK) | national CSIRT, security warnings | UNCONFIRMED |
-| `imgw.pl` | IMGW-PIB | state weather, hydrological and Baltic warnings | UNCONFIRMED |
-| `portalpasazera.pl` | PKP Polskie Linie Kolejowe | `primary`: the rail network manager's own timetable and disruption notices (a state-owned company, not an office) | UNCONFIRMED |
-| `kgsok.pl` | Straż Ochrony Kolei | `primary`: railway guard of PKP PLK, its own notices | UNCONFIRMED |
-
-The team's list of crisis and safety pages (`corpus/seeds.txt`) is searched host by host when the
-corpus is built. Its `.gov.pl` hosts (Odyseusz, RCB, GDDKiA, ULC, UTK, GIOŚ, PAA, SAR, maritime
-offices, Wody Polskie) fall under `gov.pl`.
 
 ## Known-narrative database (`disinfo_database`)
 
@@ -153,14 +202,31 @@ narrative. It is context: the verdict rules never count it as a reliable source 
 |---|---|---|---|
 | `euvsdisinfo.eu` | EUvsDisinfo (ESDZ) | EEAS East StratCom Task Force disinformation cases | UNCONFIRMED |
 
-## Reliable secondary sources (`fact_check`, `news`)
+## Reliable secondary sources (`fact_check`, `news`) and media (`media`)
 
 | Domain | Publisher | Type | Why it qualifies | Licence (check) |
 |---|---|---|---|---|
 | `konkret24.tvn24.pl` | Konkret24 | `fact_check` | fact-checking desk of TVN24; membership UNCONFIRMED | UNCONFIRMED |
 | `fakenews.pl` | FakeNews.pl | `fact_check` | Polish fact-checker; membership UNCONFIRMED | UNCONFIRMED |
 | `sprawdzam.afp.com` | AFP Sprawdzam | `fact_check` | AFP's Polish fact-checking service; membership UNCONFIRMED | UNCONFIRMED |
+| `demagog.org.pl` | Demagog | `fact_check` | Polish fact-checker; EFCSN verified member until 2027-05-25 (`corpus/catalog.yaml`, read 2026-11-21) | UNCONFIRMED; robots.txt `Content-Signal: search=yes,ai-train=no,use=reference`, `ai-input` not set (read 2026-11-22 from a home IP) |
+| `pravda.org.pl` | Stowarzyszenie Pravda | `fact_check` | Polish fact-checker; EFCSN verified member until 2028-02-23 (`corpus/catalog.yaml`) | no licence on the site (corpus catalogue, 2026-11-21): short quote and link only |
+| `oko.press` | OKO.press | `media` | news site with a fact-check section (`/kategoria/prawda-czy-falsz`); its articles have flat URLs, so the section cannot be told apart and the whole site is `media`: one publisher like any other, not a reliable type and not `news` (a news agency's own finding can stand against a reliable source in `judge.decide`) | UNCONFIRMED |
 | `pap.pl` | Polska Agencja Prasowa | `news` | national news agency | UNCONFIRMED |
+
+Reachability from our server (OVHcloud VPS, measured 2026-11-22 00:50 CET, our user agent and a
+browser one): `konkret24.tvn24.pl`, `sprawdzam.afp.com` and `demagog.org.pl` (Cloudflare) answer
+403 to every request, robots.txt included, so only their search snippets reach the judge;
+`oko.press` and `pravda.org.pl` answer 200. For Demagog that may not always hold: #127 reports
+that the full eval on `ca48b84`, run on VPS staging later that night, fetched and read its review
+pages whole (UNCONFIRMED here: the run's results file keeps no per-page data). Either way, we read
+its rating markup when a page answers, and its snippet stands in when it does not. From a home IP konkret24's robots.txt allows bots on its articles (GPTBot is kept off the whole
+site; every bot only off `/_e/p/playlist/*` and `*?page=*`), so this is an IP-level block, not
+an opt-out. AFP's robots.txt answers 403 from a home IP too
+(Akamai, 2026-11-22), so its crawler policy could not be read; its terms restrict automated
+extraction (`docs/submission/sources.md`). Demagog is on the list (#76) because the Fact Check
+Tools integration only matches phrases literally, so its reviews often do not show up there (the
+mentor on Discord, 21.11, 22:54).
 
 A domain's type is a property of the source, shown next to it. It never decides whether a claim is
 true.

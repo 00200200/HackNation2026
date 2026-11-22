@@ -21,6 +21,7 @@ from corpus.schema import (
     registered_domain,
     strict_domain,
 )
+from prawdowid.privacy import mask_personal_data
 
 DOCS_PATH = Path(__file__).parent / "evidence.jsonl"
 DISINFO_PATH = (
@@ -100,6 +101,15 @@ def problems(
         fields = [doc.text, doc.title, doc.claim or ""]
         if any(EMAIL_RE.search(value) for value in fields):
             found.append(f"{doc.id}: e-mail address in the text")
+        for field, value in (
+            ("text", doc.text),
+            ("title", doc.title),
+            ("claim", doc.claim or ""),
+            ("rating", doc.rating or ""),
+        ):
+            # Masking is idempotent: any change means an unmasked phone, PESEL, ID or card number.
+            if mask_personal_data(value) != value:
+                found.append(f"{doc.id}: unmasked personal identifier in {field}")
         if any(
             looks_like_pesel(n) for n in re.findall(r"(?<!\d)\d{11}(?!\d)", doc.text)
         ):

@@ -29,8 +29,10 @@ FIELDS = {
     "steps_ms",
     "model_calls",
     "cost_usd",
+    "unpriced_requests",
     "security_events",
     "incidents",
+    "moderator_case",
     "limitations",
     "claims",
     "unchecked_claims",
@@ -73,6 +75,7 @@ def check(api, session="session-0001", channel="web"):
     return resp.json(), rec
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_a_successful_check_leaves_one_complete_record(api):
     body, rec = check(api, channel="discord")
     assert rec["channel"] == "discord" and rec["status"] == "ok"
@@ -84,12 +87,30 @@ def test_a_successful_check_leaves_one_complete_record(api):
         {"kind": "prompt_injection", "location": "input", "detector": "model"}
     ]
     [claim] = rec["claims"]
-    # Offline every source fails: the abstention and the search errors are in the record.
-    assert claim["verdict"] == "not_checked" and claim["limitations"]
+    # Every source answers with nothing: an abstention with its reason is in the record.
+    assert claim["verdict"] == "insufficient_evidence" and claim["limitations"]
     assert {"factcheck", "web"} <= set(claim["steps_ms"])
     # The log-only fields never reach a channel.
     assert "steps_ms" not in body and "model_calls" not in body
     assert "steps_ms" not in body["claims"][0]
+
+
+@pytest.mark.parametrize(
+    ("sent", "logged"),
+    [
+        ({}, "web"),
+        ({"X-Channel": "discord"}, "discord"),
+        ({"x-channel": "discord"}, "discord"),
+        ({"X-Channel": "demo"}, "demo"),
+        ({"X-Channel": "slack"}, "other"),
+    ],
+)
+def test_channel_header_has_a_default_and_a_fallback(api, sent, logged):
+    # The session header is lowercase here: header names are case-insensitive.
+    headers = {"x-session-id": "channel-0001", **sent}
+    api.post("/api/checks", json={"input": TEXT}, headers=headers)
+    [rec] = api.get("/api/sessions/channel-0001").json()
+    assert rec["channel"] == logged
 
 
 def test_a_failed_check_leaves_one_record(api, monkeypatch):
@@ -119,7 +140,10 @@ def test_records_are_read_back_and_deleted_per_session(api):
     api.post("/api/checks", json={"input": TEXT}, headers={"X-Session-Id": "other-01"})
     api.post("/api/checks", json={"input": TEXT}, headers={"X-Session-Id": "other-01"})
     assert len(api.get("/api/sessions/other-01").json()) == 2
-    assert api.delete("/api/sessions/session-0001").json() == {"deleted": 1}
+    assert api.delete("/api/sessions/session-0001").json() == {
+        "deleted": 1,
+        "withdrawn": 0,
+    }
     assert api.get("/api/sessions/session-0001").json() == []
     assert len(api.get("/api/sessions/other-01").json()) == 2
     assert api.get("/api/sessions/bad").status_code == 422
@@ -151,6 +175,15 @@ def test_a_link_check_records_the_masked_page_and_fetch_time(api, monkeypatch):
     assert refused["status"] == "cannot_check" and set(refused["steps_ms"]) == {"fetch"}
 
 
+def test_a_link_is_recorded_without_its_secret_query_values(api):
+    """The question keeps no token, as the page URL does not (link.redact)."""
+    url = {"input": "http://10.0.0.1/a?token=SEKRET&strona=2"}
+    api.post("/api/checks", json=url, headers={"X-Session-Id": "link-0002"})
+    [rec] = api.get("/api/sessions/link-0002").json()
+    assert rec["question"] == "http://10.0.0.1/a?token=REDACTED&strona=2"
+    assert "SEKRET" not in str(rec)
+
+
 def test_a_failed_model_call_is_in_the_record():
     def garbage(messages, info):
         return ModelResponse(parts=[TextPart("not json")])
@@ -159,7 +192,8 @@ def test_a_failed_model_call_is_in_the_record():
     with agent.override(model=FunctionModel(garbage, model_name="fake-extract")):
         _, rec = check(TestClient(app))
     assert rec["status"] == "technical_error" and rec["error"] is None
-    assert set(rec["steps_ms"]) == {"extract"} and rec["cost_usd"] is None
+    assert set(rec["steps_ms"]) == {"extract"} and rec["cost_usd"] == 0.0
+    assert rec["unpriced_requests"] == 1
     # The answer that failed validation was billed: it is in the record.
     assert [m["model"] for m in rec["model_calls"]] == ["fake-extract"]
 

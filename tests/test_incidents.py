@@ -179,6 +179,7 @@ def test_refused_link_keeps_its_notice_and_shows_the_match(client, monkeypatch):
     assert body["incident_matches"][0]["matched_on"] == "url"
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_short_link_matches_on_the_final_url_after_redirects(client, monkeypatch):
     async def fetched(url):
         return Page(

@@ -77,6 +77,7 @@ def test_a_trailing_token_does_not_hide_a_number(text, masked):
     assert mask_personal_data(text) == masked
 
 
+@pytest.mark.usefixtures("quiet_sources")
 def test_pesel_and_phone_masked_in_log_and_before_the_model(client, check_log, caplog):
     api, sent = client
     with caplog.at_level(logging.INFO, logger="prawdowid"):
@@ -96,10 +97,13 @@ def test_session_can_be_deleted(client, check_log):
     api.post("/api/checks", json={"input": TEXT}, headers=mine)
     api.post("/api/checks", json={"input": TEXT}, headers={"X-Session-Id": "other-01"})
     resp = api.delete("/api/sessions/demo-session-1")
-    assert resp.status_code == 200 and resp.json() == {"deleted": 2}
+    assert resp.status_code == 200 and resp.json() == {"deleted": 2, "withdrawn": 0}
     assert [r["session"] for r in records(check_log)] == ["other-01"]
     # Deleting again, or a session that never existed, deletes nothing.
-    assert api.delete("/api/sessions/demo-session-1").json() == {"deleted": 0}
+    assert api.delete("/api/sessions/demo-session-1").json() == {
+        "deleted": 0,
+        "withdrawn": 0,
+    }
     assert api.delete("/api/sessions/bad").status_code == 422
 
 
@@ -271,3 +275,316 @@ def test_a_check_running_during_deletion_is_not_written(check_log):
         **{**WHEN, "started_at": datetime.now(UTC)},
     )
     assert [r["session"] for r in records(check_log)] == ["s-000001"]
+
+
+# Identifiers added for #82; every number is synthetic. The ID card has a valid check digit.
+NEW_IDENTIFIERS = [
+    ("ABA300000", "[numer dowodu]"),
+    ("ABA 300000", "[numer dowodu]"),
+    ("AB1234567", "[numer paszportu]"),
+    ("600 123 456", "[telefon]"),
+    ("600123456", "[telefon]"),
+    ("+48600123456", "[telefon]"),
+    ("(+48) 600 123 456", "[telefon]"),
+]
+
+
+@pytest.mark.parametrize(("raw", "placeholder"), NEW_IDENTIFIERS)
+def test_new_identifiers_are_masked_before_the_model_and_in_the_logs(
+    client, check_log, caplog, raw, placeholder
+):
+    api, sent = client
+    question = (
+        f"Donald Tusk powiedział, że jego numer to {raw}, a PKB Polski wzrósł o 3%."
+    )
+    with caplog.at_level(logging.INFO, logger="prawdowid"):
+        assert api.post("/api/checks", json={"input": question}).status_code == 200
+    masked = question.replace(raw, placeholder)
+    [rec] = records(check_log)
+    assert rec["question"] == masked
+    # The model gets the masked sentence, with the public figure's name in it.
+    assert masked in sent[0]
+    for text in [check_log.read_text(), caplog.text, *sent]:
+        assert raw not in text
+
+
+@pytest.mark.parametrize(("raw", "placeholder"), NEW_IDENTIFIERS)
+def test_an_exception_carrying_a_new_identifier_is_logged_masked(
+    client, caplog, monkeypatch, raw, placeholder
+):
+    import prawdowid.app as app_module
+
+    async def broken(text):
+        raise RuntimeError(f"fetch failed for {raw}")
+
+    monkeypatch.setattr(app_module, "verify", broken)
+    api, _ = client
+    with caplog.at_level(logging.INFO, logger="prawdowid"):
+        api.post("/api/checks", json={"input": "PKB Polski wzrósł o 3%."})
+    assert f"fetch failed for {placeholder}" in caplog.text
+    assert raw not in caplog.text
+
+
+@pytest.mark.parametrize(("raw", "placeholder"), NEW_IDENTIFIERS)
+def test_the_logging_filter_masks_new_identifiers(raw, placeholder):
+    import sys
+
+    from prawdowid.privacy import MaskingFilter
+
+    try:
+        raise RuntimeError(f"lookup failed for {raw}")
+    except RuntimeError:
+        exc_info = sys.exc_info()
+    record = logging.LogRecord(
+        "prawdowid", logging.ERROR, "", 0, "check of %s failed", (raw,), exc_info
+    )
+    assert MaskingFilter().filter(record) is True
+    assert record.getMessage() == f"check of {placeholder} failed"
+    assert placeholder in record.exc_text and raw not in record.exc_text
+
+
+@pytest.mark.parametrize("number", ["ABA300000", "ABA 300000"])
+def test_an_id_card_number_with_a_valid_check_digit_is_masked(number):
+    text = f"dowód osobisty {number}, wydany w 2019 roku"
+    assert mask_personal_data(text) == (
+        "dowód osobisty [numer dowodu], wydany w 2019 roku"
+    )
+
+
+# Vectors from other projects' tests (polish-validators, polish-id-card-validate, Faker), so the check
+# digit is not only checked against our own reading of it.
+@pytest.mark.parametrize(
+    "number", ["ABC412345", "ABS123456", "AIS850214", "AUL927285", "AEI251824"]
+)
+def test_id_card_numbers_other_projects_call_valid_are_masked(number):
+    assert mask_personal_data(f"dowód {number}.") == "dowód [numer dowodu]."
+
+
+@pytest.mark.parametrize("number", ["ABC512345", "ABS523456"])
+def test_id_card_numbers_other_projects_call_invalid_stay(number):
+    assert mask_personal_data(f"dowód {number}.") == f"dowód {number}."
+
+
+def test_a_passport_number_is_masked():
+    assert mask_personal_data("paszport AB1234567.") == "paszport [numer paszportu]."
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "kod ABA300001",  # wrong check digit
+        "kwota PLN 123456",  # passes the check digit, but is a currency code
+        "dla 100000 osób",  # lower case is no ID card
+        "faktura nr 1234567",  # passports have no space
+        "faktura nr1234567",
+        "dotacja z NFZ 100000 zł",  # passes the check digit, but a currency follows
+        "ZUS 300000 zł",
+        "GUS 550000 osób",
+        "KRS 0000123456",
+    ],
+)
+def test_codes_that_are_not_id_cards_or_passports_stay(text):
+    assert mask_personal_data(text) == text
+
+
+@pytest.mark.parametrize(
+    "phone",
+    [
+        "600 123 456",
+        "600123456",
+        "+48600123456",
+        "(+48) 600 123 456",
+        "+48 600 123 456",
+        "+48 600123456",
+        "(48) 600 123 456",
+        "0048 600 123 456",
+        "600-123-456",
+        "600\N{NO-BREAK SPACE}123\N{NO-BREAK SPACE}456",
+        "600 12 34 56",
+        "+48 600 12 34 56",
+        "502 123 456",
+    ],
+)
+def test_phone_formats(phone):
+    assert mask_personal_data(f"Zadzwoń na {phone}.") == "Zadzwoń na [telefon]."
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        ("Infolinia 24/7 +48 600 100 200", "Infolinia 24/7 [telefon]"),
+        ("+48 600 100 200 +48 601 200 300", "[telefon] [telefon]"),
+        (
+            "Infolinia +48 600 100 200 7 dni w tygodniu",
+            "Infolinia [telefon] 7 dni w tygodniu",
+        ),
+        ("Tel+48600100200", "Tel[telefon]"),
+        ("Infolinia 600 100 200 24 godziny", "Infolinia [telefon] 24 godziny"),
+    ],
+)
+def test_a_phone_next_to_other_numbers_is_masked(text, masked):
+    assert mask_personal_data(text) == masked
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        ("tel. 22 123 45 67", "tel. [telefon]"),
+        ("tel. nr 22 123 45 67", "tel. nr [telefon]"),
+        ("tel: 221234567", "tel: [telefon]"),
+        ("Telefon 12 345 67 89", "Telefon [telefon]"),
+        ("+48 22 123 45 67", "[telefon]"),
+        ("+48 (22) 123 45 67", "[telefon]"),
+        ("(22) 123-45-67", "[telefon]"),
+        ("phone=123456789", "phone=[telefon]"),
+    ],
+)
+def test_a_landline_is_masked_in_brackets_or_after_a_label_or_a_country_code(
+    text, masked
+):
+    assert mask_personal_data(text) == masked
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        ("tel. 600 100 000", "tel. [telefon]"),  # ends in 000, but a label says phone
+        ("https://x.pl/?phone=600123456", "https://x.pl/?phone=[telefon]"),
+    ],
+)
+def test_a_label_wins_over_the_round_number_and_url_exclusions(text, masked):
+    assert mask_personal_data(text) == masked
+
+
+def test_every_number_of_a_list_is_masked():
+    text = "tel. 600 123 456, 601 234 567 lub 602-345-678"
+    assert mask_personal_data(text) == "tel. [telefon], [telefon] lub [telefon]"
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        ("600-100-200 601-200-300", "[telefon] [telefon]"),
+        ("ul. Długa 5 600-100-200", "ul. Długa 5 [telefon]"),
+        ("600-100-200 2024", "[telefon] 2024"),
+        ("+48 600-100-200", "[telefon]"),
+    ],
+)
+def test_a_dashed_phone_is_masked_next_to_other_numbers(text, masked):
+    assert mask_personal_data(text) == masked
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        (
+            "numer telefonu 600 123 456 osoby, która dzwoniła",
+            "numer telefonu [telefon] osoby, która dzwoniła",
+        ),
+        ("tel. 600 123 456 osób", "tel. [telefon] osób"),
+        ("dowód ABA300000 osoby zmarłej", "dowód [numer dowodu] osoby zmarłej"),
+    ],
+)
+def test_a_count_word_does_not_hide_a_labelled_phone_or_a_glued_id_card(text, masked):
+    assert mask_personal_data(text) == masked
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "123456789 zł",
+        "Dz.U. 2024 poz. 123",
+        "w 2024 roku 1500 osób",
+        "500 000 000 zł",  # mobile-like prefix, currency behind
+        "wydano 600123456 złotych",
+        "600 000 000 dolarów",
+        "budżet 450 mln",
+        "UE liczy 450 000 000 mieszkańców",  # a round number: ends in 000
+        "zarejestrowano 512 345 678 osób",  # a mobile prefix, but a count behind it
+        "Na CPK wydano już 500 000 000, a lotniska nie ma",
+        "budżet PLN 600 000 000",  # a currency in front
+        "600 000 000 €",
+        "€600 000 000",
+        "PLN 612 345 678",
+        "1 600 123 456 zł",  # the tail of a longer number
+        "600 123 456 789 zł",  # the head of one
+        "kwota 600123456,50 zł",
+        "kwota 600123456.50",
+        "https://www.example.pl/artykul/600123456",
+        "https://www.example.pl/?id=600123456&a=1",
+        "https://www.example.pl/tytul,600123456.html",
+        "www.example.pl/a/600123456",
+        "gus-532015686e",  # a mobile prefix, but a letter behind the digits: an id
+        "Liczba telefonów 226 000 000 sztuk",  # a label word, but a round number and a count
+        "liczba telefonów 226 000 000 000 sztuk",  # the count is behind more digit groups
+        "sprzedaż telefonów 120 000 000 000 zł",  # the currency is behind more digit groups
+        "Regon 363190367",  # nine digits, no mobile prefix
+        "REGON 730123456",  # a mobile prefix, but a REGON label
+        "REGON: 730 123 456",
+        "NIP 123-456-78-90",
+        "22 123 45 67",  # a landline needs a country code, brackets or a label
+        "600\n123\n456",  # three lines are three numbers
+    ],
+)
+def test_amounts_years_statutes_and_ids_in_urls_stay(text):
+    assert mask_personal_data(text) == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Kod kreskowy: 5905784304458",  # EAN-13 passes Luhn too
+        "EAN 5900000000015",
+        "Nr partii: 4111111111111",  # a label beats the card shape
+        "https://example.eu/doc?qid=4111111111111",
+        "5905784304458",  # a valid GS1 check digit, no label
+    ],
+)
+def test_product_codes_are_not_cards(text):
+    assert mask_personal_data(text) == text
+
+
+def test_a_card_number_is_still_masked_next_to_a_product_code():
+    assert mask_personal_data("Karta 4111111111111111, EAN 5905784304458") == (
+        "Karta [numer karty], EAN 5905784304458"
+    )
+
+
+def test_names_of_public_figures_stay():
+    text = "Donald Tusk powiedział, że Karol Nawrocki zawetował ustawę w 2025 roku."
+    assert mask_personal_data(text) == text
+
+
+def test_a_currency_code_hides_an_id_card_only_when_a_space_follows_it():
+    assert mask_personal_data("kwota PLN 123456") == "kwota PLN 123456"
+    assert mask_personal_data("dowód PLN123456") == "dowód [numer dowodu]"
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        ("tel. 600123456 44051401359", "tel. [telefon] [PESEL]"),
+        ("tel. 600 123 456 2024", "tel. [telefon] 2024"),
+    ],
+)
+def test_a_labelled_phone_is_masked_whatever_digits_follow_it(text, masked):
+    assert mask_personal_data(text) == masked
+
+
+def test_a_long_url_keeps_its_numeric_path_component():
+    url = "https://example.pl/" + "a" * 201 + "/600123456"
+    assert mask_personal_data(url) == url
+    assert mask_personal_data(f"tel. {url}") == f"tel. {url}"
+    assert mask_personal_data("tel. 600123456 /x") == "tel. [telefon] /x"
+
+
+def test_a_phone_number_after_a_passport_number_is_masked():
+    assert (
+        mask_personal_data("Paszport AB1234567 600 123 456")
+        == "Paszport [numer paszportu] [telefon]"
+    )
+
+
+@pytest.mark.parametrize("label", ["karta nr", "kartą numer", "card no.", "Visa nr"])
+def test_a_card_number_after_a_card_label_is_masked(label):
+    assert mask_personal_data(f"{label} 4111111111111111") == f"{label} [numer karty]"

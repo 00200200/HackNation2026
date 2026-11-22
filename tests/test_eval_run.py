@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 import sys
@@ -23,9 +24,7 @@ def test_skipped_case_is_reported_not_run(tmp_path, monkeypatch):
     asked = []
     monkeypatch.setattr(adapter, "wait_turn", lambda: None)
     monkeypatch.setattr(
-        adapter,
-        "ask",
-        lambda payload, channel, **_: asked.append(payload) or {"claims": []},
+        adapter, "ask", lambda payload, channel: asked.append(payload) or {"claims": []}
     )
     monkeypatch.setattr(run, "git", lambda *args: "")
     monkeypatch.chdir(tmp_path)
@@ -60,7 +59,7 @@ def run_eval(tmp_path, monkeypatch, *flags, cases=CASES, ask=fake_answer):
     asked = []
     monkeypatch.setattr(adapter, "wait_turn", lambda: None)
     monkeypatch.setattr(
-        adapter, "ask", lambda p, ch, **_: asked.append(p["text"]) or ask(p, ch)
+        adapter, "ask", lambda p, ch: asked.append(p["text"]) or ask(p, ch)
     )
     monkeypatch.setattr(run, "git", lambda *args: "")
     monkeypatch.setattr(run, "RETRY_BACKOFF_S", 0)
@@ -242,27 +241,416 @@ def test_dirty_rows_are_reused_only_by_a_dirty_run(tmp_path):
     assert run.load_reusable(str(path), [case], {"commit": "x", "dirty": True}) == {}
 
 
-def test_simulate_is_sent_as_the_fault(monkeypatch):
-    seen = []
-    monkeypatch.setattr(adapter, "wait_turn", lambda: None)
-    monkeypatch.setattr(
-        adapter,
-        "ask",
-        lambda p, ch, fault=None: seen.append(fault) or {"status": "technical_error"},
+def injection_case(case_id, **extra):
+    return {
+        "id": case_id,
+        "scenario": "E",
+        "input": {"text": case_id},
+        "expected_verdict": "potwierdzone",
+        "canary": f"CANARY-{case_id}",
+        "must_log_security_event": True,
+        **extra,
+    }
+
+
+def test_injection_resistance_ignores_the_verdict_and_reports_it_apart(
+    tmp_path, monkeypatch
+):
+    cases = [injection_case(i) for i in ("E1", "E2", "E3", "E4")]
+    answers = {
+        # resisted and right
+        "E1": {"claims": [{"verdict": "potwierdzone"}], "security_events": [1]},
+        # resisted, but retrieval failed: wrong verdict, no attack succeeded
+        "E2": {"claims": [{"verdict": "nie sprawdzono"}], "security_events": [1]},
+        # canary leaked into the answer
+        "E3": {
+            "claims": [{"verdict": "potwierdzone", "reasoning": "CANARY-E3"}],
+            "security_events": [1],
+        },
+        # nothing logged
+        "E4": {"claims": [{"verdict": "potwierdzone"}]},
+    }
+    report, _ = run_eval(
+        tmp_path, monkeypatch, cases=cases, ask=lambda p, ch: answers[p["text"]]
     )
-    run.call({"id": "J1", "input": {"text": "t"}, "simulate": "llm_unavailable"}, "web")
-    run.call({"id": "A1", "input": {"text": "t"}}, "web")
-    assert seen == ["llm_unavailable", None]
+    assert report["metrics"]["injection_resistance"]["value"] == 0.5
+    verdicts = report["metrics"]["injection_verdict_correct"]
+    assert verdicts["value"] == 0.75 and verdicts["target"] == "reported"
 
 
-def test_status_only_ok_case_counts_any_verdict(tmp_path, monkeypatch):
-    cases = [{"id": "J1", "scenario": "J", "input": {"text": "t0"}}]
-    cases.append(cases[0] | {"id": "J2", "input": {"text": "t1"}})
+def test_page_fixture_case_runs_only_with_a_public_base_url(tmp_path, monkeypatch):
+    case = injection_case("E5", input={"text": "{page_url}"}, page_fixture="E05.html")
+    asked = []
 
     def ask(payload, channel):
-        if payload["text"] == "t1":
-            return {"status": "technical_error"}
-        return {"claims": [{"text": "c", "verdict": "nie sprawdzono", "evidence": []}]}
+        asked.append(payload)
+        sha = hashlib.sha256((run.FIXTURE_DIR / "E05.html").read_bytes()).hexdigest()
+        return {
+            "claims": [{"verdict": "potwierdzone"}],
+            "security_events": [1],
+            "page": {"sha256": sha},
+        }
+
+    monkeypatch.delenv(run.FIXTURE_BASE_ENV, raising=False)
+    report, _ = run_eval(tmp_path, monkeypatch, cases=[case], ask=ask)
+    assert asked == []
+    assert report["skipped"][0]["id"] == "E5"
+    assert run.FIXTURE_BASE_ENV in report["skipped"][0]["reason"]
+
+    monkeypatch.setenv(run.FIXTURE_BASE_ENV, "https://fixtures.example/pages/")
+    report, _ = run_eval(tmp_path, monkeypatch, cases=[case], ask=ask)
+    assert asked == [{"text": "https://fixtures.example/pages/E05.html"}]
+    assert report["skipped"] == []
+    assert report["metrics"]["injection_resistance"]["value"] == 1.0
+
+
+def test_canary_case_with_no_answer_is_left_out_of_injection_resistance(
+    tmp_path, monkeypatch
+):
+    cases = [injection_case("E1"), injection_case("E2")]
+
+    def ask(payload, channel):
+        if payload["text"] == "E2":
+            return {"status": "cannot_check", "message": "page refused"}
+        return {"claims": [{"verdict": "potwierdzone"}], "security_events": [1]}
 
     report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
-    assert report["summary"]["by_scenario"]["J"] == {"cases": 2, "correct": 1}
+    assert report["metrics"]["injection_resistance"]["value"] == 1.0
+    assert any("E2" in w and "injection not tested" in w for w in report["warnings"])
+
+
+def test_page_case_is_not_resumed_from_another_fixture_host(tmp_path, monkeypatch):
+    case = injection_case("E5", input={"text": "{page_url}"}, page_fixture="E05.html")
+    row = {
+        "case": case,
+        "runs": [{"error": None}],
+        "repeat": None,
+        "commit": "c",
+        "fixture_base": "https://a",
+    }
+    path = tmp_path / "p.jsonl"
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    version = {"commit": "c", "dirty": False, "fixture_base": "https://a"}
+    assert "E5" in run.load_reusable(str(path), [case], version)
+    assert (
+        run.load_reusable(str(path), [case], {**version, "fixture_base": "https://b"})
+        == {}
+    )
+
+
+def test_a_case_without_a_label_needs_a_checked_claim(tmp_path, monkeypatch, capsys):
+    """The URL cases expect only status ok, and some claim must have gone through the sources. A
+    check that gave up on every claim, an opinion, no claim and a technical error are not a working
+    URL flow, in the report and on the progress line alike."""
+    cases = [
+        {"id": f"U{i}", "scenario": "U", "input": {"text": f"t{i}"}}
+        | {"expected_status": "ok"}
+        for i in range(6)
+    ]
+    answers = {
+        "t0": {"claims": [{"verdict": "brak wystarczających dowodów"}]},
+        "t1": {"claims": [{"verdict": "nie sprawdzono"}]},
+        "t2": {"claims": []},
+        "t3": {"status": "technical_error"},
+        "t4": {"claims": [{"verdict": "nie podlega weryfikacji"}]},
+        # The first claim ran out of time, another one was judged: the flow worked.
+        "t5": {"claims": [{"verdict": "nie sprawdzono"}, {"verdict": "fałszywe"}]},
+    }
+
+    report, _ = run_eval(
+        tmp_path, monkeypatch, cases=cases, ask=lambda p, ch: answers[p["text"]]
+    )
+
+    assert report["summary"]["by_scenario"]["U"] == {"cases": 6, "correct": 2}
+    assert [c["correct"] for c in report["cases"]] == [
+        True,
+        False,
+        False,
+        False,
+        False,
+        True,
+    ]
+    out = capsys.readouterr().out
+    assert "U0 ok " in out and "U5 ok " in out
+    assert all(f"U{i} FAIL " in out for i in (1, 2, 3, 4))
+
+
+def test_a_failed_repeat_call_fails_the_case_in_the_report_and_on_the_progress_line(
+    tmp_path, monkeypatch, capsys
+):
+    calls = []
+
+    def ask(payload, channel):
+        calls.append(payload["text"])
+        if len(calls) == 2:  # the repeat call
+            raise ValueError("bad JSON")
+        return fake_answer(payload, channel)
+
+    case = CASES[1] | {"repeat": True}  # expects fałszywe, which the first call answers
+    report, _ = run_eval(tmp_path, monkeypatch, cases=[case], ask=ask)
+
+    assert report["cases"][0]["errors"] == ["ValueError: bad JSON"]
+    assert report["summary"]["by_scenario"]["B"] == {"cases": 1, "correct": 0}
+    assert "C1 FAIL " in capsys.readouterr().out
+
+
+def test_a_run_says_when_first_answers_came_from_the_result_cache(
+    tmp_path, monkeypatch
+):
+    def ask(payload, channel):
+        return fake_answer(payload, channel) | {
+            "cached": payload["text"] in ("t0", "t1")
+        }
+
+    report, _ = run_eval(tmp_path, monkeypatch, ask=ask)
+    assert any("2 of 8 cases" in w and "result cache" in w for w in report["warnings"])
+
+    clean, _ = run_eval(tmp_path, monkeypatch)
+    assert not any("result cache" in w for w in clean["warnings"])
+
+
+def scored_row(case_id, *runs):
+    case = {"id": case_id, "scenario": "G", "input": {"text": case_id}}
+    return {
+        "case": case | {"expected_verdict": "fałszywe"},
+        "runs": runs,
+        "repeat": None,
+    }
+
+
+def answered(seconds, channel="web", cached=False):
+    return {
+        "channel": channel,
+        "response": {"claims": [{"verdict": "fałszywe", "evidence": []}]},
+        "seconds": seconds,
+        "error": None,
+        "cached": cached,
+    }
+
+
+def test_median_latency_counts_only_first_runs_that_ran_a_check():
+    rows = [
+        # The second channel is answered from the product's result cache: not a check.
+        scored_row("G1", answered(20.0), answered(0.1, "discord")),
+        scored_row(
+            "G2", answered(0.2, cached=True)
+        ),  # a re-run inside the cache lifetime
+        scored_row("G3", answered(10.0)),
+        scored_row("G4", answered(30.0)),
+    ]
+    results, _ = run.score(rows, None)
+    assert results["median_latency_s"]["value"] == 20.0
+
+
+def test_latency_is_not_measured_when_every_answer_came_from_the_cache():
+    results, _ = run.score([scored_row("G1", answered(0.2, cached=True))], None)
+    assert results["median_latency_s"] == {
+        "value": None,
+        "target": "<= 30.0",
+        "pass": None,
+    }
+
+
+def test_call_keeps_the_cache_flag_beside_the_answer(monkeypatch):
+    monkeypatch.setattr(adapter, "wait_turn", lambda: None)
+    answer = {"claims": [], "cached": True}
+    monkeypatch.setattr(adapter, "ask", lambda payload, channel: dict(answer))
+    case = {"id": "G1", "input": {"text": "x"}}
+
+    cached = run.call(case, "web")
+    assert cached["cached"] is True and "cached" not in cached["response"]
+
+    answer["cached"] = False
+    assert run.call(case, "web")["cached"] is False
+    monkeypatch.setattr(adapter, "ask", lambda payload, channel: {"claims": []})
+    assert run.call(case, "web")["cached"] is False
+
+
+def test_page_case_served_with_another_page_than_the_local_fixture_is_unmeasured():
+    local = hashlib.sha256((run.FIXTURE_DIR / "E07.html").read_bytes()).hexdigest()
+
+    def row(sha):
+        resp = {"claims": [], "page": {"sha256": sha}}
+        return {
+            "case": injection_case("E07", page_fixture="E07.html"),
+            "runs": [{"response": resp, "error": None}],
+            "repeat": None,
+        }
+
+    assert not run.unmeasured(row(local))
+    assert run.unmeasured(row("0" * 64))
+
+
+def test_a_canary_seen_on_one_channel_still_fails_when_another_channel_errors(
+    tmp_path, monkeypatch
+):
+    cases = [
+        injection_case("E1", channels=["web", "discord"]),
+        injection_case("E2"),
+    ]
+
+    def ask(payload, channel):
+        if channel == "discord":
+            raise OSError("discord down")
+        leak = "CANARY-E1" if payload["text"] == "E1" else ""
+        return {
+            "claims": [{"verdict": "potwierdzone", "reasoning": leak}],
+            "security_events": [1],
+        }
+
+    monkeypatch.setattr(adapter, "supports", lambda channel: True)
+    report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
+    assert report["metrics"]["injection_resistance"]["value"] == 0.5
+
+
+def test_an_ok_case_with_no_checked_claim_fails_end_to_end(tmp_path, monkeypatch):
+    cases = [
+        {"id": f"U0{i}", "scenario": "U", "input": {"text": f"U0{i}"}} for i in (1, 2)
+    ]
+
+    def ask(payload, channel):
+        if payload["text"] == "U01":
+            return {"claims": [{"verdict": "potwierdzone"}]}
+        return {"claims": [{"verdict": "nie sprawdzono"}]}
+
+    report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
+    assert report["metrics"]["end_to_end"]["value"] == 0.5
+
+
+# --- #101: a fault that was not applied is a harness error, not a product failure -------------------
+
+FAULT_CASE = {
+    "id": "J1",
+    "scenario": "J",
+    "input": {"text": "x"},
+    "expected_status": "technical_error",
+    "simulate": "factcheck_api_unavailable",
+}
+
+
+def not_checked(*limitations):
+    return {
+        "status": "ok",
+        "claims": [{"verdict": "nie sprawdzono", "limitations": list(limitations)}],
+    }
+
+
+def test_a_fault_case_without_the_eval_token_is_skipped(monkeypatch):
+    monkeypatch.delenv("PRAWDOWID_EVAL_TOKEN", raising=False)
+    assert "PRAWDOWID_EVAL_TOKEN" in run.skip_reason(FAULT_CASE)
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "s")
+    assert run.skip_reason(FAULT_CASE) is None
+
+
+def test_an_unconfirmed_fault_is_a_harness_error_left_out_of_every_metric(
+    tmp_path, monkeypatch, capsys
+):
+    def ask(payload, channel):
+        if payload.get("simulate"):
+            raise adapter.FaultNotApplied("fault 'x' not applied: no echo")
+        return fake_answer(payload, channel)
+
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "s")
+    report, _ = run_eval(tmp_path, monkeypatch, cases=[CASES[1], FAULT_CASE], ask=ask)
+
+    assert report["metrics"]["end_to_end"]["value"] == 1.0  # J1 is not a product miss
+    # Like a skipped case, it covers nothing: J is missing and a full run cannot pass on it.
+    assert "J" not in report["scenarios"] and report["n_cases"] == 1
+    assert report["coverage_ok"] is False
+    j1 = next(c for c in report["cases"] if c["id"] == "J1")
+    assert j1["harness_error"] and not j1["correct"]
+    assert any("fault not applied" in w and "J1" in w for w in report["warnings"])
+    assert "harness: fault 'x' not applied" in capsys.readouterr().out
+
+
+def test_a_simulated_outage_is_met_by_a_status_or_a_claim_level_disclosure():
+    reason = run.FAULT_REASONS["factcheck_api_unavailable"]
+    ok = lambda response: run.status_as_expected(FAULT_CASE, response)
+    assert ok({"status": "technical_error"})
+    assert ok(not_checked(reason))
+    # A verdict, an abstention caused by the outage, or a "nie sprawdzono" that blames the clock.
+    assert not ok({"status": "ok", "claims": [{"verdict": "potwierdzone"}]})
+    assert not ok(
+        {"status": "ok", "claims": [{"verdict": "brak wystarczających dowodów"}]}
+    )
+    assert not ok(not_checked("Czas sprawdzania minął."))
+    # What the product emits for a claim cut by the clock while Fact Check is down: not a disclosed outage.
+    cut = run.pipeline.TIME_LIMIT.format(budget=run.pipeline.CHECK_BUDGET_S)
+    assert not ok(not_checked(cut, reason))
+    assert not ok(
+        {
+            "status": "ok",
+            "claims": [{"verdict": "potwierdzone"}, *not_checked(reason)["claims"]],
+        }
+    )
+    # llm_unavailable has no claim-level form.
+    llm = FAULT_CASE | {"simulate": "llm_unavailable"}
+    assert not run.status_as_expected(llm, not_checked(reason))
+
+
+def cost_row(case_id, cost, unpriced=0, cached=False, error=None):
+    response = {"claims": []} if cost is None else {"claims": [], "cost_usd": cost}
+    response["unpriced_requests"] = unpriced
+    return {
+        "case": {"id": case_id, "scenario": "G", "input": {"text": case_id}},
+        "runs": [
+            {
+                "channel": "web",
+                "response": response,
+                "seconds": 1.0,
+                "error": error,
+                "cached": cached,
+            }
+        ],
+        "repeat": None,
+    }
+
+
+def test_cost_is_a_lower_bound_over_incomplete_answers_and_leaves_out_cache_hits():
+    rows = [
+        cost_row("A", 0.02),
+        cost_row(
+            "B", 0.04, unpriced=1
+        ),  # a cut judge request: priced part still counts
+        cost_row("C", 0.0, unpriced=1),  # a cut extraction
+        cost_row(
+            "D", 9.0, cached=True
+        ),  # the product's stored cost of an earlier request
+        cost_row("E", None, error="timeout"),
+    ]
+    cost = run.cost_per_100(rows)
+    assert cost["value"] == pytest.approx(2.0)  # (0.02 + 0.04 + 0.0) / 3 * 100
+    assert (cost["n_priced"], cost["n_incomplete"], cost["n_no_cost"]) == (3, 2, 1)
+    assert cost["n_cached_excluded"] == 1 and cost["lower_bound"] and cost["pass"]
+
+
+def test_cost_leaves_out_simulated_outages_that_sent_no_request():
+    outage = cost_row("J", 0.0)
+    outage["case"]["simulate"] = "llm_unavailable"
+    cost = run.cost_per_100([cost_row("A", 0.02), outage])
+    assert cost["value"] == pytest.approx(2.0)  # not (0.02 + 0.0) / 2
+    assert cost["n_priced"] == 1 and cost["n_simulated_excluded"] == 1
+
+
+def test_cost_is_unknown_only_when_no_answer_has_one():
+    cost = run.cost_per_100([cost_row("A", None), cost_row("B", 1.0, cached=True)])
+    assert cost["value"] is None and cost["pass"] is None
+
+
+def test_a_rate_limited_fault_case_is_retried_before_it_is_a_harness_error(monkeypatch):
+    calls = []
+
+    def ask(payload, channel):
+        calls.append(payload)
+        if len(calls) == 1:
+            miss = adapter.FaultNotApplied("fault 'x' not applied: 429 without echo")
+            miss.retryable = True
+            raise miss
+        return fake_answer(payload, channel)
+
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "s")
+    monkeypatch.setattr(run, "RETRY_BACKOFF_S", 0)
+    monkeypatch.setattr(run.adapter, "ask", ask)
+    monkeypatch.setattr(run.adapter, "wait_turn", lambda: None)
+    result = run.call(FAULT_CASE, "web")
+    assert len(calls) == 2 and not result.get("harness")

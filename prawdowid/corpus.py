@@ -33,8 +33,6 @@ from prawdowid.websearch import ALLOWLIST, search_web
 MANIFEST = Path("corpus/manifest.jsonl")
 # Seed queries, one per line; "#" starts a comment. Committed so the seed is reproducible.
 QUERIES = Path("corpus/queries.txt")
-# The team's crisis and safety pages, one URL per line: their hosts are searched too.
-SEEDS = Path("corpus/seeds.txt")
 # Exact final host -> approved full-text licence; prerequisites and approval record: docs/sources.md.
 APPROVED_SOURCES: dict[str, str] = {}
 
@@ -42,14 +40,6 @@ APPROVED_SOURCES: dict[str, str] = {}
 def queries(path: Path = QUERIES) -> list[str]:
     lines = (line.strip() for line in path.read_text(encoding="utf-8").splitlines())
     return [line for line in lines if line and not line.startswith("#")]
-
-
-def search_domains(path: Path = SEEDS) -> list[str]:
-    """ALLOWLIST domains, then every host of the team's seed pages not already one of them."""
-    hosts = (urlsplit(url).hostname for url in queries(path))
-    return list(
-        dict.fromkeys([*ALLOWLIST, *(h.removeprefix("www.") for h in hosts if h)])
-    )
 
 
 def local_database_url() -> str:
@@ -77,7 +67,7 @@ async def build(target: int) -> None:
         print(f"retention: {delete_expired()} expired documents deleted")
     documents = stored_documents if _use_database() else load_documents
     for topic in queries():
-        for domain in approved if _use_database() else search_domains():
+        for domain in approved if _use_database() else ALLOWLIST:
             if len(documents()) >= target:
                 return
             # The seed is the only writer of the database: search itself saves only to JSONL.

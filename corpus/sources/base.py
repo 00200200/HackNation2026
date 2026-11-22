@@ -13,7 +13,7 @@ from corpus.schema import (
     Doc,
     clip,
     doc_id,
-    mask_emails,
+    mask_personal,
     registered_domain,
     squash,
 )
@@ -101,18 +101,22 @@ def make_doc(
     `publisher` overrides the catalogue entry for aggregators that list several publishers.
     `fact_check` holds the optional fact-check fields of `Doc` (claim, rating, ...).
     """
-    text = mask_emails(squash(text))
-    title = mask_emails(" ".join(title.split()))
+    text = mask_personal(squash(text))
+    title = mask_personal(" ".join(title.split()))
     if not text or not title or JOB_ADVERT.search(title):
         return None
     if fact_check.get("claim"):
-        fact_check["claim"] = mask_emails(fact_check["claim"])
+        fact_check["claim"] = mask_personal(fact_check["claim"])
+    if fact_check.get("rating"):
+        fact_check["rating"] = mask_personal(fact_check["rating"])
     if source.storage == "excerpt":
         # A short fragment only; the document itself stays at `url`.
         text, _ = clip(text.replace("\n", " "), EXCERPT_CHARS)
         truncated = True
     else:
         text, truncated = clip(text, source.params.get("max_chars", MAX_TEXT_CHARS))
+    # Mask again: the join of an excerpt's lines can make a number the first pass could not see.
+    text = mask_personal(text)
     return Doc(
         id=doc_id(source.id, url),
         url=url,

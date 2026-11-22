@@ -1,9 +1,10 @@
 """Text extraction for one fetched page, run as a separate process that the caller can kill.
 
 Usage: python -I extract_worker.py <content-type> <url>, page bytes on stdin, one JSON object on
-stdout: {"kind": "ok", "text", "title", "publisher", "date"} or {"kind": "paywall" | "no_text"}.
+stdout: {"kind": "ok", "text", "title", "publisher", "date", "hidden"} or {"kind": "paywall" | "no_text"}.
 "paywall" covers schema.org paywall markup (JSON-LD or microdata) and inline sign-in or subscribe
-walls, in the article text or in a form.
+walls, in the article text or in a form. "hidden" is the text of the channels the extractor drops
+(HTML comments, img alt, display:none or hidden nodes): never shown to a model, only screened.
 Self-contained on purpose (no prawdowid imports), so it runs with -I.
 
 Work is bounded twice: the caller kills the process at its deadline, and the parsers stop after a
@@ -129,6 +130,7 @@ def extract_html(body: bytes, url: str) -> dict:
     # Like a password form, it marks a wall only beside a preview: a newsletter box saying
     # "subscribe to read our digest" must not refuse a full free article.
     form_notice = any(WALL_NOTICE.search(f.text_content()) for f in tree.iter("form"))
+    hidden = hidden_text(body)
     doc = trafilatura.bare_extraction(
         tree, url=url, with_metadata=True, include_comments=False
     )
@@ -139,16 +141,45 @@ def extract_html(body: bytes, url: str) -> dict:
         (PASSWORD_INPUT.search(body) or form_notice) and len(text) < PREVIEW_CHARS
     ):
         return {"kind": "paywall"}
-    return ok(doc.text, doc.title, doc.sitename, doc.date)
+    return ok(doc.text, doc.title, doc.sitename, doc.date, hidden)
 
 
-def ok(text, title, publisher, date) -> dict:
+def hidden_text(body: bytes) -> str:
+    """Text a reader never sees and the extractor drops: comments, img alt, display:none nodes.
+
+    Parsed again with comments kept (trafilatura's loader removes them).
+    """
+    from lxml import etree, html
+    from trafilatura.utils import decode_file
+
+    parser = html.HTMLParser(remove_comments=False)
+    try:
+        # Decoded as `extract_html` decodes it: lxml guesses the encoding of raw bytes without a
+        # declaration, and a Polish comment would reach `screen` garbled.
+        try:
+            tree = html.fromstring(decode_file(body), parser=parser)
+        except ValueError:
+            # A str with an XML encoding declaration is refused; the raw bytes are not.
+            tree = html.fromstring(body, parser=parser)
+    except (ValueError, etree.ParserError):
+        return ""
+    parts = [c.text or "" for c in tree.xpath("//comment()")]
+    parts += tree.xpath("//img/@alt")
+    for node in tree.xpath("//*[@hidden or @style]"):
+        style = (node.get("style") or "").replace(" ", "").lower()
+        if node.get("hidden") is not None or "display:none" in style:
+            parts.append(node.text_content())
+    return "\n".join(p.strip() for p in parts if p.strip())[:MAX_TEXT_CHARS]
+
+
+def ok(text, title, publisher, date, hidden="") -> dict:
     return {
         "kind": "ok",
         "text": (text or "").strip()[:MAX_TEXT_CHARS],
         "title": (title or "").strip()[:MAX_META_CHARS] or None,
         "publisher": (publisher or "").strip()[:MAX_META_CHARS] or None,
         "date": date,
+        "hidden": hidden,
     }
 
 

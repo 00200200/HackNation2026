@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 import statistics
 
+from prawdowid.rerank import canonical_url
+
 VERDICTS = (
     "potwierdzone",
     "fałszywe",
@@ -41,6 +43,15 @@ def predicted_verdict(resp: dict) -> str:
         return f"status:{status}"
     claim = main_claim(resp)
     return (claim or {}).get("verdict", "")
+
+
+def checked(resp: dict) -> bool:
+    """Some claim went through the sources: a factual verdict or an abstention. Neither
+    `nie sprawdzono` (out of time, a source down) nor `nie podlega weryfikacji` (an opinion, which
+    never reaches the sources) shows that the retrieval worked."""
+    return resp.get("status", "ok") == "ok" and any(
+        c.get("verdict") in (*FACTUAL, ABSTAIN) for c in resp.get("claims") or []
+    )
 
 
 def macro_f1(gold: list[str], pred: list[str]) -> float | None:
@@ -87,25 +98,32 @@ def normalize(text: str) -> str:
 def citation_correctness(
     responses: list[dict], corpus: dict[str, str] | None
 ) -> float | None:
-    """Share of quotes found verbatim in the cited corpus document.
+    """Share of quotes from corpus documents found verbatim in the cited document.
 
     Necessary, not sufficient: an upper bound on "the quote supports the claim". Pair it with a
     manual spot check (evals/results/citation_spotcheck.md).
     """
     if not corpus:
         return None
+    # Only quotes from a document the corpus holds can be checked: a web page outside it is not
+    # wrong, just unmeasured here (spot-check those by hand, citation_spotcheck.md).
+    # The same document may be written differently in the corpus and in the answer, and two
+    # records may share one canonical URL: keep every text, a quote from any of them is correct.
+    docs: dict[str, list[str]] = {}
+    for u, text in corpus.items():
+        docs.setdefault(canonical_url(u), []).append(text)
     quotes = [
-        (e["url"], e["quote"])
+        (canonical_url(e["url"]), e["quote"])
         for r in responses
         for c in (r.get("claims") or [])
         for e in (c.get("evidence") or [])
-        if _has_citation(e)
+        if _has_citation(e) and canonical_url(e["url"]) in docs
     ]
     if not quotes:
         return None
-    return sum(normalize(q) in normalize(corpus.get(u, "")) for u, q in quotes) / len(
-        quotes
-    )
+    return sum(
+        any(normalize(q) in normalize(text) for text in docs[u]) for u, q in quotes
+    ) / len(quotes)
 
 
 def rate(flags: list[bool]) -> float | None:

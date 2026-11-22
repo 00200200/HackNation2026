@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Źródła – faktczyfejk.pl</title>
+  <meta name="description" content="Źródła, z których korzysta faktczyfejk.pl, z typem, licencją, datą pobrania i liczbą rekordów, oraz zasady ich doboru, odświeżania i wykluczania.">
+  <meta name="theme-color" content="#8A1C2F">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/Figtree.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/common.js" defer></script>
+  <script src="/zrodla.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#tresc">Przejdź do listy źródeł</a>
+
+  <div class="hero hero-page">
+    <div class="wrap">
+      <header class="top">
+        <a class="brand" href="/" aria-label="faktczyfejk.pl, strona główna">
+          <svg class="brand-mark" viewBox="0 0 200 200" aria-hidden="true">
+            <rect width="200" height="200" rx="44" fill="#FFFFFF"/>
+            <path d="M72 94 V86 C72 66 84 56 100 56 C116 56 128 66 128 86 C128 102 118 108 110 114 C104 119 100 124 100 134 V142" fill="none" stroke="#8A1C2F" stroke-width="27" stroke-linejoin="round"/>
+            <rect x="86.5" y="154" width="27" height="28" fill="#8A1C2F"/>
+            <g transform="translate(98 60) rotate(-12) scale(0.95)">
+              <path d="M-50 8 C-30 -2 30 -2 50 8 C30 15 -30 15 -50 8 Z" fill="#1D1215"/>
+              <path d="M-30 5 C-30 -26 -14 -38 0 -38 C14 -38 30 -26 30 5 Z" fill="#1D1215"/>
+              <path d="M0 -37 C-6 -47 -15 -45 -10 -37 Z" fill="#1D1215"/>
+              <path d="M0 -37 C6 -47 15 -45 10 -37 Z" fill="#1D1215"/>
+            </g>
+          </svg>
+          <span class="brand-name" aria-hidden="true" translate="no">faktczyfejk</span>
+        </a>
+        <nav class="top-nav" aria-label="Główne"><span class="event">HackNation 2026 · wyzwanie Prawdowid</span><a href="/zrodla" aria-current="page">Źródła</a><a href="https://github.com/00200200/HackNation2026" rel="noopener noreferrer" target="_blank">GitHub<span class="sr-only"> (otwiera się w nowej karcie)</span></a></nav>
+      </header>
+
+      <div class="page-intro">
+        <h1>Źródła</h1>
+        <p>Wszystkie źródła, z których korzystamy przy sprawdzaniu, z licencją i datą pobrania, oraz źródła, których nie zbieramy, z powodem. Strona czyta te same pliki co kod.</p>
+      </div>
+    </div>
+  </div>
+
+  <main id="tresc" class="listing">
+    <div class="wrap">
+      <p class="lead" id="lead" role="status"></p>
+      <noscript><p class="lead">Tabele potrzebują JavaScriptu. Bez niego listę znajdziesz w repozytorium: katalog korpusu w <a href="https://github.com/00200200/HackNation2026/blob/main/corpus/catalog.yaml">corpus/catalog.yaml</a>, domeny wyszukiwarki w <a href="https://github.com/00200200/HackNation2026/blob/main/docs/sources.md">docs/sources.md</a>.</p></noscript>
+
+      <nav aria-label="Na tej stronie">
+        <ul class="toc">
+          <li><a href="#zasady">Zasady</a></li>
+          <li><a href="#na-zywo">Na żywo</a></li>
+          <li><a href="#domeny">Wyszukiwarka</a></li>
+          <li><a href="#korpus">Korpus</a></li>
+          <li><a href="#poza-korpusem">Poza korpusem</a></li>
+        </ul>
+      </nav>
+
+      <section class="block">
+        <h2 id="zasady">Zasady</h2>
+        <p class="section-lead">Te zasady dotyczą korpusu dowodów. Serwisy pytane na żywo działają inaczej, o czym piszemy w następnej części.</p>
+        <dl class="rules">
+          <div>
+            <dt>Kto trafia do korpusu</dt>
+            <dd>
+              <p>Urzędy i instytucje publiczne, polskie i unijne, które publikują pod własną nazwą: ministerstwa, służby, agencje, Sejm, instytucje UE. Serwisy fact-checkingowe z aktualnym statusem IFCN albo EFCSN, sprawdzonym na stronie samej sieci; datę sprawdzenia zapisujemy w katalogu. Do tego baza incydentów wskazana przez organizatora, czyli EUvsDisinfo.</p>
+              <p>Regulamin źródła musi pozwalać przynajmniej na krótki fragment z linkiem. Treść musimy móc pobrać bez obchodzenia robots.txt, logowania, paywalla czy zabezpieczeń przed botami.</p>
+            </dd>
+          </div>
+          <div>
+            <dt>Co zapisujemy</dt>
+            <dd>
+              <p>Pełny tekst zapisujemy tylko wtedy, gdy pozwala na to licencja albo regulamin wydawcy (na przykład CC BY-SA 4.0) albo gdy tekst nie podlega prawu autorskiemu, jak akty prawne i materiały urzędowe (art. 4 ustawy o prawie autorskim). W pozostałych przypadkach zapisujemy metadane, fragment do 500&nbsp;znaków i link (prawo cytatu). Nie zapisujemy obrazów, nagrań ani filmów. Adresy e-mail maskujemy, ogłoszeń o pracę nie zbieramy.</p>
+            </dd>
+          </div>
+          <div>
+            <dt>Jak często odświeżamy</dt>
+            <dd>
+              <p>Serwisy z tabeli „Na żywo” pytamy przy każdym sprawdzeniu. Korpus przebudowujemy ręcznie poleceniem <code translate="no">make corpus</code>. Każde źródło w korpusie ma własny interwał: godzina dla ostrzeżeń IMGW, 30&nbsp;dni dla aktów prawnych UE. Przy przebudowie pobieramy na nowo listy, kanały RSS i odpowiedzi API starsze niż ten interwał.</p>
+              <p>Źródło, które przy przebudowie nie odpowie, zachowuje rekordy z poprzedniej wersji. Wyjątkiem są ostrzeżenia IMGW, bo stare ostrzeżenie wprowadzałoby w błąd. Każdy rekord ma datę pobrania i, jeśli udało się ją odczytać, datę publikacji. Licencję, regulamin i status IFCN albo EFCSN czytamy ponownie przy dodaniu źródła i przed każdym wydaniem.</p>
+            </dd>
+          </div>
+          <div>
+            <dt>Kiedy źródło wypada</dt>
+            <dd>
+              <p>Źródło wypada, gdy robots.txt zabrania pobierania, gdy strona odpowiada blokadą dla botów lub odrzuca automatycznych klientów albo gdy treść istnieje tylko w aplikacji renderowanej skryptem. Wyjątkiem jest oficjalny portal, którego strony same ładują treść z publicznego pliku JSON bez logowania: wtedy czytamy ten JSON. Tak jest z serwisem Odyseusz MSZ.</p>
+              <p>Źródło wypada też, gdy nie działa dłużej niż jeden interwał odświeżania, traci status IFCN albo EFCSN albo zmienia regulamin tak, że nie wolno już zapisać fragmentu. Może je też wykluczyć decyzja zespołu. Tak jest z Demagogiem: jego oceny bierzemy tylko przez Google Fact Check Tools. Wykluczone źródło zostaje w katalogu z powodem i datą. Żeby usunąć pojedynczy dokument, dopisujemy jego adres do listy <code translate="no">removed_urls</code> i przebudowujemy korpus.</p>
+            </dd>
+          </div>
+          <div>
+            <dt>Typy źródeł</dt>
+            <dd>
+              <ul>
+                <li>„Źródło oficjalne” to urząd albo instytucja publiczna, czyli źródło pierwotne lub urzędowe.</li>
+                <li>„Serwis fact-checkingowy” i „serwis informacyjny” to wiarygodne źródła wtórne.</li>
+                <li>„Baza incydentów dezinformacji” i „baza znanych narracji dezinformacyjnych” to EUvsDisinfo. Trafienie w niej mówi tylko, że twierdzenie przypomina opisaną narrację. To kontekst: samo trafienie nigdy nie przesądza o ocenie.</li>
+              </ul>
+              <p>Typ to cecha źródła, nie twierdzenia. Pokazujemy go przy każdym cytacie.</p>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="block">
+        <h2 id="na-zywo">Na żywo, przy każdym pytaniu</h2>
+        <p class="section-lead">Te serwisy pytamy równolegle o każde sprawdzane twierdzenie. Gdy któryś nie odpowie, piszemy o tym w odpowiedzi, w części „Czego nie ustaliliśmy”. Zasady katalogu ich nie obejmują: wyników Google Fact Check Tools nie zawężamy do wybranych wydawców ani nie sprawdzamy ich statusu IFCN lub EFCSN.</p>
+        <div id="lookups"></div>
+
+        <h3 id="domeny">Domeny w wyszukiwarce</h3>
+        <p class="section-lead">Tę listę domen ułożyliśmy ręcznie. Wyszukiwarka zwraca strony tylko z tych domen i ich subdomen, na przykład nik.gov.pl należy do gov.pl. Strony pobieramy zgodnie z robots.txt i nigdy nie obchodzimy blokad. Statusu IFCN lub EFCSN serwisów fact-checkingowych z tej listy nie potwierdziliśmy.<span id="web-licence-note"></span><span id="govpl-note" hidden> Strony www.gov.pl przeszukuje osobno wyszukiwarka serwisu gov.pl.</span></p>
+        <div id="web-search"></div>
+      </section>
+
+      <section class="block">
+        <h2 id="korpus">Korpus dowodów</h2>
+        <p class="section-lead" id="corpus-lead">Korpus to dokumenty, które pobraliśmy wcześniej z serwisów urzędowych i fact-checkingowych, każdy z datą pobrania.</p>
+        <p class="section-lead" id="corpus-count"></p>
+        <div id="corpus"></div>
+      </section>
+
+      <section class="block">
+        <h2 id="poza-korpusem">Poza korpusem</h2>
+        <p class="section-lead">Te źródła opisaliśmy w katalogu, ale nie zbieramy ich do korpusu. Opisy bierzemy prosto z katalogu, dlatego są po angielsku.</p>
+        <h3 id="kandydaci">Jeszcze nie zbieramy</h3>
+        <p class="section-lead">Kandydaci do korpusu, którym czegoś jeszcze brakuje (na przykład własnego parsera, sprawdzonej licencji albo statusu IFCN lub EFCSN), oraz źródła planowane jako zapytanie na żywo, które niczego nie zapisuje. Szczegóły są w kolumnach „Licencja” i „Czego brakuje”.</p>
+        <div id="candidates"></div>
+        <h3 id="wykluczone">Wykluczone</h3>
+        <p class="section-lead">Wykluczenie dotyczy korpusu. Domeny z „tak” w kolumnie „W wyszukiwarce” są objęte listą wyszukiwarki, więc ich strony mogą trafić do odpowiedzi, jeśli robots.txt pozwala je pobrać i strona nie blokuje botów. Oceny serwisów fact-checkingowych mogą też przyjść przez Google Fact Check Tools, bo przy sprawdzeniu na żywo nie zawężamy jego wyników do wybranych wydawców.</p>
+        <div id="excluded"></div>
+      </section>
+
+      <p class="data-note">Ta strona czyta katalog <a href="https://github.com/00200200/HackNation2026/blob/main/corpus/catalog.yaml">corpus/catalog.yaml</a>, plik korpusu <code translate="no">corpus/evidence.jsonl</code> i listę domen z kodu wyszukiwarki, więc pokazuje to samo, czego używa kod. Opis korpusu: <a href="https://github.com/00200200/HackNation2026/blob/main/docs/corpus.md">docs/corpus.md</a>, opis wyszukiwania: <a href="https://github.com/00200200/HackNation2026/blob/main/docs/sources.md">docs/sources.md</a>. Te same dane w formacie JSON: <a href="/api/sources">/api/sources</a>.</p>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-row">
+      <p class="foot-slogan">Fakt ma przypis.</p>
+      <p>Prototyp z HackNation 2026, wyzwanie Prawdowid. <a href="/zrodla" aria-current="page">Źródła</a> i <a href="https://github.com/00200200/HackNation2026" rel="noopener noreferrer" target="_blank">kod źródłowy<span class="sr-only"> (otwiera się w nowej karcie)</span></a>.</p>
+    </div>
+  </footer>
+</body>
+</html>

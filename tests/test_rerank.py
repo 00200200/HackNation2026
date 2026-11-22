@@ -298,3 +298,116 @@ def test_input_budget_applies_before_splitting(monkeypatch):
     fragments = rr.split_all(pages, exclude_url=None)
     assert {f.doc_id for f in fragments} == {"https://p0.pl/", "https://p1.pl/"}
     assert sum(len(f.source.fragment) for f in fragments) <= 2 * 100
+
+
+def test_fact_check_rating_stays_first_and_the_fetched_page_follows_it():
+    hit = source(
+        "https://konkret24.tvn24.pl/x/",
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Polska wyszła z UE.",
+    ).model_copy(update={"source_type": "fact_check"})
+    page = source("https://konkret24.tvn24.pl/x", "Pełny tekst analizy.")
+    ranking = run([hit, page], answering([0]))
+    [fragment] = ranking.fragments
+    assert fragment.source.fragment == f"{hit.fragment}\n\n{page.fragment}"
+    assert fragment.source.source_type == "fact_check"
+
+
+def test_the_same_page_text_is_appended_once():
+    hit = source(
+        "https://konkret24.tvn24.pl/x/",
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Polska wyszła z UE.",
+    ).model_copy(update={"source_type": "fact_check"})
+    page = source("https://konkret24.tvn24.pl/x", "Pełny tekst analizy.")
+    ranking = run([hit, page, page.model_copy()], answering([0]))
+    [fragment] = ranking.fragments
+    assert fragment.source.fragment.count("Pełny tekst analizy.") == 1
+
+
+BLOCKED = "strona nie pozwala na pobranie"
+
+
+def snippet(url, text):
+    return source(url, text).model_copy(update={"snippet_only": BLOCKED})
+
+
+@pytest.mark.parametrize("snippet_first", [True, False])
+def test_a_page_we_read_replaces_a_search_snippet_of_it(snippet_first):
+    found = snippet("https://konkret24.tvn24.pl/x", "Krótki fragment z wyszukiwarki.")
+    page = source("https://konkret24.tvn24.pl/x", "Pełny tekst analizy.")
+    candidates = [found, page] if snippet_first else [page, found]
+    [fragment] = run(candidates, answering([0])).fragments
+    assert fragment.source.fragment == page.fragment
+    assert fragment.source.snippet_only is None
+
+
+def test_a_snippet_is_never_joined_to_a_fact_check_rating():
+    hit = source(
+        "https://demagog.org.pl/x/",
+        "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Polska wyszła z UE.",
+    ).model_copy(update={"source_type": "fact_check"})
+    found = snippet("https://demagog.org.pl/x", "Fragment z wyszukiwarki.")
+    [fragment] = run([hit, found], answering([0])).fragments
+    assert fragment.source.fragment == hit.fragment
+    assert fragment.source.snippet_only is None
+
+
+def test_a_snippet_filling_a_title_only_hit_keeps_its_label():
+    hit = source("https://demagog.org.pl/x/", title="Polska w UE od 2004? Prawda")
+    found = snippet("https://demagog.org.pl/x", "Fragment z wyszukiwarki.")
+    [fragment] = run([hit, found], answering([0])).fragments
+    assert fragment.source.fragment == found.fragment
+    assert fragment.source.snippet_only == BLOCKED
+    assert fragment.source.title == hit.title  # the first candidate's metadata
+
+
+@pytest.mark.parametrize("snippet_first", [True, False])
+def test_a_snippet_copy_never_hides_a_page_we_read(snippet_first):
+    text = "Polska jest członkiem UE od 1 maja 2004 roku."
+    copies = [snippet("https://a.pl/x", text), source("https://b.pl/y", text)]
+    if not snippet_first:
+        copies.reverse()
+    [fragment] = run(copies, answering([0])).fragments
+    assert fragment.source.snippet_only is None
+
+
+def test_two_fact_checkers_rating_one_claim_alike_are_both_kept():
+    # Two reviews of one claim with the same rating get the same rating line (our wording,
+    # `factcheck.review_fragment`): two findings, not a copy.
+    text = "Ocena fact-checkera: Fałsz.\n\nSprawdzane twierdzenie: Polska wyszła z UE."
+    reviews = [
+        source(url, text).model_copy(update={"source_type": "fact_check"})
+        for url in ("https://demagog.org.pl/a", "https://konkret24.tvn24.pl/b")
+    ]
+    assert len(run(reviews, answering([0, 1])).fragments) == 2
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, "default"),
+        ("", "default"),
+        ("false", False),
+        (" LOW ", "low"),
+        ("high", "high"),
+    ],
+)
+def test_thinking_env(monkeypatch, raw, expected):
+    if raw is None:
+        monkeypatch.delenv("T", raising=False)
+    else:
+        monkeypatch.setenv("T", raw)
+    assert rr.thinking_env("T", "default") == expected
+
+
+def test_thinking_env_rejects_other_values(monkeypatch):
+    monkeypatch.setenv("T", "xhigh")
+    with pytest.raises(ValueError, match="T must be"):
+        rr.thinking_env("T", False)
+
+
+def test_each_agent_has_its_thinking_setting():
+    from prawdowid import judge, verifier
+
+    assert rr.agent.model_settings["thinking"] is False
+    assert judge.agent.model_settings["thinking"] == "low"
+    assert verifier.agent.model_settings["thinking"] == "low"

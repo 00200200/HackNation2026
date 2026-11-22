@@ -1,24 +1,37 @@
 """Steps 2 to 5 for one claim, under the time budget of the whole check.
 
-Step 2 runs up to five lookups at once: 2a Google Fact Check (`factcheck.search_claims`), EUvsDisinfo
+Step 2 runs five lookups at once: 2a Google Fact Check (`factcheck.search_keys`, the claim and its
+short keys from `factcheck.keys_for`), EUvsDisinfo
 known narratives (`euvsdisinfo.search_cases`, context that never decides alone), the www.gov.pl
 site search (`govpl.search_govpl`, the claim's gov.pl queries, else its first web query; off with
-PRAWDOWID_GOVPL=0), the registers of law (`legal.search_legal`, ISAP/ELI and EUR-Lex, only for a
-claim with legal queries; off with PRAWDOWID_LEGAL=0) and 2b web search and fetch (`websearch.search_web`, one search per web query of
-the claim, www.gov.pl pages left to the gov.pl lookup). Step 2c (our own database,
-#19) is out of the pipeline for now (team decision). Any EUvsDisinfo source, whichever lookup
-found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
-steps 4 and 5 (`judge.judge`, verdict from `decide()`). When the evidence is not enough and time
-remains, the web is searched once more with a rewritten query and the claim is judged again.
+PRAWDOWID_GOVPL=0), 2b web search and fetch (`websearch.search_web`, one search per web query of
+the claim, the claim itself, and the claim among the fact-checkers' domains only, www.gov.pl pages left to the gov.pl lookup) and our evidence corpus
+(`corpus_bm25.search_evidence`: BM25 over `corpus/evidence.jsonl`, the claim and all its queries).
+Step 2c (our own database, #19) is out of the pipeline for now (team decision). Any EUvsDisinfo
+source, whichever lookup found it, is context only. The candidates go to step 3 (`rerank.rerank`, the linked page left out) and
+steps 4 and 5 (`judge.judge`, verdict from `decide()`). There is no second pass: the claim sentence
+itself is always one of the first web searches, and one more search of the claim is restricted to
+the fact-checkers' domains, all in parallel with the rest. The old sequential retry is gone (#106,
+WORKLOG).
 
-A source that fails adds a limitation; when every source failed, or the judge did not answer, the
-claim is not checked, never "brak wystarczających dowodów". A claim that runs out of time is not
-checked either, and keeps the limitations of the sources that had already failed. Every step's
-time goes to the log; the reranker and judge calls are priced like the extraction call.
+A source that fails adds a limitation. The sources that can decide a verdict (Fact Check, web
+search) are the ones whose outage matters: when one of them failed and the evidence is not enough,
+when every source failed, or when the judge did not answer, the claim is not checked and the
+outage is the reason, never "brak wystarczających dowodów" (`ClaimCheck.outage`, which turns an
+all-outage answer into a technical error). Fact Check failed when the claim's own key or every key
+failed (`FactCheckLookup.failed`), web search when every query failed (`WebSearch.failed`); a
+failed key or query among others that answered is a limitation only. The corpus is a file on our
+own disk, so it never counts as a source that answered: when every outside source failed, corpus
+hits count only if they settle the claim, otherwise it is not checked. A claim that runs out of time is not checked either, and
+keeps the limitations of the sources that had already failed. Every step's time goes to the log;
+the reranker and judge calls are priced like the extraction call.
+
+Retrieved pages are screened for instructions in code (`_source_events`, the same patterns as the
+user's text), whatever the models do: an injection is logged even when rerank drops the page
+before the judge sees it, or the claim is cut by the time limit.
 """
 
 import asyncio
-import itertools
 import logging
 import os
 import time
@@ -28,26 +41,28 @@ from pydantic_ai import ModelResponse, capture_run_messages
 from pydantic_ai.messages import ModelMessage, ModelRequest
 
 from prawdowid import (
+    corpus_bm25,
     euvsdisinfo,
     factcheck,
+    faults,
     govpl,
-    injection,
     judge,
-    legal,
     rerank,
     websearch,
 )
-from prawdowid.contract import ModelCall, Source, Verdict
+from prawdowid.contract import ModelCall, SecurityEvent, Source, Verdict
 
 log = logging.getLogger("prawdowid")
 
 # Hyperparameters, first guesses for the 30 s median, not tuned.
-# Whole check, from the request to the last verdict (the API gives up at 60 s).
-CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 25)
-# The retry starts only with at least this much time left: a web search, rerank and judge again.
-RETRY_MIN_S = float(os.getenv("PRAWDOWID_RETRY_MIN_S") or 18)
+# Whole check, from the request to the last verdict (the API gives up at 60 s, nginx at 75 s).
+# 25 s left a long page with no judged claim (#63): extraction alone takes much of it.
+CHECK_BUDGET_S = float(os.getenv("PRAWDOWID_CHECK_BUDGET_S") or 40)
 # EUvsDisinfo only adds context: it may not hold up the claim for its own 15 s deadline.
 EUVSDISINFO_BUDGET_S = float(os.getenv("PRAWDOWID_EUVSDISINFO_BUDGET_S") or 5)
+# The API builds the corpus index at startup (about a second, more on a small server); a lookup
+# that finds it ready takes a millisecond, one that comes first builds it while the web lookups run.
+CORPUS_BUDGET_S = 5
 
 TIME_LIMIT = (
     "Nie sprawdzono: skończył się czas przeznaczony na sprawdzenie ({budget:g} s). "
@@ -58,22 +73,35 @@ WEB_PARTIAL = (
     "więc źródła mogą być niepełne."
 )
 DISINFO_DATABASE = websearch.ALLOWLIST["euvsdisinfo.eu"].source_type
-RETRY_UNJUDGED = (
-    "Dodatkowe wyszukiwanie znalazło strony, ale model nie zdążył ich ocenić, "
-    "więc ocena opiera się tylko na pierwszym wyszukiwaniu."
+FACT_CHECK_DOMAINS = tuple(
+    host for host, d in websearch.ALLOWLIST.items() if d.source_type == "fact_check"
+)
+FACTCHECK_DOWN = "bazy Google Fact Check"
+WEB_DOWN = "wyszukiwarki internetowej"
+GOVPL_DOWN = "wyszukiwarki portalu www.gov.pl"
+OUTAGE = (
+    "Nie mogę teraz sprawdzić {what} z powodu błędu dostępu. To awaria techniczna, "
+    "a nie wynik sprawdzenia: nie wydajemy werdyktu, a brak odpowiedzi nie znaczy, "
+    "że nic nie znaleziono."
 )
 SOURCES_FAILED = (
-    "Nie sprawdzono: żadne źródło nie zwróciło wyników ani nie odpowiedziało, "
-    "więc nie wydajemy werdyktu."
+    "Nie mogę teraz sprawdzić tego twierdzenia: żadne źródło nie odpowiedziało ani nie dało się "
+    "odczytać. To awaria techniczna, a nie wynik sprawdzenia: nie wydajemy werdyktu."
 )
 
 
 class ClaimCheck(BaseModel):
     judgement: judge.Judgement
-    # Reranker and judge calls; None when a request may be billed but its price is unknown.
-    cost_usd: float | None
+    # Priced sum of the reranker and judge requests that were answered, always a number.
+    cost_usd: float
+    # Requests that may be billed but have no price (cut, failed, unpriced model): the cost
+    # above is then a lower bound.
+    unpriced_requests: int = 0
     steps_ms: dict[str, int]
     model_calls: list[ModelCall] = []
+    # The claim is not checked because a source or the model was down: a technical failure of
+    # the check, not a time limit.
+    outage: bool = False
 
 
 async def check_claim(
@@ -82,16 +110,19 @@ async def check_claim(
     deadline: float,
     exclude_url: str | None = None,
     govpl_queries: list[str] = (),
-    legal_queries: list[str] = (),
-    factcheck_queries: list[str] = (),
+    source_sentence: str = "",
 ) -> ClaimCheck:
     """Verdict for one claim. `deadline` is `loop.time()` when the whole check must end.
 
     `queries` go to web search, `govpl_queries` to the gov.pl site search (to the web when it is
-    switched off), `legal_queries` to the registers of law (nothing when empty),
-    `factcheck_queries` to Google Fact Check next to the claim itself.
+    switched off). Fact Check gets the claim and short keys: both kinds of queries, the names in
+    the claim and spans in quotation marks in the claim or `source_sentence`.
     """
     steps: dict[str, int] = {}
+    # Before the gov.pl switch below folds its queries into the web ones.
+    factcheck_keys = factcheck.keys_for(
+        claim, [*queries, *govpl_queries], [claim, source_sentence]
+    )
     # Messages of each reranker and judge run, priced and logged in `_done`.
     runs: list[list[ModelMessage]] = []
     # Each lookup's answer as soon as it arrives, so a time limit keeps what already failed.
@@ -102,65 +133,52 @@ async def check_claim(
         gov = gov or [q for q in queries if q.strip()][:1] or [claim]
     else:
         gov, queries = None, [*queries, *govpl_queries]
-    searched = queries or [claim]
-    laws = [q for q in legal_queries if q.strip()] if legal.ENABLED else []
+    # The claim sentence is always searched: it is what a retry would have searched.
+    searched = list(dict.fromkeys([*queries, claim]))
     if _now() >= deadline:  # nothing is started after the budget ran out
         return _done(claim, _time_limit(found), runs, steps)
     try:
         async with asyncio.timeout_at(deadline):
-            await _retrieve(
-                claim, searched, gov, steps, found, laws, list(factcheck_queries)
-            )
-            candidates = _candidates(found)
+            await _retrieve(claim, searched, gov, steps, found, factcheck_keys)
+            candidates = _candidates(found, claim)
             judgement = await _judge(claim, candidates, exclude_url, steps, runs)
     except TimeoutError:
-        # The cost is None for a model request cut mid-flight, 0 when only search was cut.
-        return _done(claim, _time_limit(found), runs, steps)
-    # Injections the judge found in retrieved pages, kept from both passes.
-    events = list(judgement.security_events)
-
-    cut = False
-    # The claim itself is the rewritten query, so no retry when it was searched already.
-    retry = claim not in searched
-    if retry and _needs_more(judgement) and deadline - _now() >= RETRY_MIN_S:
-        try:
-            async with asyncio.timeout_at(deadline):
-                # ponytail: the claim itself is the rewritten query (the first pass used the
-                # model's queries); a HyDE-FC rewrite costs one more model call per claim.
-                web = await _timed(steps, "retry_web", _search_web, claim)
-                if web.documents:
-                    more = candidates + _candidates({"web": [web]})
-                    second = await _judge(
-                        claim, more, exclude_url, steps, runs, "retry_"
-                    )
-                    # The first pass assessed evidence only when it had fragments left after
-                    # rerank (the linked page excluded): otherwise there is no verdict to keep.
-                    assessed = judge.NO_FRAGMENTS not in judgement.limitations
-                    if second.verdict is Verdict.NOT_CHECKED and assessed:
-                        # The retry judge failed: the verdict from the first pass's evidence
-                        # stands, judged without the extra pages.
-                        judgement.limitations.append(RETRY_UNJUDGED)
-                    else:
-                        judgement = second
-                        events += judgement.security_events
-                        candidates = more
-                # Only a finished retry counts: a cut one keeps the first pass as it was.
-                found["web"].append(web)
-        except TimeoutError:
-            log.info("retry cut by the time limit claim=%r", claim)
-            cut = True
+        # A model request cut mid-flight is counted as unpriced; cost 0 when only search was cut.
+        timed_out = _time_limit(found)
+        # The pattern pre-check needs no model: pages already found are still screened.
+        timed_out.security_events = _source_events(
+            _candidates(found, claim), exclude_url
+        )
+        return _done(claim, timed_out, runs, steps)
+    # Instructions in retrieved pages: the pattern pre-check on every
+    # candidate (rerank may drop it before the judge sees it) and the judge's own flag.
+    events = [*_source_events(candidates, exclude_url), *judgement.security_events]
 
     limits = _limits(found)
-    if len(limits) == len(found) and not candidates:  # every source failed
-        reason = TIME_LIMIT.format(budget=CHECK_BUDGET_S) if cut else SOURCES_FAILED
-        judgement = _not_checked(reason)
+    outage = judgement.verdict is Verdict.NOT_CHECKED  # the judge did not answer
+    down = _deciders_down(found, govpl_decides=bool(govpl_queries))
+    # The corpus is a file on our disk and says nothing about the outside sources: when all of
+    # them failed, it counts only if it settled the claim, else the claim is not checked.
+    outside = {name: lookup for name, lookup in found.items() if name != "corpus"}
+    every_source_failed = set(outside) <= set(limits) and not _candidates(
+        outside, claim
+    )
+    if every_source_failed and (
+        not candidates or judgement.verdict is Verdict.INSUFFICIENT_EVIDENCE
+    ):
+        outage = True
+        judgement = _not_checked(SOURCES_FAILED)
+    elif down and _needs_more(judgement):
+        # Not "no evidence exists": the source that could have had it did not answer.
+        outage = True
+        judgement = _not_checked(OUTAGE.format(what=" ani ".join(down)))
     # The main reason first, then what each source said.
     reasons = judgement.limitations if judgement.verdict is Verdict.NOT_CHECKED else []
     judgement.limitations = list(
         dict.fromkeys([*reasons, *limits.values(), *judgement.limitations])
     )
     judgement.security_events = events[:1]  # same kind and location: one is enough
-    return _done(claim, judgement, runs, steps)
+    return _done(claim, judgement, runs, steps, outage)
 
 
 async def _retrieve(
@@ -169,10 +187,11 @@ async def _retrieve(
     gov: list[str] | None,
     steps: dict[str, int],
     found: dict,
-    laws: list[str] = (),
-    fc_queries: list[str] = (),
+    factcheck_keys: list[str] = (),
 ) -> None:
-    """Steps 2a, EUvsDisinfo, gov.pl (when `gov` is set), law registers (when `laws` is set) and 2b at once, each answer stored in `found` as it arrives.
+    """Steps 2a (every key in `factcheck_keys` at once, the claim when there are none),
+    EUvsDisinfo, gov.pl (when `gov` is set), 2b and the corpus at once, each answer stored in
+    `found` as it arrives.
 
     TaskGroup: when the time limit cuts the claim, every lookup task still running is cancelled
     and awaited before this returns. Provider threads (`asyncio.to_thread`) cannot be cancelled:
@@ -182,38 +201,96 @@ async def _retrieve(
     async def keep(name, fn):
         found[name] = await _timed(steps, name, fn, claim)
 
-    async def web(query):
-        found["web"].append(await _search_web(query))
+    async def web(query, domains=None):
+        found["web"].append(await _search_web(query, domains))
 
     async def all_web():
         async with asyncio.TaskGroup() as tg:
             for query in queries:
                 tg.create_task(web(query))
+            # The fact-checkers alone: a review is not crowded out by the other allowlisted sites.
+            tg.create_task(web(claim, FACT_CHECK_DOMAINS))
 
+    # The corpus gets every wording: the rankings of the claim and of each query are merged.
+    corpus_queries = list(dict.fromkeys([claim, *queries, *(gov or [])]))
     async with asyncio.TaskGroup() as tg:
-        # The prompt asks for 1 or 2 keyword queries; never more Fact Check calls than that.
         tg.create_task(
-            keep("factcheck", lambda c: _search_claims([c, *fc_queries[:2]]))
+            keep(
+                "factcheck", lambda _: _search_claims(claim, factcheck_keys or [claim])
+            )
         )
         tg.create_task(keep("euvsdisinfo", _search_cases))
         tg.create_task(_timed(steps, "web", all_web))
+        tg.create_task(keep("corpus", lambda _: _search_corpus(corpus_queries)))
         if gov is not None:
             tg.create_task(keep("govpl", lambda _: _search_govpl(gov)))
-        if laws:
-            tg.create_task(keep("legal", lambda c: _search_legal(laws, c)))
         # Step 2c (`cache.search_documents`, #19) plugs in here when it is back in the pipeline.
 
 
-def _candidates(found: dict) -> list[Source]:
+def _candidates(found: dict, claim: str) -> list[Source]:
+    webs = [*found["web"], found.get("govpl", websearch.WebSearch())]
+    govpl = found.get("govpl", websearch.WebSearch()).documents
+    web = [d for w in found["web"] for d in w.documents]
+    # rerank keeps the first MAX_DOCUMENTS URLs, so the narrow lookups (gov.pl, the fact-checkers'
+    # reviews) come before the general web pages, whatever order the searches finished in. A
+    # fact-checker's rating from its page's markup comes right before the page, as a Fact Check
+    # hit would: rerank keeps it first and the page text after it, and a Fact Check hit with a
+    # rating for the same page, which comes earlier, wins.
+    ordered = [
+        *govpl,
+        *(d for d in web if d.source_type == "fact_check"),
+        *(d for d in web if d.source_type != "fact_check"),
+    ]
+    pages = [
+        d.to_source(fragment=fragment)
+        for d in ordered
+        for fragment in [*_closest_review(d.reviews, claim), d.text]
+    ]
+    # A page fetched in this check beats its stored copy: rerank keeps the first source per URL.
+    # A snippet is no copy of the page: the stored full text stays beside it.
+    live = {
+        rerank.canonical_url(str(d.url))
+        for w in webs
+        for d in w.documents
+        if not d.snippet_only
+    }
     sources = [
         h.source
-        for name in ("factcheck", "euvsdisinfo")
+        for name in ("factcheck", "euvsdisinfo", "corpus")
         if name in found
         for h in found[name].hits
+        if name != "corpus" or rerank.canonical_url(str(h.source.url)) not in live
     ]
-    webs = [*found["web"], *(found[k] for k in ("govpl", "legal") if k in found)]
-    sources += [d.to_source(fragment=d.text) for w in webs for d in w.documents]
-    return [_context_only(s) for s in sources]
+    # The corpus comes before the web: past MAX_DOCUMENTS the web's tail is cut, not its hits.
+    return [_context_only(s) for s in [*sources, *pages]]
+
+
+def _closest_review(reviews: list[str], claim: str) -> list[str]:
+    """Of a page's ratings, the one whose reviewed claim shares most words with ours (the first
+    on a tie): rerank keeps one record per page, and `factcheck.search_keys` picks among the
+    reviews of one URL the same way."""
+    words = set(factcheck.WORD.findall(claim.casefold()))
+
+    def shared(review: str) -> int:
+        reviewed = review.partition(factcheck.CLAIM_PREFIX)[2]
+        return len(words & set(factcheck.WORD.findall(reviewed.casefold())))
+
+    return [max(reviews, key=shared)] if reviews else []
+
+
+def _source_events(
+    sources: list[Source], exclude_url: str | None
+) -> list[SecurityEvent]:
+    """Pattern pre-check on retrieved sources; the linked page itself is logged as `page`."""
+    from prawdowid.verifier import screen  # verifier imports this module
+
+    skip = exclude_url and rerank.canonical_url(exclude_url)
+    for source in sources:  # one event per check is enough
+        if skip and rerank.canonical_url(str(source.url)) == skip:
+            continue
+        if events := screen(f"{source.title}\n{source.fragment or ''}", "source"):
+            return events
+    return []
 
 
 def _context_only(source: Source) -> Source:
@@ -246,10 +323,26 @@ def _limits(found: dict) -> dict[str, str]:
         if "euvsdisinfo" in found
         else None,
         "govpl": found["govpl"].limitation if "govpl" in found else None,
-        "legal": found["legal"].limitation if "legal" in found else None,
         "web": web,
+        "corpus": found["corpus"].limitation if "corpus" in found else None,
     }
     return {k: v for k, v in limits.items() if v}
+
+
+def _deciders_down(found: dict, govpl_decides: bool) -> list[str]:
+    """The sources that can decide a verdict and failed (not: answered with no hits). The gov.pl
+    search decides only for a claim about the Polish government (the model gave it gov.pl queries);
+    web search leaves www.gov.pl to it."""
+    down = []
+    # The claim's own key or every key failed: a failed name or query key alone is a limitation.
+    if "factcheck" in found and found["factcheck"].failed:
+        down.append(FACTCHECK_DOWN)
+    # Every query failed at the provider: one query that found nothing is an answer.
+    if found["web"] and all(w.failed for w in found["web"]):
+        down.append(WEB_DOWN)
+    if govpl_decides and "govpl" in found and found["govpl"].limitation:
+        down.append(GOVPL_DOWN)
+    return down
 
 
 def _time_limit(found: dict) -> judge.Judgement:
@@ -258,16 +351,20 @@ def _time_limit(found: dict) -> judge.Judgement:
     return judgement
 
 
-async def _search_web(query: str) -> websearch.WebSearch:
+async def _search_web(
+    query: str, domains: tuple[str, ...] | None = None
+) -> websearch.WebSearch:
     """An unexpected error (cache write, extraction) is a limitation of this source only."""
     try:
         # Bounded inside: search by SEARCH_BUDGET_S, each page by PAGE_BUDGET_S.
         return await websearch.search_web(
-            query, skip_hosts=govpl.HOSTS if govpl.ENABLED else frozenset()
+            query,
+            skip_hosts=govpl.HOSTS if govpl.ENABLED else frozenset(),
+            **({"domains": domains} if domains else {}),
         )
     except Exception:
         log.exception("web search failed query=%r", query)
-        return websearch.WebSearch(limitation=websearch.SEARCH_UNAVAILABLE)
+        return websearch.WebSearch(limitation=websearch.SEARCH_UNAVAILABLE, failed=True)
 
 
 async def _search_govpl(queries: list[str]) -> websearch.WebSearch:
@@ -278,37 +375,15 @@ async def _search_govpl(queries: list[str]) -> websearch.WebSearch:
         return websearch.WebSearch(limitation=govpl.LOOKUP_UNAVAILABLE)
 
 
-async def _search_legal(queries: list[str], claim: str) -> websearch.WebSearch:
+async def _search_claims(claim: str, keys: list[str]) -> factcheck.FactCheckLookup:
+    # Eval traffic only (see faults.py): every key fails, so none is sent.
+    if faults.active(faults.FACTCHECK_UNAVAILABLE):
+        return factcheck.unavailable()
     try:
-        return await legal.search_legal(queries, claim)
+        return await factcheck.search_keys(claim, keys)
     except Exception:
-        log.exception("legal search failed")
-        return websearch.WebSearch(limitation=legal.LOOKUP_UNAVAILABLE)
-
-
-async def _search_claims(queries: list[str]) -> factcheck.FactCheckLookup:
-    """Every query at once, reviews merged by URL taking turns between queries (the claim's own
-    first) and capped at one page: keyword queries match broadly, and rerank keeps the first
-    documents, so more reviews would push web, gov.pl and law sources out. Unavailable only when
-    every lookup failed."""
-    queries = list(dict.fromkeys(q.strip() for q in queries if q.strip()))
-    lookups = await asyncio.gather(
-        *map(factcheck.search_claims, queries), return_exceptions=True
-    )
-    for lookup in lookups:
-        if isinstance(lookup, Exception):
-            log.error("factcheck failed: %r", lookup)
-    answered = [lookup.hits for lookup in lookups if not isinstance(lookup, Exception)]
-    hits: dict[str, factcheck.FactCheckHit] = {}
-    for turn in itertools.zip_longest(*answered):
-        for h in turn:
-            if h:
-                hits.setdefault(str(h.source.url), h)
-    if not hits and all(
-        isinstance(lookup, Exception) or lookup.limitation for lookup in lookups
-    ):
-        return factcheck.FactCheckLookup(limitation=factcheck.LOOKUP_UNAVAILABLE)
-    return factcheck.FactCheckLookup(hits=list(hits.values())[: factcheck.PAGE_SIZE])
+        log.exception("factcheck failed")
+        return factcheck.unavailable()
 
 
 async def _search_cases(claim: str) -> euvsdisinfo.EuvsdisinfoLookup:
@@ -321,6 +396,16 @@ async def _search_cases(claim: str) -> euvsdisinfo.EuvsdisinfoLookup:
         return euvsdisinfo.EuvsdisinfoLookup(limitation=euvsdisinfo.LOOKUP_UNAVAILABLE)
 
 
+async def _search_corpus(queries: list[str]) -> corpus_bm25.EvidenceLookup:
+    try:
+        return await asyncio.wait_for(
+            corpus_bm25.search_evidence(queries), CORPUS_BUDGET_S
+        )
+    except Exception:  # TimeoutError of its own budget included
+        log.exception("corpus search failed")
+        return corpus_bm25.EvidenceLookup(limitation=corpus_bm25.CORPUS_UNAVAILABLE)
+
+
 async def _judge(
     claim: str,
     candidates: list[Source],
@@ -330,16 +415,6 @@ async def _judge(
     prefix: str = "",
 ) -> judge.Judgement:
     """Steps 3 to 5. The linked page is never evidence for its own claims."""
-    # Report-only screen of every retrieved page in code, next to the judge's own flag.
-    # CPU-bound (tens of ms per long page), so off the event loop; timed like the other steps.
-    events = await _timed(
-        steps,
-        prefix + "screen",
-        asyncio.to_thread,
-        injection.screen_sources,
-        candidates,
-        exclude_url,
-    )
     ranking = await _priced(
         runs,
         _timed(
@@ -360,11 +435,9 @@ async def _judge(
             update={
                 "limitations": list(
                     dict.fromkeys([judge.JUDGE_UNAVAILABLE, *judgement.limitations])
-                ),
-                "security_events": events,
+                )
             }
         )
-    judgement.security_events = [*events, *judgement.security_events]
     return judgement
 
 
@@ -386,17 +459,19 @@ def _needs_more(judgement: judge.Judgement) -> bool:
     )
 
 
-def _cost(messages: list[ModelMessage]) -> float | None:
-    """Price of the captured run: 0.0 without a request, None when a request got no priced
-    answer (failed, cut off or an unpriced model)."""
+def _cost(messages: list[ModelMessage]) -> tuple[float, int]:
+    """Captured run: the priced sum of every answered request, and how many requests have no
+    price (sent but never answered, or answered by an unpriced model)."""
     responses = [m for m in messages if isinstance(m, ModelResponse)]
     requests = [m for m in messages if isinstance(m, ModelRequest)]
-    if len(requests) > len(responses):
-        return None
-    try:
-        return sum(float(r.cost().total_price) for r in responses)
-    except (LookupError, ValueError):
-        return None
+    unpriced = max(0, len(requests) - len(responses))
+    total = 0.0
+    for r in responses:
+        try:
+            total += float(r.cost().total_price)
+        except (LookupError, ValueError):
+            unpriced += 1
+    return total, unpriced
 
 
 async def _timed(steps: dict[str, int], name: str, fn, *args, **kwargs):
@@ -428,21 +503,26 @@ def _done(
     judgement: judge.Judgement,
     runs: list[list[ModelMessage]],
     steps: dict[str, int],
+    outage: bool = False,
 ) -> ClaimCheck:
     costs = [_cost(m) for m in runs]
-    cost = None if None in costs else sum(costs)
+    cost = sum(c for c, _ in costs)
+    unpriced = sum(n for _, n in costs)
     log.info(
-        "claim check claim=%r verdict=%s sources=%d cost_usd=%s steps_ms=%s",
+        "claim check claim=%r verdict=%s sources=%d cost_usd=%s unpriced=%d steps_ms=%s",
         claim,
         judgement.verdict,
         len(judgement.sources),
         cost,
+        unpriced,
         steps,
     )
     return ClaimCheck(
         judgement=judgement,
         cost_usd=cost,
+        unpriced_requests=unpriced,
         steps_ms=steps,
+        outage=outage,
         model_calls=[
             model_call(r) for m in runs for r in m if isinstance(r, ModelResponse)
         ],

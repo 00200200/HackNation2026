@@ -1,0 +1,1151 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PRAWDOWID",
+    "description": "Fact-checks a message or a link in Polish. Each checkable claim gets a verdict with the sources behind it: a quote, the publisher, the date and a link. When the evidence is not there, the verdict says so.\n\nThe web page and the Discord bot call `POST /api/checks`. A new channel does the same and names itself in `X-Channel`. The limit is 10/minute per client IP.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/checks": {
+      "post": {
+        "summary": "Check a text or a link",
+        "description": "`input` is a message, a question or one `http`/`https` link. For a link the server fetches the page and checks its text. Allow up to 60 s for the answer.\n\nA check that could not run still returns `200`: `status` is then `technical_error`, `cannot_check` or `needs_clarification`, and `message` says why in Polish. An `input` that is empty, too long or not a valid link returns `422` with a Polish text in `detail[0].msg`; too many requests return `429`.",
+        "operationId": "create_check_api_checks_post",
+        "parameters": [
+          {
+            "name": "X-Channel",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The calling channel, logged with every check. Known values: demo, discord, web. Any other value is logged as `other`.",
+              "default": "web",
+              "title": "X-Channel"
+            },
+            "description": "The calling channel, logged with every check. Known values: demo, discord, web. Any other value is logged as `other`."
+          },
+          {
+            "name": "X-Session-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Session id from an earlier answer: 8 to 64 letters, digits or hyphens. The session's checks are kept together, and `DELETE /api/sessions/{session}` removes them. Without a valid id the server starts a new session.",
+              "title": "X-Session-Id"
+            },
+            "description": "Session id from an earlier answer: 8 to 64 letters, digits or hyphens. The session's checks are kept together, and `DELETE /api/sessions/{session}` removes them. Without a valid id the server starts a new session."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The check result; `status` says whether the check ran.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Session-Id": {
+                "description": "The session of this check: the one sent, or a new one. Send it back on the next check.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{session}": {
+      "get": {
+        "summary": "Read Session",
+        "description": "Every check record of a demo session, oldest first, as stored (masked).",
+        "operationId": "read_session_api_sessions__session__get",
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9-]{8,64}$",
+              "title": "Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Read Session Api Sessions  Session  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Session",
+        "description": "Delete every check record of a demo session (`deleted`), and take its questions out of\nthe moderator cases (`withdrawn`).",
+        "operationId": "delete_session_api_sessions__session__delete",
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9-]{8,64}$",
+              "title": "Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Session Api Sessions  Session  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources": {
+      "get": {
+        "summary": "List Sources",
+        "description": "Every source a check uses, for the page /zrodla. Plain def: the first call reads the\ncorpus file, so it runs in FastAPI's thread pool instead of blocking the event loop.",
+        "operationId": "list_sources_api_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceList"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AllowedDomain": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "publisher",
+          "source_type",
+          "licence"
+        ],
+        "title": "AllowedDomain"
+      },
+      "CatalogueEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "publisher": {
+            "type": "string",
+            "title": "Publisher"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "live_only",
+              "candidate",
+              "excluded"
+            ],
+            "title": "Status"
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence"
+          },
+          "licence_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence Url"
+          },
+          "licence_checked": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence Checked"
+          },
+          "storage": {
+            "type": "string",
+            "title": "Storage"
+          },
+          "max_chars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Chars"
+          },
+          "update_interval": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Update Interval"
+          },
+          "records": {
+            "type": "integer",
+            "title": "Records"
+          },
+          "last_retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Retrieved At"
+          },
+          "needs_key": {
+            "type": "boolean",
+            "title": "Needs Key"
+          },
+          "in_web_search": {
+            "type": "boolean",
+            "title": "In Web Search"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "excluded_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded On"
+          },
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "publisher",
+          "domain",
+          "source_type",
+          "status",
+          "licence",
+          "licence_url",
+          "licence_checked",
+          "storage",
+          "max_chars",
+          "update_interval",
+          "records",
+          "last_retrieved_at",
+          "needs_key",
+          "in_web_search",
+          "note",
+          "excluded_on",
+          "excluded_reason"
+        ],
+        "title": "CatalogueEntry"
+      },
+      "CheckRequest": {
+        "properties": {
+          "input": {
+            "type": "string",
+            "title": "Input",
+            "description": "1 to 5000 characters after trimming. A single token with `://` is read as a link and must be a valid http or https URL."
+          }
+        },
+        "type": "object",
+        "required": [
+          "input"
+        ],
+        "title": "CheckRequest",
+        "examples": [
+          {
+            "input": "Czy w aplikacji Odyseusz można zarejestrować wyjazd za granicę?"
+          }
+        ]
+      },
+      "CheckResult": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckedPage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimResult"
+            },
+            "type": "array",
+            "title": "Claims",
+            "default": []
+          },
+          "unchecked_claims": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unchecked Claims",
+            "default": []
+          },
+          "security_events": {
+            "items": {
+              "$ref": "#/components/schemas/SecurityEvent"
+            },
+            "type": "array",
+            "title": "Security Events",
+            "default": []
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations",
+            "default": []
+          },
+          "cost_usd": {
+            "type": "number",
+            "title": "Cost Usd",
+            "description": "Priced sum of the model requests answered for this answer, in USD (search credits excluded). A lower bound when unpriced_requests is above 0.",
+            "default": 0.0
+          },
+          "unpriced_requests": {
+            "type": "integer",
+            "title": "Unpriced Requests",
+            "description": "Model requests that may be billed but have no price (cut, failed or refused, or an unpriced model). Above 0, cost_usd is a lower bound.",
+            "default": 0
+          },
+          "incident_matches": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentMatch"
+            },
+            "type": "array",
+            "title": "Incident Matches",
+            "default": []
+          },
+          "moderator_case": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModeratorCase"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The moderator case this question was stored in: a claim without enough evidence, a security event, or an unconfirmed claim on a high-risk topic. null when nothing was stored: the check needed no person, no moderator queue is set up on this server, or the case store failed. A channel then says nothing about a moderator."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "CheckResult"
+      },
+      "CheckedPage": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "sha256",
+          "title",
+          "publisher",
+          "published_at"
+        ],
+        "title": "CheckedPage",
+        "description": "The page a link pointed to. Its own URL is never evidence for its own claims."
+      },
+      "ClaimKind": {
+        "type": "string",
+        "enum": [
+          "statement",
+          "attribution",
+          "quoted"
+        ],
+        "title": "ClaimKind",
+        "description": "A quote \"X said that Y\" gives two claims: that X said it, and Y as quoted content."
+      },
+      "ClaimResult": {
+        "properties": {
+          "claim": {
+            "type": "string",
+            "title": "Claim"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ClaimKind"
+          },
+          "source_sentence": {
+            "type": "string",
+            "title": "Source Sentence"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "reasoning": {
+            "type": "string",
+            "title": "Reasoning"
+          },
+          "strength": {
+            "type": "string",
+            "title": "Strength"
+          },
+          "premises": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Premises"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          },
+          "verdict_label": {
+            "type": "string",
+            "title": "Verdict Label",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim",
+          "kind",
+          "source_sentence",
+          "verdict",
+          "reasoning",
+          "strength",
+          "premises",
+          "sources",
+          "limitations",
+          "verdict_label"
+        ],
+        "title": "ClaimResult"
+      },
+      "CorpusSummary": {
+        "properties": {
+          "records": {
+            "type": "integer",
+            "title": "Records"
+          },
+          "domains": {
+            "type": "integer",
+            "title": "Domains"
+          },
+          "strict_domains": {
+            "type": "integer",
+            "title": "Strict Domains"
+          },
+          "source_types": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Source Types"
+          },
+          "without_published_at": {
+            "type": "integer",
+            "title": "Without Published At"
+          },
+          "last_retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Retrieved At"
+          },
+          "in_checks": {
+            "type": "boolean",
+            "title": "In Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "records",
+          "domains",
+          "strict_domains",
+          "source_types",
+          "without_published_at",
+          "last_retrieved_at",
+          "in_checks"
+        ],
+        "title": "CorpusSummary"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IncidentMatch": {
+        "properties": {
+          "incident_id": {
+            "type": "string",
+            "title": "Incident Id"
+          },
+          "incident_text": {
+            "type": "string",
+            "title": "Incident Text"
+          },
+          "matched_on": {
+            "$ref": "#/components/schemas/MatchKind"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Similarity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "incident_id",
+          "incident_text",
+          "matched_on"
+        ],
+        "title": "IncidentMatch",
+        "description": "A known incident the input looks like (scenario I). Context only, never a verdict."
+      },
+      "Lookup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "needs_key": {
+            "type": "boolean",
+            "title": "Needs Key"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "source_type",
+          "host",
+          "needs_key",
+          "active"
+        ],
+        "title": "Lookup",
+        "description": "One of the lookups step 2 runs for every checked claim (prawdowid/pipeline.py)."
+      },
+      "MatchKind": {
+        "type": "string",
+        "enum": [
+          "url",
+          "domain",
+          "text"
+        ],
+        "title": "MatchKind",
+        "description": "How the input matched a known incident, strongest first."
+      },
+      "ModelCall": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "input_tokens",
+          "output_tokens"
+        ],
+        "title": "ModelCall",
+        "description": "One model answer, kept in the check log only."
+      },
+      "ModeratorCase": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated"
+            ],
+            "title": "Status"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "count"
+        ],
+        "title": "ModeratorCase",
+        "description": "The moderator's case this question was added to (scenario H, prawdowid/cases.py). Set only\nafter the case was written, so a channel says the question went to the moderator's queue only\nwhen it did."
+      },
+      "RateLimitError": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "examples": [
+              "Wysłano za dużo zapytań w krótkim czasie. Odczekaj minutę i spróbuj ponownie."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "RateLimitError"
+      },
+      "SecurityEvent": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "prompt_injection",
+            "title": "Kind",
+            "default": "prompt_injection"
+          },
+          "location": {
+            "type": "string",
+            "enum": [
+              "input",
+              "page",
+              "source"
+            ],
+            "title": "Location"
+          },
+          "detector": {
+            "type": "string",
+            "enum": [
+              "patterns",
+              "model"
+            ],
+            "title": "Detector"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "detector"
+        ],
+        "title": "SecurityEvent",
+        "description": "Instructions aimed at the model were found and ignored. Never carries their wording."
+      },
+      "Source": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "publisher": {
+            "type": "string",
+            "title": "Publisher"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "fragment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fragment"
+          },
+          "snippet_only": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet Only"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "publisher",
+          "published_at",
+          "fetched_at",
+          "url",
+          "source_type"
+        ],
+        "title": "Source"
+      },
+      "SourceList": {
+        "properties": {
+          "lookups": {
+            "items": {
+              "$ref": "#/components/schemas/Lookup"
+            },
+            "type": "array",
+            "title": "Lookups"
+          },
+          "web_search": {
+            "items": {
+              "$ref": "#/components/schemas/AllowedDomain"
+            },
+            "type": "array",
+            "title": "Web Search"
+          },
+          "corpus": {
+            "$ref": "#/components/schemas/CorpusSummary"
+          },
+          "catalogue": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogueEntry"
+            },
+            "type": "array",
+            "title": "Catalogue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lookups",
+          "web_search",
+          "corpus",
+          "catalogue"
+        ],
+        "title": "SourceList"
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "technical_error",
+          "cannot_check",
+          "needs_clarification"
+        ],
+        "title": "Status",
+        "description": "Outcome of the check itself. Never shown as a verdict."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "confirmed",
+          "false",
+          "misleading",
+          "insufficient_evidence",
+          "not_verifiable",
+          "not_checked"
+        ],
+        "title": "Verdict",
+        "description": "Outcome for one claim.\n\n`not_checked` is not a verdict: the time limit ran out, every source failed, or the\njudge model did not answer, and the claim's limitations say which."
+      }
+    }
+  }
+}

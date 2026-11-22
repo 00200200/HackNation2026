@@ -32,6 +32,7 @@ from prawdowid.contract import (
     MatchKind,
     Source,
     Status,
+    Verdict,
 )
 from prawdowid.privacy import MaskingFilter
 
@@ -58,6 +59,8 @@ WRAP_WIDTH = 900
 URL_LIMIT = MESSAGE_LIMIT - 4
 URL_TOO_LONG = "  (link za długi na wiadomość Discorda; jest w załączniku)"
 CONNECTION_ERROR = "Nie udało się połączyć z usługą. Spróbuj ponownie za chwilę."
+# A source we know only from the search provider's result (`Source.snippet_only` says why).
+SNIPPET_LABEL = "fragment z wyników wyszukiwarki"
 
 
 def _escape(text: str) -> str:
@@ -86,15 +89,25 @@ def _bullets(items: list[str]) -> list[str]:
 
 
 def _source(s: Source, url_limit: int | None) -> list[str]:
+    # The same labels as the web form: an undated source and a search snippet say so.
     meta = ", ".join(
-        part for part in (s.publisher, s.published_at and str(s.published_at)) if part
+        part
+        for part in (
+            s.publisher,
+            str(s.published_at) if s.published_at else "bez daty publikacji",
+            s.snippet_only and f"{SNIPPET_LABEL}; {s.snippet_only}",
+        )
+        if part
     )
     lines = _field("- ", f"{s.title}, {meta}" if meta else s.title, "  ")
     # Own line, <url> stops Discord from unfurling a preview of an untrusted page.
     url = str(s.url)
     fits = url_limit is None or len(url) <= url_limit
     lines.append(f"  <{url}>" if fits else URL_TOO_LONG)
-    if s.fragment:
+    # A fact-checker's rating comes from its ClaimReview record: never shown as a page quote.
+    if s.rating:
+        lines += _field(RATING_LABEL, s.rating, "  ")
+    elif s.fragment:
         lines += _field("> „", s.fragment, "> ", "”")
     return lines
 
@@ -130,6 +143,7 @@ SOURCE_SECURITY_NOTE = (
     "Nie wykonaliśmy ich i sprawdziliśmy resztę."
 )
 PAGE_NOTE = "Ta strona nie jest źródłem dowodów dla własnych twierdzeń."
+RATING_LABEL = "  Ocena fact-checkera: "
 UNCHECKED_NOTE = (
     "Jedno sprawdzenie obejmuje tylko najważniejsze twierdzenia z tekstu. "
     "Tych nie oceniliśmy. Możesz wkleić je osobno."
@@ -141,7 +155,8 @@ def _claim(n: int, c: ClaimResult, url_limit: int | None) -> str:
     lines = [
         *_field(f"### {n}. ", c.claim, "### "),
         *_field(f"-# {kind}W tekście: ", c.source_sentence, "-# "),
-        f"Ocena: **{c.verdict_label}**",
+        # "nie sprawdzono" is no verdict: it must not read like one.
+        f"{'Bez oceny' if c.verdict is Verdict.NOT_CHECKED else 'Ocena'}: **{c.verdict_label}**",
         *_field("**Uzasadnienie:** ", c.reasoning),
         *_field("**Siła dowodów:** ", c.strength),
         "**Przesłanki:**",
@@ -184,6 +199,16 @@ def _incidents(matches: list[IncidentMatch], url_limit: int | None) -> str:
     return "\n".join(["### Podobne znane incydenty", INCIDENT_NOTE, *lines])
 
 
+# Scenario H: the API sets `moderator_case` only once the case is stored, so this is never said
+# about a hand-off that did not happen.
+MODERATOR_NOTE = "Zgłoszenie trafiło do kolejki moderatora"
+
+
+def _moderator(check: CheckResult) -> list[str]:
+    case = check.moderator_case
+    return [f"{MODERATOR_NOTE} (sprawa {case.id})."] if case else []
+
+
 def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
     """CheckResult as Discord Markdown, with the same sections as the web form.
 
@@ -201,10 +226,10 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
             notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
         if check.limitations:
             notice += "\n**Ograniczenia:**\n" + "\n".join(_bullets(check.limitations))
-        return "\n\n".join([notice, *warning])
+        return "\n\n".join([notice, *warning, *_moderator(check)])
     if not check.claims and not check.unchecked_claims:
         notice = "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
-        return "\n\n".join([notice, *warning])
+        return "\n\n".join([notice, *warning, *_moderator(check)])
     locations = {e.location for e in check.security_events}
     sections = [
         f"**Polecenia dla modelu.** {note}"
@@ -229,7 +254,7 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
                 ]
             )
         )
-    return "\n\n".join(sections)
+    return "\n\n".join(sections + _moderator(check))
 
 
 def split(text: str) -> list[str]:
@@ -333,7 +358,15 @@ class Bot(discord.Client):
                 await send(interaction, last, file=file)
             except discord.HTTPException:
                 log.exception("attachment refused")
-                await send(interaction, f"{last}\n\n{ATTACHMENT_FAILED}")
+                # Separate messages: `last` alone can fill Discord's 2000 characters.
+                # ATTACHED points to the file that failed, so the notice replaces it and the
+                # 5-message cap holds; otherwise a five-part answer gets a sixth message.
+                try:
+                    if last != ATTACHED:
+                        await send(interaction, last)
+                    await send(interaction, ATTACHMENT_FAILED)
+                except discord.HTTPException:
+                    log.exception("fallback message refused")
 
     async def setup_hook(self) -> None:
         # Created here so the client lives in the bot's event loop.
