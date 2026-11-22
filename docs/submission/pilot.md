@@ -49,7 +49,7 @@ podróże do...?” istnieje jedna urzędowa odpowiedź, więc łatwo sprawdzić
 W buildzie `integration/r3` każde sprawdzenie przeszukuje korpus (#74, BM25 po `corpus/evidence.jsonl`,
 w tym 251 dokumentów z Odyseusza). Na `main` korpusu jeszcze nie czyta. Nie mierzyliśmy, czy pytanie
 o podróż faktycznie trafia na właściwy profil kraju i czy cytat z niego przechodzi sędziego:
-`citation_correctness` jest niezmierzone, a tego pytania nie ma w zestawie testowym. To pierwsza
+pełny przebieg na `ca48b84` dał `citation_correctness` 1,0, ale ta metryka sprawdza tylko, czy cytat z dokumentu korpusu występuje w nim dosłownie. Wpływu korpusu na odpowiedzi i trafień w pytaniach o podróż nie mierzyliśmy, a takich pytań nie ma w zestawie testowym. To pierwsza
 praca etapu 2.
 
 ## Etap 1. Odtworzenie wyników, przegląd licencji, bezpieczeństwa i architektury
@@ -63,8 +63,8 @@ Co już jest:
 - Testy: `make check` uruchamia ruff i pytest. 22.11.2026 na `1aa173f` przechodzi 547 testów, 8 jest
   pominiętych.
 - Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 73 przypadkach na `main` (86 w `integration/r3`, z czego pełny przebieg na `ca48b84` ocenił 75)
-  ([evals/cases.jsonl](../../evals/cases.jsonl)). Każdy przebieg ląduje w
-  [evals/results/HISTORY.md](../../evals/results/HISTORY.md) z commitem i uwagami, a
+  ([evals/cases.jsonl](../../evals/cases.jsonl)). Runner zapisuje każdy przebieg do
+  [evals/results/HISTORY.md](../../evals/results/HISTORY.md) z commitem i uwagami (przebiegów ze stagingu i z 21.11 nie zachowaliśmy, część wierszy jest odtworzona), a
   [docs/eval-notes.md](../eval-notes.md) mówi, którym przebiegom nie ufać.
 - Architektura: [architecture.md](architecture.md) i [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md).
 - Licencje: każde źródło korpusu ma podstawę prawną i zakres tego, co przechowujemy
@@ -120,7 +120,7 @@ Co już jest:
 Czego brakuje:
 
 - Pomiaru, że korpus poprawia odpowiedzi. Wyszukiwanie w nim jest podpięte do `verify()` w
-  `integration/r3` (#74), ale nie ma jeszcze pełnego przebiegu na tym stanie (#16). Odpowiedzi
+  `integration/r3` (#74), a pełny przebieg na `ca48b84` zmierzył tylko, że cytaty z korpusu występują w dokumentach (`citation_correctness` 1,0). Nie wiemy, czy korpus poprawia odpowiedzi ani czy pytania o podróż trafiają na właściwy profil (#16). Odpowiedzi
   biorą dowody z Google Fact Check, EUvsDisinfo, wyszukiwarki www.gov.pl, Tavily i korpusu.
 - Trybu „tylko zamknięty korpus”, który na czas pilotażu wyłącza otwartą wyszukiwarkę. Dziś osobnym
   przełącznikiem da się wyłączyć tylko wyszukiwarkę gov.pl (`PRAWDOWID_GOVPL=0`).

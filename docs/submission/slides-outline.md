@@ -3,8 +3,7 @@
 Tekst roboczy do PDF, zgodnie z [issue #18](https://github.com/00200200/HackNation2026/issues/18).
 Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą z pełnego
 przebiegu na `ca48b84` (wiersz w [HISTORY.md](../../evals/results/HISTORY.md) i plik JSON
-`evals/results/history/20261122T021757.182695Z-ca48b84-full.json`, które trafiają do `integration/r3`
-ze scaleniem). Starszy `latest.json` na `main` to `95e6177`. Pełna tabela i opis pomiaru są w
+`evals/results/history/20261122T021757.182695Z-ca48b84-full.json`, oba w commitach PR #123). Starszy `latest.json` na `main` to `95e6177`. Pełna tabela i opis pomiaru są w
 [architecture.md](architecture.md). Koszty na slajdzie 9 i ich źródła są w [cost.md](cost.md).
 PDF i film nie są częścią tego pliku.
 
@@ -60,6 +59,9 @@ PDF i film nie są częścią tego pliku.
 
 - `macro_f1: 0.803` (próg 0,75); `abstention: 0.917` (0,80); `injection_resistance: 1.0` (0,90).
 - `citation_coverage: 1.0` (0,95); `citation_correctness: 1.0` (0,85); `channel_consistency: 1.0` (1,0).
+  Uwaga: `citation_correctness` sprawdza tylko, czy cytat z dokumentu korpusu występuje w nim dosłownie, a nie
+  czy wspiera tezę. `channel_consistency` pokazuje, że wspólna pamięć wyników (#59, TTL 30 minut) oddaje na
+  Discordzie zapisaną odpowiedź ze strony, a nie że dwa niezależne sprawdzenia się zgadzają.
 - Poniżej progu: `end_to_end: 0.973` (1,0) i `moderator_loop: 0.0` (1,0; pętli moderatora nie zbudowaliśmy, #79).
 - Wynik całości nie spełnia wymagań. Odporność na polecenia dotyczy 7 przypadków E, bo 11 z ukrytym
   poleceniem w stronie pominięto. Poprawność cytatów to występowanie cytatu w źródle, a nie ocena
@@ -105,6 +107,6 @@ PDF i film nie są częścią tego pliku.
 ## Slajd 12. Następne kroki i materiały do oddania
 
 - Uruchomić skuteczne wyszukiwanie na zatwierdzonych źródłach i poprawić błędy ujawnione w teście.
-- Zmierzyć poprawność cytatów i zgodność kanałów; sprawdzić ochronę danych oraz obciążenie.
+- Zmierzyć, czy cytat wspiera tezę (dziś mierzymy tylko jego obecność w źródle), wpływ korpusu na odpowiedzi i zgodność kanałów bez wspólnej pamięci wyników; sprawdzić ochronę danych oraz obciążenie.
 - Uzupełnić TEAM_NAME. Człowiek przygotowuje PDF i film zgodnie z limitami w
   [issue #18](https://github.com/00200200/HackNation2026/issues/18); zgłoszenie wymaga akceptacji zespołu.

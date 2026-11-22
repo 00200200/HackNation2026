@@ -232,8 +232,10 @@ osobno nie mierzyliśmy.
 ### 11. Jakie macie wyniki i czy utrzymacie je na zbiorze ukrytym?
 
 Krótko: żaden zapisany przebieg nie spełnia wszystkich progów i tego nie ukrywamy. Najlepszy, pełny
-przebieg na `ca48b84`, ma macro-F1 0,803 przy progu 0,75, ale dwie metryki poniżej progu. Każdy przebieg
-jest w repozytorium razem z commitem.
+przebieg na `ca48b84`, ma macro-F1 0,803 przy progu 0,75, ale dwie metryki poniżej progu. Runner zapisuje
+każdy przebieg do HISTORY.md i `evals/results/history/`; nie zachowaliśmy pliku JSON z przebiegu
+stagingowego (3,96 USD za 100) ani z pomiaru z 21.11 (5,25 USD za 100), a część wierszy HISTORY.md jest
+odtworzona.
 
 Szczegóły: nasz zestaw to na `main` 73 przypadki (41 w zestawie A-J i 32 w zestawie FC), a w `integration/r3` 86 (54 w A-J i U oraz 32 w FC).
 Rozkład scenariuszy na `main`: A 23, B 10, C 6, D 8, E 7, G 6, H 2, I 7, J 4; w `integration/r3`: A 23, B 10, C 6, D 8,
@@ -252,9 +254,13 @@ E05-E15 pominięte bez publicznego adresu fixture): macro-F1 0,803 (próg 0,75),
 (0,90), mediana 17,8 s (30 s), zgodność kanałów 1,000, koszt 4,27 USD za 100 sprawdzeń. Poniżej progu:
 `end_to_end` 0,973 (wymagane 1,000) i `moderator_loop` 0,000 (1,000, pętli nie zbudowaliśmy, #79).
 Wynik ogólny: nie przechodzi. `citation_correctness` sprawdza tylko, czy cytat występuje w źródle, a
-nie czy dobrze wspiera werdykt. Wiersz jest w HISTORY.md razem z plikiem JSON
-`evals/results/history/20261122T021757.182695Z-ca48b84-full.json`, który trafia do `integration/r3`
-ze scaleniem. Przebieg na commicie zgłoszenia: [z #16].
+nie czy dobrze wspiera werdykt. Zmierzyliśmy ją na 1,000, ale to tylko warunek
+konieczny: nie wiemy jeszcze, czy cytat wspiera tezę ani czy korpus poprawia odpowiedzi. Zgodność kanałów
+1,000 pokazuje, że wspólna pamięć wyników (#59, 30 minut) oddaje na Discordzie zapisaną odpowiedź (te
+odpowiedzi trwały 0,1-0,2 s, na stronie 12-35 s), a nie że dwa niezależne sprawdzenia się zgadzają.
+Wiersz jest w HISTORY.md razem z plikiem JSON
+`evals/results/history/20261122T021757.182695Z-ca48b84-full.json`; oba są w commitach PR #123, nie w
+`integration/r3`. Przebieg na commicie zgłoszenia: [z #16].
 
 Zbioru ukrytego nie znamy. Zasada: żadnych przypadków ani odpowiedzi z evalu w promptach i w logice
 weryfikacji (w `prawdowid/` nie ma tekstu żadnego przypadku). Wyjątek jest na stronie: przycisk
@@ -298,7 +304,7 @@ Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje około 33 groszy: 
 Tavily według pomiaru z 21.11, a serwer z domeną około 43 zł miesięcznie.
 
 Szczegóły: modele to 0,0427 USD za sprawdzenie: pełny przebieg na `ca48b84` (75 przypadków, kod
-`integration/r3` z #88, #95 i #74; średnia z 71 odpowiedzi z ceną, bez czterech symulowanych awarii;
+`integration/r3` z #88, #95 i #74; średnia z 71 odpowiedzi z ceną: runner pomija każdy przypadek z `simulate`, więc nie liczy czterech przypadków J, w tym J01 (symulowana awaria Fact Check, ale z wywołaniami modeli, 0,0730 USD); z J01 średnia to około 4,31 USD;
 wiersz w HISTORY.md). Wcześniejsze pomiary: 4,91 USD za 100 na `edd34a5` (Opus, przed #95) i 3,96 USD za
 100 ze stagingu (bez wiersza w HISTORY.md i pliku JSON). Tavily dokłada około 4,9 kredytu (wpis z 21.11 w
 WORKLOG). Konto jest na planie Researcher z opłatą za zużycie: 1000 kredytów miesięcznie za darmo,
@@ -319,12 +325,12 @@ Kredyty Tavily z pełnego przebiegu dopiero policzymy (#16).
 Krótko: koszt rośnie liniowo, a rachunek to prawie wyłącznie tokeny modeli i kredyty wyszukiwarki.
 Serwer to poniżej 2%. Przepustowości jednego serwera jeszcze nie zmierzyliśmy.
 
-Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 3588 zł, przy 100 000 około
-35 791 zł plus kolejne serwery (Tavily po 0,008 USD za kredyt, bez abonamentu). Modele to od 56 do
-61% kosztów zmiennych. Wyodrębnianie twierdzeń na Opusie 5.5 było około jednej trzeciej kosztu
-modeli, a ranking i sędzia razem około dwóch trzecich. Od #88 wyodrębnianie domyślnie idzie na
-Sonnet 5.5, którego token kosztuje połowę tego co Opus, co obcina koszt modeli o około 18%. To
-szacunek przy tej samej liczbie tokenów, a jakość po zmianie modelu sprawdza #88. Dziś backend to jeden proces z limitem zapytań w pamięci,
+Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 3328 zł, przy 100 000 około
+33 191 zł plus kolejne serwery (Tavily po 0,008 USD za kredyt, bez abonamentu). Modele to od 52 do
+58% kosztów zmiennych. Podziału kosztu modeli na wyodrębnianie, ranking i sędziego nie zmierzyliśmy, więc nie podajemy, ile
+da tańszy model. Od #88 wyodrębnianie domyślnie idzie na Sonnet 5.5; pomiary 4,91 USD za 100 (`edd34a5`)
+i 4,27 USD (`ca48b84`) dotyczą różnych zestawów przypadków i różnego kodu, więc nie są czystym efektem tej
+zmiany. Dziś backend to jeden proces z limitem zapytań w pamięci,
 na jednym serwerze bez zapasowego. Test obciążeniowy to #88.
 
 Źródła: [cost.md](cost.md), [Dockerfile](../../Dockerfile), [docs/deploy.md](../deploy.md),

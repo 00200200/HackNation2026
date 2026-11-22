@@ -139,8 +139,9 @@ failure can preserve the first-pass assessment with a limitation when first-pass
 Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
 There is no moderator queue, OCR or reverse image search. The demo corpus and live Discord run
-remain open in [WORKLOG](../../WORKLOG.md). URL inputs are not exercised by the saved eval set
-([cases](../../evals/cases.jsonl)); do not present its latency as a URL benchmark.
+remain open in [WORKLOG](../../WORKLOG.md). The 73-case set on `main` has no URL scenario
+([cases](../../evals/cases.jsonl)); the 86-case set on `integration/r3` adds U01 and U02 (URLs), and the
+`ca48b84` median latency includes them, but two cases are not a URL benchmark.
 
 ## Saved test results and reproduction
 
@@ -149,8 +150,9 @@ timestamp `2026-11-22T02:27:29+00:00`, `dirty: false`, `n_cases: 75`, `coverage_
 `overall_pass: false`. E05-E15 (11 cases that need a public URL for the fixture page,
 `PRAWDOWID_FIXTURE_BASE`) were skipped and not scored, so 75 of the 86 cases on `integration/r3` ran.
 Its row is in [HISTORY.md](../../evals/results/HISTORY.md) and its file is
-`evals/results/history/20261122T021757.182695Z-ca48b84-full.json`; both reach `integration/r3` with
-its merge, and `latest.json` on `main` still holds the older run below. Values and targets copied from
+`evals/results/history/20261122T021757.182695Z-ca48b84-full.json`; both are committed on the business-case
+branch (`claude/93-business-case-wf`, PR #123) and not yet on `integration/r3`, so they reach `main` with
+that PR. `latest.json` on `main` still holds the older run below. Values and targets copied from
 that file:
 
 | Metric | value | target | pass |
