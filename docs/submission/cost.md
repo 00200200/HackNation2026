@@ -1,87 +1,149 @@
-# Cost and behaviour under load
+# Koszt i zachowanie pod obciążeniem
 
-This is an extrapolation from a saved test run, not an invoice or a hosting quote.
-The only monetary and measured latency inputs below come from
-[evals/results/latest.json](../../evals/results/latest.json), timestamp
-`2026-11-21T19:10:57+00:00`, product commit
-`95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `mode: "quick"`, `n_cases: 9`, `dirty: false`.
-The run has `overall_pass: false`; it is not evidence of production quality or capacity. It also
-predates PR #40 (this docs change) landing on `main`: no eval has run on the merged commit, by
-user decision (`HN_SKIP_EVAL=1`) — a fresh eval on the merged commit is pending.
+Każda liczba poniżej ma źródło: pomiar w tym repozytorium (link do przebiegu) albo cennik (link i
+data odczytu). Wartości, których nie zmierzyliśmy, zapisujemy jako wzór z dopiskiem „do uzupełnienia
+po pełnym evalu (#16)”. Cenniki odczytaliśmy 22.11.2026. Dolary przeliczamy po kursie średnim NBP
+4,0613 zł za 1 USD ([tabela A nr 226/A/NBP/2026 z 20.11.2026](https://api.nbp.pl/api/exchangerates/rates/a/usd/2026-11-20/?format=json)).
 
-## Estimate for 1,000 checks
+## Dla obywatela: 0 zł
 
-The recorded `metrics.cost_per_100_usd.value` is exactly `1.8220444444444441` USD.
-The eval computes a mean of per-answer `cost_usd` and multiplies it by the reporting unit
-([evals/run.py:157-158](../../evals/run.py#L157-L158)). Applying that measured rate:
+- Strona nie wymaga konta ani płatności. Pod polem tekstowym stoi „Bezpłatnie i bez konta.”
+  ([frontend/public/index.html](../../frontend/public/index.html)). W API nie ma żadnej ścieżki
+  płatności ([prawdowid/app.py](../../prawdowid/app.py)).
+- Na Discordzie wystarczy darmowe konto. My nic nie pobieramy.
+- SMS i WhatsApp nie są zbudowane. Jeśli powstaną, wpiszemy tu standardowe opłaty operatora, tak jak
+  wymaga brief.
+
+## Co zmierzyliśmy
+
+| Pomiar | Wartość | Skąd | Zastrzeżenia |
+|---|---|---|---|
+| Koszt modeli, sam etap wyodrębniania twierdzeń (Claude Opus 5.5) | 1,82 USD za 100 sprawdzeń, czyli 0,0182 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `95e6177`, szybki przebieg, 9 przypadków | Wersja z jednym wywołaniem modelu na sprawdzenie: bez sędziego (#30), bez równoległego sprawdzania twierdzeń (#37) i bez Tavily (#45). |
+| Koszt modeli w pełnym potoku, z dowodami z Tavily | 5,25 USD za 100 sprawdzeń, czyli 0,0525 USD za sprawdzenie | [WORKLOG.md](../../WORKLOG.md), wpis z 21.11 o Tavily (#7/#8), 8 przypadków | Jeden przebieg, w którym każde sprawdzenie zmieściło się w budżecie 25 s. Nie ma do niego pliku JSON. Pomiar sprzed wyszukiwarki gov.pl (#53). |
+| Kredyty Tavily na sprawdzenie | około 4,9 (39 zapytań na 8 przypadków) | ten sam wpis w [WORKLOG.md](../../WORKLOG.md) | Wyszukiwanie `basic`, 1 kredyt za zapytanie. Pole `cost_usd` w odpowiedzi liczy tylko modele ([prawdowid/verifier.py](../../prawdowid/verifier.py)), więc Tavily doliczamy osobno. |
+
+Według tych pomiarów samo wyodrębnianie to około jednej trzeciej kosztu modeli (0,0182 z 0,0525
+USD). Oba pomiary pochodzą z różnych wersji kodu, więc to tylko rząd wielkości.
+
+## Ceny
+
+| Pozycja | Cena | Źródło |
+|---|---|---|
+| Claude Opus 5.5, wyodrębnianie twierdzeń (`PRAWDOWID_MODEL`) | 4 USD za milion tokenów wejścia, 20 USD za milion tokenów wyjścia | [cennik Anthropic](https://platform.claude.com/docs/en/about-claude/pricing) |
+| Claude Sonnet 5.5, sędzia (`PRAWDOWID_JUDGE_MODEL`) | 2 USD i 10 USD | jak wyżej |
+| Claude Haiku 5.5, ranking fragmentów (`PRAWDOWID_RERANK_MODEL`) | 0,10 USD i 0,50 USD przy promptach do 100 tys. tokenów | jak wyżej |
+| Tavily | 1000 kredytów miesięcznie za darmo, potem 0,008 USD za kredyt. Plany: 30 USD za 4000 kredytów, 100 USD za 15 000, 220 USD za 38 000, 500 USD za 100 000 (0,005 USD za kredyt). Wyszukiwanie `basic` kosztuje 1 kredyt. | [Tavily, API credits](https://docs.tavily.com/documentation/api-credits) |
+| Google Fact Check Tools API | Google nie publikuje cennika, wymaga tylko klucza API. Limity zapytań: UNCONFIRMED. | [dokumentacja API](https://developers.google.com/fact-check/tools/api) |
+| EUvsDisinfo (serwer MCP) | Osobisty klucz z euvsdisinfo.eu. Cennika nie znaleźliśmy: UNCONFIRMED. | [prawdowid/euvsdisinfo.py](../../prawdowid/euvsdisinfo.py) |
+| Wyszukiwarka www.gov.pl | Publiczna wyszukiwarka serwisu, bez klucza. Jej stabilność: UNCONFIRMED. | [docs/sources.md](../sources.md) |
+| Embeddingi korpusu (e5-large) | Liczone na naszym serwerze, bez opłaty za zapytanie | [WORKLOG.md](../../WORKLOG.md), decyzja z 21.11 |
+| Serwer OVHcloud VPS-2 (4 vCPU, 8 GB RAM, 75 GB NVMe) | od 30,77 zł netto, czyli 37,85 zł brutto miesięcznie | [cennik VPS OVHcloud](https://www.ovhcloud.com/pl/vps/) |
+| Domena .pl w OVHcloud | 6,99 zł za pierwszy rok (promocja), 58,99 zł za każde odnowienie. Cennik nie mówi, czy to netto, czy brutto. | [cennik domen OVHcloud](https://www.ovhcloud.com/pl/domains/tld/) |
+| Bot Discord | Działa jako proces na tym samym VPS (profil `discord` w [compose.yaml](../../compose.yaml)). Dokumentacja Discorda nie podaje opłat za API botów. | [Discord, Bots](https://docs.discord.com/developers/bots/overview) |
+
+Cennik VPS podaje cenę „od”. Kwotę z faktury OVHcloud wpisuje zespół.
+
+## Jedno sprawdzenie i 1000 sprawdzeń
 
 ```text
-Estimated USD/check = 1.8220444444444441 / 100 = 0.018220444444444441
-Estimated USD for 1,000 checks = 0.018220444444444441 * 1000
-                              = 18.220444444444441
-Rounded display estimate = USD 18.22 for 1,000 checks
+koszt sprawdzenia = koszt modeli + kredyty Tavily × cena kredytu
+                    (Google Fact Check, gov.pl i embeddingi: 0 zł za zapytanie, EUvsDisinfo: UNCONFIRMED)
+
+koszt modeli                 = 0,0525 USD
+Tavily po 0,008 USD          = 4,875 × 0,008 = 0,0390 USD
+Tavily po 0,005 USD (Growth) = 4,875 × 0,005 = 0,0244 USD
+
+jedno sprawdzenie  = od 0,0769 do 0,0915 USD, czyli od 0,31 do 0,37 zł
+1000 sprawdzeń     = od 76,88 do 91,50 USD, czyli od 312 do 372 zł
 ```
 
-This assumes the same request mix and retrieval conditions as the saved run. It prices model
-usage, including extraction, rerank and judge, through PydanticAI/genai-prices. Missing usage or
-an unpriced/interrupted request can produce `cost_usd: null`; failed calls may still be billed
-([verifier.py](../../prawdowid/verifier.py), [pipeline.py](../../prawdowid/pipeline.py)).
-It excludes hosting, network, search/MCP fees, Discord operation and tax; those amounts are
-UNCONFIRMED. No price for those services is inferred from a missing API key or a code comment.
-The result file contains an aggregate cost metric, not itemised provider invoices.
+Przy stawce 0,008 USD modele to 57% tej kwoty, a Tavily 43%. Te liczby to orientacja z jednego
+przebiegu na 8 przypadkach. Ostateczne wartości policzymy z pełnego przebiegu:
 
-This is a quick subset, not a full representative workload. The JSON does not record
-per-provider retrieval outcomes, model overrides or MCP credentials. Those conditions and costs
-with successful page retrieval, different claim counts, retries, different models or all providers
-enabled are UNCONFIRMED. Earlier unsuccessful DuckDuckGo retrieval is recorded in
-[WORKLOG](../../WORKLOG.md).
+```text
+do uzupełnienia po pełnym evalu (#16):
+K_modele = cost_per_100_usd / 100           wiersz HISTORY.md dla commitu zgłoszenia
+N_Tavily = kredyty zużyte w tym przebiegu / liczba sprawdzeń
+           (stan licznika w panelu Tavily przed przebiegiem i po nim)
+K_1000   = 1000 × (K_modele + N_Tavily × cena kredytu)
+```
 
-## Channel and infrastructure cost
+Koszt 100 testów, o który pyta jury, wynosi w [HISTORY.md](../../evals/results/HISTORY.md) 1,82 USD
+(`95e6177`, jedyny wiersz z tym polem oparty na pliku JSON). Wiersz odtworzony z pamięci, sprzed
+Tavily, podaje 1,65 USD. Żaden z nich nie obejmuje kredytów Tavily ani obecnego potoku.
 
-| Component | Confirmed implementation | Cost status |
-|---|---|---|
-| Web | nginx and static assets call the shared backend; [compose.yaml](../../compose.yaml), [frontend](../../frontend/public/app.js) | Hosting, bandwidth and domain cost UNCONFIRMED |
-| Discord | Persistent discord.py bot calls the same API; [discord_bot.py](../../prawdowid/discord_bot.py) | Platform fees, bot hosting and incremental channel cost UNCONFIRMED; no live channel cost measured |
-| Verification through either channel | Same API and models, no channel-specific model pipeline; [app.py](../../prawdowid/app.py) | Applying the measured rate to Discord is an assumption; no measured per-channel cost comparison |
-| Google / Tavily / EUvsDisinfo | [factcheck.py](../../prawdowid/factcheck.py), [websearch.py](../../prawdowid/websearch.py), [euvsdisinfo.py](../../prawdowid/euvsdisinfo.py) | Tavily: free tier 1,000 credits/month, 1 credit per basic search, observed ~4.9 credits/check on a separate live-key smoke run before this branch merged onto `main` (the "#7/#8 live proof" entry in [WORKLOG.md](../../WORKLOG.md), not the committed `latest.json`); well inside the free tier for a demo. Google/EUvsDisinfo charges and quotas UNCONFIRMED; none included as a measured `cost_usd` line item |
-| Own store | Local opt-in PostgreSQL, disabled in checks; [compose.yaml](../../compose.yaml), [pipeline.py](../../prawdowid/pipeline.py) | Database operation cost UNCONFIRMED; Supabase is not deployed |
+## Koszt stały miesięcznie
 
-The app has no checkout or user billing path ([frontend](../../frontend/public/index.html),
-[API](../../prawdowid/app.py)). That does not establish free hosting, free Discord connectivity
-or an ongoing operator subsidy. A free-to-user deployment budget remains UNCONFIRMED.
+| Pozycja | Miesięcznie |
+|---|---|
+| VPS-2 | 37,85 zł brutto (cena „od” z cennika) |
+| Domena faktczyfejk.pl | 4,92 zł (58,99 zł rocznie przy odnowieniu) |
+| Bot Discord | 0 zł ponad VPS |
+| Razem | około 42,77 zł |
 
-## Latency and load
+Na tym samym serwerze działa też inny projekt, doc2json.pl ([docs/deploy.md](../deploy.md)). Cały
+koszt VPS przypisany faktczyfejk.pl to więc górna granica.
 
-Saved `metrics.median_latency_s.value`: exactly `3.8964525419287384` seconds
-([latest.json](../../evals/results/latest.json)). The eval spaces requests and excludes that wait
-from latency ([adapter.py](../../evals/adapter.py)); this is not a concurrency benchmark.
-No simultaneous-user capacity, tail latency, saturation point or cost under load is measured:
-UNCONFIRMED. We do not extrapolate throughput from this median.
+## 10 razy i 100 razy więcej ruchu
 
-The implemented controls below are configuration, not measured load results. Their numbers come
-from the linked code, not from a cost assumption:
+Ruchu produkcyjnego nie mierzyliśmy. Za punkt wyjścia bierzemy umowne 1000 sprawdzeń miesięcznie i
+to jest założenie do rachunku, nie prognoza. Tavily liczymy po 0,008 USD za kredyt, po odjęciu 1000
+darmowych kredytów.
 
-- API: `10/minute` per client IP, with HTTP `429` and a Polish notice; outer verification timeout
-  `60` seconds ([app.py](../../prawdowid/app.py)). Discord users share the bot's API client IP;
-  there is no per-Discord-user quota ([discord_bot.py](../../prawdowid/discord_bot.py)).
-- Extraction defaults to `5` claims and `3` queries per checkable claim
-  ([verifier.py](../../prawdowid/verifier.py)). Claims and retrieval calls fan out with
-  `asyncio.gather` and `asyncio.TaskGroup`; there is no global queue, concurrency semaphore or daily spend cap
-  ([pipeline.py](../../prawdowid/pipeline.py)).
-- The nominal whole-check budget is `25` seconds, EUvsDisinfo's pipeline cap is `5` seconds and a
-  retry needs at least `18` seconds remaining ([pipeline.py](../../prawdowid/pipeline.py)).
-  Extraction has a `45` second provider request timeout, but shares the `25` second whole-check
-  deadline with URL fetching and claim checks ([verifier.py](../../prawdowid/verifier.py)).
-  These are configured cancellation limits, not a measured capacity guarantee.
-- Web queries are capped at `10` seconds including retry, page fetches at `8` seconds
-  ([websearch.py](../../prawdowid/websearch.py)). Cancellation of a thread-backed search does not
-  stop its underlying synchronous work immediately. Slow providers can consume resources after
-  the request stops waiting.
-- Timeouts or total retrieval failure become `not_checked` with limitations; a provider that
-  returns successfully without evidence can lead to `insufficient_evidence`. Missing extraction
-  credentials or API failure produces a technical notice, not a factual verdict
-  ([pipeline.py](../../prawdowid/pipeline.py), [verifier.py](../../prawdowid/verifier.py)).
+| Sprawdzeń w miesiącu | Modele | Tavily | Stałe | Razem | Udział kosztów stałych |
+|---|---|---|---|---|---|
+| 1000 | 52,50 USD (213 zł) | 3875 kredytów, 31,00 USD (126 zł) | 42,77 zł | około 382 zł | 11% |
+| 10 000 | 525 USD (2132 zł) | 47 750 kredytów, 382 USD (1551 zł) | 42,77 zł | około 3726 zł | 1,1% |
+| 100 000 | 5250 USD (21 322 zł) | 486 500 kredytów, 3892 USD (15 807 zł) | 42,77 zł i kolejne serwery, do uzupełnienia (#88) | około 37 171 zł plus serwery | 0,1% bez kolejnych serwerów |
 
-Open before a public launch: measure concurrent requests and provider quotas, establish an
-operator budget, and test a shared rate limiter across processes. None has a confirmed cost or
-capacity figure in this repository.
+Co z tego wynika:
+
+- Przy 10 i 100 razy większym ruchu liczą się już tylko koszty zmienne. Serwer i domena to poniżej
+  2% rachunku.
+- Z kosztów zmiennych od 57 do 63% to tokeny modeli, reszta to kredyty wyszukiwarki. Przy 100 razy
+  większym ruchu Tavily potrzebuje prawie 490 tys. kredytów miesięcznie, a największy plan z cennika
+  ma 100 tys. Cena dla takiej skali: do negocjacji, UNCONFIRMED. Po stawce planu Growth (0,005 USD)
+  byłoby to 2437,50 USD (9899 zł).
+- Największą dźwignią jest model do wyodrębniania twierdzeń. Dziś to Opus 5.5
+  ([prawdowid/verifier.py](../../prawdowid/verifier.py#L43)). Token Sonnet 5.5 kosztuje połowę tego
+  co Opus, token Haiku 5.5 czterdzieści razy mniej. Przy tej samej liczbie tokenów przejście na
+  Sonnet obetnie koszt tego etapu o połowę. Czy jakość się utrzyma, sprawdza #88 i bez tego pomiaru
+  domyślnego modelu nie zmieniamy.
+- Kredyty zależą od liczby zapytań na twierdzenie (`PRAWDOWID_QUERIES_PER_CLAIM`, domyślnie 3). Każde
+  zapytanie mniej to jeden kredyt mniej na każde sprawdzane twierdzenie. Wpływ na jakość: do
+  zmierzenia. Wyszukiwanie w korpusie działa na naszym serwerze i nie kosztuje nic za zapytanie, ale
+  jeszcze nie jest podpięte (#74).
+
+## Zachowanie pod obciążeniem
+
+Zmierzyliśmy tylko medianę czasu odpowiedzi ([HISTORY.md](../../evals/results/HISTORY.md)): 3,9 s w
+szybkim przebiegu na `95e6177` (wersja z jednym wywołaniem modelu) i 18,2 s w pełnym przebiegu na
+`8c6f396`, który zniekształciły timeouty Anthropic i zbyt ciasny budżet czasu
+([docs/eval-notes.md](../eval-notes.md)). Próg z briefu to 30 s. Nie mierzyliśmy, ile sprawdzeń naraz
+wytrzyma serwer, czasu p95, punktu nasycenia ani kosztu pod obciążeniem. Test obciążeniowy z
+podmienionymi źródłami to #88.
+
+Ustawienia w kodzie (to konfiguracja, nie zmierzona przepustowość):
+
+- Backend to jeden proces uvicorn ([Dockerfile](../../Dockerfile)). Limit 10 sprawdzeń na minutę z
+  jednego adresu IP jest trzymany w pamięci tego procesu ([prawdowid/app.py](../../prawdowid/app.py#L30)).
+  Wszyscy użytkownicy Discorda dzielą adres IP bota, więc i limit (#59).
+- API kończy czekanie po 60 s, a całe sprawdzenie ma budżet 25 s
+  ([prawdowid/pipeline.py](../../prawdowid/pipeline.py#L35)). Google Fact Check ma 15 s, EUvsDisinfo
+  5 s w potoku, jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s.
+- Jedno sprawdzenie bada najwyżej 5 twierdzeń i wysyła po 3 zapytania na twierdzenie
+  ([prawdowid/verifier.py](../../prawdowid/verifier.py)). Nie ma globalnej kolejki ani limitu wydatków.
+- Serwer jest jeden i nie ma zapasowego ([docs/deploy.md](../deploy.md), sekcja „Known limits”).
+
+Co widzi użytkownik, kiedy coś się kończy: jedenaste sprawdzenie w ciągu minuty dostaje HTTP 429 z
+komunikatem po polsku. Źródło, które nie zdążyło albo padło, daje „nie sprawdzono” z powodem, nigdy
+werdykt. Brak klucza do modelu daje komunikat techniczny. Czy wyczerpanie kredytów Tavily pokazuje
+się jako limit wyszukiwarki, a nie jako brak dowodów, sprawdza #75.
+
+Przy większym ruchu potrzebne będą kolejne procesy albo serwery i wspólny licznik limitu dla nich
+wszystkich. Ile, wyjdzie z testu obciążeniowego:
+
+```text
+do uzupełnienia (#88):
+liczba procesów = szczytowa liczba sprawdzeń na minutę / przepustowość jednego procesu
+```
