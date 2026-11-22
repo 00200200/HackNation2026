@@ -365,7 +365,13 @@ async def verify(text: str) -> CheckResult:
     if cut:
         for c in result.claims:
             c.limitations.append(PAGE_CUT)
-    result.page = CheckedPage(**page.model_dump(exclude={"text"}))
+    result.page = CheckedPage(**page.model_dump(exclude={"text", "hidden"}))
+    # Hidden channels never reach a model, but an instruction planted there is still an attack: log it.
+    if (event := screen(page.hidden, "page")) and not any(
+        e.location == "page" and e.detector == "patterns"
+        for e in result.security_events
+    ):
+        result.security_events += event
     result.steps_ms = {"fetch": fetch_ms, **result.steps_ms}
     # The page text is not kept; the URL is masked (an e-mail in a query string).
     log.info(

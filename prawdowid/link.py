@@ -105,6 +105,7 @@ class Page(BaseModel):
     publisher: str | None
     published_at: date | None
     text: str
+    hidden: str = ""  # comments, alt and display:none text: screened for injections, never sent to a model
 
 
 class Refusal(Exception):
@@ -334,6 +335,7 @@ async def extract(body: bytes, ctype: str, url: str) -> Page:
         publisher=result["publisher"],
         published_at=parse_date(result["date"]),
         text=text,
+        hidden=result.get("hidden") or "",
     )
 
 
