@@ -91,6 +91,25 @@ def test_render_shows_every_section_of_the_contract():
         assert expected in text
 
 
+def test_a_search_snippet_and_an_undated_source_say_so():
+    found = (
+        CHECK.claims[0]
+        .sources[0]
+        .model_copy(
+            update={
+                "published_at": None,
+                "snippet_only": "strona nie pozwala na pobranie",
+            }
+        )
+    )
+    claim = CHECK.claims[0].model_copy(update={"sources": [found]})
+    text = " ".join(render(CheckResult(status=Status.OK, claims=[claim])).split())
+    assert (
+        "- Polska w UE, gov.pl, bez daty publikacji, fragment z wyników wyszukiwarki; "
+        "strona nie pozwala na pobranie <https://www.gov.pl/web/ue>"
+    ) in text
+
+
 def test_render_escapes_untrusted_text():
     text = render(CHECK)
     assert "@everyone" not in text

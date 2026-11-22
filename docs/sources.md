@@ -31,18 +31,21 @@ Web search (step 2b, `prawdowid/websearch.py`) only returns pages from the domai
 matches its own entry or the closest parent entry (`nik.gov.pl` falls under `gov.pl`). The list
 lives in `ALLOWLIST`; `tests/test_websearch.py` fails when a domain there is missing here.
 
-Every cached document has a title, publisher, publication date (`published_at`, found by
-trafilatura/htmldate, mostly in page metadata; falls back to the search provider's own
-`published_date` when the page carries none; on a page without date metadata it can come from a
-date written on the page, so it may be wrong there; pages with no date anywhere are skipped) and
-retrieval time (`fetched_at`). The per-document list goes to `corpus/manifest.jsonl` when the
-corpus is built with `uv run python -m prawdowid.corpus`.
+Every cached document has a title, publisher, retrieval time (`fetched_at`) and, when one can be
+found, a publication date (`published_at`, found by trafilatura/htmldate, mostly in page metadata;
+falls back to the search provider's own `published_date` when the page carries none; on a page
+without date metadata it can come from a date written on the page, so it may be wrong there). A
+page with no date anywhere is kept with an empty `published_at`: the answer says "bez daty
+publikacji", the verdict lists it as a limitation and an undated source never makes the evidence
+"silna" (#95). The per-document list goes to `corpus/manifest.jsonl` when the corpus is built with
+`uv run python -m prawdowid.corpus`.
 **The corpus is not built yet:** it needs `TAVILY_API_KEY`, which no one on the team has set yet.
 Search provider is now **Tavily** (`/search`, official API, see `WORKLOG.md` Decisions, #7, #8);
 it replaced DuckDuckGo (`ddgs`), which returned no results from our machine on 2026-11-21.
 
-What we store (`prawdowid/cache.py`): metadata of every page (URL, title, publisher, dates,
-type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo.
+What we store (`prawdowid/cache.py`): metadata of every page we read (URL, title, publisher, dates,
+type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo;
+never a search snippet of a page we could not read.
 Full page text is stored only for a domain whose licence is confirmed (`licence` in `ALLOWLIST`);
 today none is, so no page text is archived. The pipeline uses the live text in memory for the
 current check only. Records older than 30 days (`RETENTION_DAYS`, by `fetched_at`) are never loaded
@@ -52,8 +55,46 @@ the eval corpus for citation correctness, which needs the text.
 
 How pages are fetched (`prawdowid/safefetch.py`): every hop, redirects included, must be on the
 allowlist, use http(s) on the default port, resolve only to public IP addresses (the connection
-goes to the checked address) and be allowed by that host's robots.txt. A robots.txt answering 429,
-5xx or not at all means we do not fetch. We never get around a 401, 403, 429 or a bot challenge.
+goes to the checked address) and be allowed by that host's robots.txt, read with Protego (the
+parser the corpus build uses), which matches the `*` and `$` of RFC 9309; Python's
+`RobotFileParser` ignores them, so a rule such as pap.pl's `Disallow: /aktualnosci/index*` did not
+apply before. A robots.txt answering 429, 5xx or not at all means we do not fetch. Following RFC
+9309 (2.3.1.3), a robots.txt answering any other 4xx, 401 and 403 included, is unavailable and
+sets no rules (`RobotFileParser.read()` would treat 401 and 403 as "disallow everything"). The
+page itself must still answer 200: we never get around a 401, 403, 429 or a bot challenge, and never retry with
+another user agent. HTML is read with trafilatura, PDF with the link input's pypdf worker
+(`prawdowid/extract_worker.py`, a child process with page and memory ceilings); both stop at the
+same 2 MB cap and the same 8 s per page (`PAGE_BUDGET_S`).
+
+### Search snippets of pages we cannot read (#95)
+
+When our own fetch cannot use an allowlisted page (the site answers 403, 429 or another 4xx, a
+5xx or nothing after the retry, its robots.txt cannot be read, it is slower than 8 s, over 2 MB,
+of another type, or has no readable text), the hit stays as evidence built only from what the search API returned for it: Tavily's
+title and `content` (up to three passages of about 500 characters copied from the page, joined by
+`[...]`, per the [search API docs](https://docs.tavily.com/documentation/api-reference/endpoint/search),
+read 2026-11-22), with the type and publisher from the allowlist, the provider's
+`published_date` or none, and the time of the search as `fetched_at`. Tavily calls that date its
+best estimate of when the page was published or last updated, so for a snippet it can be later
+than the original publication. Rules:
+
+- Nothing more is fetched for such a page: no retry, no other user agent, no proxy, and not
+  Tavily's `raw_content` (the full page through a third party would be getting around the block).
+- It is never saved, in the JSONL cache or in the database (`cache.store_document` refuses it).
+- Quotes are checked against the snippet like against any fragment, and the source is marked
+  `snippet_only` with the reason all the way to the answer: web and Discord show "fragment z
+  wyników wyszukiwarki; <reason>", premises and the justification say so, and the verdict lists
+  it as a limitation.
+- It counts for the side it supports like a fetched page of the same type (a fact-checker's
+  snippet can decide alone), but never makes the evidence "silna": that needs a reliable source we
+  read ourselves and that carries a date.
+- No snippet either for a page that robots.txt disallows (the site opted out of crawlers, so we
+  do not use a search engine's copy), that is gone (404, 410), that redirects off the allowlist,
+  or that sits behind a login or payment wall (401, 402): its content is not public, and the brief
+  rules out paid databases.
+
+This uses only what the search API returns. Michał approved the rule on 2026-11-22 (`WORKLOG.md`,
+Decisions).
 
 Our own database (step 2c: local PostgreSQL, tables `documents` and `chunks`,
 schema in `db/migrations/`, compose service `sourcedb`, profile `sourcedb`, volume `sourcedb_data`) is **disabled in the pipeline** until the team
@@ -121,14 +162,28 @@ narrative. It is context: the verdict rules never count it as a reliable source 
 |---|---|---|---|
 | `euvsdisinfo.eu` | EUvsDisinfo (ESDZ) | EEAS East StratCom Task Force disinformation cases | UNCONFIRMED |
 
-## Reliable secondary sources (`fact_check`, `news`)
+## Reliable secondary sources (`fact_check`, `news`) and media (`media`)
 
 | Domain | Publisher | Type | Why it qualifies | Licence (check) |
 |---|---|---|---|---|
 | `konkret24.tvn24.pl` | Konkret24 | `fact_check` | fact-checking desk of TVN24; membership UNCONFIRMED | UNCONFIRMED |
 | `fakenews.pl` | FakeNews.pl | `fact_check` | Polish fact-checker; membership UNCONFIRMED | UNCONFIRMED |
 | `sprawdzam.afp.com` | AFP Sprawdzam | `fact_check` | AFP's Polish fact-checking service; membership UNCONFIRMED | UNCONFIRMED |
+| `demagog.org.pl` | Demagog | `fact_check` | Polish fact-checker; EFCSN verified member until 2027-05-25 (`corpus/catalog.yaml`, read 2026-11-21) | UNCONFIRMED; robots.txt `Content-Signal: search=yes,ai-train=no,use=reference`, `ai-input` not set (read 2026-11-22 from a home IP) |
+| `pravda.org.pl` | Stowarzyszenie Pravda | `fact_check` | Polish fact-checker; EFCSN verified member until 2028-02-23 (`corpus/catalog.yaml`) | no licence on the site (corpus catalogue, 2026-11-21): short quote and link only |
+| `oko.press` | OKO.press | `media` | news site with a fact-check section (`/kategoria/prawda-czy-falsz`); its articles have flat URLs, so the section cannot be told apart and the whole site is `media`: one publisher like any other, not a reliable type and not `news` (a news agency's own finding can stand against a reliable source in `judge.decide`) | UNCONFIRMED |
 | `pap.pl` | Polska Agencja Prasowa | `news` | national news agency | UNCONFIRMED |
+
+Reachability from our server (OVHcloud VPS, measured 2026-11-22 00:50 CET, our user agent and a
+browser one): `konkret24.tvn24.pl`, `sprawdzam.afp.com` and `demagog.org.pl` (Cloudflare) answer
+403 to every request, robots.txt included, so only their search snippets reach the judge;
+`oko.press` and `pravda.org.pl` answer 200. From a home IP konkret24's robots.txt allows bots on its articles (GPTBot is kept off the whole
+site; every bot only off `/_e/p/playlist/*` and `*?page=*`), so this is an IP-level block, not
+an opt-out. AFP's robots.txt answers 403 from a home IP too
+(Akamai, 2026-11-22), so its crawler policy could not be read; its terms restrict automated
+extraction (`docs/submission/sources.md`). Demagog is on the list (#76) because the Fact Check
+Tools integration only matches phrases literally, so its reviews often do not show up there (the
+mentor on Discord, 21.11, 22:54).
 
 A domain's type is a property of the source, shown next to it. It never decides whether a claim is
 true.

@@ -175,6 +175,8 @@ body.checked .results { flex: 1 0 auto; }
 .summary { margin: .55rem 0 0; display: flex; flex-wrap: wrap; gap: .4rem; }
 .verdict.small { font-size: .8rem; padding: .15rem .6rem; }
 .archival { display: inline-block; padding: .05rem .5rem; border-radius: 999px; background: #f6e9eb; color: var(--red); font-weight: 700; }
+/* A source we know only from the search engine's extract: neutral, never a verdict colour */
+.snippet { display: inline-block; padding: .05rem .5rem; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); color: var(--navy); font-weight: 600; }
 .origin { margin: 0 0 .5rem; font-size: .9rem; color: var(--muted); }
 .kind { display: inline-block; margin-right: .5rem; padding: 0 .4rem; border-radius: 3px;
         background: var(--soft); border: 1px solid var(--line); color: var(--navy); }
