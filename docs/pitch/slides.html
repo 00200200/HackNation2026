@@ -197,7 +197,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="step"><div class="k">5 · Claude Sonnet</div><h3>Sędzia i&nbsp;cytat</h3><p>Model oznacza fragment: potwierdza, przeczy albo daje kontekst, zawsze z&nbsp;cytatem. Kod odrzuca cytat, którego nie ma w&nbsp;źródle słowo w&nbsp;słowo.</p></div>
     <div class="step code"><div class="k">6 · Kod, nie model</div><h3>Werdykt z&nbsp;reguł</h3><p>Wystarczy jedno źródło oficjalne, pierwotne albo fact-checkingowe, albo dwa niezależne. Źródła sprzeczne: „brak wystarczających dowodów” i&nbsp;opis konfliktu. Awaria źródła: „nie sprawdzono”.</p></div>
   </div>
-  <p class="muted" style="position:absolute; top:880px; left:110px; right:110px; margin:0; font-size:24px; line-height:1.35">Na całe sprawdzenie jest 40&nbsp;s. Ta sama odpowiedź trafia na stronę i&nbsp;do /czat. Każde sprawdzenie zostawia zamaskowany wpis w&nbsp;dzienniku na 30&nbsp;dni, a&nbsp;twierdzenie bez dowodów trafia do kolejki moderatora.</p>
+  <p class="muted" style="position:absolute; top:880px; left:110px; right:110px; margin:0; font-size:24px; line-height:1.35">Na całe sprawdzenie jest 40&nbsp;s. Ta sama odpowiedź trafia na stronę, do /czat i&nbsp;do bota Discord. Każde sprawdzenie zostawia zamaskowany wpis w&nbsp;dzienniku na 30&nbsp;dni, a&nbsp;twierdzenie bez dowodów trafia do kolejki moderatora.</p>
   <div class="ft"><span>Modele i limity z kodu na main, 22.11.2026 · docs/submission/architecture.md, docs/adr/0001</span><span class="n">06 / 12</span></div>
 </section>
 
@@ -223,7 +223,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="status" style="position:absolute; top:400px; left:110px; width:620px">
     <p><span class="tag t-on">działa</span><br><b>Strona WWW</b>: faktczyfejk.pl, bez konta, za darmo, na telefonie i&nbsp;komputerze.</p>
     <p><span class="tag t-on">działa</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, to samo API i&nbsp;ta sama odpowiedź co na stronie.</p>
-    <p><span class="tag t-on">działa</span><br><b>Lista źródeł</b>: faktczyfejk.pl/zrodla, z&nbsp;licencjami i&nbsp;źródłami odrzuconymi.</p>
+    <p><span class="tag t-off">kod gotowy</span><br><b>Discord /sprawdz</b>: bot na tym samym API.</p>
   </div>
   <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; box-shadow:0 30px 80px rgba(29,18,21,.25); border:1px solid var(--line)">
   <div class="ft"><span>Zrzut strony głównej faktczyfejk.pl, 22.11.2026</span><span class="n">08 / 12</span></div>
@@ -235,17 +235,17 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <h2 style="position:absolute; top:170px; left:110px">Nasz test, progi jury.</h2>
   <p class="muted" style="position:absolute; top:285px; left:110px; right:110px; margin:0; font-size:24px; line-height:1.35">Metoda: 86 przypadków, w&nbsp;tym scenariusze zadania A–J i&nbsp;dwa z&nbsp;linkiem do strony; każdy z&nbsp;etykietą ze źródła (oceny Demagoga, Konkret24, strony urzędowe). Skrypt wysyła je do API jak użytkownik i&nbsp;liczy metryki z&nbsp;zadania. Awarie symulujemy przełącznikiem tylko dla testu.</p>
   <div style="position:absolute; top:400px; left:110px; right:110px; display:grid; grid-template-columns: repeat(4, 1fr); gap:48px">
-    <div class="metric"><div class="big">0,92</div><p>Trafność ocen, macro-F1 (cel&nbsp;≥&nbsp;0,75), 62 z&nbsp;69 ocen trafnych w&nbsp;pełnym przebiegu</p></div>
+    <div class="metric"><div class="big">0,92</div><p>macro-F1, średnia F1 pięciu ocen (cel&nbsp;≥&nbsp;0,75)</p></div>
     <div class="metric"><div class="big">20,5 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
     <div class="metric"><div class="big">1,00</div><p>Abstencja na 12 przypadkach: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
-    <div class="metric"><div class="big">3,45 $</div><p>Koszt modeli za 100 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
+    <div class="metric"><div class="big">34,5 $</div><p>Koszt modeli za 1000 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
   </div>
   <div class="small" style="position:absolute; top:705px; left:110px; right:110px">
-    <div><b>1,00</b><span>Pokrycie cytatami (cel&nbsp;≥&nbsp;0,95)</span></div>
-    <div><b>1,00</b><span>Poprawność cytatów: cytat jest w&nbsp;źródle dosłownie (cel&nbsp;≥&nbsp;0,85)</span></div>
-    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7 w&nbsp;tekście i&nbsp;11 na pobranej stronie, tu też 11 z&nbsp;11 trafnych ocen (cel&nbsp;≥&nbsp;0,90)</span></div>
-    <div><b>1,00</b><span>Zgodność kanałów, 6 przypadków (cel 1,00)</span></div>
-    <div><b>1,00</b><span>Pętla moderatora, 2 przypadki (cel 1,00)</span></div>
+    <div><b>1,00</b><span>Pokrycie cytatami, przy ocenach merytorycznych (cel&nbsp;≥&nbsp;0,95)</span></div>
+    <div><b>1,00</b><span>Poprawność cytatów: cytat z&nbsp;korpusu jest w&nbsp;źródle słowo w&nbsp;słowo (cel&nbsp;≥&nbsp;0,85)</span></div>
+    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7 przypadków we wklejonym tekście i&nbsp;11 z&nbsp;11 na stronach z&nbsp;linku (cel&nbsp;≥&nbsp;0,90)</span></div>
+    <div><b>1,00</b><span>Zgodność kanałów: ten sam wynik przez API i&nbsp;drugi kanał, 6 przypadków (cel 1,00)</span></div>
+    <div><b>1,00</b><span>Pętla moderatora: 2 przypadki, powtórzone pytanie trafia do tej samej sprawy (cel 1,00)</span></div>
     <div><b style="color:var(--red)">0,99</b><span>End-to-end (cel 1,00): przy symulowanej awarii Fact Check J01 dostał ocenę zamiast komunikatu</span></div>
   </div>
   <div class="ft"><span>Dwa przebiegi, 22.11.2026: pełny na a14b93c (75 przypadków) i 11 stron z poleceniem na 5e5be00 · szczegóły: docs/eval-notes.md</span><span class="n">09 / 12</span></div>
