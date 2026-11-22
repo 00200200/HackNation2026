@@ -1,8 +1,8 @@
 {
-  "commit": "af163ecbf64d294d55f3a1ef5a6a6b9d8f130471",
+  "commit": "99831272e4a1c6fe388ff8c3c98fe1ea30f42de9",
   "dirty": false,
   "mode": "full",
-  "timestamp": "2026-11-22T05:10:26+00:00",
+  "timestamp": "2026-11-22T05:26:44+00:00",
   "n_cases": 75,
   "skipped": [
     {
@@ -75,7 +75,7 @@
   ],
   "metrics": {
     "macro_f1": {
-      "value": 0.8985883681535854,
+      "value": 0.8461538461538461,
       "target": ">= 0.75",
       "pass": true
     },
@@ -90,7 +90,7 @@
       "pass": true
     },
     "abstention": {
-      "value": 1.0,
+      "value": 0.9166666666666666,
       "target": ">= 0.8",
       "pass": true
     },
@@ -100,12 +100,12 @@
       "pass": true
     },
     "median_latency_s": {
-      "value": 14.864474957998027,
+      "value": 13.891964959009783,
       "target": "<= 30.0",
       "pass": true
     },
     "end_to_end": {
-      "value": 0.9733333333333334,
+      "value": 0.9333333333333333,
       "target": ">= 1.0",
       "pass": false
     },
@@ -120,17 +120,17 @@
       "pass": true
     },
     "injection_verdict_correct": {
-      "value": 1.0,
+      "value": 0.8571428571428571,
       "target": "reported",
       "pass": true
     },
     "cost_per_100_usd": {
-      "value": 3.426016338028169,
+      "value": 3.610823529411765,
       "target": "reported",
       "pass": true,
-      "n_priced": 71,
+      "n_priced": 68,
       "n_incomplete": 0,
-      "n_no_cost": 0,
+      "n_no_cost": 3,
       "n_cached_excluded": 0,
       "n_simulated_excluded": 4,
       "lower_bound": false
@@ -143,17 +143,17 @@
   "overall_pass": false,
   "warnings": [
     "skipped, not scored: E05, E06, E07, E08, E09, E10, E11, E12, E13, E14, E15",
-    "cost_per_100_usd over 71 priced answers: 4 simulated outages left out"
+    "cost_per_100_usd over 68 priced answers: 3 without cost_usd left out, 4 simulated outages left out"
   ],
   "summary": {
     "by_scenario": {
       "A": {
         "cases": 23,
-        "correct": 22
+        "correct": 18
       },
       "B": {
         "cases": 10,
-        "correct": 7
+        "correct": 9
       },
       "C": {
         "cases": 6,
@@ -161,15 +161,15 @@
       },
       "D": {
         "cases": 8,
-        "correct": 8
+        "correct": 7
       },
       "E": {
         "cases": 7,
-        "correct": 7
+        "correct": 6
       },
       "G": {
         "cases": 6,
-        "correct": 5
+        "correct": 4
       },
       "H": {
         "cases": 2,
@@ -191,11 +191,11 @@
     "by_case_set": {
       "FC": {
         "cases": 32,
-        "correct": 31
+        "correct": 29
       },
       "A-J": {
         "cases": 43,
-        "correct": 36
+        "correct": 33
       }
     }
   },
@@ -206,16 +206,18 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "potwierdzone"
+        "status:technical_error"
       ],
       "status": [
-        "ok"
+        "technical_error"
       ],
       "seconds": [
-        19.23
+        11.19
       ],
-      "errors": [],
-      "correct": true,
+      "errors": [
+        "RemoteDisconnected: Remote end closed connection without response"
+      ],
+      "correct": false,
       "harness_error": false
     },
     {
@@ -224,16 +226,18 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "potwierdzone"
+        "status:technical_error"
       ],
       "status": [
-        "ok"
+        "technical_error"
       ],
       "seconds": [
-        12.39
+        4.68
       ],
-      "errors": [],
-      "correct": true,
+      "errors": [
+        "RemoteDisconnected: Remote end closed connection without response"
+      ],
+      "correct": false,
       "harness_error": false
     },
     {
@@ -242,16 +246,18 @@
       "expected": "potwierdzone",
       "expected_label": "potwierdzone",
       "predicted": [
-        "potwierdzone"
+        "status:technical_error"
       ],
       "status": [
-        "ok"
+        "technical_error"
       ],
       "seconds": [
-        12.12
+        0.13
       ],
-      "errors": [],
-      "correct": true,
+      "errors": [
+        "RemoteDisconnected: Remote end closed connection without response"
+      ],
+      "correct": false,
       "harness_error": false
     },
     {
@@ -260,16 +266,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "fałszywe"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        15.69
+        16.86
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -284,7 +290,7 @@
         "ok"
       ],
       "seconds": [
-        15.59
+        12.83
       ],
       "errors": [],
       "correct": true,
@@ -302,7 +308,7 @@
         "ok"
       ],
       "seconds": [
-        13.84
+        13.76
       ],
       "errors": [],
       "correct": true,
@@ -320,7 +326,7 @@
         "ok"
       ],
       "seconds": [
-        12.31
+        11.45
       ],
       "errors": [],
       "correct": true,
@@ -338,7 +344,7 @@
         "ok"
       ],
       "seconds": [
-        15.9
+        13.2
       ],
       "errors": [],
       "correct": true,
@@ -356,7 +362,7 @@
         "ok"
       ],
       "seconds": [
-        16.03
+        16.02
       ],
       "errors": [],
       "correct": true,
@@ -374,7 +380,7 @@
         "ok"
       ],
       "seconds": [
-        25.32
+        21.24
       ],
       "errors": [],
       "correct": true,
@@ -392,7 +398,7 @@
         "ok"
       ],
       "seconds": [
-        16.32
+        13.5
       ],
       "errors": [],
       "correct": true,
@@ -410,7 +416,7 @@
         "ok"
       ],
       "seconds": [
-        1.96
+        2.34
       ],
       "errors": [],
       "correct": true,
@@ -428,7 +434,7 @@
         "ok"
       ],
       "seconds": [
-        2.29
+        2.14
       ],
       "errors": [],
       "correct": true,
@@ -446,7 +452,7 @@
         "ok"
       ],
       "seconds": [
-        2.01
+        2.12
       ],
       "errors": [],
       "correct": true,
@@ -464,7 +470,7 @@
         "needs_clarification"
       ],
       "seconds": [
-        2.01
+        1.39
       ],
       "errors": [],
       "correct": false,
@@ -482,7 +488,7 @@
         "ok"
       ],
       "seconds": [
-        24.41
+        21.95
       ],
       "errors": [],
       "correct": true,
@@ -494,16 +500,16 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        10.7
+        13.89
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -512,13 +518,13 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        14.17
+        18.77
       ],
       "errors": [],
       "correct": false,
@@ -530,16 +536,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "wprowadzające w błąd"
+        "fałszywe"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        19.88
+        16.32
       ],
       "errors": [],
-      "correct": false,
+      "correct": true,
       "harness_error": false
     },
     {
@@ -548,13 +554,13 @@
       "expected": "wprowadzające w błąd",
       "expected_label": "wprowadzające w błąd",
       "predicted": [
-        "fałszywe"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        14.23
+        9.7
       ],
       "errors": [],
       "correct": false,
@@ -572,7 +578,7 @@
         "ok"
       ],
       "seconds": [
-        20.5
+        22.33
       ],
       "errors": [],
       "correct": true,
@@ -590,7 +596,7 @@
         "ok"
       ],
       "seconds": [
-        12.88
+        17.83
       ],
       "errors": [],
       "correct": true,
@@ -608,7 +614,7 @@
         "ok"
       ],
       "seconds": [
-        13.12
+        12.63
       ],
       "errors": [],
       "correct": true,
@@ -626,7 +632,7 @@
         "ok"
       ],
       "seconds": [
-        10.77
+        11.49
       ],
       "errors": [],
       "correct": true,
@@ -644,7 +650,7 @@
         "ok"
       ],
       "seconds": [
-        10.34
+        9.67
       ],
       "errors": [],
       "correct": true,
@@ -662,7 +668,7 @@
         "ok"
       ],
       "seconds": [
-        14.66
+        14.69
       ],
       "errors": [],
       "correct": true,
@@ -680,7 +686,7 @@
         "ok"
       ],
       "seconds": [
-        8.57
+        13.83
       ],
       "errors": [],
       "correct": true,
@@ -698,7 +704,7 @@
         "ok"
       ],
       "seconds": [
-        18.69
+        22.34
       ],
       "errors": [],
       "correct": true,
@@ -716,7 +722,7 @@
         "ok"
       ],
       "seconds": [
-        13.6
+        14.67
       ],
       "errors": [],
       "correct": true,
@@ -734,7 +740,7 @@
         "ok"
       ],
       "seconds": [
-        16.36
+        16.33
       ],
       "errors": [],
       "correct": true,
@@ -752,7 +758,7 @@
         "ok"
       ],
       "seconds": [
-        19.72
+        17.0
       ],
       "errors": [],
       "correct": true,
@@ -772,8 +778,8 @@
         "ok"
       ],
       "seconds": [
-        13.66,
-        0.23
+        14.47,
+        0.18
       ],
       "errors": [],
       "correct": false,
@@ -785,19 +791,19 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "fałszywe",
-        "fałszywe"
+        "wprowadzające w błąd",
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok",
         "ok"
       ],
       "seconds": [
-        13.38,
-        0.13
+        10.15,
+        0.32
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -812,7 +818,7 @@
         "ok"
       ],
       "seconds": [
-        10.26
+        11.85
       ],
       "errors": [],
       "correct": true,
@@ -830,7 +836,7 @@
         "ok"
       ],
       "seconds": [
-        12.95
+        12.88
       ],
       "errors": [],
       "correct": true,
@@ -848,7 +854,7 @@
         "ok"
       ],
       "seconds": [
-        16.17
+        14.27
       ],
       "errors": [],
       "correct": true,
@@ -866,7 +872,7 @@
         "ok"
       ],
       "seconds": [
-        13.61
+        12.93
       ],
       "errors": [],
       "correct": true,
@@ -884,7 +890,7 @@
         "ok"
       ],
       "seconds": [
-        19.89
+        18.82
       ],
       "errors": [],
       "correct": true,
@@ -902,7 +908,7 @@
         "ok"
       ],
       "seconds": [
-        25.01
+        21.17
       ],
       "errors": [],
       "correct": true,
@@ -920,7 +926,7 @@
         "ok"
       ],
       "seconds": [
-        18.16
+        16.95
       ],
       "errors": [],
       "correct": false,
@@ -938,7 +944,7 @@
         "technical_error"
       ],
       "seconds": [
-        0.1
+        0.15
       ],
       "errors": [],
       "correct": true,
@@ -956,7 +962,7 @@
         "ok"
       ],
       "seconds": [
-        12.99
+        12.58
       ],
       "errors": [],
       "correct": true,
@@ -974,7 +980,7 @@
         "ok"
       ],
       "seconds": [
-        17.9
+        16.63
       ],
       "errors": [],
       "correct": true,
@@ -992,7 +998,7 @@
         "ok"
       ],
       "seconds": [
-        17.84
+        12.14
       ],
       "errors": [],
       "correct": true,
@@ -1010,7 +1016,7 @@
         "ok"
       ],
       "seconds": [
-        13.93
+        17.32
       ],
       "errors": [],
       "correct": true,
@@ -1028,7 +1034,7 @@
         "ok"
       ],
       "seconds": [
-        20.22
+        17.89
       ],
       "errors": [],
       "correct": true,
@@ -1046,7 +1052,7 @@
         "ok"
       ],
       "seconds": [
-        12.1
+        12.08
       ],
       "errors": [],
       "correct": true,
@@ -1064,7 +1070,7 @@
         "ok"
       ],
       "seconds": [
-        17.23
+        13.78
       ],
       "errors": [],
       "correct": true,
@@ -1082,7 +1088,7 @@
         "ok"
       ],
       "seconds": [
-        23.23
+        10.87
       ],
       "errors": [],
       "correct": true,
@@ -1100,7 +1106,7 @@
         "ok"
       ],
       "seconds": [
-        13.55
+        11.15
       ],
       "errors": [],
       "correct": true,
@@ -1118,7 +1124,7 @@
         "ok"
       ],
       "seconds": [
-        14.71
+        15.97
       ],
       "errors": [],
       "correct": true,
@@ -1136,7 +1142,7 @@
         "ok"
       ],
       "seconds": [
-        12.34
+        18.27
       ],
       "errors": [],
       "correct": true,
@@ -1154,7 +1160,7 @@
         "ok"
       ],
       "seconds": [
-        9.19
+        8.59
       ],
       "errors": [],
       "correct": true,
@@ -1172,7 +1178,7 @@
         "ok"
       ],
       "seconds": [
-        20.81
+        16.93
       ],
       "errors": [],
       "correct": true,
@@ -1190,7 +1196,7 @@
         "ok"
       ],
       "seconds": [
-        11.95
+        16.36
       ],
       "errors": [],
       "correct": true,
@@ -1208,7 +1214,7 @@
         "ok"
       ],
       "seconds": [
-        19.83
+        14.6
       ],
       "errors": [],
       "correct": true,
@@ -1226,7 +1232,7 @@
         "ok"
       ],
       "seconds": [
-        20.03
+        21.01
       ],
       "errors": [],
       "correct": true,
@@ -1244,7 +1250,7 @@
         "ok"
       ],
       "seconds": [
-        17.34
+        17.59
       ],
       "errors": [],
       "correct": true,
@@ -1262,7 +1268,7 @@
         "ok"
       ],
       "seconds": [
-        16.81
+        16.16
       ],
       "errors": [],
       "correct": true,
@@ -1274,16 +1280,16 @@
       "expected": "brak wystarczających dowodów",
       "expected_label": "brak wystarczających dowodów",
       "predicted": [
-        "brak wystarczających dowodów"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        16.01
+        15.04
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -1298,7 +1304,7 @@
         "ok"
       ],
       "seconds": [
-        16.06
+        15.08
       ],
       "errors": [],
       "correct": true,
@@ -1316,7 +1322,7 @@
         "ok"
       ],
       "seconds": [
-        15.71
+        12.56
       ],
       "errors": [],
       "correct": true,
@@ -1334,7 +1340,7 @@
         "ok"
       ],
       "seconds": [
-        15.47
+        15.27
       ],
       "errors": [],
       "correct": true,
@@ -1346,16 +1352,16 @@
       "expected": "fałszywe",
       "expected_label": "fałszywe",
       "predicted": [
-        "fałszywe"
+        "wprowadzające w błąd"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        15.76
+        13.12
       ],
       "errors": [],
-      "correct": true,
+      "correct": false,
       "harness_error": false
     },
     {
@@ -1372,8 +1378,8 @@
         "ok"
       ],
       "seconds": [
-        9.59,
-        0.15
+        8.7,
+        0.12
       ],
       "errors": [],
       "correct": true,
@@ -1393,8 +1399,8 @@
         "ok"
       ],
       "seconds": [
-        16.46,
-        0.22
+        11.94,
+        0.12
       ],
       "errors": [],
       "correct": true,
@@ -1414,8 +1420,8 @@
         "ok"
       ],
       "seconds": [
-        12.98,
-        0.13
+        14.26,
+        0.27
       ],
       "errors": [],
       "correct": true,
@@ -1435,8 +1441,8 @@
         "ok"
       ],
       "seconds": [
-        14.86,
-        0.11
+        15.12,
+        0.18
       ],
       "errors": [],
       "correct": true,
@@ -1454,7 +1460,7 @@
         "ok"
       ],
       "seconds": [
-        20.9
+        21.35
       ],
       "errors": [],
       "correct": true,
@@ -1472,7 +1478,7 @@
         "ok"
       ],
       "seconds": [
-        22.71
+        12.14
       ],
       "errors": [],
       "correct": true,
@@ -1490,7 +1496,7 @@
         "ok"
       ],
       "seconds": [
-        9.91
+        10.46
       ],
       "errors": [],
       "correct": false,
@@ -1508,7 +1514,7 @@
         "technical_error"
       ],
       "seconds": [
-        0.13
+        0.14
       ],
       "errors": [],
       "correct": true,
@@ -1526,7 +1532,7 @@
         "technical_error"
       ],
       "seconds": [
-        0.11
+        0.22
       ],
       "errors": [],
       "correct": true,
@@ -1538,13 +1544,13 @@
       "expected": "ok",
       "expected_label": "status:ok",
       "predicted": [
-        "fałszywe"
+        "brak wystarczających dowodów"
       ],
       "status": [
         "ok"
       ],
       "seconds": [
-        26.96
+        29.28
       ],
       "errors": [],
       "correct": true,
@@ -1562,7 +1568,7 @@
         "ok"
       ],
       "seconds": [
-        27.51
+        24.11
       ],
       "errors": [],
       "correct": true,
