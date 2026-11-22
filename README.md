@@ -180,6 +180,33 @@ Most setups need only these keys. Every variable, its default and what it change
 | `PRAWDOWID_ADMIN_TOKEN` | Turns on the moderator queue and `GET /api/cases`. Unset: no queue. |
 | `DISCORD_BOT_TOKEN` | Only for the Discord bot. |
 
+## Uruchomienie
+
+Potrzebny jest Docker z Compose i klucz Anthropic w pliku `.env` (ignorowanym przez git). Bez klucza
+strona się otwiera, ale każde sprawdzenie kończy się komunikatem technicznym.
+
+```bash
+make up
+```
+
+Otwórz http://localhost:8080, a zatrzymaj stos przez `make down`. Samo API z przeładowaniem:
+zainstaluj [uv](https://docs.astral.sh/uv/getting-started/installation/), potem `make install` i
+`make dev` (dokumentacja API pod http://127.0.0.1:8000/api/docs). `make help` pokazuje wszystkie
+cele, `make check` uruchamia ruff i pytest. Wdrożenie publiczne z HTTPS:
+[docs/deploy.md](docs/deploy.md).
+
+Najważniejsze zmienne w `.env` (pełna lista: [docs/reference.md](docs/reference.md#configuration)):
+
+| Zmienna | Do czego służy |
+|---|---|
+| `ANTHROPIC_API_KEY` | Wymagana. Bez niej każde sprawdzenie zwraca `technical_error`. |
+| `GOOGLE_FACTCHECK_API_KEY` | Oceny fact-checkerów. Bez niej Fact Check liczy się jako niedostępny, więc twierdzenie bez innych wystarczających dowodów dostaje `nie sprawdzono`. |
+| `PERPLEXITY_API_KEY` | Wyszukiwanie w sieci na dozwolonych domenach (Perplexity Search API). Bez niej używany jest `TAVILY_API_KEY`. |
+| `TAVILY_API_KEY` | Zapasowe wyszukiwanie na dozwolonych domenach. Bez obu kluczy wyszukiwanie jest zgłaszane jako niedostępne. |
+| `EUVSDISINFO_API_KEY` | Znane narracje dezinformacyjne, tylko jako kontekst. |
+| `PRAWDOWID_ADMIN_TOKEN` | Włącza kolejkę moderatora i `GET /api/cases`. Bez niej kolejki nie ma. |
+| `DISCORD_BOT_TOKEN` | Tylko dla bota Discord. |
+
 ## Docs
 
 - [Reference](docs/reference.md): configuration, API, repository layout
