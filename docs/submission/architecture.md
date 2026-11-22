@@ -80,7 +80,8 @@ separate, already-populated source and does not substitute for the incident base
 These are literal code defaults, not a statement about currently available public model names.
 Availability and the model overrides used in the saved eval are UNCONFIRMED: its JSON does not
 record them. All model calls use PydanticAI native structured output through the installed
-Anthropic provider. Alternative provider dependencies and credentials are not demonstrated.
+Anthropic provider. Alternative provider dependencies and credentials are not demonstrated; the
+EU-processed option is described under "Deployment, storage and data processing" below.
 Web search (step 2b) is now **Tavily** (`tavily_search` in `prawdowid/websearch.py`), which
 replaced DuckDuckGo (#7, proposed as #20; wired as #45) because DuckDuckGo via `ddgs` returned no
 results from our machines and left retrieval empty. Retrieval providers and their terms are listed
@@ -115,9 +116,31 @@ the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Inp
 Anthropic masked (a placeholder keeps the sentence shape so claims still split); masked claim text
 and queries go to Google, Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
 has no delete command, Docker stdout logs sit outside retention): [docs/privacy.md](../privacy.md).
-Browser traffic, fetched evidence, the host and Discord also process data. Exact provider
-processing locations and retention agreements are UNCONFIRMED. See [risks.md](risks.md) for code
-references and [sources.md](sources.md) for storage limits.
+Who processes what, from each provider's own terms read on 22.11.2026. The full table, with
+retention, training use and links to the terms, is in
+[docs/privacy.md](../privacy.md#where-data-is-processed).
+
+| Processor | Receives | Processes in |
+|---|---|---|
+| Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
+| Tavily (web search) | Masked search queries | United States. An EU endpoint exists for selected customers only |
+| Google Fact Check Tools | Masked claim text | Not stated for this API. Google's servers are worldwide |
+| EUvsDisinfo MCP | Claim text, cut to 200 characters | Not stated, UNCONFIRMED |
+| www.gov.pl search | Search queries | Not stated, UNCONFIRMED |
+| OVHcloud VPS | Everything the app stores | Limburg, Germany |
+| Discord (bot, not deployed yet) | The typed command and our reply | United States |
+
+Migration path: the three model steps are chosen by `PRAWDOWID_MODEL`, `PRAWDOWID_RERANK_MODEL`
+and `PRAWDOWID_JUDGE_MODEL` (PydanticAI model strings). The same Claude models can run in the EU
+through Amazon Bedrock EU inference profiles (for example `bedrock:eu.anthropic.claude-opus-5-5`).
+That takes the variables, the `bedrock` dependency extra and the `environment:` list in
+`compose.yaml`, and is expected to need no prompt or code change. It has not been run. After it,
+web search (Tavily), Fact Check (Google) and the Discord channel still leave the EEA, and
+EUvsDisinfo and www.gov.pl state no location. Steps and open points:
+[docs/privacy.md](../privacy.md#migration-path-to-an-eu-processed-model).
+
+Browser traffic and fetched evidence also pass through other parties' systems. See
+[risks.md](risks.md) for code references and [sources.md](sources.md) for storage limits.
 
 ## Default limits, not performance measurements
 

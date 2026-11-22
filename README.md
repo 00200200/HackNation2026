@@ -47,6 +47,144 @@ back as `nie sprawdzono` with the reason.
 Measured results live in [`evals/results/HISTORY.md`](evals/results/HISTORY.md), one row per eval
 run with its commit and notes. Read [`docs/eval-notes.md`](docs/eval-notes.md) before quoting a number.
 
+## Zgodność z wymaganiami
+
+Wymagania pochodzą z opisu zadania Prawdowid (MSZ), sekcje 3 do 6. Tabele opisują kod z `main` (`1aa173f`) na 22.11.2026. "Zrobione" znaczy, że działa w kodzie i ma test albo pomiar. "Częściowo" znaczy, że działa z nazwanym brakiem. "Brak" znaczy, że tego nie ma. Przy zakazach "zrobione" znaczy, że kod ich przestrzega. Numery w nawiasach to zgłoszenia w repozytorium. Czego system nie obsługuje i jaki komunikat widzi wtedy użytkownik: [docs/unsupported.md](docs/unsupported.md).
+
+### Minimalny zakres (sekcja 3)
+
+| Wymaganie | Stan | Dowód i uwagi |
+|---|---|---|
+| Wejście: tekst przez responsywny interfejs WWW | zrobione | Strona w `frontend/` (nginx) wywołuje `POST /api/checks` z `prawdowid/app.py`. Długość wejścia jest walidowana, limit to 5000 znaków. |
+| Wejście: adres URL | częściowo | `prawdowid/link.py` pobiera stronę (HTML i PDF, ochrona przed SSRF), a jej tekst idzie przez to samo `verify()`. Żaden z 73 przypadków eval nie ma adresu na wejściu, więc ta ścieżka nie jest zmierzona. W pomiarze na żywo z 21.11 długa strona zużyła budżet 25 s i twierdzenia wróciły jako `nie sprawdzono` ([#63]). |
+| Drugi kanał albo adapter demonstracyjny | częściowo | Komenda Discord `/sprawdz` (`prawdowid/discord_bot.py`) woła to samo `POST /api/checks` z nagłówkiem `X-Channel: discord` i ma testy (`tests/test_discord_bot.py`). Bot nie jest wdrożony, więc jury nie uruchomi go na naszym serwerze ([#59]). |
+| Rozpoznanie jednego lub kilku twierdzeń | zrobione | Model dzieli tekst na twierdzenia i oznacza sprawdzalne (`prawdowid/verifier.py`). Werdykt dostaje do 5 z nich (`PRAWDOWID_MAX_CHECKED_CLAIMS`), reszta trafia na listę bez werdyktu. |
+| Wyszukiwanie w opisanym zbiorze, co najmniej dwa typy źródeł, pokazanie użytych materiałów | częściowo | Na każde twierdzenie: Google Fact Check, wyszukiwarka www.gov.pl, Tavily na liście 15 domen (`prawdowid/websearch.py`) i EUvsDisinfo (samo trafienie nie wystarcza do werdyktu). Źródło ma tytuł, wydawcę, datę, link i cytat. Korpus (1158 rekordów) nie jest przeszukiwany przez `verify()` ([#74]), a pobieranie gubi większość znalezionych stron ([#95]). Strony z listą źródeł nie ma ([#83]). |
+| Wynik, krótkie uzasadnienie, siła podstawy, ograniczenia | częściowo | `ClaimResult` (`prawdowid/contract.py`) ma werdykt, uzasadnienie, siłę, przesłanki, źródła i ograniczenia. Siła nie uwzględnia świeżości dowodów ([#67]), a pole "Uzasadnienie" pokazuje czasem powód sprawdzalności zamiast uzasadnienia werdyktu ([#68]). |
+| Odpowiedź po polsku, prostym językiem | zrobione | Etykiety, komunikaty i odpowiedzi są po polsku, strona ma `lang="pl"`. Czytelności nie mierzyliśmy, a porównanie z przykładowymi odpowiedziami mentora jest otwarte ([#92]). |
+| Zapis przebiegu: pytanie, czas, źródła, wynik | częściowo | `prawdowid/checklog.py` zapisuje zamaskowane pytanie, czas, kanał, status, czasy kroków, wywołania modeli, koszt oraz werdykt i źródła każdego twierdzenia. Na serwerze dziennik ginie przy każdym wdrożeniu, bo nie ma wolumenu ([#70]). |
+| Wstrzymanie się bez dowodów | zrobione | `judge.decide()` (kod, nie model) zwraca `brak wystarczających dowodów`, gdy żadna strona nie ma zweryfikowanego cytatu z wystarczająco mocnego źródła (`prawdowid/judge.py`). Pomiar jest w tabeli metryk. |
+| Pełna ścieżka bez ręcznej ingerencji | częściowo | W kodzie nie ma kroku ręcznego między zgłoszeniem a zapisem w dzienniku. W quick evalu 8 z 9 przypadków skończyło się oczekiwanym statusem (commit `95e6177`). Dziewiąty, J01, wymaga symulowanej awarii, której eval nie potrafi wywołać (tabela metryk). |
+
+### Funkcje premiowane
+
+| Funkcja | Stan | Dowód i uwagi |
+|---|---|---|
+| Obraz i dźwięk: OCR, transkrypcja, metadane, porównywanie obrazów | brak | Wejście to tekst i adres URL. Zrzut ekranu: [#80]. Nie deklarujemy wyszukiwania odwrotnego obrazu. |
+| Porównywanie źródeł, łańcuch dowodowy | częściowo | Sędzia oznacza każdy fragment jako potwierdzający, obalający, kontekst albo lukę i podaje dokładny cytat (`prawdowid/judge.py`). Odpowiedź nie pokazuje tego stanowiska przy źródle ([#78]). |
+| Wielojęzyczne wyszukiwanie, odpowiedź po polsku | brak | Zapytania są po polsku. Angielskie zapytania do EUvsDisinfo i źródeł międzynarodowych: [#89]. |
+| Otwarty lub wymienny katalog źródeł z zasadami | częściowo | Katalog `corpus/catalog.yaml`, zasady włączania, aktualizacji i wykluczania oraz licencje w [docs/corpus.md](docs/corpus.md) i [docs/sources.md](docs/sources.md). Odświeżanie jest ręczne ([#90]), a publicznej strony ze źródłami nie ma ([#83]). |
+| Podłączanie kanałów, modeli i źródeł bez przebudowy | częściowo | Kanały wołają to samo API, modele wybierają trzy zmienne środowiskowe (PydanticAI, ale `compose.yaml` przekazuje dziś do kontenera tylko `PRAWDOWID_MODEL`), a źródła zwracają wspólny `Source`. Podmiana na model spoza Claude nie była uruchomiona, a zainstalowany jest tylko dodatek `anthropic` (szczegóły w [docs/privacy.md](docs/privacy.md#where-data-is-processed)). |
+| Dopasowanie do katalogu incydentów albo korpusu | częściowo | `prawdowid/incidents.py` dopasowuje wejście po adresie, domenie i podobieństwie tekstu i nigdy nie ustawia werdyktu. Baza incydentów organizatora nie jest wczytana, więc moduł jest pusty ([#64]), a korpus nie jest przeszukiwany ([#74]). |
+| Eksport danych, integracje analityczne | częściowo | JSON z `POST /api/checks` i `GET /api/sessions/{id}`. CSV i STIX dla OpenCTI: brak ([#86]). Specyfikacja OpenAPI z FastAPI zwraca 404 na publicznym demo ([#87]). |
+| Kontrolowana archiwizacja materiału wskazanego przez użytkownika | brak | Nic nie jest archiwizowane na prośbę użytkownika. Dziennik sprawdzeń trzyma skrót SHA-256 strony, nie jej treść. |
+| Mniejsza zależność od dostawców spoza EOG, audyt, hosting własny, miejsce przetwarzania | częściowo | Serwer to OVHcloud VPS w Limburgu (DE), całość uruchamia Docker Compose z kodu z repozytorium. Dostawcy modeli i wyszukiwania działają poza naszą kontrolą: tabela dostawców i droga migracji w [docs/privacy.md](docs/privacy.md#where-data-is-processed). Przebiegu na modelu przetwarzanym w UE nie wykonano ([#85]). |
+| Pętla informacji: sprawa moderatora, grupowanie podobnych zgłoszeń | brak | Nie zbudowana ([#79]). Eval pokazuje 0.0. |
+
+### Wymagania formalne (sekcja 4)
+
+| Wymaganie | Stan | Gdzie |
+|---|---|---|
+| Nazwa zespołu, tytuł, opis do 4000 znaków | częściowo | Szkic: [docs/submission/description.md](docs/submission/description.md), 2309 znaków. Nazwa zespołu to placeholder TEAM_NAME, a szkic nadal pisze, że nie zbudowaliśmy korpusu, który już jest ([#18]). |
+| Prezentacja PDF, do 12 slajdów | brak | W repozytorium jest tylko konspekt: [docs/submission/slides-outline.md](docs/submission/slides-outline.md). Pliku PDF nie ma, jego stan poza repozytorium UNCONFIRMED ([#18]). |
+| Film demonstracyjny, do 3 minut | brak | W repozytorium nie ma filmu ani linku do niego ([#18]). |
+| Link do repozytorium z instrukcją uruchomienia | częściowo | Instrukcja: sekcja "Run" poniżej (uv i Docker Compose). Repozytorium jest dziś prywatne, dostęp dla jury ustala zespół. |
+| Opis architektury, przepływu danych, modeli, dostawców i ograniczeń | zrobione | [docs/submission/architecture.md](docs/submission/architecture.md), tablica architektury (link niżej) i [docs/privacy.md](docs/privacy.md). |
+| Źródła, licencje, kwalifikacja i aktualizacja | częściowo | [docs/submission/sources.md](docs/submission/sources.md), [docs/sources.md](docs/sources.md) i [docs/corpus.md](docs/corpus.md). Prawa do części źródeł są oznaczone UNCONFIRMED, odświeżanie jest ręczne ([#90]). |
+| Wyniki testów według sekcji 6 z danymi do odtworzenia | częściowo | 73 przypadki w `evals/cases.jsonl`, uruchomienie `uv run python -m evals.run`, wyniki w [evals/results/HISTORY.md](evals/results/HISTORY.md). Pełnego przebiegu na commicie zgłoszenia jeszcze nie ma ([#16]). |
+| Ryzyka: halucynacje, stronniczość źródeł, prywatność, prompt injection, dostępność, nadużycia | zrobione | [docs/submission/risks.md](docs/submission/risks.md) ma wszystkie sześć, z istniejącymi zabezpieczeniami i miejscem w kodzie. |
+| Opcjonalnie: publiczne demo, kontener Docker, OpenAPI, makiety kanałów, dashboard jakości | częściowo | Demo: https://faktczyfejk.pl. Docker: `compose.yaml`. OpenAPI: [#87]. Makiet kolejnych kanałów i dashboardu jakości nie ma. |
+
+### Wymagania techniczne (sekcja 5)
+
+| Obszar | Stan | Dowód i uwagi |
+|---|---|---|
+| Architektura: kanały oddzielone od logiki, wymiana modelu bez przebudowy | częściowo | Web i Discord wołają to samo API, a API jedno `verify()`. Modele wybierają `PRAWDOWID_MODEL`, `PRAWDOWID_RERANK_MODEL` i `PRAWDOWID_JUDGE_MODEL`, ale `compose.yaml` przekazuje do kontenera tylko pierwszą. Wymiana nie została wypróbowana ([docs/privacy.md](docs/privacy.md#where-data-is-processed)). |
+| Fakty: dowód albo wstrzymanie, awaria, niejasne pytanie i wyjście poza zakres osobno | częściowo | Statusy `technical_error`, `cannot_check` i `needs_clarification` są szarą informacją, nie werdyktem, a opinie i prognozy dostają `nie podlega weryfikacji`. Wyjątki: awaria źródeł bywa pokazana jako `brak wystarczających dowodów` ([#60]), a `nie sprawdzono` wygląda jak werdykt ([#68]). |
+| Źródła: co najmniej 100 dokumentów, 10 domen, dwa typy, źródła pierwotne i wtórne, lista do audytu | częściowo | `make corpus-check` na zapisanym korpusie: 1158 dokumentów, 11 domen rejestrowych (7, gdy wszystkie `*.gov.pl` liczyć jako jedną), typy `official` (1143) i `fact_checker` (15). Wiarygodnych źródeł wtórnych jest w korpusie tylko 15 rekordów Pravdy. Lista do audytu: `corpus/catalog.yaml`. Korpus nie jest przeszukiwany ([#74]). |
+| Aktualność: znaczniki publikacji i pobrania, preferowanie świeżych, ostrzeżenie o archiwaliach | częściowo | `Source` ma `published_at` i `fetched_at`, a źródło starsze niż 730 dni dostaje ostrzeżenie o materiale archiwalnym (`PRAWDOWID_ARCHIVE_DAYS`, próg ustawiony na oko, nie dostrojony). W korpusie 259 z 1158 rekordów nie ma daty publikacji. Siła werdyktu nie zależy od świeżości ([#67]). |
+| Bezpieczeństwo: walidacja wejścia, separacja instrukcji od treści źródeł, ograniczenia narzędzi, sekrety, limit żądań, logowanie zdarzeń | częściowo | Jest walidacja długości, dane źródeł w osobnych znacznikach, agenci bez narzędzi, limit 10 żądań na minutę na adres, sekrety w ignorowanych plikach `.env` ze skanem przed pushem i zdarzenia prompt injection w dzienniku. Odporność zmierzona w quick evalu to 0.000 (tabela metryk), a przypadków z wstrzyknięciem w pobranej stronie nie ma ([#61], [#94]). |
+| Prywatność: minimalizacja, maskowanie, retencja, usunięcie sesji | częściowo | `prawdowid/privacy.py` maskuje e-mail, NRB i IBAN, kartę, PESEL i telefon przed modelem i w każdym logu. Retencja to 30 dni, a "Usuń moje sprawdzenia" na stronie woła `DELETE /api/sessions/{id}`. Maskowanie pomija numery dowodu i paszportu oraz część formatów telefonu ([#82]). Na Discordzie nie ma usuwania. |
+| Obserwowalność: czas, użycie modeli, błędy wyszukiwania, wstrzymania, szacunkowy koszt | częściowo | Dziennik ma czas i czasy kroków, wywołania modeli z tokenami, `cost_usd` na odpowiedź, zdarzenia bezpieczeństwa oraz werdykt i ograniczenia każdego twierdzenia, więc błędy źródeł i wstrzymania da się z niego policzyć. Agregacji ani dashboardu nie ma, a dziennik ginie przy wdrożeniu ([#70]). |
+| Dostępność: responsywny interfejs, kontrast, język bez wiedzy technicznej | częściowo | Strona ma `meta viewport`, `lang="pl"`, `aria-live` na wyniku i `prefers-reduced-motion`. W repozytorium nie ma pomiaru kontrastu ani testu z czytnikiem ekranu. |
+| Kanały i dostęp: ta sama logika, spójny wynik | częściowo | Jedno API dla obu kanałów i test `test_same_input_same_result_on_web_and_discord` (`tests/test_discord_bot.py`), który uruchamia prawdziwą aplikację FastAPI w procesie, z atrapą modelu. Spójność na żywych źródłach nie jest zmierzona, bo drugi kanał nie jest wdrożony ([#59]). |
+| Pętla informacji | brak | Nie zbudowana ([#79]). |
+| Zależności zewnętrzne: klucze, limity, koszty, miejsce przetwarzania, zachowanie przy awarii | częściowo | Klucze i limity: sekcja "Configuration" poniżej. Koszty: [docs/submission/cost.md](docs/submission/cost.md). Miejsce przetwarzania: [docs/privacy.md](docs/privacy.md#where-data-is-processed), część UNCONFIRMED. Zachowanie przy awarii: [docs/unsupported.md](docs/unsupported.md). Demo może wyczerpać kredyty Tavily albo budżet modelu ([#75]). |
+| Multimodalność (nieobowiązkowa) | brak | [#80]. |
+| Koszt 1000 zapytań, koszt kanału, zachowanie przy ruchu | częściowo | [docs/submission/cost.md](docs/submission/cost.md): z quick evalu wynika USD 18.22 za 1000 sprawdzeń (`95e6177`, 9 przypadków, zestaw niereprezentatywny). Koszt kanału i zachowanie pod obciążeniem: UNCONFIRMED. Ekstrakcja działa na Opusie, tańsze modele i test obciążenia: [#88]. |
+| Bezpłatny dostęp dla użytkownika | zrobione | Aplikacja nie ma płatności ani logowania. Koszty operatora (hosting, klucze API) nie są wyliczone, UNCONFIRMED. |
+
+### Zakazy
+
+| Zakaz | Stan | Dowód i uwagi |
+|---|---|---|
+| Wynik modelu jako fakt bez źródła | zrobione | Werdykt ustawia kod w `judge.decide()` z cytatów, które kod sprawdził w tytule albo fragmencie źródła. Model tylko oznacza cytaty. |
+| Obchodzenie zabezpieczeń serwisów i płatnych baz | zrobione | Pobieranie stron z wyników wyszukiwania i budowa korpusu respektują robots.txt (RFC 9309; wyjątek to udokumentowane wywołania API z kluczem), a korpus zatrzymuje się na 403, 429 i wyzwaniach antybotowych. Adres podany przez użytkownika jest pobierany jak w przeglądarce, bez sprawdzania robots.txt, a paywall i ściana logowania kończą się prośbą o wklejenie tekstu. Wyszukiwarka www.gov.pl używa nieudokumentowanego endpointu samego serwisu, jego stabilność UNCONFIRMED. |
+| Przesądzanie o prawdziwości z domeny, autora, kanału, popularności, udostępnień albo etykiety tego samego modelu | częściowo | Werdykt wymaga zweryfikowanego cytatu ze stanowiskiem, więc sama domena go nie daje. Domena ustala typ źródła (`ALLOWLIST` w `prawdowid/websearch.py`), a typ to, czy wystarczy jeden cytat ze źródła urzędowego, pierwotnego albo fact-checkera, czy potrzebne są dwa niezależne (`prawdowid/judge.py`). Autora, kanału i popularności nie ma w danych, z których `judge.decide()` liczy werdykt. EUvsDisinfo nie jest typem wiarygodnym, więc samo nie wystarcza, a baza incydentów nie wpływa na werdykt. Luka: tytuł recenzji z Fact Check, bez oceny fact-checkera, może sam przesądzić werdykt ([#66]). |
+| Status źródła (np. sankcje UE) nie przesądza o prawdziwości, osobne neutralne ostrzeżenie | częściowo | Status źródła nie wpływa na werdykt, ale ostrzeżenia o statusie nie ma ([#81]). |
+| Pełne wyszukiwanie odwrotne obrazu bez działającego API | zrobione | Nie deklarujemy go: wejście nie przyjmuje obrazów. |
+| Archiwizacja pełnych treści i obrazów bez podstawy, licencji, retencji, kontroli dostępu i usunięcia | zrobione | Pełny tekst zapisujemy tylko tam, gdzie pozwala licencja albo warunki wydawcy, resztę jako fragment do 500 znaków, obrazów nie zapisujemy. Zasady, retencja i usuwanie na żądanie: [docs/corpus.md](docs/corpus.md). Odyseusz nie podaje licencji, podstawą jest art. 4 pkt 2 i wskazanie przez mentora, czy to wystarcza: UNCONFIRMED. |
+| Brak klucza, limit albo awaria nie jako wynik merytoryczny | częściowo | Brak klucza modelu, limit żądań i przekroczenie czasu dają szarą informację, a nie werdykt. Wyjątek: gdy wszystkie źródła zawiodą, część odpowiedzi pokazuje `brak wystarczających dowodów` zamiast awarii ([#60]). |
+| Klucze, dane osobowe i sekrety poza repozytorium i materiałami demo | zrobione | Pliki `.env*` są ignorowane, a hook `.githooks/pre-push` blokuje push z sekretami w zmienionych liniach i ze śledzonym plikiem `.env`. Korpus zawiera tylko materiał opublikowany przez wydawców, a `make corpus-check` odrzuca adres e-mail i numer z poprawną sumą PESEL ([docs/corpus.md](docs/corpus.md)). |
+
+### Metryki obowiązkowe (sekcja 6)
+
+Ostatnie pomiary pochodzą z [evals/results/latest.json](evals/results/latest.json): przebieg quick, 9 przypadków, commit produktu `95e6177`, 2026-11-21T19:10:57Z, drzewo czyste. Wszystkie wartości są do aktualizacji po pełnym evalu ([#16]). Każdy przebieg z commitem i uwagami jest w [evals/results/HISTORY.md](evals/results/HISTORY.md). Wiersz z pełnego przebiegu na 71 przypadkach (`8c6f396`) jest odtworzony z logów, bez pliku JSON, i zniekształcony przez limity czasu modelu, więc nie służy jako pomiar ([docs/eval-notes.md](docs/eval-notes.md)).
+
+| Metryka | Próg | Ostatni pomiar (do aktualizacji po pełnym evalu, #16) | Uwagi |
+|---|---|---|---|
+| Dokładność werdyktu, macro-F1 | ≥ 0.75 | 0.100, poniżej progu | Wszystkie 9 odpowiedzi to `brak wystarczających dowodów`. Analiza błędów: [#77]. |
+| Pokrycie cytatami twierdzeń faktograficznych | ≥ 95% | brak pomiaru | W JSON wartość `null`. |
+| Poprawność cytatów | ≥ 85% | brak pomiaru | Wymaga przebiegu z `--corpus`. Cytaty z żywych źródeł oznaczone "przeczy" nie obalają twierdzenia ([#62]). |
+| Poprawne wstrzymanie się | ≥ 80% | 1.000, spełnione | Wynik trywialny: wszystkie odpowiedzi tego przebiegu to wstrzymanie. |
+| Odporność na prompt injection | ≥ 90% | 0.000, poniżej progu | Przypadki mają wstrzyknięcie w tekście wejściowym, w pobranej stronie żadnego ([#61], [#94]). |
+| Mediana czasu, tekst i adres URL | ≤ 30 s | 3.90 s, spełnione | Tylko zestaw quick, bez przypadków z adresem URL. |
+| Koszt 100 testów | do podania | USD 1.82 | Z `cost_usd`, przy ekstrakcji na Opusie ([#88]). |
+| Scenariusze end-to-end bez zespołu | 100% | 0.889 (8 z 9), poniżej progu | Niezaliczony jest J01: eval nie stosuje pola `simulate`, więc awaria Fact Check nie jest wywołana i wraca `brak wystarczających dowodów` zamiast `technical_error`. FC-J01 i FC-J02 pominięte. |
+| Spójność między kanałami | 100% | brak pomiaru | Drugi kanał nie jest podłączony do evalu ([#59]). |
+| Pętla moderatora (jeśli wdrożona) | 100% | 0.0 | Nie zbudowana ([#79]). |
+
+### Najważniejsze braki
+
+- Pełny eval na commicie zgłoszenia nie był uruchomiony ([#16]). Ostatni pomiar jest poniżej progu dla dokładności werdyktu, odporności na prompt injection i scenariuszy end-to-end, a pokrycie i poprawność cytatów są niezmierzone ([#77], [#62]).
+- Korpus nie jest przeszukiwany przez `verify()` ([#74]).
+- Discord nie jest wdrożony ([#59]), więc spójność kanałów nie jest zmierzona.
+- Brakuje pliku PDF z prezentacją, filmu i nazwy zespołu ([#18]).
+- Nie zbudowano pętli moderatora ([#79]), wejścia z obrazu ([#80]) ani ostrzeżenia o statusie źródła ([#81]).
+- Awaria źródeł bywa pokazana jako `brak wystarczających dowodów` ([#60]).
+- Część dostawców przetwarza dane poza EOG albo w nieznanym miejscu. Tabela dostawców i droga migracji: [docs/privacy.md](docs/privacy.md#where-data-is-processed) ([#85]).
+
+[#16]: https://github.com/00200200/HackNation2026/issues/16
+[#18]: https://github.com/00200200/HackNation2026/issues/18
+[#59]: https://github.com/00200200/HackNation2026/issues/59
+[#60]: https://github.com/00200200/HackNation2026/issues/60
+[#61]: https://github.com/00200200/HackNation2026/issues/61
+[#62]: https://github.com/00200200/HackNation2026/issues/62
+[#63]: https://github.com/00200200/HackNation2026/issues/63
+[#64]: https://github.com/00200200/HackNation2026/issues/64
+[#66]: https://github.com/00200200/HackNation2026/issues/66
+[#67]: https://github.com/00200200/HackNation2026/issues/67
+[#68]: https://github.com/00200200/HackNation2026/issues/68
+[#70]: https://github.com/00200200/HackNation2026/issues/70
+[#74]: https://github.com/00200200/HackNation2026/issues/74
+[#75]: https://github.com/00200200/HackNation2026/issues/75
+[#77]: https://github.com/00200200/HackNation2026/issues/77
+[#78]: https://github.com/00200200/HackNation2026/issues/78
+[#79]: https://github.com/00200200/HackNation2026/issues/79
+[#80]: https://github.com/00200200/HackNation2026/issues/80
+[#81]: https://github.com/00200200/HackNation2026/issues/81
+[#82]: https://github.com/00200200/HackNation2026/issues/82
+[#83]: https://github.com/00200200/HackNation2026/issues/83
+[#85]: https://github.com/00200200/HackNation2026/issues/85
+[#86]: https://github.com/00200200/HackNation2026/issues/86
+[#87]: https://github.com/00200200/HackNation2026/issues/87
+[#88]: https://github.com/00200200/HackNation2026/issues/88
+[#89]: https://github.com/00200200/HackNation2026/issues/89
+[#90]: https://github.com/00200200/HackNation2026/issues/90
+[#92]: https://github.com/00200200/HackNation2026/issues/92
+[#94]: https://github.com/00200200/HackNation2026/issues/94
+[#95]: https://github.com/00200200/HackNation2026/issues/95
+
 ## Status in detail
 
 The verifier sends the text to Claude (through PydanticAI) and gets back a list of
@@ -228,7 +366,8 @@ their own copy of the labels.
 Submission drafts: [description](docs/submission/description.md),
 [architecture and exact test results](docs/submission/architecture.md),
 [sources](docs/submission/sources.md), [risks](docs/submission/risks.md),
-[cost](docs/submission/cost.md), [Polish slide outline](docs/submission/slides-outline.md).
+[cost](docs/submission/cost.md), [Polish slide outline](docs/submission/slides-outline.md),
+[unsupported cases and their messages](docs/unsupported.md) (Polish).
 The PDF and demo video remain open human work under [#18](https://github.com/00200200/HackNation2026/issues/18).
 
 ## Pre-push gate

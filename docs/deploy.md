@@ -261,7 +261,9 @@ site block to `caddy/Caddyfile`, and point the domain's `A` records at the serve
 
 - Web server, API, database and logs: OVHcloud VPS in Limburg, Germany.
 - Corpus search embeddings: computed on the same server with a local model; no external service.
-- The text of each check goes to the Anthropic API for claim extraction.
+- The text of each check goes to the Anthropic API for claim extraction. The other processors
+  (Tavily, Google, EUvsDisinfo, www.gov.pl, Discord), their locations and the migration path to
+  an EU-processed model: [privacy.md](privacy.md#where-data-is-processed).
 
 ## Try the production setup locally
 

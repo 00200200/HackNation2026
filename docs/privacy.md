@@ -86,14 +86,78 @@ call with the id from the log.
 
 ## Where data is processed
 
-| Service | What it receives | When |
-|---|---|---|
-| Anthropic API (Claude) | Masked text to check; claims and evidence fragments (rerank, judge) | Every check. |
-| Google Fact Check Tools API | Claim text | Every checkable claim, when `GOOGLE_FACTCHECK_API_KEY` is set. |
-| Tavily (`/search`, `tavily-python`) | Masked search queries | Every checkable claim, when `TAVILY_API_KEY` is set, and the corpus builder. |
-| EUvsDisinfo MCP server (`mcp.euvsd.info`) | Claim text | Every checkable claim, when `EUVSDISINFO_API_KEY` is set. |
-| The incident base (`prawdowid/incidents.py`) | The raw input and the final URL | Every check; local file, nothing leaves the server. |
-| The site a link points to | A request from our server | Link checks. The site sees our server's address, not the user's. |
+Issue #85. The table comes from each provider's own terms and documentation, read on 22.11.2026
+(links in the last column). A cell says UNCONFIRMED where those pages are silent or did not load.
+Nothing here was tested by sending data to a provider, and no model or eval was run for this page.
+What a processor receives is limited by the masking above: e-mail, NRB and IBAN, card, PESEL and
+phone are replaced before the model, names and addresses are not.
 
-The region where each provider processes the data is UNCONFIRMED: we have not checked their data
-residency terms for this demo.
+### Processors
+
+| Processor and step | What it receives | Where it processes | Retention and training | Terms |
+|---|---|---|---|---|
+| Anthropic API (Claude): extraction, rerank, judge. Every check. | Extraction: the pasted text or the text of a linked page, masked, up to 5000 characters. Rerank and judge: the masked claim and public evidence fragments. | The default `inference_geo` is `global`, and Anthropic says it may route traffic by default to select countries in the US, Europe, Asia and Australia ([where its servers are](https://privacy.claude.com/en/articles/7996890-where-are-your-servers-located-do-you-host-your-models-on-eu-servers), 15.06.2026), with storage in the US. The only other setting is `us`. The first-party API has no EU-only option. The EEA contract partner is Anthropic Ireland, transfers rest on SCCs. | The Privacy Center says inputs and outputs are deleted from the backend within 30 days (content flagged by policy checks may stay up to 2 years). The API docs say content is not retained by default except for some models (30 days). The two pages disagree: which one applies to us is UNCONFIRMED. The Commercial Terms bar training on Customer Content. | [Commercial Terms](https://www.anthropic.com/legal/commercial-terms), [DPA](https://www.anthropic.com/legal/data-processing-addendum) (SCC modules 2 and 3), [Privacy Policy](https://www.anthropic.com/legal/privacy), [data residency](https://platform.claude.com/docs/en/manage-claude/data-residency), [retention](https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data). The sub-processor list did not render: UNCONFIRMED. |
+| Tavily web search (`/search`). Every checkable claim, when `TAVILY_API_KEY` is set, and the corpus builder. | The search queries the model wrote from the masked text, the domain allowlist, `language=pl` and our API key. No page text: we fetch pages ourselves. | United States: the help center says the infrastructure is primarily there, cloud provider not stated. An EU endpoint (`api.eu.tavily.com`, API in Germany, index in France) is open to selected customers only. Tavily has belonged to Nebius since 19.02.2026, and says its terms and contracting entity did not change. | No retention period is stated. With the account setting "Allow Use of Query Data" off, queries are not stored or used for improvements. Its default is not stated and we have not checked ours: UNCONFIRMED. Zero retention is available on request. Terms §6.5 let Tavily and its AI providers use Customer Input and Outputs, which include queries, to train and improve AI models. Terms §8.2(l) bar special categories of personal data, and our masking does not detect names or health content. | [Terms](https://tavily.com/terms) (4.05.2026), [Privacy](https://tavily.com/privacy), [GDPR and DPA](https://help.tavily.com/articles/8202749643-gdpr-dpa-security-documentation), [query data setting](https://help.tavily.com/articles/4205958832-understanding-the-allow-use-of-query-data-setting), [EU endpoint](https://www.tavily.com/eu). A DPA exists on request, whether we hold one is UNCONFIRMED. |
+| Google Fact Check Tools (`claims:search`). Every checkable claim, when `GOOGLE_FACTCHECK_API_KEY` is set. | The masked claim text, `languageCode` and our API key. | Not stated for this API. Google's privacy policy says its servers are worldwide, the EEA controller is Google Ireland. | Not stated for API requests. The API Terms let Google monitor use of the APIs to improve its products (§3.a) and use submitted information as its privacy policies say (§7.a). Training use for this API is not stated. | [API Terms](https://developers.google.com/terms), [Privacy Policy](https://policies.google.com/privacy), [controller-to-controller terms](https://business.safety.google/controllerterms/) (DPF and SCCs). There is no processor DPA. |
+| EUvsDisinfo MCP (`mcp.euvsd.info`). Every checkable claim, when `EUVSDISINFO_API_KEY` is set. | The claim text as a search query, cut to 200 characters, and our API key. | Not stated. The landing page is also served from a Vercel hostname, so Vercel hosting is likely but unstated. The operator is the EEAS East StratCom Task Force. | Not stated for MCP requests, server logs or training. | No terms found for the MCP, access is by request ([about](https://euvsdisinfo.eu/about/)). The [EEAS privacy notice](https://euvsdisinfo.eu/eeas-privacy-statement-data-protection-notice/) covers the website, newsletter and feedback, not the MCP. |
+| www.gov.pl search. Every checkable claim, unless `PRAWDOWID_GOVPL=0`. | The keyword queries the model wrote for the claim, or its first web query when it wrote none (`/api/data/search?query=`), then GET requests for the result pages. The site sees our server's address. | Not stated. The portal operator is the Minister Cyfryzacji. | Request logging and retention are not stated. There is no portal-wide privacy policy: each unit publishes its own. | [Copyright page](https://www.gov.pl/web/gov/prawa-autorskie) (text under CC BY-SA 4.0), [cookie policy](https://www.gov.pl/web/gov/polityka-dotyczaca-cookies). No rule on automated access found. The endpoint is undocumented and its stability is UNCONFIRMED. |
+| OVHcloud VPS, Limburg (DE). Hosts everything. | Everything the app holds: masked claims in the check log, the source cache, PostgreSQL data, proxy logs, and every request in transit. | Germany, Limburg (region eu-west-lim). The VPS terms fix the location at order time. OVHcloud and its sub-processors may process content remotely, and the sub-processor list names OVH affiliates in Canada and the UK. Whether they touch VPS data, and which OVH entity our account is under, is UNCONFIRMED (the invoice says). | On termination OVHcloud deletes all content and backups irreversibly (General Terms §6.5), with no number of days stated. Our own retention is 30 days for the check log and the cache, and Docker's logs sit outside it. The DPA limits OVHcloud's use of content to what the services need (§4.1). | [VPS conditions](https://contract.eu.ovhapis.com/1.0/pdf/Conditions_Particulieres_VPS-pl.pdf), [DPA](https://contract.eu.ovhapis.com/1.0/pdf/OVH_Data_Protection_Agreement-pl.pdf) (Art. 28 GDPR, SCCs for transfers to countries without adequacy), [sub-processors](https://contract.eu.ovhapis.com/1.0/pdf/OVH_Sub_processors-pl.pdf). |
+| Discord, when the bot runs (not deployed yet, #59). | The text a user types into `/sprawdz`, which Discord already holds, and our reply posted in the channel. | United States: Discord says it stores and processes information on servers there. The EEA controller is Discord Netherlands BV, transfers rest on SCCs and the Data Privacy Framework. | Discord keeps information until it decides it is no longer needed, and deleted messages leave backups after 30 to 45 days. Retention of slash-command payloads is not stated: UNCONFIRMED. The Developer Policy bars developers from training AI on message content obtained through the APIs. | [Developer Terms](https://support-dev.discord.com/hc/en-us/articles/8562894815383-Discord-Developer-Terms-of-Service), [Developer Policy](https://support-dev.discord.com/hc/en-us/articles/8563934450327-Discord-Developer-Policy), [Privacy Policy](https://discord.com/privacy). The Developer Terms (§5) require a privacy policy and a deletion route; ours is an API call with the session id (see above). |
+| The sites a link or a search result points to. | A request from our server: the URL, from our server's address. No user text. | The site's own hosting. | Not ours to control. Public pages fetched as evidence are cached as metadata for 30 days (Retention above). | The site's own terms. |
+
+Local only: the incident base (`prawdowid/incidents.py`, a local file) and the embeddings for corpus
+search (computed on the server with a local model; corpus search is not wired into checks yet, #74).
+
+### What leaves the EEA today
+
+With the defaults every check sends data outside the EEA or to a place the provider does not state.
+The three model steps go to Anthropic (global processing, storage in the US), web search goes to
+Tavily (US) and Fact Check goes to Google (worldwide, not stated for the API). EUvsDisinfo and
+www.gov.pl state no location. Only the VPS is fixed in the EEA, and the Discord channel adds the US
+when it runs. Extraction matters most: it is the only step that sees the user's text. Rerank and
+judge see the claims and public page fragments.
+
+### Migration path to an EU-processed model
+
+Provider facts below were read on 22.11.2026. No model and no eval was run for this path, so it is
+a plan from documentation, not a result.
+
+1. How the model is chosen. Three variables, read when the module loads and passed to PydanticAI as
+   model strings: `PRAWDOWID_MODEL` for extraction (`prawdowid/verifier.py`, default
+   `anthropic:claude-opus-5-5`), `PRAWDOWID_RERANK_MODEL` (`prawdowid/rerank.py`, default
+   `anthropic:claude-haiku-5-5`) and `PRAWDOWID_JUDGE_MODEL` (`prawdowid/judge.py`, default
+   `anthropic:claude-sonnet-5-5`). The three agents use native structured output and have no tools.
+2. Same Claude models, in the EU: Amazon Bedrock. Anthropic's own API has no EU setting, but
+   Bedrock serves Opus, Sonnet and Haiku 5.5 through EU geographic inference profiles that stay in
+   EU regions (from eu-central-1: Frankfurt, Stockholm, Milan, Spain, Ireland, Paris), as the
+   model cards for [Opus 5.5](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-opus-5-5.html),
+   [Sonnet 5.5](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-5-5.html) and
+   [Haiku 5.5](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-haiku-5-5.html)
+   list them. Steps:
+   - In `pyproject.toml` change `pydantic-ai-slim[anthropic,mcp]` to
+     `pydantic-ai-slim[anthropic,bedrock,mcp]`, then `uv lock` and rebuild the image.
+   - Set `PRAWDOWID_MODEL=bedrock:eu.anthropic.claude-opus-5-5`,
+     `PRAWDOWID_RERANK_MODEL=bedrock:eu.anthropic.claude-haiku-5-5`,
+     `PRAWDOWID_JUDGE_MODEL=bedrock:eu.anthropic.claude-sonnet-5-5`, `AWS_DEFAULT_REGION=eu-central-1`
+     and either `AWS_BEARER_TOKEN_BEDROCK` or `AWS_ACCESS_KEY_ID` with `AWS_SECRET_ACCESS_KEY`.
+   - Of the model settings and credentials, `compose.yaml` forwards only `PRAWDOWID_MODEL` and
+     `ANTHROPIC_API_KEY` to the backend. Add the other two model variables and the AWS ones to its
+     `environment:` list, or they never reach the container.
+   - Native structured output keeps working, because PydanticAI gives these model names the same
+     profile. AWS warns that the profile prefix alone does not prove where a request runs: check
+     the routing with `GetInferenceProfile`.
+   - UNCONFIRMED: access criteria for the 5.5 models on Bedrock, their default data retention
+     there, and whether a long-term Bedrock API key works with `eu.` model IDs.
+3. Fallback: Google Vertex AI, `eu` multi-region (about 10% dearer). It is not env-only: it needs
+   an `AsyncAnthropicVertex(region="eu", ...)` client passed to `AnthropicProvider` in code, and
+   the `anthropic[vertex]` extra. Google stores data at rest in the region but says processing may
+   vary, so in-EU processing is not guaranteed by the pages we read. Microsoft Foundry has no EU
+   zone for Claude (global or US only).
+4. Non-Claude EU providers: Mistral on `api.eu.mistral.ai`, OVHcloud AI Endpoints and IONOS AI
+   Model Hub (Germany). Each needs a model object in code, not a string. PydanticAI 2.71.0
+   raises an error for native structured output on Mistral models, whose profile does not enable
+   it, so those agents would need tool or prompted output. No page we read gives Polish quality figures for these models. Switch a step only after
+   `uv run python -m evals.run` shows parity on Polish, and that run does not exist (#16).
+5. What stays outside the EEA after step 2: web search (Tavily, US), Fact Check (Google, location
+   not stated) and the Discord channel (US). EUvsDisinfo and www.gov.pl may be in the EEA, but
+   neither says. If only one model step can move first, move extraction.
