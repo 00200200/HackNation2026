@@ -303,11 +303,11 @@ def test_cost_comes_from_token_usage():
 
 
 @pytest.mark.usefixtures("quiet_sources")
-def test_unpriced_model_reports_unknown_cost():
+def test_unpriced_model_is_counted_not_priced():
     extraction = Extraction(claims=[FACT], other_claims=[], unclear=False)
     result = run("tekst", priced(extraction, model_name="no-such-model"))
     assert result.status is Status.OK
-    assert result.cost_usd is None
+    assert (result.cost_usd, result.unpriced_requests) == (0.0, 1)
 
 
 def test_injection_flag_logs_an_event_without_its_wording():
@@ -409,18 +409,23 @@ def test_patterns_skip_reported_speech_and_plain_facts(text):
 
 
 @pytest.mark.parametrize(
-    "error, status, cost",
+    "error, status",
     [
-        (ContentFilterError("refusal"), Status.CANNOT_CHECK, None),
-        (ModelHTTPError(529, "claude", "overloaded"), Status.TECHNICAL_ERROR, None),
+        (ContentFilterError("refusal"), Status.CANNOT_CHECK),
+        (ModelHTTPError(529, "claude", "overloaded"), Status.TECHNICAL_ERROR),
     ],
 )
-def test_every_model_failure_keeps_pattern_events(error, status, cost):
+def test_every_model_failure_keeps_pattern_events(error, status):
     def failing(messages, info):
         raise error
 
     result = run(OVERRIDE, FunctionModel(failing))
-    assert (result.status, result.cost_usd) == (status, cost)
+    # The failed request may be billed: a number with one unpriced request, never None.
+    assert (result.status, result.cost_usd, result.unpriced_requests) == (
+        status,
+        0.0,
+        1,
+    )
     assert [e.detector for e in result.security_events] == ["patterns"]
     assert result.limitations == [PATTERNS_ONLY]
 
@@ -432,7 +437,7 @@ def test_missing_key_keeps_pattern_events_at_zero_cost(monkeypatch):
     assert [e.detector for e in result.security_events] == ["patterns"]
 
 
-def test_no_request_costs_nothing_and_failed_request_cost_is_unknown(monkeypatch):
+def test_no_request_costs_nothing_and_a_failed_request_is_unpriced(monkeypatch):
     assert (
         run("https://example.com/a", FunctionModel(lambda m, i: None)).cost_usd == 0.0
     )
@@ -442,7 +447,8 @@ def test_no_request_costs_nothing_and_failed_request_cost_is_unknown(monkeypatch
     def failing(messages, info):
         raise ModelHTTPError(529, "claude", "overloaded")
 
-    assert run("tekst", FunctionModel(failing)).cost_usd is None
+    failed = run("tekst", FunctionModel(failing))
+    assert (failed.cost_usd, failed.unpriced_requests) == (0.0, 1)
 
 
 @pytest.mark.parametrize("value", ["0", "-1"])

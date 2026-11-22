@@ -201,7 +201,9 @@ def test_every_claim_hitting_an_outage_is_a_technical_error(monkeypatch):
     assert result.status is Status.TECHNICAL_ERROR
     assert result.claims == [] and result.unchecked_claims == []
     assert "Nie mogę teraz sprawdzić bazy Google Fact Check" in result.message
-    assert result.cost_usd is not None  # the extraction call is still priced
+    assert (
+        result.cost_usd > 0 and result.unpriced_requests == 0
+    )  # the extraction call is priced
 
 
 def test_a_claim_without_outage_keeps_the_answer_ok(monkeypatch):
@@ -426,3 +428,27 @@ def test_the_eval_token_is_not_sent_in_clear_text_to_a_remote_host(monkeypatch):
     monkeypatch.setenv("PRAWDOWID_URL", "http://staging.example")
     with pytest.raises(RuntimeError, match="plain http"):
         adapter.ask({"text": "x", "simulate": "llm_unavailable"}, "web")
+
+
+def test_the_applied_fault_is_echoed_only_with_a_valid_token(monkeypatch):
+    fact_check(monkeypatch, down=False)
+    web(monkeypatch, lambda q: websearch.WebSearch())
+    monkeypatch.setenv(faults.TOKEN_ENV, "secret")
+
+    def post(headers):
+        app_module.limiter.reset()
+        with verifier.agent.override(
+            model=model(lambda _: extraction(1).model_dump_json(), "claude-opus-5-5")
+        ):
+            return TestClient(app_module.app).post(
+                "/api/checks", json={"input": "Twierdzenie."}, headers=headers
+            )
+
+    good = post({"X-Eval-Fault": "llm_unavailable", "X-Eval-Token": "secret"})
+    assert good.headers[faults.APPLIED_HEADER] == "llm_unavailable"
+    for headers in (
+        {"X-Eval-Fault": "llm_unavailable"},
+        {"X-Eval-Fault": "llm_unavailable", "X-Eval-Token": "guess"},
+        {},
+    ):
+        assert faults.APPLIED_HEADER not in post(headers).headers

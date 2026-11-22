@@ -17,6 +17,7 @@ import urllib.request
 import httpx2
 
 from prawdowid.discord_bot import ask_api
+from prawdowid.faults import APPLIED_HEADER
 
 TIMEOUT_S = float(os.environ.get("PRAWDOWID_TIMEOUT_S", "90"))
 # The API allows 10 requests per minute per client; stay under it.
@@ -39,9 +40,16 @@ PASSTHROUGH = (
     "security_events",
     "limitations",
     "cost_usd",
+    "unpriced_requests",
     "moderator_case_id",
     "incident_matches",
 )
+
+
+class FaultNotApplied(RuntimeError):
+    """A fault case whose simulated fault the product did not confirm. The answer is a healthy
+    run, so scoring it would blame the product for a harness or deployment gap."""
+
 
 _last_call = 0.0
 _turn = threading.Lock()  # concurrent cases still start one by one
@@ -105,8 +113,8 @@ def fault_headers(payload: dict) -> dict:
         return {}
     token = os.environ.get("PRAWDOWID_EVAL_TOKEN")
     if not token:
-        raise RuntimeError(
-            f"case simulates {fault!r}: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+        raise FaultNotApplied(
+            f"fault {fault!r} not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
         )
     return {"X-Eval-Fault": fault, "X-Eval-Token": token}
 
@@ -121,6 +129,16 @@ def require_private_transport(base: str) -> None:
         )
 
 
+def confirm_fault(payload: dict, applied: str | None) -> None:
+    """Refuses to score a fault case whose answer does not echo the fault (APPLIED_HEADER)."""
+    fault = payload.get("simulate")
+    if fault and applied != fault:
+        raise FaultNotApplied(
+            f"fault {fault!r} not applied: no matching {APPLIED_HEADER} in the response "
+            "(PRAWDOWID_EVAL_TOKEN unset or different on the product?)"
+        )
+
+
 def ask(payload: dict, channel: str) -> dict:
     base = os.environ.get("PRAWDOWID_URL")
     if not base:
@@ -132,7 +150,9 @@ def ask(payload: dict, channel: str) -> dict:
     if faults:
         require_private_transport(base)
     if channel == "discord":
-        return to_eval_shape(asyncio.run(_ask_discord(base, text, faults)))
+        raw, applied = asyncio.run(_ask_discord(base, text, faults))
+        confirm_fault(payload, applied)
+        return to_eval_shape(raw)
     body = json.dumps({"input": text}).encode()
     request = urllib.request.Request(
         f"{base.rstrip('/')}/api/checks",
@@ -145,16 +165,26 @@ def ask(payload: dict, channel: str) -> dict:
         },
     )
     with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+        confirm_fault(payload, response.headers.get(APPLIED_HEADER))
         shaped = to_eval_shape(json.loads(response.read().decode()))
         # Read by `evals.run.call`: an answer from the product's result cache says nothing about
-        # how long a check takes. The Discord client does not expose headers.
+        # how long a check takes.
         shaped["cached"] = response.headers.get("X-Cache") == "hit"
     return shaped
 
 
-async def _ask_discord(base: str, text: str, headers: dict) -> dict:
+async def _ask_discord(base: str, text: str, headers: dict) -> tuple[dict, str | None]:
+    """The bot's answer and the fault echo of the response behind it."""
+    applied: list[str | None] = []
+
+    async def note_echo(response: httpx2.Response) -> None:
+        applied.append(response.headers.get(APPLIED_HEADER))
+
     async with httpx2.AsyncClient(
-        base_url=base, timeout=TIMEOUT_S, headers=headers
+        base_url=base,
+        timeout=TIMEOUT_S,
+        headers=headers,
+        event_hooks={"response": [note_echo]},
     ) as client:
         check = await ask_api(text, client)
-    return check.model_dump(mode="json")
+    return check.model_dump(mode="json"), next(iter(applied), None)

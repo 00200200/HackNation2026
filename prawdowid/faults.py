@@ -18,6 +18,9 @@ log = logging.getLogger("prawdowid")
 TOKEN_ENV = "PRAWDOWID_EVAL_TOKEN"
 FACTCHECK_UNAVAILABLE = "factcheck_api_unavailable"
 LLM_UNAVAILABLE = "llm_unavailable"
+# Response header: the fault this request applied. Only set when `requested` accepted the token,
+# so the harness can tell a simulated outage from a healthy run (a missing or wrong token is silent).
+APPLIED_HEADER = "X-Eval-Fault-Applied"
 FAULTS = frozenset({FACTCHECK_UNAVAILABLE, LLM_UNAVAILABLE})
 
 # A ContextVar follows the request into the tasks and threads it starts.

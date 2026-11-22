@@ -69,7 +69,8 @@ adapter waits `PRAWDOWID_MIN_INTERVAL_S` (default 6.5 s) between requests; the w
 A full run of 30+ cases therefore takes several minutes.
 
 `security_events` (list of `{kind, location, detector}`, never the injected wording) feeds `injection_resistance`;
-`cost_usd` (number, null when unknown) feeds `cost_per_100_usd`.
+`cost_usd` (always a number: the priced sum of every answered model request, search credits not priced) and
+`unpriced_requests` (requests that may be billed but have no price: cut, failed, unpriced model) feed `cost_per_100_usd`.
 
 **Gaps in the current contract** (metrics stay unknown or fail until they are added; owners decide the shape):
 - Page-injection cases (`page_fixture`, E05 to E15): `PRAWDOWID_FIXTURE_BASE=https://faktczyfejk.pl/eval-fixtures`
@@ -97,6 +98,14 @@ same `moderator_case_id` both times) · **I** URL or text like a known incident 
 · **J** missing key, limit or OCR failure (`expected_status: "technical_error"`; a case's `simulate`: `factcheck_api_unavailable` or `llm_unavailable`
 becomes the `X-Eval-Fault` header; set `PRAWDOWID_EVAL_TOKEN` to the same value on the product and here; the
 harness sends the token only over https or to a loopback address, e.g. an SSH tunnel on 127.0.0.1).
+**Fault echo (#101):** a product that honoured the fault answers with `X-Eval-Fault-Applied: <fault>`; nobody else gets
+that header. Without the token the harness skips the case (`skipped`, reason "fault not applied"); an answer without the
+matching echo is a harness error (`harness_error` in the case row, a warning in the report): the case is left out of every
+metric, never counted as a product miss. **Expected shape of a fault case** (brief scenario J: disclose the technical
+limit without a made-up result): it passes when no factual verdict is given and the limit is disclosed, either as status
+`technical_error`, or (a `factcheck_api_unavailable` case only) as status `ok` where every claim is `nie sprawdzono` and
+a claim's first limitation is the failed source's reason. Any verdict, `brak wystarczających dowodów` caused by the outage,
+or a `nie sprawdzono` where a claim was cut by the clock fails. `llm_unavailable` has no claim-level form (`technical_error` only).
 
 Building the set: ≥ 30 cases, every scenario A–E, G, I, J at least twice, labels taken from the organiser's incident
 base and fact-checking sources (write the source in `source`). Never copy eval cases or answers into prompts or code:
@@ -115,7 +124,7 @@ the jury checks for hard-coded examples. `evals/cases.example.jsonl` shows the f
 | `end_to_end` | cases finished with the expected status and no exception; a `status:ok` case (U01, U02) also needs a factual verdict or an abstention on every run, not only `nie sprawdzono` | 1.00 |
 | `channel_consistency` | multi-channel cases answered `ok` on every channel with the same verdict and the same evidence URLs | 1.00 |
 | `moderator_loop` | H cases with one stable moderator case (only if built; required once measured) | 1.00 |
-| `cost_per_100_usd` | reported cost of 100 requests (all responses must report `cost_usd`) | reported |
+| `cost_per_100_usd` | mean `cost_usd` of each case's first answer times 100, without answers from the result cache (`X-Cache: hit`). Answers with `unpriced_requests` > 0 still count and the figure is then a lower bound (`lower_bound`, `n_incomplete`; HISTORY.md shows `>=`); `n_priced`, `n_no_cost`, `n_cached_excluded` say what the mean covers. `null` only when no answer has a cost | reported |
 
 A full run passes only on the real set: `evals/cases.jsonl` with ≥ 30 cases and every scenario A–E, G, I, J
 (`coverage_ok` in the results). Unknown is not a pass. A metric we cannot measure goes into the PDF as "not measured", never as a number.

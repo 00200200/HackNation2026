@@ -138,17 +138,18 @@ def failed(
     text: str,
     status: Status,
     message: str,
-    cost: float | None,
+    unpriced: int = 0,
     location: str = "input",
 ) -> CheckResult:
-    """A check the model did not complete: the pattern events still go out, with that limit."""
+    """A check the model did not complete: the pattern events still go out, with that limit.
+    `unpriced` is 1 when a request may have been billed (cut, failed or refused)."""
     events = screen(text, location)
     return CheckResult(
         status=status,
         message=message,
         security_events=events,
         limitations=[PATTERNS_ONLY],
-        cost_usd=cost,
+        unpriced_requests=unpriced,
     )
 
 
@@ -406,6 +407,8 @@ async def verify_text(
     if isinstance(
         result, CheckResult
     ):  # the model failed: a notice, kept in the check log
+        # Responses answered before the failure were billed: price them, count the rest unpriced.
+        result.cost_usd, result.unpriced_requests = pipeline._cost(messages)
         result.steps_ms = {"extract": extract_ms}
         result.model_calls = calls
         return result
@@ -415,7 +418,7 @@ async def verify_text(
     # $20 output per million tokens, from https://platform.claude.com/docs/en/about-claude/pricing.
     # Rerank and judge calls are added per claim; Fact Check is free. Tavily web search costs API
     # credits but is not priced into cost_usd (#7/#8: not measured yet, no key in this clone).
-    cost = None if usage.cost is None else float(usage.cost)
+    cost = None if usage.cost is None else float(usage.cost)  # None: unpriced model
     log.info(
         "model name=%s input_tokens=%d output_tokens=%d cost_usd=%s latency_ms=%d",
         result.response.model_name,
@@ -440,8 +443,11 @@ async def verify_text(
         # Every claim that could be checked hit an outage: a technical error, no claims shown.
         message = outage[0].judgement.limitations[0]
         check = CheckResult(status=Status.TECHNICAL_ERROR, message=message)
-    claim_costs = [c.cost_usd for c in checks if c]
-    check.cost_usd = None if None in [cost, *claim_costs] else cost + sum(claim_costs)
+    claim_checks = [c for c in checks if c]
+    check.cost_usd = (cost or 0.0) + sum(c.cost_usd for c in claim_checks)
+    check.unpriced_requests = (cost is None) + sum(
+        c.unpriced_requests for c in claim_checks
+    )
     check.steps_ms = {"extract": extract_ms}
     check.model_calls = calls + [call for c in checks if c for call in c.model_calls]
     check.security_events = screen(text, location)
@@ -462,9 +468,7 @@ async def _extract(
 ) -> AgentRunResult[Extraction] | CheckResult:
     """Step 1, or the notice to show when the model fails."""
     if faults.active(faults.LLM_UNAVAILABLE):  # eval traffic only, see faults.py
-        return failed(
-            text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=0.0, location=location
-        )
+        return failed(text, Status.TECHNICAL_ERROR, MODEL_FAILED, location=location)
     try:
         # Masked before the model: placeholders keep the sentence, so claims still split (docs/privacy.md).
         # The extraction shares the check's budget: its own 45 s would overrun it.
@@ -473,25 +477,23 @@ async def _extract(
     except TimeoutError:
         if not budget.expired():
             raise  # not our budget: the API answers with a technical error
-        # The cut request may still be billed: cost unknown.
+        # The cut request may still be billed: counted as unpriced.
         log.warning("extraction cut by the check budget model=%s", MODEL)
         return failed(
-            text, Status.TECHNICAL_ERROR, TIMED_OUT, cost=None, location=location
+            text, Status.TECHNICAL_ERROR, TIMED_OUT, unpriced=1, location=location
         )
-    # A failed or refused request may still be billed and reports no usage: cost unknown.
+    # A failed or refused request may still be billed and reports no usage: counted as unpriced.
     except ContentFilterError:
         log.warning("model refused model=%s", MODEL)
         return failed(
-            text, Status.CANNOT_CHECK, MODEL_REFUSED, cost=None, location=location
+            text, Status.CANNOT_CHECK, MODEL_REFUSED, unpriced=1, location=location
         )
     except UserError as exc:
         # A missing API key, raised on first use of the provider: no request was sent.
         log.warning("model not configured model=%s error=%r", MODEL, exc)
-        return failed(
-            text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=0.0, location=location
-        )
+        return failed(text, Status.TECHNICAL_ERROR, MODEL_FAILED, location=location)
     except AgentRunError as exc:
         log.warning("model failed model=%s error=%r", MODEL, exc)
         return failed(
-            text, Status.TECHNICAL_ERROR, MODEL_FAILED, cost=None, location=location
+            text, Status.TECHNICAL_ERROR, MODEL_FAILED, unpriced=1, location=location
         )

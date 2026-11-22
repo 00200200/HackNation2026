@@ -128,6 +128,7 @@ def test_five_claims_with_fast_sources_finish_under_budget(monkeypatch, models):
     assert {s.fragment for c in result.claims for s in c.sources} == {QUOTE}
     # Extraction (opus) plus rerank (haiku) and judge (sonnet) for each claim.
     assert result.cost_usd == pytest.approx(OPUS + 5 * (HAIKU + SONNET))
+    assert result.unpriced_requests == 0  # a complete check is not a lower bound
     # The check log gets every model answer with its tokens, and the time of each step.
     assert [m.model for m in result.model_calls].count("claude-sonnet-5-5") == 5
     assert len(result.model_calls) == 11 and result.model_calls[0].input_tokens == 1000
@@ -215,7 +216,7 @@ def test_judge_failure_is_a_limitation_without_retry(monkeypatch):
     assert result.judgement.verdict is Verdict.NOT_CHECKED
     assert result.judgement.limitations[0] == judge.JUDGE_UNAVAILABLE
     assert seen == ["model 1"]
-    assert result.cost_usd is None
+    assert result.unpriced_requests == 1 and result.cost_usd >= 0.0
 
 
 def test_a_crashing_source_is_a_limitation_of_that_source(monkeypatch, models):
@@ -252,7 +253,8 @@ def test_retry_cut_by_the_deadline_keeps_the_first_pass(monkeypatch):
         budget=pipeline.CHECK_BUDGET_S
     )
     assert websearch.SEARCH_UNAVAILABLE in result.judgement.limitations
-    assert result.cost_usd is None
+    # The cut rerank request is counted, not priced.
+    assert (result.cost_usd, result.unpriced_requests) == (0.0, 1)
 
 
 def test_injection_in_a_source_reaches_the_check_result(monkeypatch):
@@ -362,7 +364,7 @@ def test_cut_extraction_keeps_the_pattern_event(monkeypatch):
     assert result.message == verifier.TIMED_OUT
     assert [e.detector for e in result.security_events] == ["patterns"]
     assert result.limitations == [verifier.PATTERNS_ONLY]
-    assert result.cost_usd is None
+    assert (result.cost_usd, result.unpriced_requests) == (0.0, 1)
 
 
 def test_slow_link_fetch_is_cut_by_the_check_budget(monkeypatch):
@@ -675,3 +677,20 @@ def test_an_euvsdisinfo_record_in_the_corpus_is_context_only():
     hit = corpus_hit("https://euvsdisinfo.eu/report/x")
     found = {"web": [], "corpus": corpus_bm25.EvidenceLookup(hits=[hit])}
     assert [s.source_type for s in pipeline._candidates(found)] == ["disinfo_database"]
+
+
+def test_cost_is_the_priced_sum_of_answered_requests_plus_a_count_of_the_rest():
+    from pydantic_ai import ModelRequest
+
+    answered = [
+        ModelRequest(parts=[]),
+        ModelResponse(parts=[], usage=USAGE, model_name="claude-sonnet-5-5"),
+    ]
+    cut = [ModelRequest(parts=[])]  # sent, never answered
+    unpriced = [
+        ModelRequest(parts=[]),
+        ModelResponse(parts=[], usage=USAGE, model_name="no-such-model"),
+    ]
+    assert pipeline._cost([]) == (0.0, 0)
+    assert pipeline._cost(answered) == pytest.approx((SONNET, 0))
+    assert pipeline._cost(answered + cut + unpriced) == pytest.approx((SONNET, 2))

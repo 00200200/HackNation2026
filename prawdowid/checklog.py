@@ -57,6 +57,7 @@ def record(
         "steps_ms": result.steps_ms,
         "model_calls": [m.model_dump() for m in result.model_calls],
         "cost_usd": result.cost_usd,
+        "unpriced_requests": result.unpriced_requests,
         "security_events": [e.model_dump() for e in result.security_events],
         "incidents": [m.incident_id for m in result.incident_matches],
         # Check-level limits, e.g. "patterns only" when the model did not answer.

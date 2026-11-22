@@ -240,6 +240,9 @@ async def create_check(
     # else. A faulted run neither reads nor fills the result cache: a stored answer would hide
     # the simulated outage, and an answer computed with a dependency "down" is not the real one.
     fault = faults.requested(request.headers)
+    if fault:
+        # Tells the eval the fault was applied (see faults.APPLIED_HEADER); absent for everyone else.
+        response.headers[faults.APPLIED_HEADER] = fault
     cached = None if fault else _results.get(key)
     try:
         if cached:
@@ -255,9 +258,9 @@ async def create_check(
     except Exception as exc:
         log.exception("verify failed")
         error = "timeout" if isinstance(exc, TimeoutError) else type(exc).__name__
-        # Cost unknown: a model request may have been sent before the failure.
+        # A model request may have been sent before the failure: counted as unpriced.
         result = failed(
-            body.input, Status.TECHNICAL_ERROR, TECHNICAL_ERROR_MESSAGE, cost=None
+            body.input, Status.TECHNICAL_ERROR, TECHNICAL_ERROR_MESSAGE, unpriced=1
         )
         if is_link(body.input):
             # Only the URL was screened, not the page, so the "patterns only" note would mislead.
@@ -289,6 +292,7 @@ async def create_check(
         logged = result.model_copy(
             update={
                 "cost_usd": 0.0,
+                "unpriced_requests": 0,
                 "steps_ms": {},
                 "model_calls": [],
                 "claims": [

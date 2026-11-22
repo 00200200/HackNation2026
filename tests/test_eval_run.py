@@ -510,3 +510,123 @@ def test_an_ok_case_with_no_checked_claim_fails_end_to_end(tmp_path, monkeypatch
 
     report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
     assert report["metrics"]["end_to_end"]["value"] == 0.5
+
+
+# --- #101: a fault that was not applied is a harness error, not a product failure -------------------
+
+FAULT_CASE = {
+    "id": "J1",
+    "scenario": "J",
+    "input": {"text": "x"},
+    "expected_status": "technical_error",
+    "simulate": "factcheck_api_unavailable",
+}
+
+
+def not_checked(*limitations):
+    return {
+        "status": "ok",
+        "claims": [{"verdict": "nie sprawdzono", "limitations": list(limitations)}],
+    }
+
+
+def test_a_fault_case_without_the_eval_token_is_skipped(monkeypatch):
+    monkeypatch.delenv("PRAWDOWID_EVAL_TOKEN", raising=False)
+    assert "PRAWDOWID_EVAL_TOKEN" in run.skip_reason(FAULT_CASE)
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "s")
+    assert run.skip_reason(FAULT_CASE) is None
+
+
+def test_an_unconfirmed_fault_is_a_harness_error_left_out_of_every_metric(
+    tmp_path, monkeypatch, capsys
+):
+    def ask(payload, channel):
+        if payload.get("simulate"):
+            raise adapter.FaultNotApplied("fault 'x' not applied: no echo")
+        return fake_answer(payload, channel)
+
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "s")
+    report, _ = run_eval(tmp_path, monkeypatch, cases=[CASES[1], FAULT_CASE], ask=ask)
+
+    assert report["metrics"]["end_to_end"]["value"] == 1.0  # J1 is not a product miss
+    # Like a skipped case, it covers nothing: J is missing and a full run cannot pass on it.
+    assert "J" not in report["scenarios"] and report["n_cases"] == 1
+    assert report["coverage_ok"] is False
+    j1 = next(c for c in report["cases"] if c["id"] == "J1")
+    assert j1["harness_error"] and not j1["correct"]
+    assert any("fault not applied" in w and "J1" in w for w in report["warnings"])
+    assert "harness: fault 'x' not applied" in capsys.readouterr().out
+
+
+def test_a_simulated_outage_is_met_by_a_status_or_a_claim_level_disclosure():
+    reason = run.FAULT_REASONS["factcheck_api_unavailable"]
+    ok = lambda response: run.status_as_expected(FAULT_CASE, response)
+    assert ok({"status": "technical_error"})
+    assert ok(not_checked(reason))
+    # A verdict, an abstention caused by the outage, or a "nie sprawdzono" that blames the clock.
+    assert not ok({"status": "ok", "claims": [{"verdict": "potwierdzone"}]})
+    assert not ok(
+        {"status": "ok", "claims": [{"verdict": "brak wystarczających dowodów"}]}
+    )
+    assert not ok(not_checked("Czas sprawdzania minął."))
+    # What the product emits for a claim cut by the clock while Fact Check is down: not a disclosed outage.
+    cut = run.pipeline.TIME_LIMIT.format(budget=run.pipeline.CHECK_BUDGET_S)
+    assert not ok(not_checked(cut, reason))
+    assert not ok(
+        {
+            "status": "ok",
+            "claims": [{"verdict": "potwierdzone"}, *not_checked(reason)["claims"]],
+        }
+    )
+    # llm_unavailable has no claim-level form.
+    llm = FAULT_CASE | {"simulate": "llm_unavailable"}
+    assert not run.status_as_expected(llm, not_checked(reason))
+
+
+def cost_row(case_id, cost, unpriced=0, cached=False, error=None):
+    response = {"claims": []} if cost is None else {"claims": [], "cost_usd": cost}
+    response["unpriced_requests"] = unpriced
+    return {
+        "case": {"id": case_id, "scenario": "G", "input": {"text": case_id}},
+        "runs": [
+            {
+                "channel": "web",
+                "response": response,
+                "seconds": 1.0,
+                "error": error,
+                "cached": cached,
+            }
+        ],
+        "repeat": None,
+    }
+
+
+def test_cost_is_a_lower_bound_over_incomplete_answers_and_leaves_out_cache_hits():
+    rows = [
+        cost_row("A", 0.02),
+        cost_row(
+            "B", 0.04, unpriced=1
+        ),  # a cut judge request: priced part still counts
+        cost_row("C", 0.0, unpriced=1),  # a cut extraction
+        cost_row(
+            "D", 9.0, cached=True
+        ),  # the product's stored cost of an earlier request
+        cost_row("E", None, error="timeout"),
+    ]
+    cost = run.cost_per_100(rows)
+    assert cost["value"] == pytest.approx(2.0)  # (0.02 + 0.04 + 0.0) / 3 * 100
+    assert (cost["n_priced"], cost["n_incomplete"], cost["n_no_cost"]) == (3, 2, 1)
+    assert cost["n_cached_excluded"] == 1 and cost["lower_bound"] and cost["pass"]
+
+
+def test_cost_leaves_out_simulated_outages_that_sent_no_request():
+    outage = cost_row("J", 0.0)
+    outage["case"]["simulate"] = "llm_unavailable"
+    cost = run.cost_per_100([cost_row("A", 0.02), outage])
+    assert cost["value"] == pytest.approx(2.0)  # not (0.02 + 0.0) / 2
+    assert cost["n_priced"] == 1 and cost["n_simulated_excluded"] == 1
+
+
+def test_cost_is_unknown_only_when_no_answer_has_one():
+    cost = run.cost_per_100([cost_row("A", None), cost_row("B", 1.0, cached=True)])
+    assert cost["value"] is None and cost["pass"] is None
