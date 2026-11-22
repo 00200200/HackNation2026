@@ -644,3 +644,25 @@ def test_two_headlines_from_two_publishers_are_not_enough():
         ),
     )
     assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+
+
+def test_a_headline_is_not_cited_for_the_verdict_it_cannot_decide():
+    head = fragment("https://c.pl/z", None, "Portal Nagłówkowy")
+    head.source.title = "Takiego podatku od wypieków w UE nie ma"
+    j = run(
+        [head, A, B],
+        answering(
+            label(head, "refutes", "Takiego podatku od wypieków w UE nie ma"),
+            label(A, "refutes", NO_TAX),
+            label(B, "refutes", "takiego podatku nie ma w UE"),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert "Portal Nagłówkowy" not in j.justification
+    assert "Portal A" in j.justification and "Portal B" in j.justification
+
+
+def test_a_quote_cannot_span_two_joined_passages():
+    joined = "Pierwszy fragment kończy się tutaj.\n\nDrugi fragment zaczyna się potem."
+    assert find_quote("kończy się tutaj. Drugi fragment zaczyna", joined) is None
+    assert find_quote("Drugi fragment zaczyna się potem", joined)

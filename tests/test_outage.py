@@ -407,3 +407,22 @@ def test_budget_and_claim_cap_defaults():
 def test_budget_and_claim_cap_can_be_set_by_env():
     env = {"PRAWDOWID_CHECK_BUDGET_S": "45", "PRAWDOWID_MAX_CHECKED_CLAIMS": "2"}
     assert defaults(**env) == (45, 2)
+
+
+@pytest.mark.parametrize(
+    "base",
+    ["https://staging.example", "http://127.0.0.1:8000", "http://localhost:8000"],
+)
+def test_the_eval_token_goes_over_https_or_to_this_machine(base):
+    from evals import adapter
+
+    adapter.require_private_transport(base)
+
+
+def test_the_eval_token_is_not_sent_in_clear_text_to_a_remote_host(monkeypatch):
+    from evals import adapter
+
+    monkeypatch.setenv(faults.TOKEN_ENV, "secret")
+    monkeypatch.setenv("PRAWDOWID_URL", "http://staging.example")
+    with pytest.raises(RuntimeError, match="plain http"):
+        adapter.ask({"text": "x", "simulate": "llm_unavailable"}, "web")

@@ -44,10 +44,13 @@ _NUMBER = (
 # After a country code any nine digits are a phone, whatever stands next to them: "24/7 +48 600 100 200".
 PHONE_WITH_CODE = re.compile(rf"(?:\(\+?48\)|\+48|(?<!\d)0048){_S}(?:{_NUMBER})(?!\d)")
 # Without one the number must stand alone: not the tail of a longer number ("1 600 123 456 zł"), not
-# the head of one ("600 123 456 789"), not a decimal ("600123456.50"), not part of an id ("gus-532015686e").
-PHONE = re.compile(
-    rf"(?<!\w)(?<!\d{_SEP})(?P<number>{_NUMBER})(?!\w|{_SEP}\d{{3}}|[.,]\d)"
-)
+# the head of one ("600 123 456 789", see MORE_DIGITS), not a decimal ("600123456.50"), not part of an
+# id ("gus-532015686e").
+PHONE = re.compile(rf"(?<!\w)(?<!\d{_SEP})(?P<number>{_NUMBER})(?!\w|[.,]\d)")
+# Another group of digits behind a number: it may be the head of a longer number, unless a label says
+# it is a phone ("tel. 600123456 44051401359"). Checked in `_mask_phone`, not in PHONE, so that a
+# labelled phone is recognised whatever stands behind it.
+MORE_DIGITS = re.compile(rf"{_SEP}\d{{3}}")
 # 600-100-200 is a phone wherever it stands, next to other numbers too (the one bare format that was
 # masked before).
 DASHED_PHONE = re.compile(r"\b\d{3}-\d{3}-\d{3}\b")
@@ -75,9 +78,9 @@ MONEY_UNIT = re.compile(
 COUNT_UNIT = re.compile(
     r"\s*(?:osób|osoby|ludzi|mieszkańców|obywateli|sztuk|szt)\b", re.IGNORECASE
 )
-# Capitals as printed: "dla 100000 osób" is not an ID card. Currency codes are skipped because
-# "PLN 123456" passes the check digit.
-ID_CARD = re.compile(r"\b(?!PLN|EUR|USD|GBP|CHF)[A-Z]{3} ?\d{6}\b")
+# Capitals as printed: "dla 100000 osób" is not an ID card. A currency code and a space are skipped
+# because "PLN 123456" passes the check digit; glued ("PLN123456") it is a card number as any other.
+ID_CARD = re.compile(r"\b(?!(?:PLN|EUR|USD|GBP|CHF) )[A-Z]{3} ?\d{6}\b")
 # Shape only, no check digit: UNCONFIRMED, two unofficial sources disagree on where it sits (3rd or last
 # character). A space is not allowed, "nr 1234567" is an ordinary phrase (lower case never matches either).
 PASSPORT = re.compile(r"\b[A-Z]{2}\d{7}\b")
@@ -146,16 +149,21 @@ def _mask_phone(m: re.Match) -> str:
     it ("telefonów 226 000 000 sztuk"). Without a label also with either of those two alone, a REGON
     label in front or a URL around it."""
     number = m["number"]
+    before = m.string[max(m.start() - 200, 0) : m.start()]
+    if MORE_DIGITS.match(m.string, m.end()) and not PHONE_LABEL.search(before):
+        return m.group()
     if number.startswith("("):
         return "[telefon]"
     digits = _digits(number)
-    before = m.string[max(m.start() - 200, 0) : m.start()]
+    # A URL is judged by its whole token: its scheme can be further back than `before` reaches.
+    head = m.string[: m.start()]
+    token = "" if not head or head[-1].isspace() else head.rsplit(None, 1)[-1]
     count = COUNT_UNIT.match(m.string, m.end())
     round_number = digits.endswith("000")
     mobile = (
         MOBILE.fullmatch(digits)
         and not (round_number or count)
-        and not (REGON_LABEL.search(before) or URL_TAIL.search(before))
+        and not (REGON_LABEL.search(before) or URL_TAIL.search(token))
     )
     money = CURRENCY_BEFORE.search(before) or MONEY_UNIT.match(m.string, m.end())
     if (PHONE_LABEL.search(before) or mobile) and not (

@@ -458,3 +458,39 @@ def test_call_keeps_the_cache_flag_beside_the_answer(monkeypatch):
     assert run.call(case, "web")["cached"] is False
     monkeypatch.setattr(adapter, "ask", lambda payload, channel: {"claims": []})
     assert run.call(case, "web")["cached"] is False
+
+
+def test_a_canary_seen_on_one_channel_still_fails_when_another_channel_errors(
+    tmp_path, monkeypatch
+):
+    cases = [
+        injection_case("E1", channels=["web", "discord"]),
+        injection_case("E2"),
+    ]
+
+    def ask(payload, channel):
+        if channel == "discord":
+            raise OSError("discord down")
+        leak = "CANARY-E1" if payload["text"] == "E1" else ""
+        return {
+            "claims": [{"verdict": "potwierdzone", "reasoning": leak}],
+            "security_events": [1],
+        }
+
+    monkeypatch.setattr(adapter, "supports", lambda channel: True)
+    report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
+    assert report["metrics"]["injection_resistance"]["value"] == 0.5
+
+
+def test_an_ok_case_with_no_checked_claim_fails_end_to_end(tmp_path, monkeypatch):
+    cases = [
+        {"id": f"U0{i}", "scenario": "U", "input": {"text": f"U0{i}"}} for i in (1, 2)
+    ]
+
+    def ask(payload, channel):
+        if payload["text"] == "U01":
+            return {"claims": [{"verdict": "potwierdzone"}]}
+        return {"claims": [{"verdict": "nie sprawdzono"}]}
+
+    report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
+    assert report["metrics"]["end_to_end"]["value"] == 0.5

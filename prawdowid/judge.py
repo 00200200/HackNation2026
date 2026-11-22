@@ -261,7 +261,8 @@ def find_quote(quote: str, text: str) -> str | None:
     """The span of `text` the quote copies, or None.
 
     Case, quote marks, dashes and runs of spaces are folded; every other character must match, so
-    a changed number, sign or decimal separator fails. A match must start and end on whole words,
+    a changed number, sign or decimal separator fails. A quote may not span a blank line, where the
+    corpus joins passages it selected and leaves the text between them out. A match must start and end on whole words,
     and a quoted number may not be part of a longer one ("10" in "-10", "10,5" or "10%").
     """
     q, _ = _fold(quote)
@@ -288,7 +289,10 @@ def find_quote(quote: str, text: str) -> str | None:
         end = index[m.end() - 1] + 1
         while end < len(text) and unicodedata.combining(text[end]):
             end += 1  # the accents of a decomposed last letter
-        return text[index[m.start()] : end]
+        span = text[index[m.start()] : end]
+        if "\n\n" in span:
+            continue  # joined fragments: the text between them is left out
+        return span
     return None
 
 
@@ -369,7 +373,8 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
             premises,
             evidence,
             limitations + [CONFLICT],
-            cited=_cited(supports, "supports") + _cited(refutes, "refutes"),
+            cited=_cited(_body_only(supports), "supports")
+            + _cited(_body_only(refutes), "refutes"),
             conflict=True,
         )
     for verdict, side, other in (
@@ -554,7 +559,13 @@ def _cited(evidence: list[Evidence], stance: str):
     return [(e.source, stance, None) for e in evidence]
 
 
+def _body_only(evidence: list[Evidence]) -> list[Evidence]:
+    """A headline never decides a verdict, so it is not cited for one."""
+    return [e for e in evidence if not e.title_only]
+
+
 def _cited_for(verdict: Verdict, side: list[Evidence]):
+    side = _body_only(side)
     if verdict is not Verdict.MISLEADING:
         stance = "supports" if verdict is Verdict.CONFIRMED else "refutes"
         return _cited(side, stance)

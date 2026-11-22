@@ -11,6 +11,7 @@ import json
 import os
 import threading
 import time
+import urllib.parse
 import urllib.request
 
 import httpx2
@@ -110,6 +111,16 @@ def fault_headers(payload: dict) -> dict:
     return {"X-Eval-Fault": fault, "X-Eval-Token": token}
 
 
+def require_private_transport(base: str) -> None:
+    """The eval token must not cross a network in clear text: https, or http to this machine."""
+    url = urllib.parse.urlsplit(base)
+    if url.scheme != "https" and url.hostname not in ("localhost", "127.0.0.1", "::1"):
+        raise RuntimeError(
+            f"PRAWDOWID_URL {base!r} is plain http to a remote host: a case that simulates a "
+            "fault sends the eval token, use https or a local tunnel"
+        )
+
+
 def ask(payload: dict, channel: str) -> dict:
     base = os.environ.get("PRAWDOWID_URL")
     if not base:
@@ -118,6 +129,8 @@ def ask(payload: dict, channel: str) -> dict:
         )
     text = payload.get("text") or payload.get("url", "")
     faults = fault_headers(payload)
+    if faults:
+        require_private_transport(base)
     if channel == "discord":
         return to_eval_shape(asyncio.run(_ask_discord(base, text, faults)))
     body = json.dumps({"input": text}).encode()

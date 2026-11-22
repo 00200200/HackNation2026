@@ -528,3 +528,26 @@ def test_amounts_years_statutes_and_ids_in_urls_stay(text):
 def test_names_of_public_figures_stay():
     text = "Donald Tusk powiedział, że Karol Nawrocki zawetował ustawę w 2025 roku."
     assert mask_personal_data(text) == text
+
+
+def test_a_currency_code_hides_an_id_card_only_when_a_space_follows_it():
+    assert mask_personal_data("kwota PLN 123456") == "kwota PLN 123456"
+    assert mask_personal_data("dowód PLN123456") == "dowód [numer dowodu]"
+
+
+@pytest.mark.parametrize(
+    ("text", "masked"),
+    [
+        ("tel. 600123456 44051401359", "tel. [telefon] [PESEL]"),
+        ("tel. 600 123 456 2024", "tel. [telefon] 2024"),
+    ],
+)
+def test_a_labelled_phone_is_masked_whatever_digits_follow_it(text, masked):
+    assert mask_personal_data(text) == masked
+
+
+def test_a_long_url_keeps_its_numeric_path_component():
+    url = "https://example.pl/" + "a" * 201 + "/600123456"
+    assert mask_personal_data(url) == url
+    assert mask_personal_data(f"tel. {url}") == f"tel. {url}"
+    assert mask_personal_data("tel. 600123456 /x") == "tel. [telefon] /x"
