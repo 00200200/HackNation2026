@@ -1,5 +1,6 @@
 | timestamp | sha | mode | cases | macro_f1 | abstention | injection | e2e | channel | median s | cost/100 | overall | notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ~2026-11-?? (before Tavily) | unknown | quick | 8 | 0.250 | 1.000 | 1.000 | 0.875 | — | ~15 | 1.65 | FAIL | RECONSTRUCTED, no JSON; pre-Tavily smoke test. See docs/eval-notes.md. |
 | 2026-11-21 (same commit as next row) | 8c6f396 | — | — | 0.353 | 1.000 | 0.571 | 0.972 | 1.000 | 5.8 | — | FAIL | RECONSTRUCTED, no JSON; "Run 1", invalid (no TAVILY/EUVSDISINFO keys, only Fact Check searched). mode/cases UNCONFIRMED. See docs/eval-notes.md. |
 | 2026-11-21 ~20:44 UTC | 8c6f396 | full | 71 | 0.498 | 0.583 | 0.571 | 0.704 | 0.000 | 18.2 | — | FAIL | RECONSTRUCTED, no JSON; "Run 2". Distorted by Anthropic timeouts (FC-A02+) and a 25s CHECK_BUDGET_S; not a quality signal for FC-*. See docs/eval-notes.md. |
 | 2026-11-21T19:10:57+00:00 | 95e6177 | quick | 9 | 0.100 | 1.000 | 0.000 | 0.889 | — | 3.90 | 1.82 | FAIL | Real data, but of the pre-judge stub (the verifier returned a constant abstention, so abstention is a constant and time and cost cover extraction only; see docs/eval-notes.md), from the committed `evals/results/latest.json` (predates this history mechanism, so backfilled here too). FC-J01/FC-J02 skipped. |
@@ -23,4 +24,4 @@
 | 2026-11-22T05:26:44+00:00 | 9983127 | full | 75 | 0.846 | 0.917 | 1.000 | 0.933 | 1.000 | 13.9 | 3.61 | FAIL |  |
 | 2026-11-22T05:40:07+00:00 | f4c9aa8 | full | 75 | 0.888 | 1.000 | 1.000 | 0.973 | 1.000 | 16.0 | 3.54 | FAIL |  |
 | 2026-11-22T05:46:35+00:00 | 37c7e87 | full | 73 | 0.814 | 0.917 | 1.000 | 1.000 | — | 10.9 | — | FAIL | default 25 s budget, fault switch on, clean commit |
-| ~2026-11-?? (before Tavily) | unknown | quick | 8 | 0.250 | 1.000 | 1.000 | 0.875 | — | ~15 | 1.65 | FAIL | RECONSTRUCTED, no JSON; pre-Tavily smoke test. See docs/eval-notes.md. |
+| 2026-11-22T06:26:43+00:00 | a14b93c | full | 75 | 0.918 | 1.000 | 1.000 | 0.987 | 1.000 | 20.5 | 3.45 | FAIL | local API on a laptop (not VPS staging), A15 extraction fix, E05-E15 skipped; misses: J01 label, A10, B01, B04, FC-A08, FC-B05, FC-G03, FC-I03 |
