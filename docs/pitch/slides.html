@@ -9,9 +9,14 @@
           --allow-file-access-from-files --print-to-pdf=faktczyfejk-pitch.pdf "file://$PWD/slides.html"
   PPTX: one screenshot per slide, N = 1..12, with the same Chrome and
           --hide-scrollbars --allow-file-access-from-files --window-size=1920,1080 --screenshot=sN.png "file://$PWD/slides.html?s=N"
-        then python-pptx 1.0.2: a 16:9 deck, blank layout, one full-slide picture per slide, the slide's text as its notes.
+        and the notes, the JSON list in <body data-notes> of
+          --headless --allow-file-access-from-files --dump-dom "file://$PWD/slides.html?notes"
+        then python-pptx 1.0.2, no project dependency (uvx --with python-pptx==1.0.2 python): the default template,
+        16:9 (12192000 x 6858000 EMU), layout 6 (blank), one full-slide picture per slide, that slide's text as its notes.
+        22.11 (second pass) the whole deck was rebuilt that way.
 -->
 <style>
+/* Figtree, SIL Open Font License 1.1 (OFL.txt in this folder), the same file as frontend/public/fonts/. */
 @font-face { font-family: "Figtree"; src: url("Figtree.woff2") format("woff2"); font-weight: 300 900; }
 @page { size: 1920px 1080px; margin: 0; }
 :root {
@@ -148,8 +153,8 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px">Dla kogo.</h2>
   <div class="users" style="position:absolute; top:380px; left:110px; right:110px; display:grid; grid-template-columns: 1fr 1fr; gap:40px">
-    <div class="card"><div class="k">Obywatel, także o niskich kompetencjach cyfrowych</div><h3>Nie wie, czy podać wiadomość dalej</h3><p>Nie musi znać się na technologii: wkleja tekst albo link, bez konta i za darmo. Odpowiedź zaczyna się od „Tak.”, „Nie.” albo „Nie udało mi się potwierdzić tej informacji.”, a pod nią jest źródło z cytatem. Ostatnie słowo ma czytelnik.</p></div>
-    <div class="card"><div class="k">Analityk lub moderator MSZ</div><h3>Chce wiedzieć, skąd wzięła się ocena</h3><p>Każde sprawdzenie trafia do dziennika: pytanie, źródła, wynik, czas, koszt i zdarzenia bezpieczeństwa. Powiadomień o powtarzających się pytaniach bez odpowiedzi jeszcze nie mamy.</p></div>
+    <div class="card"><div class="k">Obywatel, także o niskich kompetencjach cyfrowych</div><h3>Nie wie, czy podać wiadomość dalej</h3><p>Nie musi znać się na technologii: wkleja tekst albo link, bez konta i za darmo. Odpowiedź zaczyna się od „Tak.”, „Nie.” albo „Nie udało mi się potwierdzić tej informacji.”, a pod nią są źródła z cytatem, jeśli je znaleźliśmy, i to, czego nie ustaliliśmy. Ostatnie słowo ma czytelnik.</p></div>
+    <div class="card"><div class="k">Analityk lub moderator MSZ</div><h3>Chce wiedzieć, skąd wzięła się ocena</h3><p>Każde sprawdzenie trafia do dziennika: pytanie, źródła, wynik, czas, koszt i zdarzenia bezpieczeństwa. Pętlę moderatora dla powtarzających się pytań bez odpowiedzi dopiero budujemy.</p></div>
   </div>
   <div class="ft"><span>Odbiorcy według zadania MSZ (punkt 3) · badań z użytkownikami nie prowadziliśmy</span><span class="n">03 / 12</span></div>
 </section>
@@ -159,10 +164,10 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="hd"><div class="brand">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px; width:1700px">Odpowiadamy jak człowiek. Z przypisem.</h2>
   <div style="position:absolute; top:430px; left:110px; right:110px; display:grid; gap:30px">
-    <div class="bubble b-user" style="max-width:1050px"><div class="who">Wiadomość od użytkownika</div>Czy Wrocław był jedynym miastem w Polsce, w którym 65-latkowie jeździli komunikacją miejską za darmo?</div>
-    <div class="bubble b-bot"><div class="who">faktczyfejk.pl</div><b>Nie.</b> Według weryfikacji Demagoga Wrocław oferował takie przejazdy, ale nie był jedynym miastem.<div style="font-size:24px; opacity:.75; margin-top:14px">Źródło: Demagog, przez Google Fact Check Tools</div></div>
+    <div class="bubble b-user" style="max-width:1050px"><div class="who">Wiadomość od użytkownika</div>Czy Wrocław był jedynym miastem w Polsce, w którym <span class="nw">65-latkowie</span> jeździli komunikacją miejską za darmo?</div>
+    <div class="bubble b-bot"><div class="who">Wzór odpowiedzi</div><b>Nie.</b> Według weryfikacji Demagoga Wrocław oferował takie przejazdy, ale nie był jedynym miastem.<div style="font-size:24px; opacity:.75; margin-top:14px">Źródło: Demagog, przez Google Fact Check Tools</div></div>
   </div>
-  <div class="ft"><span>Pytanie i odpowiedź z przykładów organizatora (scenariusz G)</span><span class="n">04 / 12</span></div>
+  <div class="ft"><span>Pytanie pochodzi z przykładów organizatora, a odpowiedź jest wzorem w ich formacie: faktczyfejk.pl jej nie udzielił.</span><span class="n">04 / 12</span></div>
 </section>
 
 <!-- 5. Verdicts -->
@@ -202,8 +207,8 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
     <div class="card"><h3>Halucynacje</h3><p>Cytat jest dowodem tylko wtedy, gdy kod znajdzie go w źródle słowo w słowo.</p><p class="rest">Zostaje: cytat może być w źródle i mimo to nie wspierać twierdzenia.</p></div>
     <div class="card"><h3>Stronniczość źródeł</h3><p>Teksty jednego wydawcy, z tym samym cytatem albo od tej samej agencji liczymy jako jedno potwierdzenie.</p><p class="rest">Zostaje: listę domen wybrał zespół, bez niezależnego audytu.</p></div>
     <div class="card"><h3>Prywatność</h3><p>PESEL, dowód, paszport, telefon, e-mail, konta i karty maskujemy, zanim tekst trafi do modelu i do logów.</p><p class="rest">Zostaje: imion i adresów nie maskujemy.</p></div>
-    <div class="card"><h3>Prompt injection</h3><p>Wzorce w kodzie i flaga modelu wyłapują ukryte polecenia. Traktujemy je jak dane i zapisujemy zdarzenie.</p><p class="rest">Zostaje: wzorce znają tylko typowe sformułowania, a w teście był jeden przypadek.</p></div>
-    <div class="card"><h3>Dostępność</h3><p>Gdy źródło padnie albo skończy się czas, pokazujemy „nie sprawdzono” albo błąd techniczny, nigdy ocenę.</p><p class="rest">Zostaje: nie ma zapasowego dostawcy ani zmierzonej przepustowości.</p></div>
+    <div class="card"><h3>Prompt injection</h3><p>Wzorce w kodzie i flaga modelu wyłapują ukryte polecenia. Traktujemy je jak dane i zapisujemy zdarzenie.</p><p class="rest">Zostaje: wzorce znają tylko typowe sformułowania, a we wszystkich 7 przypadkach testu polecenie było we wklejonym tekście.</p></div>
+    <div class="card"><h3>Dostępność</h3><p>Gdy dowodów brak, bo padło źródło zdolne rozstrzygnąć albo czas minął przed odpowiedzią, pokazujemy <span class="nw">„nie sprawdzono”</span> albo błąd techniczny.</p><p class="rest">Zostaje: nie ma zapasowego dostawcy ani zmierzonej przepustowości.</p></div>
     <div class="card"><h3>Nadużycia</h3><p>Jeden adres IP może wysłać najwyżej 10 sprawdzeń na minutę.</p><p class="rest">Zostaje: limit na adres IP nie zatrzyma wielu klientów naraz ani nie ogranicza wydatków.</p></div>
   </div>
   <div class="ft"><span>Pełna lista z miejscami w kodzie: docs/submission/risks.md</span><span class="n">07 / 12</span></div>
@@ -215,32 +220,32 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <h2 style="position:absolute; top:170px; left:110px; width:640px">Strona działa dziś.</h2>
   <div class="status" style="position:absolute; top:400px; left:110px; width:620px">
     <p><span class="tag t-on">działa</span><br><b>Strona WWW</b>: faktczyfejk.pl, bez konta, za darmo.</p>
-    <p><span class="tag t-off">kod gotowy</span><br><b>Discord /sprawdz</b>: to samo API, ale bot nie działa jeszcze na serwerze.</p>
-    <p><span class="tag t-off">w przygotowaniu</span><br><b>Adapter w stylu komunikatora</b>: drugi kanał na tym samym API.</p>
+    <p><span class="tag t-off">czeka na wdrożenie</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, to samo API co strona. Ocenę fact-checkera i&nbsp;fragment z&nbsp;wyszukiwarki pokazuje jeszcze bez podpisu.</p>
+    <p><span class="tag t-off">kod gotowy</span><br><b>Discord /sprawdz</b>: to samo API. Wdrożenie czeka, a bot nie był jeszcze uruchomiony na prawdziwym Discordzie.</p>
   </div>
   <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; box-shadow:0 30px 80px rgba(29,18,21,.25); border:1px solid var(--line)">
-  <div class="ft"><span>faktczyfejk.pl, zrzut z 21.11.2026 · stan kanałów na 22.11.2026</span><span class="n">08 / 12</span></div>
+  <div class="ft"><span>Zrzut strony głównej z kodu integration/r2, uruchomionej lokalnie 22.11.2026 · stan kanałów na 22.11.2026</span><span class="n">08 / 12</span></div>
 </section>
 
 <!-- 9. Results -->
 <section class="slide" id="s9">
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
-  <h2 style="position:absolute; top:170px; left:110px">Mierzymy tak jak jury.</h2>
+  <h2 style="position:absolute; top:170px; left:110px">Nasz test, progi jury.</h2>
   <div style="position:absolute; top:330px; left:110px; right:110px; display:grid; grid-template-columns: repeat(4, 1fr); gap:48px">
-    <div class="metric"><div class="big">1,00</div><p>Abstencja: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
-    <div class="metric"><div class="big">24,9 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
-    <div class="metric"><div class="big">4,91 $</div><p>Koszt modelu za 100 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
-    <div class="metric"><div class="big" style="color:var(--red)">0,28</div><p>Trafność ocen (macro-F1, cel&nbsp;≥&nbsp;0,75): za często mówimy „brak dowodów”</p></div>
+    <div class="metric"><div class="big">0,80</div><p>Trafność ocen, macro-F1 (cel&nbsp;≥&nbsp;0,75). 42&nbsp;etykiety to oceny Demagoga, które produkt może przejąć</p></div>
+    <div class="metric"><div class="big">17,8 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
+    <div class="metric"><div class="big">0,92</div><p>Abstencja na 12 przypadkach: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
+    <div class="metric"><div class="big">4,27 $</div><p>Koszt modeli za 100 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
   </div>
   <div class="small" style="position:absolute; top:700px; left:110px; right:110px">
-    <div><b>1,00</b><span>Pokrycie cytatami (cel&nbsp;≥&nbsp;0,95)</span></div>
-    <div><b>1,00</b><span>Odporność na wstrzyknięcia, jeden przypadek (cel&nbsp;≥&nbsp;0,90)</span></div>
-    <div><b>0,90</b><span>Scenariusze end-to-end (cel 1,00)</span></div>
-    <div><b>1,00</b><span>Zgodność kanałów: klient API bota, bez prawdziwego Discorda</span></div>
-    <div><b>0</b><span>Pętla moderatora: jeszcze jej nie zbudowaliśmy</span></div>
-    <div><b>b.d.</b><span>Poprawność cytatów: jeszcze niezmierzona</span></div>
+    <div><b>1,00</b><span>Pokrycie cytatami, przy ocenach merytorycznych (cel&nbsp;≥&nbsp;0,95)</span></div>
+    <div><b>1,00</b><span>Poprawność cytatów: tylko czy cytat z&nbsp;korpusu jest w&nbsp;źródle dosłownie, nie czy wspiera twierdzenie (cel&nbsp;≥&nbsp;0,85)</span></div>
+    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7&nbsp;przypadków we wklejonym tekście, 3&nbsp;z&nbsp;nich nasze wzorce znają dosłownie (cel&nbsp;≥&nbsp;0,90)</span></div>
+    <div><b>1,00</b><span>Zgodność kanałów: 6&nbsp;przypadków, API i&nbsp;klient API bota; bot dostał wynik z&nbsp;pamięci podręcznej (cel 1,00)</span></div>
+    <div><b style="color:var(--red)">0,97</b><span>End-to-end (cel 1,00): nie przeszły J01 (awaria Fact Check) i A15 (opinia)</span></div>
+    <div><b style="color:var(--red)">—</b><span>Pętla moderatora: zbudowana (#79), zmierzymy ją w kolejnym przebiegu</span></div>
   </div>
-  <div class="ft"><span>evals/results/latest.json · szybki test, 10 przypadków · commit edd34a5 · 22.11.2026 · następny krok: pełny test, 77 przypadków</span><span class="n">09 / 12</span></div>
+  <div class="ft"><span>Nasz zestaw, pełny przebieg, 75 przypadków · commit ca48b84 · 22.11.2026 · evals/results/HISTORY.md · pominięte: 11 z poleceniem na stronie (brak publicznego adresu)</span><span class="n">09 / 12</span></div>
 </section>
 
 <!-- 10. Deployment -->
@@ -248,11 +253,11 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="hd"><div class="brand">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px; width:1300px">Zbudowane pod wdrożenie.</h2>
   <div class="grid3" style="position:absolute; top:430px; left:110px; right:110px">
-    <div class="card"><h3>Gdzie są dane</h3><p>Serwer w Niemczech (OVHcloud), HTTPS. Poza EOG: model (Anthropic) i wyszukiwarka (Tavily).</p></div>
-    <div class="card"><h3>Bez uzależnienia</h3><p>Model każdego kroku zmieniamy zmienną środowiskową (PydanticAI). Każde źródło ma własny limit czasu.</p></div>
-    <div class="card"><h3>Źródła urzędowe</h3><p>Korpus 1158 dokumentów: gov.pl, CERT Polska, Policja, Sejm, IMGW, Odyseusz, GUS. Oceny <span class="nw">fact-checkerów</span> przez Google Fact Check Tools.</p></div>
+    <div class="card"><h3>Gdzie są dane</h3><p>Serwer w Niemczech (OVHcloud), HTTPS. Poza EOG: model (Anthropic) i wyszukiwarka (Tavily). Google, EUvsDisinfo i&nbsp;gov.pl nie podają, gdzie przetwarzają dane.</p></div>
+    <div class="card"><h3>Bez uzależnienia</h3><p>Model każdego kroku wybiera się zmienną środowiskową (PydanticAI). Inny dostawca wymaga jeszcze swojego pakietu i klucza. Każde źródło ma własny limit czasu.</p></div>
+    <div class="card"><h3>Źródła urzędowe</h3><p>Korpus 1158 dokumentów: gov.pl, CERT Polska, Policja, Sejm, IMGW, Odyseusz, GUS. Oceny <span class="nw">fact-checkerów</span> przez Google Fact Check Tools. Lista źródeł z&nbsp;licencjami jest na stronie&nbsp;/zrodla.</p></div>
   </div>
-  <div class="ft"><span>docs/deploy.md, docs/privacy.md, docs/corpus.md · stan na 22.11.2026</span><span class="n">10 / 12</span></div>
+  <div class="ft"><span>docs/deploy.md, docs/corpus.md · miejsca przetwarzania: tabela dostawców w PR #124 · stan na 22.11.2026</span><span class="n">10 / 12</span></div>
 </section>
 
 <!-- 11. Next -->
@@ -260,11 +265,11 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px">Co dalej.</h2>
   <div class="grid3" style="position:absolute; top:400px; left:110px; right:110px">
-    <div class="card"><h3>Trafniejsze oceny</h3><p>Lepsze wyszukiwanie ocen <span class="nw">fact-checkerów</span> i korpus odświeżany według harmonogramu.</p></div>
+    <div class="card"><h3>Pętla moderatora</h3><p>Gotowa w kodzie: powtarzające się pytania bez odpowiedzi trafiają jako jedna sprawa do moderatora, a odpowiedź mówi o przekazaniu dopiero po zapisaniu sprawy.</p></div>
+    <div class="card"><h3>Trafniejsze oceny</h3><p>W teście najczęściej myliliśmy „fałszywe” z „wprowadzającymi w&nbsp;błąd”. Do tego korpus odświeżany według harmonogramu.</p></div>
     <div class="card"><h3>Baza incydentów MSZ</h3><p>Dopasowanie do znanych narracji, zawsze jako kontekst, nigdy jako werdykt.</p></div>
-    <div class="card"><h3>Panel analityka</h3><p>Powtarzające się zgłoszenia w jednej sprawie, do oceny przez człowieka.</p></div>
   </div>
-  <div class="ft"><span>Plan po hackathonie</span><span class="n">11 / 12</span></div>
+  <div class="ft"><span>Plan na teraz i na czas po hackathonie</span><span class="n">11 / 12</span></div>
 </section>
 
 <!-- 12. Close -->
@@ -284,8 +289,11 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
 </section>
 
 <script>
-  const p = new URLSearchParams(location.search).get("s");
+  const q = new URLSearchParams(location.search), p = q.get("s");
   if (p) { document.body.classList.add("one"); document.getElementById("s" + p).classList.add("on"); }
+  // ?notes: each slide's text, whitespace collapsed, for the PPTX notes (read with --dump-dom).
+  if (q.has("notes")) document.body.dataset.notes = JSON.stringify(
+    [...document.querySelectorAll(".slide")].map((s) => s.innerText.split(/\s+/).join(" ").trim()));
 </script>
 </body>
 </html>

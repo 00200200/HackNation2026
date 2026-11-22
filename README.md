@@ -304,7 +304,8 @@ Submission drafts: [description](docs/submission/description.md),
 [architecture and exact test results](docs/submission/architecture.md),
 [sources](docs/submission/sources.md), [risks](docs/submission/risks.md),
 [cost](docs/submission/cost.md), [Polish slide outline](docs/submission/slides-outline.md).
-The PDF and demo video remain open human work under [#18](https://github.com/00200200/HackNation2026/issues/18).
+The 12-slide deck is in [docs/pitch/](docs/pitch/): `slides.html` is the source of the PDF and the
+PPTX. The demo video remains open human work under [#18](https://github.com/00200200/HackNation2026/issues/18).
 
 ## Pre-push gate
 
