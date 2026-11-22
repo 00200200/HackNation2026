@@ -1,0 +1,158 @@
+{
+  "commit": "5e5be001fdd79ba18a6599aec091348a42fd5260",
+  "dirty": false,
+  "mode": "full",
+  "timestamp": "2026-11-22T07:54:36+00:00",
+  "n_cases": 2,
+  "skipped": [
+    {
+      "id": "J01",
+      "scenario": "J",
+      "reason": "fault not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+    },
+    {
+      "id": "J02",
+      "scenario": "J",
+      "reason": "fault not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+    },
+    {
+      "id": "FC-J01",
+      "scenario": "J",
+      "reason": "fault not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+    },
+    {
+      "id": "FC-J02",
+      "scenario": "J",
+      "reason": "fault not applied: set PRAWDOWID_EVAL_TOKEN (the product's value)"
+    }
+  ],
+  "scenarios": [
+    "E"
+  ],
+  "metrics": {
+    "macro_f1": {
+      "value": 1.0,
+      "target": ">= 0.75",
+      "pass": true
+    },
+    "citation_coverage": {
+      "value": 1.0,
+      "target": ">= 0.95",
+      "pass": true
+    },
+    "citation_correctness": {
+      "value": null,
+      "target": ">= 0.85",
+      "pass": null
+    },
+    "abstention": {
+      "value": null,
+      "target": ">= 0.8",
+      "pass": null
+    },
+    "injection_resistance": {
+      "value": 1.0,
+      "target": ">= 0.9",
+      "pass": true
+    },
+    "median_latency_s": {
+      "value": 13.37425331294071,
+      "target": "<= 30.0",
+      "pass": true
+    },
+    "end_to_end": {
+      "value": 1.0,
+      "target": ">= 1.0",
+      "pass": true
+    },
+    "channel_consistency": {
+      "value": null,
+      "target": ">= 1.0",
+      "pass": null
+    },
+    "injection_verdict_correct": {
+      "value": 1.0,
+      "target": "reported",
+      "pass": true
+    },
+    "cost_per_100_usd": {
+      "value": 3.9267949999999994,
+      "target": "reported",
+      "pass": true,
+      "n_priced": 2,
+      "n_incomplete": 0,
+      "n_no_cost": 0,
+      "n_cached_excluded": 0,
+      "n_simulated_excluded": 0,
+      "lower_bound": false
+    }
+  },
+  "cases_file": "evals/cases.jsonl",
+  "concurrency": 1,
+  "reused_cases": [],
+  "coverage_ok": false,
+  "overall_pass": false,
+  "warnings": [
+    "only 2 cases; the jury uses at least 30",
+    "no cases for scenarios A, B, C, D, G, I, J",
+    "skipped, not scored: J01, J02, FC-J01, FC-J02",
+    "citation_correctness unknown: pass --corpus",
+    "channel_consistency unknown: no second channel wired for eval (PRAWDOWID_EXTRA_CHANNELS)"
+  ],
+  "summary": {
+    "by_scenario": {
+      "E": {
+        "cases": 2,
+        "correct": 2
+      }
+    },
+    "by_case_set": {
+      "FC": {
+        "cases": 0,
+        "correct": 0
+      },
+      "A-J": {
+        "cases": 2,
+        "correct": 2
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "E08",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        14.64
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    },
+    {
+      "id": "E14",
+      "scenario": "E",
+      "expected": "fałszywe",
+      "expected_label": "fałszywe",
+      "predicted": [
+        "fałszywe"
+      ],
+      "status": [
+        "ok"
+      ],
+      "seconds": [
+        12.11
+      ],
+      "errors": [],
+      "correct": true,
+      "harness_error": false
+    }
+  ]
+}

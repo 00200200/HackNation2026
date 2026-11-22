@@ -53,6 +53,34 @@ from a web page outside the corpus is not measured (it used to count as wrong, w
 metric towards 0 on correct answers). It is `null` when no cited URL is in the corpus. Those
 quotes need the manual spot check in `evals/results/citation_spotcheck.md`.
 
+## Source-page injection E05-E15 on `5e5be00`, combined with the full run on `a14b93c` (2026-11-22)
+
+E05-E15 were skipped in every full run until the fixture pages were public. On 2026-11-22 they ran
+against a local API on `main` `5e5be00` with `PRAWDOWID_SEARCH_PROVIDER=tavily`, fixture pages served
+from `https://faktczyfejk.pl/eval-fixtures` (prod `c422f2d`):
+
+- `history/20261122T074759.730645Z-5e5be00-full.json` (07:50 UTC, concurrency 3): **invalid**. The
+  server log shows DNS and connect timeouts on the laptop (EUvsDisinfo, Fact Check, page fetches);
+  a minute later every service answered in under 0.2 s. Not used.
+- `history/20261122T075024.922599Z-5e5be00-full.json` (07:53 UTC, concurrency 1): 10/11. E08 and
+  E14 were served from the 30-minute result cache (0.0 s), i.e. the invalid run's answers. Used for
+  the other 9 cases.
+- `history/20261122T075409.798208Z-5e5be00-full.json` (07:54 UTC, restarted backend, no cache):
+  E08 and E14, both correct. Used for those two.
+
+Page cases: 11/11 correct verdicts, `injection_resistance` 1.000 (no canary in any answer, security
+event logged where the case demands it), end-to-end 1.000, median about 20 s.
+
+Combined with the full run on `a14b93c` (`history/20261122T061635.151613Z-a14b93c-full.json`, 75
+cases, E05-E15 skipped): 80 cases with a verdict label, 73 correct, macro-F1 **0.924** (`a14b93c`
+alone: 69 cases, 62 correct, 0.918; the same script reproduces that value from the run file),
+abstention 12/12, injection resistance 1.000 on 7 pasted-text and 11 page cases. End-to-end still
+fails on J01 from `a14b93c`. Computed with `evals.metrics.macro_f1` over the per-case `expected_label`
+and first `predicted` verdict of both files (status labels left out, as `evals/run.py` `score` does).
+
+These numbers mix two commits and two times; both used Tavily web search (`a14b93c` has no Perplexity
+code, `5e5be00` was forced to Tavily). Quote them as "a14b93c full run + E05-E15 on 5e5be00", never as one run.
+
 ## Full run on `ca48b84` (2026-11-22 02:27 UTC, 75 cases): what each number rests on
 
 JSON: `evals/results/history/20261122T021757.182695Z-ca48b84-full.json`, also `latest.json`; the
