@@ -24,7 +24,7 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
 from typing import NamedTuple, Protocol
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx2
 import requests
@@ -429,7 +429,9 @@ def _claim_reviews(page_html: str, page_url: str) -> list[str]:
     reads, whose `reviewRating.alternateName` is the rating and `claimReviewed` the claim.
 
     JSON-LD may hold one object, a list or an `@graph`. A review whose `url` is another page is
-    left out, and a block that does not parse is skipped.
+    left out (a relative `url` is read against the page's), and a block that does not parse is
+    skipped. lxml and json are dependencies already; extruct would add rdflib, pyrdfa3 and mf2py
+    and still leave the `@graph` and ClaimReview walk to us.
     """
     try:  # bytes, so an XML declaration naming an encoding is no error
         tree = html.fromstring(
@@ -437,7 +439,6 @@ def _claim_reviews(page_html: str, page_url: str) -> list[str]:
         )
     except (ValueError, etree.LxmlError):
         return []
-    page = canonical_url(page_url)
     reviews = []
     for script in tree.iter("script"):
         kind = (script.get("type") or "").split(";")[0].strip().lower()
@@ -453,12 +454,12 @@ def _claim_reviews(page_html: str, page_url: str) -> list[str]:
                 stack += reversed(item)
             elif isinstance(item, dict):
                 stack.append(item.get("@graph"))
-                if fragment := _claim_review(item, page):
+                if fragment := _claim_review(item, page_url):
                     reviews.append(fragment)
     return reviews
 
 
-def _claim_review(item: dict, page: str) -> str | None:
+def _claim_review(item: dict, page_url: str) -> str | None:
     """The rating fragment of one JSON-LD object when it is a ClaimReview of this page."""
     kinds = item.get("@type")
     if "ClaimReview" not in (kinds if isinstance(kinds, list) else [kinds]):
@@ -469,7 +470,10 @@ def _claim_review(item: dict, page: str) -> str | None:
         item.get("claimReviewed"),
     )
     try:
-        if url and (not isinstance(url, str) or canonical_url(url) != page):
+        if url and (
+            not isinstance(url, str)
+            or canonical_url(urljoin(page_url, url)) != canonical_url(page_url)
+        ):
             return None  # a review on another page
     except ValueError:  # "https://[x" names no page: the markup is broken
         return None

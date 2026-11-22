@@ -18,6 +18,7 @@ from prawdowid.judge import (
     SELF_CONTRADICTION,
     SNIPPET_ALONE,
     SNIPPET_ONLY,
+    SUPERSEDED,
     Labels,
     agent,
     find_quote,
@@ -1044,9 +1045,55 @@ def test_a_publishers_newest_rating_of_the_claim_is_its_verdict(older, newer, ve
     assert j.verdict is verdict
     assert CONFLICT not in j.limitations
     assert SELF_CONTRADICTION.format(publishers="demagog") not in j.limitations
-    # The older rating is listed, but the answer rests on the newest one only.
+    # The older rating is listed, but the answer rests on the newest one only and says so.
     assert [s.rating for s in j.sources] == [older, newer]
     assert newer in j.justification and older not in j.justification
+    assert (
+        SUPERSEDED.format(
+            publisher="Demagog",
+            new=newer,
+            new_date="2026-11-10",
+            old=older,
+            old_date="2025-02-21",
+        )
+        in j.limitations
+    )
+
+
+def test_an_older_rating_in_the_same_words_needs_no_note():
+    old = claim_review(
+        "Fałsz", CLAIM, url="https://demagog.org.pl/a/", published=date(2025, 2, 21)
+    )
+    undated = claim_review(
+        "Falsz", CLAIM, url="https://demagog.org.pl/b/", published=None
+    )
+    new = claim_review(
+        "Fałsz", CLAIM, url="https://demagog.org.pl/c/", published=date(2026, 11, 10)
+    )
+    j = run(
+        [old, undated, new], answering(*(rating_label(f) for f in (old, undated, new)))
+    )
+    assert j.verdict is Verdict.FALSE
+    assert not any("liczy się nowsza ocena" in limit for limit in j.limitations)
+    # A different rating without a date is the oldest one, and is named as such.
+    confirmed = claim_review(
+        "Prawda", CLAIM, url="https://demagog.org.pl/d/", published=None
+    )
+    j = run(
+        [confirmed, new],
+        answering(rating_label(confirmed, "supports"), rating_label(new)),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert (
+        SUPERSEDED.format(
+            publisher="Demagog",
+            new="Fałsz",
+            new_date="2026-11-10",
+            old="Prawda",
+            old_date="bez daty",
+        )
+        in j.limitations
+    )
 
 
 def test_two_fact_checkers_whose_ratings_disagree_are_a_conflict_whatever_the_dates():

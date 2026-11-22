@@ -83,15 +83,22 @@ same 2 MB cap and the same 8 s per page (`PAGE_BUDGET_S`).
 Fact-checkers publish their rating as schema.org `ClaimReview` markup (JSON-LD), the same data
 Google Fact Check Tools serves. On every HTML page of a `fact_check` domain we read, the markup is
 parsed with lxml (`websearch._claim_reviews`): JSON-LD as one object, a list or an `@graph`; a
-review whose `url` is another page is left out, and a block that does not parse is skipped. The
-rating (`reviewRating.alternateName`) and the reviewed claim (`claimReviewed`) become a rating
-fragment exactly like a Fact Check hit (`factcheck.review_fragment`), placed before the page text,
-so the judge reads the rating first and `judge.decide` maps it through `judge.RATINGS` only when
-the review is of the checked claim (`same_claim`). When Fact Check returned a hit for the same
-page, that hit wins and the markup adds nothing. Of the Demagog pages cited in the full eval of
-2026-11-22 that answered, 52 of 55 carried the markup (#127); it matters because Fact Check often
-returns no review for the claim sentence (#100). Official pages and PDFs are not searched for
-markup.
+review whose `url` is another page is left out (a relative `url` is read against the page's
+address), and a block that does not parse is skipped. The rating (`reviewRating.alternateName`) and
+the reviewed claim (`claimReviewed`) become a rating fragment exactly like a Fact Check hit
+(`factcheck.review_fragment`), placed before the page text, so the judge reads the rating first and
+`judge.decide` maps it through `judge.RATINGS` only when the review is of the checked claim
+(`same_claim`). When a page rates several statements, we use the one whose reviewed claim shares
+the most words with the checked claim, the rule `factcheck.search_keys` applies to several Fact
+Check reviews under one URL. The page text that follows the rating in the same fragment is still
+the page's own text: only a quote of the rating line (or of the review's title alone) counts as the
+rating, and a quote of the page text keeps the judge's label, as on a page without markup
+(`judge._in_record`). When Fact Check returned a hit with a rating for the same page, that hit wins
+and the markup adds nothing; a hit without a rating takes the markup's rating, shown under the
+hit's publisher and review date. The markup matters because Fact Check often returns no review for
+the claim sentence (#100). #127 reports that 52 of the 55 Demagog pages that answered in the full
+eval on `ca48b84` (2026-11-22) carried the markup; the run's results file keeps no per-page data,
+so that count is UNCONFIRMED here. Official pages and PDFs are not searched for markup.
 
 ### Search snippets of pages we cannot read (#95)
 
@@ -208,9 +215,10 @@ narrative. It is context: the verdict rules never count it as a reliable source 
 Reachability from our server (OVHcloud VPS, measured 2026-11-22 00:50 CET, our user agent and a
 browser one): `konkret24.tvn24.pl`, `sprawdzam.afp.com` and `demagog.org.pl` (Cloudflare) answer
 403 to every request, robots.txt included, so only their search snippets reach the judge;
-`oko.press` and `pravda.org.pl` answer 200. That does not hold all the time for Demagog: in the
-full eval on VPS staging later that night (#127) its review pages were fetched and read in full,
-so its rating markup is read when the page answers and its snippet stands in when it does not. From a home IP konkret24's robots.txt allows bots on its articles (GPTBot is kept off the whole
+`oko.press` and `pravda.org.pl` answer 200. For Demagog that may not always hold: #127 reports
+that the full eval on `ca48b84`, run on VPS staging later that night, fetched and read its review
+pages whole (UNCONFIRMED here: the run's results file keeps no per-page data). Either way, we read
+its rating markup when a page answers, and its snippet stands in when it does not. From a home IP konkret24's robots.txt allows bots on its articles (GPTBot is kept off the whole
 site; every bot only off `/_e/p/playlist/*` and `*?page=*`), so this is an IP-level block, not
 an opt-out. AFP's robots.txt answers 403 from a home IP too
 (Akamai, 2026-11-22), so its crawler policy could not be read; its terms restrict automated
