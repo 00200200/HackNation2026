@@ -8,7 +8,7 @@ from corpus.extract import main_text, plain_text
 from corpus.schema import (
     Doc,
     clip,
-    mask_emails,
+    mask_personal,
     parse_date,
     read_jsonl,
     registered_domain,
@@ -177,7 +177,7 @@ def test_text_helpers():
     assert clip("krótki tekst", 50) == ("krótki tekst", False)
     assert clip("jeden dwa trzy cztery", 12) == ("jeden dwa…", True)
     assert (
-        mask_emails("pisz na jan.kowalski@urzad.gov.pl dziś")
+        mask_personal("pisz na jan.kowalski@urzad.gov.pl dziś")
         == "pisz na [adres e-mail usunięty] dziś"
     )
     assert plain_text("<p>Ala&nbsp;ma <b>kota</b></p>") == "Ala ma kota"

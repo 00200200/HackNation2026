@@ -165,8 +165,8 @@ The IMGW terms treat publication funded by advertising as commercial use; this s
 
 - The corpus holds only material the publishers made public. Who made a reviewed claim is never
   stored, because it is often a private person. Job adverts, which list contact
-  persons, are skipped. E-mail addresses in texts are masked. `make corpus-check` fails on an
-  e-mail address, a number that passes the PESEL checksum, a "contact persons" block, or a record
+  persons, are skipped. Corpus text is masked before it is written (`corpus.schema.mask_personal`: e-mail addresses, then `prawdowid.privacy.mask_personal_data`: phone numbers, PESEL, ID card, passport, account and card numbers, institutional switchboards included; names are not touched), so a rebuild cannot bring them back. The committed `corpus/evidence.jsonl` was masked in place on 22.11 (#113): 13 records, 17 values, all phone numbers. Git history still holds the old record (gus-ca9942c072); a public snapshot repository without history versus a history rewrite is Michał's decision (#112), nothing was rewritten. `make corpus-check` fails on an
+  e-mail address, any text `mask_personal_data` would still change (an unmasked phone, PESEL, ID or card number, reported with the record id), a number that passes the PESEL checksum, a "contact persons" block, or a record
   from a domain on the disinformation list. Embassy contact lists and flags from Odyseusz are left
   out. Where publishers shorten names (for example "Michał O."), the text stays as they published
   it; whether to mask these too is a team decision (OPEN).

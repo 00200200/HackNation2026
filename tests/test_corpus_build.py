@@ -22,6 +22,7 @@ from corpus.schema import (
     SECONDARY_TYPES,
     Doc,
     doc_id,
+    mask_personal,
     read_jsonl,
     write_jsonl,
 )
@@ -410,3 +411,87 @@ def test_checks_refuse_contact_persons_and_disinformation_domains():
     found = " | ".join(problems(docs, banned={"example-outlet.ru"}))
     assert "names contact persons" in found
     assert "from a domain on the disinformation list" in found
+
+
+def test_checks_name_the_record_with_an_unmasked_identifier():
+    docs = passing_docs() + [
+        doc("s", "https://x.pl/tel", text="Kontakt: tel.600123456"),
+        doc("s", "https://x.pl/plus", title="Infolinia +48 22 279 99 99"),
+        doc(
+            "s",
+            "https://x.pl/ok",
+            text="Kontakt: tel. [telefon], [adres e-mail usunięty]",
+        ),
+    ]
+    found = problems(docs, banned=set())
+    assert (
+        f"{doc_id('s', 'https://x.pl/tel')}: unmasked personal identifier in text"
+        in found
+    )
+    assert (
+        f"{doc_id('s', 'https://x.pl/plus')}: unmasked personal identifier in title"
+        in found
+    )
+    assert not any(doc_id("s", "https://x.pl/ok") in p for p in found)
+
+
+def test_mask_personal_hides_phones_and_emails_but_keeps_names():
+    text = "Rzecznik Jan Kowalski, jan@example.pl, tel.600123456, infolinia +48 22 279 99 99"
+    masked = mask_personal(text)
+    assert masked == (
+        "Rzecznik Jan Kowalski, [adres e-mail usunięty], tel.[telefon], infolinia [telefon]"
+    )
+    assert mask_personal(masked) == masked
+
+
+def test_the_builder_masks_before_writing(tmp_path):
+    made = make_doc(
+        source(),
+        url="https://www.gov.pl/web/x/prasowy",
+        title="Kontakt tel. 600 123 456",
+        text="Rzecznik: tel.600123456, jan@example.pl",
+        published_at=None,
+        retrieved_at="2026-11-21T15:00:00+00:00",
+        claim="Zadzwoń +48 600 100 200",
+    )
+    write_jsonl([made], tmp_path / "e.jsonl")
+    written = (tmp_path / "e.jsonl").read_text(encoding="utf-8")
+    assert (
+        "600123" not in written
+        and "example.pl" not in written
+        and "600 100" not in written
+    )
+    assert not any("personal identifier" in p for p in problems([made], banned=set()))
+
+
+def test_an_excerpt_is_masked_after_its_lines_are_joined():
+    made = make_doc(
+        source(storage="excerpt"),
+        url="https://example.gov.pl/a",
+        title="T",
+        text="Kontakt: 600 100\n200",
+        published_at=None,
+        retrieved_at="2026-11-21T15:00:00+00:00",
+    )
+    assert made.text == "Kontakt: [telefon]"
+    assert not any("identifier" in p for p in problems([made], banned=set()))
+
+
+def test_a_masked_passport_does_not_hide_a_phone_from_the_masking():
+    assert mask_personal("Paszport AB1234567 600 123 456") == (
+        "Paszport [numer paszportu] [telefon]"
+    )
+
+
+def test_a_rating_is_masked():
+    made = make_doc(
+        source(),
+        url="https://x.pl/r",
+        title="T",
+        text="Tekst",
+        published_at=None,
+        retrieved_at="2026-11-21T15:00:00+00:00",
+        claim="Twierdzenie",
+        rating="Fałsz, tel. 600 100 200",
+    )
+    assert made.rating == "Fałsz, tel. [telefon]"
