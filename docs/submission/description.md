@@ -18,12 +18,12 @@ Wzorce w kodzie i flaga modelu wyłapują polecenia ukryte w tekście, na stroni
 
 Kanały to strona WWW i adapter demonstracyjny komunikatora pod /czat, oba na tym samym API. Przygotowaliśmy też bota Discord (/sprawdz). Serwer stoi w Niemczech (OVHcloud). Poza EOG trafia zamaskowany tekst do Anthropic i zapytania do wyszukiwarki (Perplexity albo Tavily). Model każdego kroku ustawia zmienna środowiskowa.
 
-Pełny przebieg naszego testu (75 przypadków): macro-F1 0,92 przy celu 0,75, pokrycie cytatami 1,0, cytaty zgodne słowo w słowo ze źródłem 1,0, poprawna abstencja 1,0 (12), odporność na wstrzyknięcia w tekście 1,0 (7), mediana czasu 20,5 s, zgodność kanałów 1,0 (6), pętla moderatora 1,0 (2), end-to-end 0,99. Koszt 1000 sprawdzeń: 34,47 USD za modele, z Tavily szacunkowo 73,47 USD. W osobnym teście 11 z 11 stron z ukrytym poleceniem dostało trafną ocenę, odporność 1,0. Razem 73 z 80 trafnych ocen.
+Pełny przebieg naszego testu (75 przypadków): macro-F1 0,92 przy celu 0,75, pokrycie cytatami 1,0, cytaty zgodne słowo w słowo ze źródłem 1,0, poprawna abstencja 1,0 (12), odporność na wstrzyknięcia w tekście 1,0 (7), mediana czasu 20,5 s, zgodność kanałów 1,0 (6), pętla moderatora 1,0 (2). Koszt 1000 sprawdzeń: 34,47 USD za modele, z Tavily szacunkowo 73,47 USD. W osobnym teście 11 z 11 stron z ukrytym poleceniem dostało trafną ocenę, odporność 1,0. Razem 73 z 80 trafnych ocen.
 
 ## Przed wysłaniem (nie wklejać do formularza)
 
-Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka: 2975 znaków
-(`len()`, znaki nowej linii jako LF), 2987 z CRLF; limit 4000 znaków
+Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka: 2958 znaków
+(`len()`, znaki nowej linii jako LF), 2970 z CRLF; limit 4000 znaków
 ([issue #18](https://github.com/00200200/HackNation2026/issues/18)). Liczby z pełnego przebiegu:
 [evals/results/history/20261122T061635.151613Z-a14b93c-full.json](../../evals/results/history/20261122T061635.151613Z-a14b93c-full.json);
 przypadki E05-E15:
