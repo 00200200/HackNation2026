@@ -1,6 +1,6 @@
 # Opis zgłoszenia
 
-Nazwa zespołu: TEAM_NAME
+Nazwa zespołu: Genwrownik
 
 Tytuł: faktczyfejk.pl: sprawdź, zanim podasz dalej
 
@@ -34,7 +34,6 @@ podręczna drugiego kanału i trzy przypadki wstrzyknięć znane wzorcom:
 [źródła](sources.md), [ryzyka](risks.md), [koszty](cost.md), [prywatność](../privacy.md),
 [korpus](../corpus.md).
 
-- Wpisać nazwę zespołu w miejsce TEAM_NAME.
 - Sprawdzić, czy https://faktczyfejk.pl działa na kodzie `integration/r3`: 22.11 o 04:30 `/czat`
   i `/zrodla` zwracały 404, a `prod` bierze tylko commity z `main` ([deploy.md](../deploy.md)).
   Od tego zależą też trasa fact-checkera, podpisy fragmentów z wyszukiwarki i maskowanie numeru

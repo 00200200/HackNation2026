@@ -36,7 +36,7 @@ Wymagania pochodzą z opisu zadania Prawdowid (MSZ), sekcje 3 do 6. Tabele opisu
 
 | Wymaganie | Stan | Gdzie |
 |---|---|---|
-| Nazwa zespołu, tytuł, opis do 4000 znaków | częściowo | Szkic: [docs/submission/description.md](../submission/description.md). Plik zawiera tekst formularza (według własnego rachunku 3816 znaków z CRLF, limit 4000) i opisuje korpus. Nazwa zespołu to nadal TEAM_NAME ([#18]). Liczby pomiarowe w opisie pochodzą z przebiegu `ca48b84`, a nie z `f4c9aa8`, więc przed wysłaniem trzeba je zaktualizować. |
+| Nazwa zespołu, tytuł, opis do 4000 znaków | częściowo | Szkic: [docs/submission/description.md](../submission/description.md). Plik zawiera tekst formularza (według własnego rachunku 3816 znaków z CRLF, limit 4000) i opisuje korpus. Nazwa zespołu: Genwrownik. Liczby pomiarowe w opisie pochodzą z przebiegu `ca48b84`, a nie z `f4c9aa8`, więc przed wysłaniem trzeba je zaktualizować. |
 | Prezentacja PDF, do 12 slajdów | częściowo | `docs/pitch/faktczyfejk-pitch.pdf` ma 12 stron, obok są plik `.pptx` i źródło `slides.html`; konspekt: [docs/submission/slides-outline.md](../submission/slides-outline.md). Treści slajdów tu nie sprawdzano ([#18]). |
 | Film demonstracyjny, do 3 minut | brak | W repozytorium nie ma filmu ani linku do niego ([#18]). |
 | Link do repozytorium z instrukcją uruchomienia | częściowo | Instrukcja: sekcja "Run" poniżej (uv i Docker Compose). Repozytorium jest prywatne (`gh repo view`, 22.11.2026), dostęp dla jury ustala zespół. |
@@ -100,7 +100,7 @@ Ostatni zapisany pełny pomiar produktu to przebieg z 2026-11-22T05:40:07Z, zapi
 - Pełny eval nie jest policzony na commicie zgłoszenia ([#16]). W przebiegu `f4c9aa8` poniżej progu jest tylko end-to-end (0.973: J01 i A15). Pozostałe metryki mają wartości powyżej progów, przy czym E05 do E15 są niezmierzone ([#94]).
 - Poprawność cytatów to tylko obecność cytatu w tekście dokumentu z korpusu, bez ręcznej próbki (brak pliku `evals/results/citation_spotcheck.md`, [#62]).
 - Bot Discord nie działa na publicznym serwerze (README, [#59], [PR #73]), więc spójność z żywym kanałem nie jest zmierzona.
-- Brakuje filmu demonstracyjnego i nazwy zespołu (TEAM_NAME w `docs/submission/description.md`, [#18]). Liczby w opisie pochodzą ze starszego przebiegu (`ca48b84`).
+- Brakuje filmu demonstracyjnego ([#18]). Liczby w opisie pochodzą ze starszego przebiegu (`ca48b84`).
 - Kolejka moderatora działa tylko z ustawionym `PRAWDOWID_ADMIN_TOKEN` ([#79]); czy jest ustawiony na serwerze demo: UNCONFIRMED. Nie zbudowano wejścia z obrazu ([#80]) ani ostrzeżenia o statusie źródła ([#81]).
 - Według [#112] historia git zachowuje numer telefonu usunięty z korpusu ([#113]); repozytorium jest prywatne.
 - Część dostawców przetwarza dane poza EOG albo w nieznanym miejscu. Tabela dostawców i droga migracji: [docs/privacy.md](../privacy.md#where-data-is-processed) ([#85]).
