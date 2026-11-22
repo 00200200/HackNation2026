@@ -203,7 +203,7 @@ twierdzenie dostaje „nie sprawdzono”. Korpus nie liczy się jako źródło, 
 Źródła: [prawdowid/pipeline.py](../../prawdowid/pipeline.py),
 [prawdowid/websearch.py](../../prawdowid/websearch.py),
 [prawdowid/factcheck.py](../../prawdowid/factcheck.py), [prawdowid/app.py](../../prawdowid/app.py),
-[README](../../README.md#configuration), [#60](https://github.com/00200200/HackNation2026/issues/60),
+[docs/reference.md](../reference.md#configuration), [#60](https://github.com/00200200/HackNation2026/issues/60),
 [#75](https://github.com/00200200/HackNation2026/issues/75),
 [PR #109](https://github.com/00200200/HackNation2026/pull/109).
 
@@ -342,9 +342,10 @@ przebudowa obrazu backendu, a inna wyszukiwarka to jedna funkcja. Całego system
 trzeba. Serwer stoi w Niemczech, ale gdzie dane przetwarzają dostawcy, jeszcze nie potwierdziliśmy.
 
 Szczegóły: modele wybieramy przez PydanticAI, a każdy etap ma swoją zmienną z nazwą modelu:
-`PRAWDOWID_MODEL` (wyodrębnianie), `PRAWDOWID_JUDGE_MODEL` (sędzia) i `PRAWDOWID_RERANK_MODEL`
-(ranking). Inny model Anthropic to zmiana tej zmiennej i restart. [compose.yaml](../../compose.yaml)
-przekazuje do kontenera tylko `PRAWDOWID_MODEL`, więc
+`PRAWDOWID_MODEL` (wyodrębnianie), `PRAWDOWID_JUDGE_MODEL` (sędzia), `PRAWDOWID_RERANK_MODEL`
+(ranking) i `PRAWDOWID_IMAGE_MODEL` (odczyt obrazu, domyślnie model wyodrębniania). Inny model
+Anthropic to zmiana tej zmiennej i restart. [compose.yaml](../../compose.yaml)
+przekazuje do kontenera tylko `PRAWDOWID_MODEL` i `PRAWDOWID_IMAGE_MODEL`, więc
 dwie pozostałe trzeba dopisać w nadpisaniu Compose. Inny dostawca, na przykład Mistral, potrzebuje
 swojego pakietu. Instalujemy tylko `pydantic-ai-slim[anthropic,mcp]` ([pyproject.toml](../../pyproject.toml)),
 a bez pakietu dostawcy PydanticAI zgłasza ImportError i każde sprawdzenie kończy się komunikatem

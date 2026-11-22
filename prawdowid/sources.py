@@ -23,6 +23,9 @@ from prawdowid import euvsdisinfo, factcheck, govpl, websearch
 # True, or the other way round.
 CORPUS_IN_CHECKS = True
 TAVILY_HOST = "api.tavily.com"  # tavily-python's default base URL
+PERPLEXITY_HOST = "api.perplexity.ai"  # perplexityai's default base URL
+SEARCH_HOSTS = {"tavily": TAVILY_HOST, "perplexity": PERPLEXITY_HOST}
+PROVIDER_NAMES = {"tavily": "Tavily", "perplexity": "Perplexity"}
 
 
 class Lookup(BaseModel):
@@ -142,15 +145,15 @@ def _lookups() -> list[Lookup]:
         ),
         Lookup(
             id="web",
-            name="Wyszukiwarka internetowa Tavily",
+            name=f"Wyszukiwarka internetowa {PROVIDER_NAMES[websearch.provider_name()]}",
             description=(
                 f"Zwraca strony tylko z {len(websearch.ALLOWLIST)} domen "
                 "z listy poniżej."
             ),
             source_type=None,
-            host=TAVILY_HOST,
+            host=SEARCH_HOSTS[websearch.provider_name()],
             needs_key=True,
-            active=bool(os.getenv(websearch.KEY_ENV)),
+            active=bool(os.getenv(websearch.provider_key_env())),
         ),
     ]
 

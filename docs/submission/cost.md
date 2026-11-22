@@ -37,7 +37,7 @@ The earlier quick run on `edd34a5` (10 cases, Opus extraction) recorded $4.91 pe
 ([HISTORY.md](../../evals/results/HISTORY.md)); it is not used here.
 
 It excludes hosting, network, search fees, Discord operation and tax. Web search is the one fee
-with recorded inputs, both older than this run: about 4.9 Tavily credits per check in an 8-case
+with recorded inputs, both older than this run: about 4.9 Tavily credits per check (measured with Tavily; Perplexity pricing and usage are not measured here: UNCONFIRMED) in an 8-case
 run before the merge onto `main` (the "#7/#8 live proof" entry in [WORKLOG.md](../../WORKLOG.md)),
 and pay-as-you-go at $0.008 a credit (the #7 provider research in the same file). At that rate
 1,000 checks would take about 4,900 credits, roughly $39, or $31 after the 1,000 free monthly
@@ -96,7 +96,7 @@ will record it.
 | Web | nginx and static assets call the shared backend; [compose.yaml](../../compose.yaml), [frontend](../../frontend/public/app.js) | Hosting, bandwidth and domain cost UNCONFIRMED |
 | Discord | Persistent discord.py bot calls the same API; [discord_bot.py](../../prawdowid/discord_bot.py). Not running on the server and never run against real Discord ([deploy.md](../deploy.md), section 7) | Platform fees, bot hosting and incremental channel cost UNCONFIRMED; no live channel cost measured |
 | Verification through either channel | Same API and models, no channel-specific model pipeline; [app.py](../../prawdowid/app.py) | Applying the measured rate to Discord is an assumption; no measured per-channel cost comparison |
-| Google / Tavily / EUvsDisinfo / www.gov.pl | [factcheck.py](../../prawdowid/factcheck.py), [websearch.py](../../prawdowid/websearch.py), [euvsdisinfo.py](../../prawdowid/euvsdisinfo.py), [govpl.py](../../prawdowid/govpl.py) | Tavily: estimate above, UNCONFIRMED. The others: charges and quotas UNCONFIRMED. None is a measured `cost_usd` line item |
+| Google / Perplexity or Tavily / EUvsDisinfo / www.gov.pl | [factcheck.py](../../prawdowid/factcheck.py), [websearch.py](../../prawdowid/websearch.py), [euvsdisinfo.py](../../prawdowid/euvsdisinfo.py), [govpl.py](../../prawdowid/govpl.py) | Tavily: estimate above, UNCONFIRMED. Perplexity: charges and quotas UNCONFIRMED, not measured. The others: charges and quotas UNCONFIRMED. None is a measured `cost_usd` line item |
 | Own store | Local opt-in PostgreSQL, disabled in checks; [compose.yaml](../../compose.yaml), [pipeline.py](../../prawdowid/pipeline.py) | Database operation cost UNCONFIRMED; Supabase is not deployed |
 
 The app has no checkout or user billing path ([frontend](../../frontend/public/index.html),
@@ -122,7 +122,7 @@ from the linked code, not from a cost assumption:
   most 500 answers), with no model or search calls, whichever channel asks
   ([app.py](../../prawdowid/app.py)).
 - Extraction checks at most `3` claims in full and asks for `2` model queries per checkable claim,
-  plus the claim sentence and one fact-checker-only search, so about `4` Tavily searches per claim
+  plus the claim sentence and one fact-checker-only search, so about `4` web searches per claim (Tavily credits when Tavily is the provider)
   ([verifier.py](../../prawdowid/verifier.py)). Claims and retrieval calls fan out with
   `asyncio.gather` and `asyncio.TaskGroup`; there is no global queue or daily spend cap, only
   per-process limits on page extraction and gov.pl requests ([pipeline.py](../../prawdowid/pipeline.py),
@@ -177,7 +177,7 @@ po pełnym evalu (#16)”. Cenniki odczytaliśmy 22.11.2026. Dolary przeliczamy 
 | Pomiar | Wartość | Skąd | Zastrzeżenia |
 |---|---|---|---|
 | Koszt modeli, sam etap wyodrębniania twierdzeń (Claude Opus 5.5) | 1,82 USD za 100 sprawdzeń, czyli 0,0182 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `95e6177`, szybki przebieg, 9 przypadków | Wersja z jednym wywołaniem modelu na sprawdzenie: bez sędziego (#30), bez równoległego sprawdzania twierdzeń (#37) i bez Tavily (#45). Widać to w `git show 95e6177:prawdowid/verifier.py`: „For now one LLM call that finds claims”. |
-| Koszt modeli w pełnym potoku, z dowodami z Tavily | 4,27 USD za 100 sprawdzeń, czyli 0,0427 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `ca48b84` (pełny przebieg 22.11, 75 przypadków; plik JSON `evals/results/history/20261122T021757.182695Z-ca48b84-full.json` jest w commitach PR #123), pole `cost_per_100_usd` | Średnia z 71 odpowiedzi z ceną; cztery symulowane awarie nie wysyłają zapytań do modelu i są pominięte. To kod z `ca48b84` (`integration/r3`) z #88 (wyodrębnianie na Sonnet 5.5), #95 i #74. Późniejsze zmiany (#106: jeden przebieg wyszukiwania, 2 zapytania modelu na twierdzenie, ustawienia myślenia dla poszczególnych agentów) tego przebiegu nie obejmuje; nowy pełny przebieg go zastąpi. Pole `cost_usd` liczy tylko modele, bez Tavily. Wcześniejsze pomiary: 4,91 USD za 100 na `edd34a5` (szybki przebieg, 10 przypadków, Opus, przed #95) i 3,96 USD za 100 ze stagingu (README, bez wiersza w HISTORY.md i bez pliku JSON). Pomiar z 21.11 (8 przypadków, bez pliku JSON) dał 5,25 USD za 100. |
+| Koszt modeli w pełnym potoku, z dowodami z Tavily | 4,27 USD za 100 sprawdzeń, czyli 0,0427 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `ca48b84` (pełny przebieg 22.11, 75 przypadków; plik JSON `evals/results/history/20261122T021757.182695Z-ca48b84-full.json` jest w commitach PR #123), pole `cost_per_100_usd` | Średnia z 71 odpowiedzi z ceną; cztery symulowane awarie nie wysyłają zapytań do modelu i są pominięte. To kod z `ca48b84` (`integration/r3`) z #88 (wyodrębnianie na Sonnet 5.5), #95 i #74. Późniejsze zmiany (#106: jeden przebieg wyszukiwania, 2 zapytania modelu na twierdzenie, ustawienia myślenia dla poszczególnych agentów) tego przebiegu nie obejmuje; nowy pełny przebieg go zastąpi. Pole `cost_usd` liczy tylko modele, bez wyszukiwarki (przebiegi mierzono z Tavily). Wcześniejsze pomiary: 4,91 USD za 100 na `edd34a5` (szybki przebieg, 10 przypadków, Opus, przed #95) i 3,96 USD za 100 ze stagingu (README, bez wiersza w HISTORY.md i bez pliku JSON). Pomiar z 21.11 (8 przypadków, bez pliku JSON) dał 5,25 USD za 100. |
 | Kredyty Tavily na sprawdzenie | około 4,9 (39 zapytań na 8 przypadków) | [WORKLOG.md](../../WORKLOG.md), wpis z 21.11 o Tavily (#7/#8) | Wyszukiwanie `basic`, 1 kredyt za zapytanie. Lepszego pomiaru nie mamy: [docs/eval-notes.md](../eval-notes.md) i HISTORY.md nie zapisują kredytów. Pomiar sprzed wyszukiwarki gov.pl (#53) i sprzed #106, który zmienił liczbę zapytań (dziś około 4 wyszukiwania na twierdzenie). Pole `cost_usd` w odpowiedzi liczy tylko modele ([prawdowid/verifier.py](../../prawdowid/verifier.py)), więc Tavily doliczamy osobno. |
 
 Pomiar 0,0182 USD pochodzi z innej wersji kodu (jedno wywołanie modelu, Opus) niż pomiar 0,0427 USD,
