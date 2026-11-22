@@ -9,34 +9,46 @@
 
 # faktczyfejk
 
-A citizen pastes a message or a link, and faktczyfejk answers claim by claim, in Polish, with one of five verdicts:
-`potwierdzone`, `fałszywe`, `wprowadzające w błąd`, `brak wystarczających dowodów` or `nie podlega weryfikacji`.
-Each source in the answer comes with a link and a quote that the code found word for word in the cited text (for a
-fact-checker's review, its rating). When the evidence is not enough, the answer for that claim starts with
-"Nie udało mi się potwierdzić tej informacji." and gives the reasons. Claude reads the text and the sources, and
-rules in code set the verdict.
+Paste a message or a link you were sent. faktczyfejk splits it into claims and answers each one
+in plain Polish, with the sources behind the answer: a quote, the publisher, the date and a link.
+When the evidence is not there, it says so instead of guessing.
+
+| One box for text or a link | The answer, claim by claim |
+|---|---|
+| <img src="docs/readme/home.png" alt="faktczyfejk.pl home page: the name, one box for text or a link" width="100%"> | <img src="docs/readme/answer.png" alt="An answer from the live API: two claims, each with its verdict, the answer's first words and what could not be established" width="100%"> |
+
+The answer on the right is a real response from the live API on 21.11.2026, taken before Google
+Fact Check and EUvsDisinfo were configured on the server.
+
+## How an answer reads
+
+<img src="docs/readme/verdicts.png" alt="Five verdicts and the first words of each answer: Tak, Nie, To wprowadza w błąd, Nie udało mi się potwierdzić, Tego nie da się sprawdzić" width="100%">
+
+The first words come from the verdict, then the sources by name, as in the organiser's sample
+answers. "Skopiuj odpowiedź na czat" copies the same text. When every source answered and nothing
+settles the claim, the answer is `brak wystarczających dowodów` with the reasons. When a source
+that could settle it was down, the claim is `nie sprawdzono` with the outage as the reason. A
+technical failure or a request to clarify is a grey notice, never a verdict.
 
 ## How it works
 
-1. The input is a text of up to 5000 characters or a link. The API fetches a link (HTML or PDF, public addresses
-   only, `prawdowid/link.py`) and checks its main text like pasted text. A page it cannot read (paywall, login wall,
-   social media) comes back as `cannot_check` with a request to paste the text. E-mail addresses and PESEL, ID
-   card, passport, phone, account and card numbers are masked before the text goes to a model.
-2. Claude, through PydanticAI, splits the text into claims and marks which ones can be checked. Up to 3 get a full
-   check (`PRAWDOWID_MAX_CHECKED_CLAIMS`) and the rest are listed without a verdict. An opinion or a forecast gets
-   `nie podlega weryfikacji`.
-3. Each checked claim goes to five sources in parallel: Google Fact Check Tools, the www.gov.pl site search, web
-   search on allowlisted domains (Perplexity when `PERPLEXITY_API_KEY` is set, otherwise cached Tavily, which the demo
-   server uses; `prawdowid/websearch.py`, [docs/reference.md](docs/reference.md#configuration)), our corpus of 1158 documents
-   (`corpus/evidence.jsonl`, BM25 in memory) and EUvsDisinfo, which is context only and never decides alone.
-4. A model ranks the fragments, and a judge model labels each one as supporting, refuting, adding context or showing
-   a data gap, with an exact quote. The code drops every quote it cannot find verbatim in the cited document
-   (`prawdowid/judge.py`).
-5. `judge.decide()` sets the verdict from the quotes that are left: how many independent sources back each side, and
-   whether one of them is official, primary or a fact-checker. Without enough evidence the verdict is
-   `brak wystarczających dowodów`. When a source that could decide (Fact Check, the web search, or www.gov.pl for a
-   claim about the government) is down and the rest is not enough, the claim is `nie sprawdzono` with the outage as
-   the reason. An answer in which every checked claim ended that way is a technical error.
+<img src="docs/readme/flow.png" alt="Pipeline: text or link, sources in parallel per claim, rerank, a model judge labels quotes, the verdict is set by rules in code" width="100%">
+
+- Claude (through PydanticAI) splits the text into claims and labels quotes. The verdict itself
+  comes from rules in code, `judge.decide()`.
+- Each claim is looked up in parallel in Google Fact Check Tools, the www.gov.pl site search, web
+  search on allowlisted domains (Perplexity, or Tavily without its key), our evidence corpus (`corpus/evidence.jsonl`) and EUvsDisinfo,
+  which is context only.
+- PESEL, ID card, passport, phone, e-mail, account and card numbers are masked before
+  the model sees the text. Checks are kept for 30 days and can be deleted per session.
+- The web page, the Discord command `/sprawdz` and the messenger-style
+  demo page `/czat` all call the same `POST /api/checks`.
+- With `PRAWDOWID_ADMIN_TOKEN` set, a claim without enough evidence, a security
+  event or an unconfirmed high-risk claim goes to a queue read through `GET /api/cases`.
+
+Details: [how a check runs](docs/reference.md#how-a-check-runs),
+[architecture](docs/submission/architecture.md), [privacy](docs/privacy.md),
+[sources](docs/sources.md).
 
 ## Architecture
 
@@ -44,7 +56,6 @@ rules in code set the verdict.
 flowchart TB
     subgraph channels["Channels"]
         web["Web page<br/>text or link, in Polish"]
-        czat["Messenger demo<br/>/czat"]
         discord["Discord<br/>/sprawdz"]
     end
 
@@ -53,18 +64,19 @@ flowchart TB
         verify["verify()"]
         log[("Check log<br/>masked, 30 days")]
         cases[("Moderator queue<br/>GET /api/cases")]
+        cache[("Result cache<br/>same text, 30 min")]
     end
 
     web -- "via nginx" --> api
-    czat --> api
     discord -- "same call" --> api
     api --> verify
     api -.-> log
     api -.-> cases
+    api -. "hit: stored answer" .-> cache
 
     subgraph check["Inside verify(): one check, in order"]
         link["0. Link: guarded fetch<br/>public IPs only, trafilatura / pypdf<br/>blocked: ask for text"]
-        extract["1. Claims + queries<br/>Claude via PydanticAI"]
+        extract["1. Claims + queries<br/>personal data masked first<br/>Claude via PydanticAI<br/>first 3 claims checked in full"]
 
         subgraph sources["2. Each claim in parallel"]
             fc["Google Fact Check"]
@@ -79,18 +91,24 @@ flowchart TB
         decide{"5. judge.decide()<br/>rules in code"}
         verdict(["Verdict + quotes"])
         insufficient(["brak wystarczających dowodów"])
-        notchecked(["nie sprawdzono<br/>source down or deadline"])
+        notchecked(["nie sprawdzono"])
+        notverifiable(["nie podlega weryfikacji<br/>opinion, forecast"])
+        cannotcheck(["cannot_check<br/>paywall, social media, login"])
+        techerror(["technical_error<br/>every checked claim hit an outage"])
     end
 
     verify --> link
     link -- "page text" --> extract
+    link -. "page refused" .-> cannotcheck
     verify -- "text" --> extract
     extract --> fc & gov & ws & corpus & eu
+    extract -. "not checkable" .-> notverifiable
     fc & gov & ws & corpus & eu --> rerank
     rerank --> judge --> decide
     decide -- "enough evidence" --> verdict
     decide -- "sources answered, not enough" --> insufficient
-    decide -- "outage or timeout" --> notchecked
+    sources -. "a deciding source down<br/>or the budget ran out" .-> notchecked
+    notchecked -. "all claims" .-> techerror
 ```
 
 One shared `CheckResult` goes back to every channel. Every claim shares one time budget, and a
@@ -99,103 +117,86 @@ linked page is never evidence for its own claims. Details:
 
 ## Results
 
-Full run of our eval on `main` at `c422f2d`, 22.11.2026 ([`latest.json`](evals/results/latest.json)), on VPS
-staging built from that commit, with Tavily search as on prod. We wrote the cases and labels. The targets come from the brief.
+Full run of the 75 cases that need no public address, on commit `a14b93c` with a local API
+([run file](evals/results/history/20261122T061635.151613Z-a14b93c-full.json)):
 
 | Metric | Target | Result |
 |---|---|---|
-| Verdict accuracy, macro-F1 | ≥ 0.75 | 0.918 |
-| Citation coverage | ≥ 0.95 | 1.0 |
-| Citation correctness | ≥ 0.85 | 1.0 (checks only that the quote is in the corpus document) |
-| Correct abstention | ≥ 0.80 | 1.0 |
-| Prompt-injection resistance | ≥ 0.90 | 1.0 (injection in the input text only) |
-| Median time, text and URL | ≤ 30 s | 14.6 s |
-| End-to-end scenarios without the team | 1.0 | 0.987, below target: J01 fails |
-| Channel consistency | 1.0 | 1.0 |
-| Moderator loop | 1.0 | 1.0 |
-| Cost of 1,000 checks (the metric is per 100) | reported | 34.60 USD for model calls (3.46 per 100); with Tavily search about 73.60 USD, an estimate ([cost.md](docs/submission/cost.md)) |
+| macro-F1 | ≥ 0.75 | 0.918 |
+| citation coverage | ≥ 0.95 | 1.0 |
+| citation correctness | ≥ 0.85 | 1.0 |
+| abstention | ≥ 0.80 | 1.0 |
+| injection resistance | ≥ 0.90 | 1.0 |
+| median latency | ≤ 30 s | 20.5 s |
+| end-to-end | 1.0 | 0.987 (J01) |
+| channel consistency | 1.0 | 1.0 |
+| moderator loop | 1.0 | 1.0 |
+| model cost per 1,000 checks | reported | USD 34.47 (3.45 per 100); about USD 73.47 with Tavily search, an estimate in [cost.md](docs/submission/cost.md) |
 
-75 cases. This run skipped E05 to E15 (injection in a fetched page). Separate runs on `5e5be00`, which has the
-same product code, got all 11 right with injection resistance 1.0 ([eval notes](docs/eval-notes.md)). Every run with its commit: [HISTORY.md](evals/results/HISTORY.md). A spot check of 12 sampled citations
-found the quote or rating on the page for 11, and 9 fit the verdict shown. The sample is from the earlier `f4c9aa8` run,
-not from `c422f2d`, and an agent with automated tools checked it, not a person:
-[citation_spotcheck.md](evals/results/citation_spotcheck.md).
+Injection through a fetched page (cases E05 to E15, pages served from faktczyfejk.pl) ran
+separately on `5e5be00`: 11 of 11 correct verdicts, injection resistance 1.0. With those cases
+added, 73 of 80 verdicts are correct, macro-F1 0.924; these are two runs, not one. Runs of the
+same code vary by a few points. Every run is in
+[`evals/results/HISTORY.md`](evals/results/HISTORY.md); read
+[`docs/eval-notes.md`](docs/eval-notes.md) before quoting a number. Requirement by requirement:
+[compliance](docs/submission/compliance.md) (Polish).
 
-## Requirements
+## Try it
 
-The table describes the code, not what runs on faktczyfejk.pl. Done means it works in the code and has a test or a
-measurement. Partial means it works, with the gap named.
-
-| Requirement | Status | Where |
-|---|---|---|
-| End-to-end without help from the team | Partial: the code has no manual step, but the full run scores 0.987 (J01) | [docs/eval-notes.md](docs/eval-notes.md) |
-| No fabricated sources | Done: the verdict rests on quotes the code found in the cited document, or on a fact-checker's rating of the same claim. The model only labels quotes | [`prawdowid/judge.py`](prawdowid/judge.py) |
-| Abstention without evidence | Done: `judge.decide()` returns `brak wystarczających dowodów` without a verified quote from a strong enough source, 1.0 in the full run | [`tests/test_judge.py`](tests/test_judge.py) |
-| Two channels, or a channel and a demo adapter | Partial: the web page, the `/czat` demo adapter and the Discord bot `/sprawdz` call the same `POST /api/checks`. The bot runs from Compose ([docs/deploy.md](docs/deploy.md), [scenario G](docs/submission/scenario-g.md)); per [#59](https://github.com/00200200/HackNation2026/issues/59) it is not deployed on the demo server (we did not check) | [`czat.js`](frontend/public/czat.js), [`discord_bot.py`](prawdowid/discord_bot.py) |
-| Masking and retention | Partial: the personal data listed in step 1 is masked before the model and in every log. Names and addresses are not. The check log keeps 30 days, and "Usuń moje sprawdzenia" deletes a session | [docs/privacy.md](docs/privacy.md) |
-| Prompt injection | Partial: code screens the input, the linked page and the retrieved sources for injected instructions, and the prompts mark source text as data. 1.0 on injected input text (7 cases) and on the page cases E05 to E15 (11, separate runs on the same product code) | [docs/submission/risks.md](docs/submission/risks.md) |
-| Outage not shown as a verdict | Partial: a missing model key, the rate limit or a timeout gives a notice, and a down source that could decide gives `nie sprawdzono`. J01 fails: under a simulated Fact Check outage the answer names it but gives verdicts from the other sources | [docs/unsupported.md](docs/unsupported.md#awarie-i-limity) |
-| Moderator loop | Partial: cases are filed and grouped only while `PRAWDOWID_ADMIN_TOKEN` is set. It is set on faktczyfejk.pl: `GET /api/cases` answers 401 without the token. 1.0 on H01 and H02 | [`prawdowid/cases.py`](prawdowid/cases.py) |
-
-What the product does not support and the message the user sees then: [docs/unsupported.md](docs/unsupported.md)
-(Polish). Submission documents: [architecture](docs/submission/architecture.md), [sources](docs/submission/sources.md),
-[risks](docs/submission/risks.md), [cost](docs/submission/cost.md), [pilot](docs/submission/pilot.md) (Polish),
-[privacy](docs/privacy.md). Open work and decisions: [WORKLOG.md](WORKLOG.md).
+- Web: https://faktczyfejk.pl (the live site runs the `prod` branch, which may lag this one).
+- Messenger demo adapter: `/czat` on the same site, or http://localhost:8080/czat after `make up`.
+- Discord: the bot is not on a public server yet. To run it with your own bot, create an
+  application at https://discord.com/developers/applications, put its token in `.env` as
+  `DISCORD_BOT_TOKEN`, invite it with the `bot` and `applications.commands` scopes, then run
+  `make dev` and `make discord` and type `/sprawdz` in your server. One question through both
+  channels: [scenario G](docs/submission/scenario-g.md).
 
 ## Run
 
-You need Docker with Compose. Put the keys in `.env` in the repository root. Git ignores the file and the image
-does not include it.
+Needs Docker with Compose and an Anthropic key in `.env` (git-ignored). Without the key the page
+opens, but every check returns a technical notice.
 
-| Variable | What it is for |
+```bash
+make up
+```
+
+Open http://localhost:8080 and stop with `make down`. For the API alone with reload, install
+[uv](https://docs.astral.sh/uv/getting-started/installation/) and run `make install` and
+`make dev` (docs at http://127.0.0.1:8000/api/docs). `make help` lists every target; `make check`
+runs ruff and pytest. Public deployment with HTTPS: [docs/deploy.md](docs/deploy.md).
+
+## Configuration
+
+Most setups need only these keys. Every variable, its default and what it changes:
+[docs/reference.md](docs/reference.md#configuration).
+
+| Variable | What it does |
 |---|---|
 | `ANTHROPIC_API_KEY` | Required. Without it every check returns `technical_error`. |
-| `GOOGLE_FACTCHECK_API_KEY`, `PERPLEXITY_API_KEY`, `TAVILY_API_KEY` | Fact Check and web search (Perplexity if its key is set, else Tavily). Without them these sources count as down, so a claim without enough other evidence is `nie sprawdzono`. |
-| `EUVSDISINFO_API_KEY` | EUvsDisinfo context. Without it that lookup is skipped. |
-| `PRAWDOWID_ADMIN_TOKEN` | Bearer token for the moderator queue (`GET /api/cases`). Without it no case is filed and the route answers 404. |
-| `PRAWDOWID_MODEL` | Extraction model as PydanticAI `provider:model`, default `anthropic:claude-sonnet-5-5`. The rerank and judge models have their own variables, which Compose does not pass on. |
+| `GOOGLE_FACTCHECK_API_KEY` | Fact-checkers' ratings. Without it Fact Check counts as down, so a claim without enough other evidence is `nie sprawdzono`. |
+| `PERPLEXITY_API_KEY` | Web search on allowlisted domains (Perplexity Search API). Without it, `TAVILY_API_KEY` is used. |
+| `TAVILY_API_KEY` | Fallback web search on allowlisted domains. With neither key, web search is reported as unavailable. |
+| `EUVSDISINFO_API_KEY` | Known disinformation narratives, context only. |
+| `PRAWDOWID_ADMIN_TOKEN` | Turns on the moderator queue and `GET /api/cases`. Unset: no queue. |
+| `DISCORD_BOT_TOKEN` | Only for the Discord bot. |
 
-```bash
-make up      # http://localhost:8080, make up PORT=9000 for another port, make down to stop
-```
+## Docs
 
-Without `make`: `docker compose up --build -d`. `make up DISCORD=1` also starts the Discord bot, which needs
-`DISCORD_BOT_TOKEN`. For the API alone, install [uv](https://docs.astral.sh/uv/getting-started/installation/), then
-run `make install` and `make dev` (http://127.0.0.1:8000, docs at `/api/docs`, `.env` loaded). `make check` runs
-`ruff format --check`, `ruff check` and `pytest`, and `make help` lists every target. Tuning settings are
-`PRAWDOWID_*` variables with defaults in the code, and Compose passes on only the ones in `compose.yaml`. Default
-limits: [architecture.md](docs/submission/architecture.md#default-limits-not-performance-measurements). Deployment
-with HTTPS: [docs/deploy.md](docs/deploy.md).
+- [Reference](docs/reference.md): configuration, API, repository layout
+- [Architecture](docs/submission/architecture.md)
+- [Compliance with the brief](docs/submission/compliance.md) and
+  [unsupported cases](docs/unsupported.md) (Polish)
+- [Privacy](docs/privacy.md), [sources](docs/sources.md), [corpus](docs/corpus.md),
+  [deployment](docs/deploy.md)
+- Submission: [description](docs/submission/description.md), [sources](docs/submission/sources.md),
+  [risks](docs/submission/risks.md), [cost](docs/submission/cost.md),
+  [slide outline](docs/submission/slides-outline.md), [deck](docs/pitch/)
 
-Eval, against the API from `make dev`:
+## Contributing
 
-```bash
-PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick                          # one case per scenario
-PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --corpus corpus/evidence.jsonl   # full set
-```
-
-Some cases need more setup, or they are skipped or fail. The simulated outages (scenario J) need
-`PRAWDOWID_EVAL_TOKEN` on the API and in the harness (leave it unset on the public demo), the channel cases (G)
-`PRAWDOWID_EXTRA_CHANNELS=discord,demo`, the moderator cases (H) `PRAWDOWID_ADMIN_TOKEN` on the API, and E05 to E15
-`PRAWDOWID_FIXTURE_BASE`, a public address of the test pages. Each run writes `evals/results/latest.json` and a row
-in HISTORY.md. Details: [`.claude/skills/prawdowid-eval/SKILL.md`](.claude/skills/prawdowid-eval/SKILL.md).
-
-## API
-
-- `POST /api/checks`: body `{"input": "..."}`, a text or a link of 1 to 5000 characters, returns `CheckResult`. A
-  channel names itself in `X-Channel` and sends back the `X-Session-Id` it got. 10 requests per minute per client IP.
-- `GET /api/sources`: every source a check uses, shown on the page `/zrodla`.
-- `GET /api/sessions/{id}` and `DELETE /api/sessions/{id}`: read or delete the masked check records of a demo
-  session. Delete also takes the session's questions out of the moderator cases.
-- `GET /api/cases`: the moderator queue, with `Authorization: Bearer <PRAWDOWID_ADMIN_TOKEN>`. It answers 404 when the
-  variable is unset and 401 on a wrong token, and it is left out of the OpenAPI spec.
-- `GET /api/docs` and `GET /api/openapi.json`: Swagger UI and the spec, with a copy in
-  [`docs/openapi.json`](docs/openapi.json) that `make openapi` regenerates.
-- `GET /health`: liveness.
-
-## Team and license
-
-Team: Michał Furgała, Łukasz Lenkiewicz, Dominik Galus.
-
-License: the repository has no license file. Licenses of the corpus sources:
-[docs/corpus.md](docs/corpus.md#licences-and-what-we-store).
+Run `git config core.hooksPath .githooks` once per clone. The pre-push hook refuses a push without
+a `judge` agent PASS for the pushed commit, and on secrets, tracked `.env` files, files over 10 MB,
+or failing ruff or pytest. Once an eval has run in the clone, product changes also need a clean
+eval run on the pushed commit (`uv run python -m evals.run --quick`). The submission push is
+`HN_FINAL=1 git push`. Rules: `.claude/skills/hacknation-judging/SKILL.md` and
+`.claude/skills/prawdowid-eval/SKILL.md`.

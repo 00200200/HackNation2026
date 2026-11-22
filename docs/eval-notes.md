@@ -83,8 +83,8 @@ code, `5e5be00` was forced to Tavily). Quote them as "a14b93c full run + E05-E15
 
 ## Full run on `c422f2d` (2026-11-22 07:21 UTC, 75 cases): the round-4 release candidate
 
-JSON: `evals/results/history/20261122T071235.638303Z-c422f2d-full.json`, also `latest.json`; the
-submission description, slide 9, README and `docs/submission/architecture.md` quote it. Read this
+JSON: `evals/results/history/20261122T071235.638303Z-c422f2d-full.json`. Kept as a record: on the team's
+decision the submission docs quote the `a14b93c` run instead (section above). Read this
 before quoting it:
 
 - Stamp: `c422f2d` is `main` after #129 and #134 (the harness commit, `dirty: false`). The server

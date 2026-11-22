@@ -13,7 +13,7 @@
           --headless --allow-file-access-from-files --dump-dom "file://$PWD/slides.html?notes"
         then python-pptx 1.0.2, no project dependency (uvx --with python-pptx==1.0.2 python): the default template,
         16:9 (12192000 x 6858000 EMU), layout 6 (blank), one full-slide picture per slide, that slide's text as its notes.
-        22.11 (second pass) the whole deck was rebuilt that way, and again for the round-4 release candidate and the full run on main (c422f2d).
+        22.11 (second pass) the whole deck was rebuilt that way, and again for the round-4 release candidate and the a14b93c full run the docs cite.
 -->
 <style>
 /* Figtree, SIL Open Font License 1.1 (OFL.txt in this folder), the same file as frontend/public/fonts/. */
@@ -162,10 +162,10 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
 <!-- 4. How we answer -->
 <section class="slide red" id="s4">
   <div class="hd"><div class="brand">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
-  <h2 style="position:absolute; top:170px; left:110px; width:1700px">Odpowiedź z naszego testu.</h2>
+  <h2 style="position:absolute; top:170px; left:110px; width:1700px">Tak wygląda odpowiedź.</h2>
   <div style="position:absolute; top:330px; left:110px; right:110px; display:grid; gap:30px">
     <div class="bubble b-user" style="max-width:1250px"><div class="who">Pytanie</div>Poseł Konrad Berkowicz udostępnił 4 października 2026 film z podpisem „Ten filmik z Francji przeraża chyba najbardziej…”, jako obraz obecnych protestów we Francji. Czy ten wpis rzetelnie pokazuje, co dzieje się teraz we Francji?</div>
-    <div class="bubble b-bot" style="max-width:1300px"><div class="who">Odpowiedź faktczyfejk.pl</div><b>To wprowadza w błąd.</b> Nagranie pochodzi z marca 2023 roku i dotyczy protestów przeciwko reformie emerytalnej, a nie obecnych protestów uczniów.<div style="font-size:24px; opacity:.75; margin-top:14px">Demagog, 6.10.2026: „Materiał nie dotyczy jednak aktualnych wydarzeń we Francji, lecz pochodzi z marca 2023 roku…” Ocena fact-checkera: Manipulacja.</div></div>
+    <div class="bubble b-bot" style="max-width:1300px"><div class="who">Odpowiedź faktczyfejk.pl na główne twierdzenie</div><b>To wprowadza w błąd.</b> Nagranie pochodzi z marca 2023 roku i dotyczy protestów przeciwko reformie emerytalnej, a nie obecnych protestów uczniów.<div style="font-size:24px; opacity:.75; margin-top:14px">Demagog, 6.10.2026: „Materiał nie dotyczy jednak aktualnych wydarzeń we Francji, lecz pochodzi z marca 2023 roku…” Ocena fact-checkera: Manipulacja.</div></div>
   </div>
   <div class="ft"><span class="n">04 / 12</span></div>
 </section>
@@ -233,9 +233,9 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <h2 style="position:absolute; top:170px; left:110px">Nasz test, progi jury.</h2>
   <div style="position:absolute; top:330px; left:110px; right:110px; display:grid; grid-template-columns: repeat(4, 1fr); gap:48px">
     <div class="metric"><div class="big">0,92</div><p>macro-F1, średnia F1 pięciu ocen (cel&nbsp;≥&nbsp;0,75). 42&nbsp;etykiety to oceny Demagoga</p></div>
-    <div class="metric"><div class="big">14,6 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
+    <div class="metric"><div class="big">20,5 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
     <div class="metric"><div class="big">1,00</div><p>Abstencja na 12 przypadkach: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
-    <div class="metric"><div class="big">34,6 $</div><p>Koszt modeli za 1000 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
+    <div class="metric"><div class="big">34,5 $</div><p>Koszt modeli za 1000 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
   </div>
   <div class="small" style="position:absolute; top:700px; left:110px; right:110px">
     <div><b>1,00</b><span>Pokrycie cytatami, przy ocenach merytorycznych (cel&nbsp;≥&nbsp;0,95)</span></div>

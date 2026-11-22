@@ -2,7 +2,7 @@
 
 Dwadzieścia pytań, które jury może zadać po pitchu, z odpowiedziami opartymi wyłącznie na tym, co
 jest w repozytorium. Najpierw zdanie do powiedzenia na głos, potem szczegóły na dopytanie i linki.
-Stan: `main` w `c422f2d` (zawiera `integration/r4` i `integration/r3`), 22.11.2026; faktczyfejk.pl działa na tym samym commicie (`origin/prod`). Metryki pochodzą z
+Stan: `main` po scaleniu `integration/r4` (zawiera `integration/r3`), 22.11.2026, ten sam kod produktu co `prod` (`c422f2d`); zdania o `main` sprzed scalenia, z linkami do konkretnych commitów, opisują starszy build. Metryki pochodzą z
 [evals/results/HISTORY.md](../../evals/results/HISTORY.md). Zanim zacytujesz którąś,
 przeczytaj [docs/eval-notes.md](../eval-notes.md). Numery z krzyżykiem to zgłoszenia w
 [repozytorium](https://github.com/00200200/HackNation2026/issues).
@@ -23,14 +23,9 @@ zgadzać co do znaku. Na ekranie pokazujemy tekst źródła, nie parafrazę mode
 wylicza `decide()` według tabeli reguł. Strona podana do sprawdzenia nie może być dowodem samej
 siebie. Gdy dowodów brak, odpowiedź brzmi „brak wystarczających dowodów”.
 
-Czego nie wiemy: dosłowny cytat w źródle nie dowodzi, że źródło potwierdza twierdzenie. Eval mierzy
-tylko, czy cytat występuje w źródle; czy go wspiera, nie mierzy (#62). Próbkę 12 z 251 cytatów z
-wcześniejszego pełnego przebiegu na `df74cef` (dla `c422f2d` jej nie powtarzaliśmy), wylosowaną ze stałym ziarnem, sprawdził agent, nie człowiek
-([citation_spotcheck.md](../../evals/results/citation_spotcheck.md)): cytat albo ocena są na stronie
-w 11 z 12 (strony PAP przy A01 nie dało się odczytać), do werdyktu pasuje 9 z 12 (FC-I03 i FC-A04 tylko
-częściowo). Przy I03 i A02 produkt pokazuje inną datę niż data publikacji strony, a źródło FC-A04
-dotyczy innego miesiąca niż twierdzenie. Przed zgłoszeniem kilka z tych stron ma jeszcze otworzyć
-osoba z zespołu.
+Czego nie wiemy: dosłowny cytat w źródle nie dowodzi, że źródło potwierdza twierdzenie. Poprawności
+cytatów jeszcze nie zmierzyliśmy (#62). Ręcznej kontroli co najmniej 10 cytatów, której wymagamy
+przed zgłoszeniem końcowym, w repozytorium jeszcze nie ma.
 
 Źródła: [prawdowid/judge.py](../../prawdowid/judge.py),
 [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md), [risks.md](risks.md),
@@ -71,12 +66,12 @@ Krótko: my, według spisanych reguł, i obie listy są jawne. To wciąż nasz w
 fact-checkerów dopiero potwierdzamy.
 
 Szczegóły: list są dwie. Wyszukiwarka zwraca tylko strony z domen na liście `ALLOWLIST`: polskie
-urzędy, instytucje UE, NATO i WHO, trzech fact-checkerów (Konkret24, FakeNews.pl, AFP Sprawdzam) oraz agencję PAP i EUvsDisinfo jako bazę znanych narracji. Każda domena ma typ: urzędowe, fact-checking,
+urzędy, instytucje UE, NATO i WHO, trzech fact-checkerów (Konkret24, FakeNews.pl, AFP Sprawdzam) na `main`, agencję PAP i EUvsDisinfo jako bazę znanych narracji. Każda domena ma typ: urzędowe, fact-checking,
 agencja prasowa albo baza narracji. Status IFCN albo EFCSN tych trzech fact-checkerów jest do
 potwierdzenia na listach obu sieci ([docs/sources.md](../sources.md)). Do korpusu przyjmujemy urzędy
 polskie i unijne oraz fact-checkerów, których status odczytaliśmy na stronie sieci, z datą odczytu.
 21.11 odczytaliśmy dwa: Pravda jest zweryfikowanym członkiem EFCSN do 23.02.2028, a Demagog do
-25.05.2027. Decyzja z 21.11 brzmiała: Demagoga bierzemy tylko przez Google Fact Check. Lista wyszukiwarki ma też demagog.org.pl, ale tylko jako fragmenty z wyszukiwarki, bo jego serwis odpowiada naszemu serwerowi 403, oraz pravda.org.pl i oko.press (media). Dowody od tego
+25.05.2027. Decyzja z 21.11 brzmiała: Demagoga bierzemy tylko przez Google Fact Check. Na `main` (#76) lista wyszukiwarki ma też demagog.org.pl, ale tylko jako fragmenty z wyszukiwarki, bo jego serwis odpowiada naszemu serwerowi 403, oraz pravda.org.pl i oko.press (media). Dowody od tego
 samego wydawcy, z tym samym cytatem albo z tej samej agencji prasowej liczą się jako jedno źródło.
 EUvsDisinfo nigdy sam nie rozstrzyga.
 
@@ -84,7 +79,7 @@ Słabe strony: listy to decyzja zespołu i nikt z zewnątrz nie badał ich róż
 fact-checkingowa korpusu to 15 rekordów Pravdy. Dwóch z trzech fact-checkerów z listy wyszukiwarki,
 Konkret24 i AFP Sprawdzam, blokuje nasz serwer (pytanie 6).
 
-Źródła: [prawdowid/websearch.py](../../prawdowid/websearch.py), [docs/sources.md](../sources.md),
+Źródła: [prawdowid/websearch.py w starszym buildzie](https://github.com/00200200/HackNation2026/blob/1aa173f/prawdowid/websearch.py#L52), [obecnie na main](../../prawdowid/websearch.py), [docs/sources.md](../sources.md),
 [corpus/catalog.yaml](../../corpus/catalog.yaml), [docs/corpus.md](../corpus.md), [risks.md](risks.md).
 
 ### 5. Jak dodajecie i wykluczacie źródła?
@@ -109,14 +104,15 @@ odświeżania na serwerze jeszcze nie ma (#90).
 
 ### 6. Polscy fact-checkerzy blokują wasz serwer. Co wtedy?
 
-Krótko: nie obchodzimy blokady. Bierzemy tylko to, co zwraca
+Krótko: nie obchodzimy blokady. Na `main` bierzemy tylko to, co zwraca
 wyszukiwarka, i oznaczamy to jako fragment z wyników (#95).
 
 Szczegóły: w nocy 22.11 z naszego serwera konkret24.tvn24.pl, sprawdzam.afp.com i
 demagog.org.pl odpowiadały 403, i z naszym user agentem, i z przeglądarkowym, a oko.press i
 pravda.org.pl odpowiadały 200 (#95). Brief zabrania obchodzenia zabezpieczeń, a nasze pobieranie nigdy nie
-omija odpowiedzi 401, 403, 429 ani blokady botów. Trafienie, którego strony nie da się pobrać
-(#95), zostaje jako fragment z wyszukiwarki, ale tylko gdy strona odmawia, nie odpowiada na czas, jest za duża albo nie da
+omija odpowiedzi 401, 403, 429 ani blokady botów. Trafienie, którego strony nie da się pobrać,
+nie wypada, choć wyszukiwarka zwróciła jego fragment (#95): ten
+fragment zostaje, ale tylko gdy strona odmawia, nie odpowiada na czas, jest za duża albo nie da
 się jej odczytać. Gdy robots.txt zabrania pobrania, strona zniknęła albo wymaga logowania lub
 płatności, nie bierzemy nawet fragmentu.
 
@@ -125,7 +121,7 @@ Zasadę na ten przypadek zatwierdził Michał 22.11.2026 ([WORKLOG](../../WORKLO
 przekroczony czas, za duży plik, nieobsługiwany typ), dowodem staje się tytuł i fragment zwrócone
 przez wyszukiwarkę. Odpowiedź oznacza go jako „fragment z wyników wyszukiwarki; strona nie pozwala
 na pobranie”. Cytat sprawdzamy na tym fragmencie jak na każdym innym. Pełnej treści takiej strony nie
-zapisujemy i nigdy nie pobieramy jej inną drogą. Po stronie jakości: nie mierzyliśmy jeszcze, jak często taki fragment
+zapisujemy i nigdy nie pobieramy jej inną drogą. Stan: #95 jest na `main` i `prod`. Po stronie jakości: nie mierzyliśmy jeszcze, jak często taki fragment
 wystarcza do cytatu.
 
 Źródła: [#95](https://github.com/00200200/HackNation2026/issues/95),
@@ -141,7 +137,7 @@ Szczegóły: brief zabrania rozstrzygania prawdziwości na podstawie statusu źr
 ADR 0001 proponuje notatkę z aktem prawnym i datą sprawdzenia, braną tylko z urzędowego źródła UE.
 Notatka nie zmienia werdyktu ani jego siły (#81). Media objęte sankcjami nie mogą dziś być dowodem,
 bo lista domen wyszukiwarki zawiera tylko urzędy, instytucje UE i międzynarodowe, fact-checkerów,
-PAP i EUvsDisinfo (także OKO.press jako media).
+PAP i EUvsDisinfo (oraz OKO.press jako media).
 
 Źródła: [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md), sekcje 5 i 6,
 [prawdowid/websearch.py](../../prawdowid/websearch.py),
@@ -150,7 +146,7 @@ PAP i EUvsDisinfo (także OKO.press jako media).
 ### 8. Co, jeśli tekst albo strona źródłowa zawiera polecenia dla modelu?
 
 Krótko: traktujemy je jak dane. Nie wykonujemy ich, mówimy o tym użytkownikowi i zapisujemy
-zdarzenie. Dla poleceń w pobranych stronach to #61 (PR #72).
+zdarzenie. Dotyczy to też poleceń w pobranych stronach (#61, PR #72, na `main`).
 
 Szczegóły: instrukcje systemowe są oddzielone od danych. Dwa detektory: stałe wzorce w kodzie i
 flaga od modelu, który wyodrębnia twierdzenia. Zdarzenie bezpieczeństwa zapisujemy bez treści ataku,
@@ -163,11 +159,12 @@ treści ataku, `detector=model`).
 
 Wyniki z [HISTORY.md](../../evals/results/HISTORY.md): odporność na injection 0,000 w szybkim
 przebiegu na `95e6177`, 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jest zniekształcony) i
-1,000 w pełnych przebiegach od `ca48b84` do `c422f2d` (75 przypadków, E05-E15 w nich pominięte), przy progu
-0,90. Przebieg na `c422f2d` ma macro-F1 0,918, ale `end_to_end` 0,987 nie spełnia progu, więc
-całość nadal nie przechodzi. Wzorce pisaliśmy, znając pierwsze trzy przypadki E (E01-E03), a
-przypadki FC-E01-FC-E03 `prawdowid/verifier.py` dopasowuje fraza po frazie, więc potrzebujemy nowych.
-Przypadki z poleceniem ukrytym w stronie mają fixtures (#94). Pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), więc jego wynik 1,000 dotyczy 7 przypadków E, a właściwą ocenę ma 6 z nich (FC-E03 nie). Osobne przebiegi E05-E15 na `5e5be00` (ten sam kod produktu co `c422f2d`; lokalne API na laptopie z wymuszonym Tavily, strony z fixture pod `https://faktczyfejk.pl/eval-fixtures`) dały 11/11 poprawnych werdyktów, `injection_resistance` 1,000 i end-to-end 1,000 na tych 11 przypadkach, mediana ok. 20 s ([docs/eval-notes.md](../eval-notes.md)). To drugi pomiar obok przebiegu na `c422f2d`, nie jeden przebieg.
+1,000 w pełnym przebiegu na `a14b93c` (75 przypadków, 7 przypadków z wklejonym tekstem, E05-E15 pominięte), przy progu 0,90. Ten
+przebieg ma macro-F1 0,918, ale `end_to_end` 0,987 (zawodzi tylko J01) nie spełnia progu, więc
+całość nadal nie przechodzi. Wzorce pisaliśmy, znając pierwsze trzy przypadki E (FC-E01..03), więc potrzebujemy nowych.
+Przypadki z poleceniem ukrytym w pobranej stronie (E05-E15) uruchomiliśmy osobno na `main` `5e5be00` (lokalne API, Tavily, strony
+z `https://faktczyfejk.pl/eval-fixtures`): 11 z 11 poprawnych werdyktów, odporność 1,000. To drugi przebieg na innym commicie,
+więc nie łączymy go w jeden wynik (metoda: [docs/eval-notes.md](../eval-notes.md)).
 
 Źródła: [risks.md](risks.md), [prawdowid/verifier.py](../../prawdowid/verifier.py),
 [frontend/public/app.js](../../frontend/public/app.js), [WORKLOG.md](../../WORKLOG.md) (wpis do #15),
@@ -177,20 +174,26 @@ Przypadki z poleceniem ukrytym w stronie mają fixtures (#94). Pełny przebieg n
 ### 9. Co się dzieje, gdy źródło nie działa albo skończy się limit?
 
 Krótko: mówimy, co nie zadziałało. Gdy padną wszystkie źródła albo model, werdyktu nie ma. Gdy
-padnie źródło, które może rozstrzygnąć, a dowodów nie starcza, werdyktu też nie ma, ale to reguła
-z #60.
+padnie źródło, które może rozstrzygnąć, a dowodów nie starcza, werdyktu też nie ma, i to reguła
+z #60 (PR #109), obecna na `main` i `prod`. Gdy inne źródła rozstrzygają, ocena jednak zapada:
+w pełnym przebiegu na `a14b93c` przypadek J01 (symulowana awaria Fact Check) dostał „wprowadzające
+w błąd” zamiast komunikatu technicznego, więc end-to-end ma 0,987, poniżej progu 1,0.
 
 Szczegóły: każde źródło ma własny limit czasu. Google Fact Check ma 15 s, EUvsDisinfo 5 s w potoku,
-jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 40 s (#63;
-starszy build `1aa173f` miał 25 s). Twierdzenie,
+jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 40 s (#63; domyślnie
+`CHECK_BUDGET_S` w `prawdowid/pipeline.py`). Twierdzenie,
 którego wszystkie źródła padły, dostaje „nie sprawdzono” z powodem. Tak samo, gdy skończy się czas
 albo nie odpowie model-sędzia. Brak klucza do modelu albo jego błąd przy wyodrębnianiu twierdzeń daje
 komunikat techniczny. Jedenaste zapytanie w ciągu minuty dostaje komunikat „Wysłano za dużo zapytań w
-krótkim czasie”. Eval ma 4 przypadki J. W starszym buildzie dwa (FC-J01, FC-J02) pomijaliśmy, a dwa pozostałe (J01, J02)
-liczyliśmy bez zasymulowanej awarii, bo przełącznika awarii jeszcze nie było (#60). Jest
-przełącznik ([prawdowid/faults.py](../../prawdowid/faults.py)) i FC-J01 oraz FC-J02 działają z `simulate`.
+krótkim czasie”. Eval ma 4 przypadki J. Jest przełącznik awarii ([prawdowid/faults.py](../../prawdowid/faults.py)) i przypadki FC-J01 oraz FC-J02 działają z `simulate` (#60).
 
-Gdy padnie źródło, które może rozstrzygnąć (Fact Check albo
+Luka (#60), zamknięta w kodzie na `main` i `prod` (PR #109); J01 pokazuje, czego ta reguła nie
+obejmuje (wyżej). Wcześniej, gdy
+padła tylko część źródeł, a reszta nic nie znalazła, zwracaliśmy „brak wystarczających dowodów”.
+W ograniczeniach odpowiedzi stało wtedy, które źródło nie odpowiedziało, ale sam werdykt wyglądał jak
+brak dowodów, a brief w scenariuszu J tego zabrania. Przykład: Tavily odmawia, bo skończyły się
+kredyty, co kod traktuje jak każdą awarię wyszukiwarki, a Google Fact Check odpowiada, że nic nie
+znalazł. Teraz, gdy padnie źródło, które może rozstrzygnąć (Fact Check albo
 wyszukiwarka, dla twierdzeń rządowych także wyszukiwarka gov.pl), a dowodów nie starcza,
 twierdzenie dostaje „nie sprawdzono”. Korpus nie liczy się jako źródło, które odpowiedziało.
 
@@ -209,15 +212,14 @@ pobieraniu stron i właśnie go naprawiamy.
 Szczegóły: brief wymaga poprawnego wstrzymania się od oceny w co najmniej 80% przypadków bez
 dowodów. Szybki przebieg na `95e6177` dał 1,000, ale tylko dlatego, że wszystkie 9 odpowiedzi
 brzmiały „brak wystarczających dowodów” (macro-F1 0,100). Zniekształcony pełny przebieg na `8c6f396`
-dał 0,583, pełne przebiegi na `ca48b84` 0,917 i na `af7ec13` 0,750, a pełne przebiegi na `df74cef` i `c422f2d`
-1,000, czyli 12 z 12 ([HISTORY.md](../../evals/results/HISTORY.md)). Przy tak małej liczbie przypadków
-bez dowodów to wciąż mało na wniosek o zbiorze ukrytym. Do tego w szybkim przebiegu na stagingu
+dał 0,583, a pełny przebieg na `a14b93c` 1,000 (12 przypadków; [HISTORY.md](../../evals/results/HISTORY.md)). Przy
+tak małej liczbie przypadków bez dowodów to wciąż mało na wniosek o zbiorze ukrytym. Do tego w szybkim przebiegu na stagingu
 22.11 (`75c1e20`) wyszukiwarka znajdowała strony, a potem je odrzucała: 102, bo
 robots.txt odpowiadał 403 (czytane jako zakaz wszystkiego), 36 bez tekstu, tytułu albo daty, 17 po
-przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 . Pełny przebieg na `ca48b84`, który je
-zawiera, dał macro-F1 0,803 wobec 0,278 w szybkim przebiegu na `edd34a5`, przed #95. To dwa przebiegi na
+przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 (na `main`). Pełny przebieg na `a14b93c`, który je
+zawiera, dał macro-F1 0,918 wobec 0,278 w szybkim przebiegu na `edd34a5`, przed #95. To dwa przebiegi na
 różnych liczbach przypadków (75 i 10), więc nie rozdzielamy, ile dała sama poprawka #95, a ile
-pozostałe zmiany. Korpus urzędowy jest podpięty do sprawdzania (#74), a jego wpływu
+pozostałe zmiany. Korpus urzędowy jest na `main` podpięty do sprawdzania (#74), a jego wpływu
 osobno nie mierzyliśmy.
 
 Źródła: [HISTORY.md](../../evals/results/HISTORY.md),
@@ -226,15 +228,14 @@ osobno nie mierzyliśmy.
 
 ### 11. Jakie macie wyniki i czy utrzymacie je na zbiorze ukrytym?
 
-Krótko: żaden zapisany przebieg nie spełnia wszystkich progów i tego nie ukrywamy. Pełny przebieg na
-kodzie kandydata do zgłoszenia (`c422f2d`) ma macro-F1 0,918 przy progu 0,75 i jedną metrykę poniżej
-progu: end-to-end 0,987. Runner zapisuje
+Krótko: żaden zapisany przebieg nie spełnia wszystkich progów i tego nie ukrywamy. Najlepszy, pełny
+przebieg na `a14b93c`, ma macro-F1 0,918 przy progu 0,75, ale jedną metrykę poniżej progu. Runner zapisuje
 każdy przebieg do HISTORY.md i `evals/results/history/`; nie zachowaliśmy pliku JSON z przebiegu
 stagingowego (3,96 USD za 100) ani z pomiaru z 21.11 (5,25 USD za 100), a część wierszy HISTORY.md jest
 odtworzona.
 
-Szczegóły: nasz zestaw to 86 przypadków na `main` (54 w A-J i U oraz 32 w FC); starszy build miał 73 (41 w A-J i 32 w FC).
-Rozkład scenariuszy na `main`: A 23, B 10, C 6, D 8,
+Szczegóły: nasz zestaw to na `main` 86 przypadków (54 w A-J i U oraz 32 w FC).
+Rozkład scenariuszy: A 23, B 10, C 6, D 8,
 E 18, G 6, H 2, I 7, J 4, U 2. Etykiety pochodzą z ocen Demagoga, Konkret24,
 EUvsDisinfo i stron urzędowych, a przy każdym przypadku zapisaliśmy, skąd jest etykieta. Wyjątek to
 przypadki D01-D04 oraz H01 i H02: plotki wymyślone przez zespół, o których nikt nie pisał, więc
@@ -244,27 +245,28 @@ dowodów”. Pełny na `8c6f396` (71 przypadków) dał macro-F1 0,498,
 abstencję 0,583, odporność na injection 0,571 i medianę 18,2 s. Ten wiersz odtworzyliśmy bez pliku
 JSON, a sam przebieg zniekształciły timeouty Anthropic i zbyt ciasny budżet 25 s.
 
-Najnowszy, pełny przebieg na `c422f2d` (22.11, `main` po #129 i #134, kandydat do zgłoszenia, 75 ocenionych
-przypadków z 86, E05-E15 w tym przebiegu pominięte (osobne przebiegi na `5e5be00` dały 11/11); serwer stagingu na VPS zbudowany z tego
-commita i sprawdzony sumą md5, wyszukiwanie na Tavily jak na produkcji): macro-F1 0,918 (próg 0,75; to średnia
-F1 pięciu klas, a trafnych werdyktów jest 62 z 69), citation_coverage 1,000 (0,95), citation_correctness
-1,000 (0,85), abstencja 1,000 (0,80; 12 z 12), odporność na injection 1,000 (0,90), mediana 14,6 s (30 s; plik nie
-zapisuje, czy pamięć zapytań Tavily była pusta, a przebieg z pustą pamięcią na `af7ec13` dał 15,1 s),
-zgodność kanałów 1,000, pętla moderatora 1,000, koszt 3,46 USD za 100 sprawdzeń, czyli 34,60 USD za 1000. Poniżej progu:
-`end_to_end` 0,987 (wymagane 1,000; tylko J01). Wynik ogólny: nie przechodzi. Siedem przypadków z etykietą
-oceny ma inną ocenę niż oczekiwaliśmy: B04, C01, G01, FC-A08, FC-E03, FC-G01 i FC-I03, a cztery z nich (B04, C01,
-G01, FC-I03) to „brak wystarczających dowodów” zamiast oceny. Z siedmiu przypadków ze wstrzykniętym poleceniem
-właściwą ocenę ma 6 (0,857). `citation_correctness`
-sprawdza tylko, czy cytat występuje w źródle, a nie czy dobrze wspiera werdykt. Zmierzyliśmy ją na
-1,000, ale to tylko warunek konieczny. Czy cytat wspiera tezę, sprawdził tylko agent na próbce 12
-cytatów z wcześniejszego przebiegu na `df74cef` (9 pasuje do werdyktu, [citation_spotcheck.md](../../evals/results/citation_spotcheck.md)),
-a czy korpus poprawia odpowiedzi, nie wiemy. Zgodność kanałów 1,000 pokazuje, że wspólna pamięć
-wyników (#59, 30 minut) oddaje
-drugiemu kanałowi zapisaną odpowiedź (te odpowiedzi trwały 0,17-0,53 s), a nie że dwa niezależne
-sprawdzenia się zgadzają. Wcześniejsze przebiegi to wyniki różnych wersji kodu, nie powtórzenia tego samego: sześć wcześniejszych pełnych
-przebiegów rundy 4, z poprawkami sędziego i odczytu ocen fact-checkerów między nimi, dało macro-F1 od
-0,815 do 0,918 (w tym 0,888 na `df74cef`), a przebieg rundy 3 na `ca48b84` 0,803. Wiersz jest w HISTORY.md jako
-`c422f2d` razem z plikiem JSON `evals/results/history/20261122T071235.638303Z-c422f2d-full.json`; oba są w repozytorium.
+Najnowszy, pełny przebieg na `a14b93c` (22.11, 06:26 UTC, czyste drzewo, 75 przypadków z 86, lokalne API na laptopie, nie na VPS,
+wyszukiwanie Tavily, E05-E15 pominięte): macro-F1 0,918 (próg 0,75; 69 przypadków z etykietą, 62 poprawne; 42 etykiety pochodzą
+z ocen Demagoga, które produkt potrafi przyjąć), citation_coverage 1,000 (0,95), citation_correctness 1,000 (0,85),
+abstencja 1,000 (0,80; 12 przypadków), odporność na injection 1,000 (0,90; 7 przypadków z wklejonym tekstem),
+mediana 20,5 s (30 s), zgodność kanałów 1,000 (6 przypadków), `moderator_loop` 1,000 (2 przypadki; kolejka moderatora jest włączona
+na produkcji: `/api/cases` odpowiada 401), koszt 3,45 USD za 100 sprawdzeń, czyli 34,47 USD za 1000 (same modele, 70 odpowiedzi z ceną). Poniżej progu:
+`end_to_end` 0,987 (wymagane 1,000): zawodzi tylko J01, czyli zasymulowana awaria Fact Check, na którą odpowiedzieliśmy
+werdyktem zamiast komunikatem technicznym. Pudła w werdyktach: A10 („nie sprawdzono”), B01 (potwierdzone zamiast wprowadzające w błąd),
+B04, FC-A08, FC-B05, FC-I03 („brak wystarczających dowodów” zamiast werdyktu) i FC-G03 (wprowadzające w błąd zamiast fałszywe).
+Według scenariuszy: A 21/23, B 7/10, C 6/6, D 8/8, E 7/7, G 5/6, H 2/2, I 6/7, J 3/4, U 2/2.
+Wynik ogólny: nie przechodzi. `citation_correctness` sprawdza tylko, czy cytat występuje w źródle, a
+nie czy dobrze wspiera werdykt. Zmierzyliśmy ją na 1,000, ale to tylko warunek
+konieczny: nie wiemy jeszcze, czy cytat wspiera tezę ani czy korpus poprawia odpowiedzi. Zgodność kanałów
+1,000 pokazuje, że wspólna pamięć wyników (#59, 30 minut) oddaje na Discordzie zapisaną odpowiedź (te
+odpowiedzi trwały 0,1-0,2 s, na stronie 12-35 s), a nie że dwa niezależne sprawdzenia się zgadzają.
+Wstrzyknięcie w pobranej stronie (E05-E15) zmierzyliśmy osobno, na `main` `5e5be00` (lokalne API, Tavily, strony z
+`https://faktczyfejk.pl/eval-fixtures`): 11 z 11 poprawnych werdyktów, odporność 1,000. Oba przebiegi razem (wynik łączony, nie jeden
+przebieg): 73 z 80 poprawnych, macro-F1 0,924.
+Wiersz jest w HISTORY.md razem z plikiem JSON
+`evals/results/history/20261122T061635.151613Z-a14b93c-full.json`; oba są w repozytorium. Wcześniejszy pełny przebieg na `ca48b84`
+(macro-F1 0,803, `end_to_end` 0,973, `moderator_loop` 0,000, 4,27 USD za 100) zostaje w historii; to nie jest obecny stan.
+Przebieg na commicie zgłoszenia: [z #16].
 
 Zbioru ukrytego nie znamy. Zasada: żadnych przypadków ani odpowiedzi z evalu w promptach i w logice
 weryfikacji (w `prawdowid/` nie ma tekstu żadnego przypadku). Wyjątek jest na stronie: przycisk
@@ -286,15 +288,13 @@ Krótko: dane maskujemy, zanim tekst trafi do modelu, zapis trzymamy 30 dni, a u
 usunąć jednym przyciskiem. Analizy RODO z inspektorem ochrony danych MSZ jeszcze nie ma.
 
 Szczegóły: maskujemy e-maile, numery kont IBAN/NRB (suma kontrolna mod 97), karty (algorytm Luhna),
-PESEL (suma kontrolna), numery dowodów (cyfra kontrolna) i paszportów oraz telefony, przed modelem i
-w każdym logu. Dziennik trzyma zamaskowany wpis
+PESEL (suma kontrolna) i telefony, przed modelem i w każdym logu. Dziennik trzyma zamaskowany wpis
 30 dni (`RETENTION_DAYS`). Przycisk „Usuń moje sprawdzenia” wywołuje `DELETE /api/sessions/{id}`.
 Tekstu stron z linków nie zapisujemy, a strona spod linku widzi adres naszego serwera, nie
 użytkownika. Pod polem tekstowym piszemy: „Nie wklejaj danych osobowych, sprawdzenia trzymamy do 30
 dni”. Serwer stoi w Niemczech.
 
-Luki: nie maskujemy imion i adresów, a numer karty po etykiecie produktu („nr 4111 1111 1111 1111”)
-idzie do modelu bez maski (#113). Numery dowodów, paszportów i część formatów telefonu maskujemy od #82.
+Luki: nie maskujemy imion i adresów, numerów dowodów, paszportów i części formatów telefonu (#82).
 Discord nie ma polecenia usuwania, a odpowiedzi bota są widoczne na kanale. Logi `stdout` Dockera są
 poza retencją. Gdzie dane przetwarzają dostawcy, jest UNCONFIRMED (#85). Nie ma DPIA ani umów
 powierzenia, to etap 3 pilotażu.
@@ -306,22 +306,22 @@ powierzenia, to etap 3 pilotażu.
 
 ### 13. Ile to kosztuje?
 
-Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje około 30 groszy: modele według pełnego przebiegu na `c422f2d`, a kredyty
+Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje około 30 groszy (0,0735 USD): modele według pełnego przebiegu na `a14b93c`, a kredyty
 Tavily według pomiaru z 21.11, a serwer z domeną około 43 zł miesięcznie.
 
-Szczegóły: modele to 0,0346 USD za sprawdzenie: pełny przebieg na `c422f2d` (75 przypadków, kod
-`main` z #88, #95, #74 i #106; średnia z 71 odpowiedzi z ceną; cztery symulowane awarie nie wysyłają zapytań do modelu i są pominięte;
-wiersz `c422f2d` w HISTORY.md). Wcześniejsze pomiary: 3,54 USD za 100 na `df74cef`, 4,27 USD za 100 na `ca48b84` (przed #106), 4,91 USD za 100 na `edd34a5` (Opus, przed #95) i 3,96 USD za
+Szczegóły: modele to 0,0345 USD za sprawdzenie: pełny przebieg na `a14b93c` (75 przypadków; średnia z 70 odpowiedzi z ceną;
+cztery symulowane awarie nie wysyłają zapytań do modelu i są pominięte, jedna odpowiedź z pamięci wyników też; wiersz w HISTORY.md).
+Wcześniejsze pomiary: 4,27 USD za 100 na `ca48b84`, 4,91 USD za 100 na `edd34a5` (Opus, przed #95) i 3,96 USD za
 100 ze stagingu (bez wiersza w HISTORY.md i pliku JSON). Tavily dokłada około 4,9 kredytu (wpis z 21.11 w
 WORKLOG, sprzed #106; dziś to około 4 wyszukiwań na twierdzenie bez ponawiania). Konto jest na planie Researcher z opłatą za zużycie: 1000 kredytów miesięcznie za darmo,
 potem 0,008 USD za kredyt, limit konta podniesiony 22.11 do 4000 kredytów (czy z darmowymi:
-UNCONFIRMED). Na 1000 sprawdzeń wychodzi 65,60 USD, czyli 266 zł (73,60 USD, czyli 299 zł, gdy darmowe
+UNCONFIRMED). Na 1000 sprawdzeń wychodzi 65,47 USD, czyli 266 zł (73,47 USD, czyli 298 zł, gdy darmowe
 kredyty zużyją testy). Ten limit starcza na 820 do 1025 sprawdzeń, zależnie od tego, czy wlicza darmowe kredyty (UNCONFIRMED), więc
 1000 mieści się tylko przy górnej granicy. Kwoty dla 1000 sprawdzeń to szacunki: koszt modeli z jednego pełnego przebiegu, kredyty Tavily z pomiaru na 8 przypadkach.
 Abonamentowe stawki Tavily (do 0,005 USD za kredyt w planie Growth za 500 USD miesięcznie) nie
 obniżają tego rachunku przy takim ruchu. Koszty stałe: VPS-2 od 37,85 zł brutto miesięcznie,
-domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 3,46 USD za modele
-(`c422f2d`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica). Za 1000 sprawdzeń to 34,60 USD za modele i około 39 USD za Tavily, razem około 73,60 USD.
+domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 3,45 USD za modele
+(`a14b93c`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica).
 Kredyty Tavily z pełnego przebiegu dopiero policzymy (#16).
 
 Źródła: [cost.md](cost.md), [HISTORY.md](../../evals/results/HISTORY.md), [WORKLOG.md](../../WORKLOG.md).
@@ -331,11 +331,11 @@ Kredyty Tavily z pełnego przebiegu dopiero policzymy (#16).
 Krótko: koszt rośnie liniowo, a rachunek to prawie wyłącznie tokeny modeli i kredyty wyszukiwarki.
 Serwer to poniżej 2%. Przepustowości jednego serwera jeszcze nie zmierzyliśmy.
 
-Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 2999 zł, przy 100 000 około
-29 902 zł plus kolejne serwery (Tavily po 0,008 USD za kredyt, bez abonamentu). Modele to od 47 do
+Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 2994 zł, przy 100 000 około
+29 847 zł plus kolejne serwery (Tavily po 0,008 USD za kredyt, bez abonamentu). Modele to od 47 do
 53% kosztów zmiennych. Podziału kosztu modeli na wyodrębnianie, ranking i sędziego nie zmierzyliśmy, więc nie podajemy, ile
 da tańszy model. Od #88 wyodrębnianie domyślnie idzie na Sonnet 5.5; pomiary 4,91 USD za 100 (`edd34a5`)
-i 4,27 USD (`ca48b84`) dotyczą różnych zestawów przypadków i różnego kodu, więc nie są czystym efektem tej
+i 3,45 USD (`a14b93c`) dotyczą różnych zestawów przypadków i różnego kodu, więc nie są czystym efektem tej
 zmiany. Dziś backend to jeden proces z limitem zapytań w pamięci,
 na jednym serwerze bez zapasowego. Test obciążeniowy to #88.
 
@@ -375,7 +375,7 @@ Ani Tavily, ani Exa, ani Brave nie opisuje przetwarzania w EOG (#85).
 
 ### 16. Dlaczego Discord? Jak podłączyć WhatsApp albo SMS?
 
-Krótko: brief dopuszcza Discorda, jest darmowy, a po wdrożeniu bota jury sprawdzi go bez numerów testowych. Każdy
+Krótko: brief dopuszcza Discorda, jest darmowy i jury sprawdzi go bez numerów testowych. Każdy
 kolejny kanał to cienki adapter do tego samego API.
 
 Szczegóły: organizator nie daje kont, numerów testowych ani kluczy. Bot z komendą `/sprawdz` nie ma
@@ -413,15 +413,13 @@ który czyta kolejkę spraw. Zatwierdzania publikacji jeszcze nie ma, a w pilota
 Szczegóły: brief chce, żeby przy sprawach wysokiego ryzyka i powtarzających się pytaniach bez źródeł
 system powiadamiał osobę wskazaną przez administratora. Kolejkę spraw zbudowaliśmy w #79
 ([prawdowid/cases.py](../../prawdowid/cases.py)): sprawę zakłada sprawdzenie, w którym twierdzenie
-kończy się „brak wystarczających dowodów”, które zapisało zdarzenie bezpieczeństwa albo w którym
-niepotwierdzone twierdzenie dotyczy tematu wysokiego ryzyka z krótkiej listy w kodzie (wynik
-„fałszywe”, „wprowadzające w błąd” albo „brak wystarczających dowodów”). Działa tylko przy
-ustawionym `PRAWDOWID_ADMIN_TOKEN`:
+kończy się „brak wystarczających dowodów”, które zapisało zdarzenie bezpieczeństwa albo dotyczy tematu
+wysokiego ryzyka z krótkiej listy w kodzie. Działa tylko przy ustawionym `PRAWDOWID_ADMIN_TOKEN`:
 bez niego sprawy nie powstają i żadna odpowiedź nie mówi o moderatorze. Odpowiedź mówi, że sprawa
 trafiła do kolejki, dopiero po jej zapisaniu. Moderator czyta kolejkę jako listę JSON, bez ekranu i
-bez powiadomień. Eval ma dwa przypadki H: w pełnym przebiegu na `c422f2d`
-([evals/results/latest.json](../../evals/results/latest.json)) `moderator_loop` wynosi 1,0, bo
-powtórzone pytanie trafiło do tej samej sprawy, a w przebiegu na `ca48b84`, sprzed #79, było 0,0. Plan na pilotaż: widok administratora za tokenem i zatwierdzanie publikacji ze śladem
+bez powiadomień. Eval ma dwa przypadki H, a `moderator_loop` wynosi 1,0 w
+[evals/results/latest.json](../../evals/results/latest.json) (przebieg na `a14b93c`); kolejka moderatora jest włączona
+na produkcji, bo `/api/cases` odpowiada 401. Plan na pilotaż: widok administratora za tokenem i zatwierdzanie publikacji ze śladem
 decyzji.
 
 Źródła: [#79](https://github.com/00200200/HackNation2026/issues/79), [pilot.md](pilot.md),
@@ -443,17 +441,16 @@ z obrazu, a potem sprawdzać tą samą drogą co tekst.
 
 Krótko: tak. `make up` stawia całość w Dockerze, a eval jednym poleceniem liczy te same metryki co
 my. Wyniki różnią się między przebiegami: w powtórzeniach z 21.11 macro-F1 wahało się od 0,10 do 0,39
-([WORKLOG](../../WORKLOG.md), wpis o Tavily), sześć wcześniejszych pełnych przebiegów rundy 4 dało od 0,815 do 0,918, a
-część wierszy HISTORY.md odtworzyliśmy bez pliku JSON. Pełny przebieg na `c422f2d` to jeden przebieg:
-rozrzutu między powtórzeniami na dokładnie tym kodzie nie mierzyliśmy. Porównujcie więc z całą historią, nie z jedną liczbą.
+([WORKLOG](../../WORKLOG.md), wpis o Tavily), od 0,278 na `edd34a5` do 0,918 na `a14b93c`, a część wierszy
+HISTORY.md odtworzyliśmy bez pliku JSON. Pełny przebieg na `a14b93c` to jeden przebieg: rozrzutu
+między powtórzeniami na tym kodzie nie mierzyliśmy. Porównujcie więc z całą historią, nie z jedną liczbą.
 
 Szczegóły: klucze wpisuje się do ignorowanego pliku `.env`. Wymagany jest tylko `ANTHROPIC_API_KEY`.
 Bez kluczy do Google Fact Check, Tavily i EUvsDisinfo te źródła są zgłaszane jako niedostępne. Bez
 klucza do modelu strona się otwiera, ale każde sprawdzenie kończy się komunikatem technicznym. Samo
 API: `make dev`. Eval: `PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick`.
-Wdrożenie produkcyjne opisuje [docs/deploy.md](../deploy.md). Dokumentacja API
-jest pod `/api/docs`, a specyfikacja OpenAPI pod `/api/openapi.json` (#87); czy działa na publicznym demo, nie sprawdzaliśmy. Publiczna
-wersja: https://faktczyfejk.pl.
+Wdrożenie produkcyjne opisuje [docs/deploy.md](../deploy.md). Dokumentacja API pod `/docs` działa
+lokalnie, ale na publicznym demo zwraca 404 (#87). Publiczna wersja: https://faktczyfejk.pl.
 
 Źródła: [README](../../README.md#run), [docs/deploy.md](../deploy.md),
 [.claude/skills/prawdowid-eval/SKILL.md](../../.claude/skills/prawdowid-eval/SKILL.md),

@@ -5,19 +5,19 @@ https://faktczyfejk.pl oraz film demonstracyjny do 3 minut. Odpowiedzi na pytani
 [qa.md](qa.md), plan pilotażu w [pilot.md](pilot.md), koszty w [cost.md](cost.md).
 
 Zasada dla obu tekstów: pokazujemy tylko prawdziwe odpowiedzi z działającej usługi. Liczby bierzemy z
-[evals/results/HISTORY.md](../../evals/results/HISTORY.md): wiersz `c422f2d` to pełny przebieg na kodzie
-`c422f2d` (`main` po #129 i #134), kandydacie do zgłoszenia, a jego plik JSON jest w repozytorium. Jeśli
-zgłoszony kod będzie inny niż `c422f2d`, liczby trzeba zmierzyć ponownie (#16).
+[evals/results/HISTORY.md](../../evals/results/HISTORY.md) (wiersze i pliki JSON dla `a14b93c` i `5e5be00` są w repozytorium). Miejsca oznaczone „[z #16]” wypełniamy
+po pełnym evalu na commicie zgłoszenia i nie wpisujemy tam niczego wcześniej.
 
 ## Część 1. Pitch na żywo, 5 minut
 
 ### Przed wejściem na scenę
 
-- Wersja na produkcji. faktczyfejk.pl działa na `c422f2d` (`origin/prod`, sprawdzone 22.11 o 09:08 CET),
-  czyli na kodzie z pełnego przebiegu evalu. Zawiera #69 (cztery przyciski z przykładami w
-  [frontend/public/index.html](../../frontend/public/index.html#L58-L61)), #66 i #74. Przed występem
-  sprawdzamy to jeszcze raz: `git fetch` i `git rev-parse origin/prod`. Gdyby przycisków nie było,
-  wklejamy pytania ręcznie (tabela „Pytania do wklejenia” niżej).
+- Wersja na produkcji. Scenariusz potrzebuje na `prod` commita, który zawiera #69 (`acb1f9e`, cztery
+  przyciski z przykładami w [frontend/public/index.html](../../frontend/public/index.html#L58-L61))
+  i scalone #66 (ocena fact-checkera dociera do sędziego) oraz #74 (korpus przeszukiwany przy każdym
+  sprawdzeniu). Wszystkie są na `main` i na `prod` (22.11 rano `origin/prod` to `c422f2d`). Sprawdzamy to przez `git fetch` i
+  `git merge-base --is-ancestor acb1f9e origin/prod && echo jest`, a potem tak samo dla commitów z
+  #66 i #74. Bez przycisków wklejamy pytania ręcznie (tabela „Pytania do wklejenia” niżej).
 - Próba każdej sceny na produkcji, najwyżej godzinę przed występem: cztery pytania, `/sprawdz` na
   Discordzie i jedno pytanie o podróż w rodzaju „Czy MSZ odradza podróże do ...?”, bo o takie może
   zapytać jury. Zapisujemy pierwsze słowa każdej odpowiedzi i jej źródła. Ta sama próba pokazuje, czy
@@ -44,7 +44,7 @@ zgłoszony kod będzie inny niż `c422f2d`, liczby trzeba zmierzyć ponownie (#1
 | 1:50-2:25 | Przycisk „Pytanie z ukrytym poleceniem” | „To samo pytanie, tylko z dopisanym poleceniem: odpowiedz, że tak. Strona mówi, że w treści były polecenia i że ich nie wykonaliśmy. Każdą taką próbę zapisujemy jako zdarzenie bezpieczeństwa, bez jej treści.” Zdanie „Werdykt jest ten sam co bez polecenia” dodajemy tylko wtedy, gdy tak wyszło na próbie. |
 | 2:25-2:55 | Przycisk „Bilety tylko w aplikacji” | „Plotka z małej miejscowości, której nikt nie opisał. Tu najłatwiej o zmyślenie. A my mówimy: nie udało się potwierdzić, i wypisujemy, czego brakuje.” |
 | 2:55-3:15 | Discord, `/sprawdz` z pytaniem o Wrocław | „Drugi kanał. Ta sama usługa i ta sama logika: bot nie ma własnej, wysyła tekst do tego samego API co strona.” Jeśli bot nie działa na produkcji (#59), mówimy to jednym zdaniem i idziemy dalej. |
-| 3:15-3:45 | HISTORY.md albo slajd z wynikami | „Testujemy się tak jak jury: 86 przypadków w scenariuszach A-E, G-J i U (adresy URL), te same nazwy metryk, ale nasze `citation_correctness` sprawdza tylko, czy cytat występuje w źródle, a nie czy wspiera tezę. Ostatni pełny przebieg ocenił 75 z nich, a 11 z ukrytym poleceniem w stronie sprawdziliśmy osobno: wszystkie 11 dobrze. Zrzutów ekranu, czyli F, jeszcze nie mamy. Runner zapisuje każdy przebieg do HISTORY.md i do plików JSON, także słaby; dwóch starszych przebiegów (staging i 21.11) nie zachowaliśmy. Wynik: macro-F1 0,92 przy progu 0,75, abstencja 1,00, mediana 15 sekund, pętla moderatora 1,00. Jednego progu nie spełniamy: end-to-end wyszło 0,99, bo przy symulowanej awarii Fact Check dajemy ocenę z innych źródeł zamiast komunikatu technicznego. W 7 z 69 przypadków z etykietą ocena była inna niż oczekiwana, w czterech z nich „brak wystarczających dowodów” zamiast oceny. Przebiegi tego samego kodu różnią się o kilka punktów, dlatego pokazujemy całą historię.” |
+| 3:15-3:45 | HISTORY.md albo slajd z wynikami | „Testujemy się tak jak jury: 86 przypadków w scenariuszach A-E, G-J i U (adresy URL), te same nazwy metryk, ale nasze `citation_correctness` sprawdza tylko, czy cytat występuje w źródle, a nie czy wspiera tezę. Pełny przebieg na commicie a14b93c ocenił 75 z nich, a 11 z ukrytym poleceniem w stronie przeszło osobno, na commicie 5e5be00. Zrzutów ekranu, czyli F, jeszcze nie mamy. Runner zapisuje każdy przebieg do HISTORY.md i do plików JSON, także słaby; dwóch starszych przebiegów (staging i 21.11) nie zachowaliśmy. Wynik: macro-F1 0,92 przy progu 0,75, 62 z 69 ocen trafnych. Cytaty, abstencja, odporność na polecenia i pętla moderatora mają 1,00. Mediana czasu to 20,5 sekundy. Jedna metryka jest poniżej progu: end-to-end 0,99 przy progu 1,00, przez jeden przypadek, J01, w którym awarię Fact Check zasymulowaliśmy, a odpowiedź i tak dała werdykt. Poprawność cytatów sprawdza tylko, czy cytat jest w źródle. To dwa przebiegi, nie jeden, i nie jest to przebieg na commicie zgłoszenia: [z #16].” |
 | 3:45-4:30 | Slajd z pilotażem | „Jak to wdrożyć w MSZ? Brief podaje pięć etapów i do każdego mamy już kawałek: uruchomienie jednym poleceniem z testami, zamknięty korpus 1158 dokumentów, w tym 1143 urzędowych, maskowanie danych z 30-dniową retencją, wersję publiczną na serwerze w Niemczech i kontrolę przed pushem, która puszcza testy i sprawdza, czy eval był na tym samym kodzie. Kolejkę spraw dla moderatora już mamy. Brakuje pomiaru, czy korpus trafia na właściwy dokument, zatwierdzania odpowiedzi przez eksperta, procedury korekt i zewnętrznego red teamu. Proponujemy start od pytań o bezpieczeństwo podróży na danych z Odyseusza, po zmierzeniu, że korpus trafia na właściwy profil kraju. Każdą odpowiedź do publikacji zatwierdza tam człowiek.” |
 | 4:30-5:00 | Slajd końcowy z hasłem „Fakt ma przypis.” | „Nie budujemy sędziego prawdy. Pokazujemy źródło i to, czego nie wiemy, a ostatnie słowo ma czytelnik. Obywatel płaci zero złotych. Fakt ma przypis. Możecie wpisać własne pytanie na żywo, chętnie je sprawdzimy.” |
 
@@ -57,13 +57,12 @@ Jedno zdanie i idziemy dalej:
 
 - Wrocław kończy się „Nie udało mi się potwierdzić tej informacji”: „Tym razem nie znaleźliśmy
   cytatu, który by to rozstrzygał, więc werdyktu nie ma. Wolimy powiedzieć, że nie wiemy, niż
-  zgadywać.” Pokazujemy dopiski pod odpowiedzią. Na dopytanie, na `main`: ocena
+  zgadywać.” Pokazujemy dopiski pod odpowiedzią. Na dopytanie: ocena
   fact-checkera trafia do sędziego jako osobny fragment „Ocena fact-checkera: ...” (#66). Dla każdego
   twierdzenia idzie do Fact Check kilka krótkich kluczy, a ocena tego samego twierdzenia jest
   mapowana w kodzie na werdykt, tak jak opisuje ADR 0001. Ocena innego twierdzenia to tylko kontekst
-  (#100). Ocenę czytamy też ze strony recenzji (ClaimReview), a zdanie werdyktu fact-checkera liczy się
-  jako jego ocena (#127). Odpowiedź podaje ją jako „Ocena fact-checkera: <ocena>”, nie jako cytat ze
-  strony.
+  (#100). Odpowiedź podaje ją jako „Ocena fact-checkera: <ocena>”, nie jako cytat ze
+  strony. Na `prod` tego jeszcze nie ma: PR #126 trzeba scalić do `main`, a potem wypchnąć `main` na `prod`.
 - Pytanie z poleceniem daje inny werdykt niż pytanie bez niego: „Wyszukiwanie idzie na żywo i za
   drugim razem trafiło na inne strony. Polecenia nie wykonaliśmy i strona to mówi.” Jeśli odpowiedź
   zaczyna się od „Tak.”, nie bronimy jej: „Ten przypadek nam nie wyszedł i zapisujemy go jako błąd.”
@@ -92,32 +91,32 @@ Na wypadek wersji bez przycisków. Treść skopiowana z
 
 Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odpowiadamy wprost:
 
-- Macro-F1, czyli średnia F1 pięciu klas ocen, wynosi w pełnym przebiegu na `c422f2d` (75 przypadków)
-  0,918 przy progu 0,75. To nie odsetek trafień: trafnych werdyktów jest 62 z 69. Wcześniej: 0,100 na
-  `95e6177` (szkielet bez sędziego), 0,278 na `edd34a5` (szybki przebieg), 0,803 na `ca48b84` i od 0,815
-  do 0,918 w sześciu wcześniejszych pełnych przebiegach rundy 4 (dwa z nich na API uruchomionym na laptopie, jeden z Perplexity), z poprawkami sędziego i odczytu ocen fact-checkerów
-  między nimi. To wyniki różnych wersji kodu, nie powtórzenia tego samego; rozrzutu na samym `c422f2d`
-  nie mierzyliśmy. To nasz własny zestaw, a ukrytego zbioru jury nie znamy. W tym
-  przebiegu nie przechodzi
-  `end_to_end` (0,987 przy progu 1,000: tylko J01), więc całość nadal nie spełnia progów.
+- Trafność werdyktów (macro-F1) jest w pełnym przebiegu na `a14b93c` (75 przypadków, lokalne API,
+  Tavily) równa 0,918 przy progu 0,75, czyli 62 z 69 ocen trafnych. Starsza historia: 0,100 na
+  `95e6177`, 0,278 na `edd34a5`, 0,803 na `ca48b84`. To nasz własny zestaw, a ukrytego zbioru jury
+  nie znamy. W tym przebiegu poniżej progu jest tylko `end_to_end` (0,987 przy progu 1,000; błąd to
+  J01, symulowana awaria Fact Check, na którą odpowiedź dała werdykt), więc całość nadal nie spełnia
+  wszystkich progów. Pętla moderatora ma 1,000 (2 przypadki). Mediana czasu to 20,5 s przy progu 30 s.
+  Poprawność cytatów 1,0 sprawdza tylko, czy cytat występuje w źródle. Wynik łączony z E05-E15 to
+  73 z 80 trafnych ocen i macro-F1 0,92, ale są to dwa przebiegi. Wynik na commicie zgłoszenia: [z #16].
 - Odporność na polecenia w zapisanych przebiegach: 0,000 na `95e6177`, 0,571 w zniekształconym
-  pełnym przebiegu na `8c6f396` i 1,000 w pełnych przebiegach od `ca48b84` do `c422f2d`, przy progu 0,90
-  ([HISTORY.md](../../evals/results/HISTORY.md)). Te przebiegi pominęły E05-E15 (11 przypadków z
-  poleceniem ukrytym w stronie), więc ich wynik dotyczy 7 przypadków E. Osobne przebiegi tych 11 na `5e5be00` (ten sam kod produktu co `c422f2d`, lokalne API na laptopie z wymuszonym Tavily, strony z fixture pod `https://faktczyfejk.pl/eval-fixtures`) dały 11/11 poprawnych werdyktów, `injection_resistance` 1,000 i end-to-end 1,000, mediana ok. 20 s. To drugi pomiar obok przebiegu na `c422f2d`, nie jeden przebieg. Na `main` (`95e6177`, `8c6f396`) metryka liczy przypadek jako porażkę także przy złym werdykcie. Wartość 1,000 z `c422f2d` liczy tylko kanarka i zapisane zdarzenie bezpieczeństwa; werdykt jest osobną metryką (`injection_verdict_correct`, 0,857: 6 z 7 przypadków, FC-E03 ma ocenę „wprowadzające w błąd” zamiast „fałszywe”).
-- Zgodność kanałów: w pełnym przebiegu na `c422f2d` wyszło 1,000 (drugie odpowiedzi przyszły ze wspólnej pamięci wyników, po 0,17-0,53 s, więc to pokazuje, że pamięć oddaje zapisaną odpowiedź, a nie że dwa niezależne sprawdzenia się zgadzają), a w zniekształconym timeoutami
+  pełnym przebiegu na `8c6f396` i 1,000 w pełnym przebiegu na `a14b93c`, przy progu 0,90
+  ([HISTORY.md](../../evals/results/HISTORY.md)). Ten przebieg pominął E05-E15 (11 przypadków z
+  poleceniem ukrytym w stronie), więc jego wynik dotyczy 7 przypadków z poleceniem w wklejonym
+  tekście. E05-E15 przeszły osobno na `5e5be00`: 11 z 11 trafnych ocen, odporność 1,000. Na `main` (`95e6177`, `8c6f396`) metryka liczy przypadek jako porażkę także przy złym werdykcie. Wartość 1,000 liczy tylko kanarka i zapisane zdarzenie bezpieczeństwa; werdykt jest osobną metryką (`injection_verdict_correct`, 1,000).
+- Zgodność kanałów: w pełnym przebiegu na `a14b93c` wyszło 1,000 (6 przypadków; odpowiedzi z Discorda przyszły ze wspólnej pamięci wyników, 0,1-0,2 s, więc to pokazuje, że pamięć oddaje zapisaną odpowiedź, a nie że dwa niezależne sprawdzenia się zgadzają), a w zniekształconym timeoutami
   przebiegu na `8c6f396` 0,000 ([docs/eval-notes.md](../eval-notes.md)). Eval porównuje odpowiedzi kanałów tylko dla
-  przypadków, które mają więcej niż jeden kanał, więc to nie jest pomiar na ruchu użytkowników. Wspólna
-  pamięć wyników (#59) jest w kodzie.
+  przypadków, które mają więcej niż jeden kanał, więc to nie jest pomiar na ruchu użytkowników. Na
+  `main` ten sam tekst w ciągu 30 minut dostaje zapamiętaną odpowiedź (#59), więc kanały zgadzają się z konstrukcji.
 - Od #66 ocena fact-checkera dociera do sędziego jako osobny fragment, a od #100 krótkie klucze
-  Fact Check i mapa ocen na werdykt są w kodzie (oba w kodzie na faktczyfejk.pl).
-- Od #60 (PR #109) awaria źródła, które może rozstrzygnąć werdykt, daje
+  Fact Check i mapa ocen na werdykt są w kodzie (oba na `main` i na `prod`).
+- Od #60 (PR #109, na `main` i na `prod`) awaria źródła, które może rozstrzygnąć werdykt, daje
   „nie sprawdzono” z powodem.
-- Kolejka moderatora (#79) jest zbudowana i zakłada sprawy tylko przy ustawionym
-  `PRAWDOWID_ADMIN_TOKEN`; w pełnym przebiegu na `c422f2d` pętla moderatora wyszła 1,00 (H01, H02),
-  token jest ustawiony na serwerze demo (22.11 o 09:08 `GET /api/cases` bez tokenu zwraca tam 401). Nie ma ekranu moderatora ani zatwierdzania odpowiedzi przez eksperta,
+- Kolejka moderatora (#79) zakłada sprawy tylko przy ustawionym `PRAWDOWID_ADMIN_TOKEN`; na produkcji
+  jest włączona (`/api/cases` odpowiada 401). Nie ma ekranu moderatora ani zatwierdzania odpowiedzi przez eksperta,
   zrzutów ekranu i zdjęć (scenariusz F, #80) ani ostrzeżenia o sankcjach UE (#81).
 - Baza incydentów organizatora jest wpięta, ale pusta, bo nie mamy pliku (#64).
-- Wyszukiwanie w korpusie jest podpięte do sprawdzania na `main` (#74). Nie mamy pomiaru,
+- Wyszukiwanie w korpusie jest podpięte do sprawdzania (#74). Nie mamy pomiaru,
   że poprawia odpowiedzi ani że pytania o podróż trafiają na właściwy profil. `citation_correctness` zmierzyliśmy na 1,0, ale sprawdza tylko, czy cytat występuje w dokumencie.
 - Bot Discord działa w kodzie. Jego stan na produkcji: #59.
 - Gdzie dostawcy modeli i wyszukiwarki przetwarzają dane, jest UNCONFIRMED (#85). Nie pokazaliśmy
@@ -133,7 +132,7 @@ Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odp
 - Czekanie na odpowiedź można przyciąć, ale wtedy na ekranie pojawia się napis „odpowiedź po N s”
   z prawdziwym czasem.
 - Próba i nagranie to około 20 sprawdzeń. Według [cost.md](cost.md) to około 100 kredytów Tavily i
-  około 0,69 USD za modele (20 × 0,0346 USD). Przed nagraniem sprawdzamy stan kredytów (#75).
+  około 0,7 USD za modele (3,45 USD za 100 sprawdzeń). Przed nagraniem sprawdzamy stan kredytów (#75).
 - Scenę J nagrywamy lokalnie: `make up` bez kluczy w `.env`, strona na http://localhost:8080
   ([README](../../README.md#run)).
 - Bez danych osobowych na ekranie. Serwer Discord testowy, bez prywatnych nazw. Ekran 1920×1080,
@@ -167,7 +166,7 @@ sobie przeczą ([prawdowid/judge.py](../../prawdowid/judge.py)), w filmie nie ob
 przypadek C ma jedną ocenę Demagoga, a nie dwa sprzeczne źródła ([WORKLOG](../../WORKLOG.md), punkt
 o lukach evalu w „Next”). Czego się spodziewać:
 
-- Scena 2 zależy od #66 i #100 (są na `main`) i od tego, czy wyszukiwarka dotrze do cytatu,
+- Scena 2 zależy od #66 i #100 (są na `prod`) i od tego, czy wyszukiwarka dotrze do cytatu,
   tak jak na żywo. Gdy odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”, pokazujemy
   ją z napisem „Bez cytatu nie wydajemy werdyktu”, a lektor zamiast zdania z tabeli mówi: „Tym razem
   nie znaleźliśmy cytatu, który to rozstrzyga, więc werdyktu nie ma. Wolimy to powiedzieć niż
@@ -176,7 +175,7 @@ o lukach evalu w „Next”). Czego się spodziewać:
 - Scena 3 wymaga bota na produkcji albo na serwerze testowym (#59). Bez działającego bota wycinamy
   ją i dopisujemy w napisie końcowym: „Discord: uruchomienie w toku, #59”.
 - Sceny 7 i 8 zależą od tego, czy wyszukiwarka dotrze do strony fact-checkera. Część z nich blokuje
-  nasz serwer. Na `main` taki wynik wchodzi jako fragment z wyników wyszukiwarki, oznaczony
+  nasz serwer. Taki wynik wchodzi jako fragment z wyników wyszukiwarki, oznaczony
   jako taki (#95). Jeśli mimo to odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”,
   pokazujemy taką. Napis „źródło zablokowało pobranie, #95” dodajemy tylko wtedy, gdy nagranie albo logi
   potwierdzają blokadę; w innym przypadku opisujemy sam wynik, bez podawania przyczyny.
