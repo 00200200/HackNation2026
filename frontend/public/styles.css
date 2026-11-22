@@ -50,7 +50,7 @@ a { color: var(--red-deep); }
 .hero :focus-visible { outline-color: #fff; }
 .hero a { color: #fff; }
 
-.top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; }
 .brand { display: inline-flex; align-items: center; gap: .65rem; text-decoration: none; }
 .brand-mark { width: 2.4rem; height: 2.4rem; flex: none; }
 .brand-name { font-weight: 800; font-size: 1.25rem; letter-spacing: -.01em; }
@@ -59,7 +59,8 @@ a { color: var(--red-deep); }
 .top-nav a { font-weight: 700; display: inline-block; padding: .4rem .95rem; border-radius: 999px;
   text-decoration: none; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .55); }
 .top-nav a:hover { background: rgba(255, 255, 255, .12); }
-@media (max-width: 640px) { .event { display: none; } }
+.top-nav a[aria-current="page"] { background: #fff; color: var(--red); }
+@media (max-width: 640px) { .event { display: none; } .top-nav { gap: .5rem; } }
 
 .hero-intro { text-align: center; margin: clamp(2.5rem, 8vh, 5rem) auto clamp(2rem, 5vh, 3rem); }
 .hero h1 { position: relative; display: inline-block; margin: 0; font-weight: 900; font-size: clamp(3.25rem, 10vw, 8.5rem);
@@ -195,6 +196,7 @@ body.checked .results { flex: 1 0 auto; }
 .ref { color: var(--red); font-weight: 800; }
 .source-meta { margin: 0; font-size: .82rem; color: var(--muted); }
 .empty { margin: 0; color: var(--muted); }
+.sources-note { margin: .65rem 0 0; font-size: .92rem; }
 
 .assessment { background: var(--soft); border-radius: 1rem; padding: .9rem 1.1rem; }
 .assessment p { margin: 0 0 .4rem; color: var(--muted); }
@@ -235,6 +237,56 @@ body.checked .results { flex: 1 0 auto; }
 .incidents { border-left: 4px solid var(--line); padding: .2rem 0 .2rem 1rem; margin-bottom: 1.5rem; overflow-wrap: anywhere; }
 .incidents h2 { font-size: 1rem; margin: 0 0 .3rem; }
 .incidents p, .incidents ul { margin: .2rem 0; }
+
+/* Source list (/zrodla): a short cloth band with the title, the list on the white page below */
+.hero-page { flex: none; padding-bottom: clamp(2.25rem, 6vh, 3.5rem); }
+.page-intro { margin: clamp(2rem, 6vh, 3.5rem) 0 0; }
+.hero-page h1 { font-size: clamp(3.25rem, 10vw, 7rem); }
+.page-intro p { margin: clamp(1rem, 2.5vw, 1.75rem) 0 0; max-width: 40rem; font-size: clamp(1.05rem, 1.6vw, 1.25rem); line-height: 1.45; opacity: .92; }
+
+.listing { flex: 1 0 auto; padding: clamp(2rem, 5vh, 3rem) 0 clamp(3rem, 8vh, 5rem); }
+.listing > .wrap { max-width: 76rem; padding: 0 clamp(1rem, 3vw, 2.5rem); }
+.listing [id] { scroll-margin-top: 1rem; }
+.listing code { font-size: .92em; padding: .05em .3em; border-radius: .3em; background: var(--soft); }
+.lead { margin: 0; max-width: 48rem; font-size: clamp(1.2rem, 2.2vw, 1.55rem); font-weight: 700; line-height: 1.35; letter-spacing: -.01em; text-wrap: pretty; }
+.lead.failed { font-size: 1.1rem; font-weight: 600; }
+.toc { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.5rem 0 0; padding: 0; list-style: none; }
+.toc a { display: inline-block; padding: .45rem .95rem; border-radius: 999px; border: 1.5px solid #8a7f82;
+  color: var(--navy); font-weight: 600; text-decoration: none; }
+.toc a:hover { border-color: var(--red); color: var(--red-deep); }
+.block { margin-top: clamp(2.75rem, 7vh, 4rem); }
+.block h2 { margin: 0 0 .6rem; font-size: clamp(1.6rem, 3.2vw, 2.25rem); font-weight: 900; line-height: 1.1; letter-spacing: -.03em; text-wrap: balance; }
+.block h3 { margin: 2.25rem 0 .5rem; font-size: 1.2rem; font-weight: 800; letter-spacing: -.01em; }
+.section-lead { margin: 0 0 1rem; max-width: 48rem; color: var(--muted); }
+
+/* The rules read like a register: the term on the left, plain Polish on the right */
+.rules { margin: 1.25rem 0 0; border-top: 1px solid var(--line); }
+.rules > div { display: grid; grid-template-columns: minmax(10rem, 15rem) minmax(0, 46rem); gap: .5rem 2.5rem;
+  padding: 1.25rem 0; border-bottom: 1px solid var(--line); }
+.rules dt { font-size: 1.05rem; font-weight: 800; }
+.rules dd { margin: 0; }
+.rules p, .rules ul { margin: 0 0 .6rem; }
+.rules ul { padding-left: 1.2rem; }
+.rules dd > :last-child { margin-bottom: 0; }
+@media (max-width: 760px) { .rules > div { grid-template-columns: minmax(0, 1fr); } }
+
+/* One table style for every list; a table wider than the screen scrolls inside its frame */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 1rem; background: #fff; }
+.listing table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .95rem; line-height: 1.4; }
+.listing th, .listing td { padding: .75rem 1rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.listing thead th { background: var(--soft); color: var(--muted); font-size: .85rem; font-weight: 700; }
+.listing .wide { min-width: 17rem; overflow-wrap: anywhere; }
+.listing .short { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.listing tbody tr:last-child > * { border-bottom: 0; }
+/* The source name stays in view while a wide table scrolls sideways */
+.listing tbody th, .listing thead th:first-child { position: sticky; left: 0; z-index: 1; box-shadow: 1px 0 0 var(--line); }
+.listing tbody th { min-width: 11rem; font-weight: 700; background: #fff; }
+@media (max-width: 640px) { .listing tbody th { min-width: 8.5rem; } }
+.listing .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.listing .name { display: block; }
+.listing .sub { display: block; margin-top: .15rem; font-size: .85rem; font-weight: 500; color: var(--muted); overflow-wrap: anywhere; }
+.listing .on { font-weight: 700; }
+.data-note { margin: clamp(2.5rem, 6vh, 3.5rem) 0 0; max-width: 48rem; font-size: .92rem; color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }

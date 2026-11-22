@@ -1,4 +1,5 @@
 // Web channel: send the input to the API and render CheckResult. No verification logic here.
+// SOURCE_TYPES, el, plural, plDate and safeUrl come from common.js, loaded first.
 const form = document.getElementById("check-form");
 const input = document.getElementById("input");
 const submit = document.getElementById("submit");
@@ -16,17 +17,6 @@ const NOTICE_TITLES = {
   technical_error: "Nie udało się sprawdzić",
   cannot_check: "Nie możemy tego sprawdzić",
   needs_clarification: "Doprecyzuj, co chcesz sprawdzić",
-};
-const PLURAL = new Intl.PluralRules("pl-PL");
-// Values used by the corpus branch and the web-search PR; anything else is shown as sent.
-const SOURCE_TYPES = {
-  official: "źródło oficjalne",
-  fact_checker: "serwis fact-checkingowy",
-  fact_check: "serwis fact-checkingowy",
-  incident_base: "baza incydentów dezinformacji",
-  disinfo_database: "baza znanych narracji dezinformacyjnych",
-  news: "serwis informacyjny",
-  media: "portal informacyjny",
 };
 // First words of the answer, in the organiser's format ("Tak." / "Nie." / "Nie udało mi się potwierdzić…"),
 // picked from the verdict set in code. The reasons stay in the sources and limitations.
@@ -56,31 +46,9 @@ const ENTER_SENDS = window.matchMedia("(hover: hover) and (pointer: fine)");
 let busy = false;
 let errorFrame = 0;
 
-function el(tag, attrs = {}, ...children) {
-  const node = document.createElement(tag);
-  Object.assign(node, attrs);
-  node.append(...children.filter((c) => c !== null && c !== undefined && c !== false));
-  return node;
-}
-
 // The API counts characters, not UTF-16 units: an emoji is one character.
 function chars(text) {
   return [...text].length;
-}
-
-function plural(n, one, few, many) {
-  const form = PLURAL.select(n);
-  return `${n} ${form === "one" ? one : form === "few" ? few : many}`;
-}
-
-function plDate(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("pl-PL", { timeZone: "Europe/Warsaw" });
-}
-
-function safeUrl(url) {
-  return /^https?:\/\//.test(url ?? "") ? url : null;
 }
 
 // Anything that is not a verdict: neutral look, never the colours of a verdict.
@@ -145,6 +113,13 @@ function answerText(c) {
   return [ANSWER_LEAD[c.verdict] ?? `${c.verdict_label}.`, named].filter(Boolean).join(" ");
 }
 
+// Under every claim's sources: what we search and why. A new tab, so the answer stays where it was.
+function sourcesNote() {
+  return el("p", { className: "sources-note" },
+    el("a", { href: "/zrodla", target: "_blank", rel: "noopener" }, "Jak dobieramy źródła",
+      el("span", { className: "sr-only", textContent: " (otwiera się w nowej karcie)" })));
+}
+
 function claimBlock(c) {
   return el("div", { className: "claim" },
     el("h2", { className: "claim-text", textContent: `„${c.claim}”` }),
@@ -157,6 +132,7 @@ function claimBlock(c) {
     c.sources.length
       ? el("ol", { className: "sources" }, ...c.sources.map(sourceItem))
       : el("p", { className: "empty", textContent: "Brak źródła przy tej ocenie." }),
+    sourcesNote(),
     el("h3", { className: "part", textContent: "Nasza ocena" }),
     el("div", { className: "assessment" },
       el("p", { className: "explain" }, el("b", { textContent: "Uzasadnienie: " }), c.reasoning),

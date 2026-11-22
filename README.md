@@ -173,7 +173,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 
 ## Layout
 
-- `frontend/`: static `index.html`, `styles.css` and `app.js` (no build step) served by nginx.
+- `frontend/`: static `index.html` (the check) and `zrodla.html` (the source list, from
+  `GET /api/sources`), with `styles.css`, `common.js`, `app.js` and `zrodla.js` (no build step), served by nginx.
   `czat.html`, `czat.js` and `czat.css` are the messenger demo adapter at `/czat` (#116): the same
   `POST /api/checks` with `X-Channel: demo`, the reply in the sections and order of the Discord bot's
   message plus the web page's first words (`tests/test_czat.py` keeps the wording in step).

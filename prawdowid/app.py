@@ -32,6 +32,7 @@ from prawdowid import checklog, corpus_bm25, faults
 from prawdowid.contract import CheckResult, Status, Verdict
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
+from prawdowid.sources import SourceList, source_list
 from prawdowid.verifier import failed, is_link, verify
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:  %(name)s %(message)s")
@@ -331,3 +332,10 @@ async def delete_session(
     deleted = checklog.delete_session(session)
     log.info("session deleted session=%s records=%d", session, deleted)
     return {"deleted": deleted}
+
+
+@app.get("/api/sources")
+def list_sources() -> SourceList:
+    """Every source a check uses, for the page /zrodla. Plain def: the first call reads the
+    corpus file, so it runs in FastAPI's thread pool instead of blocking the event loop."""
+    return source_list()
