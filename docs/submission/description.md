@@ -1,6 +1,6 @@
 # Opis zgłoszenia
 
-Nazwa zespołu: TEAM_NAME
+Nazwa zespołu: Genwrownik
 
 Tytuł: faktczyfejk.pl: sprawdź, zanim podasz dalej
 
@@ -39,7 +39,6 @@ którą sprawdził agent: [citation_spotcheck.md](../../evals/results/citation_s
 [architektura](architecture.md), [źródła](sources.md), [ryzyka](risks.md), [koszty](cost.md),
 [prywatność](../privacy.md), [korpus](../corpus.md).
 
-- Wpisać nazwę zespołu w miejsce TEAM_NAME.
 - Runda 4 jest na `main` (#129, #134 z uzgodnieniem z #130, #133, #73). Liczby w opisie, na slajdzie 9 i w README
   opisują ten kod (`c422f2d`). Jeśli do zgłoszenia trafi nowszy kod produktu, powtórzyć pełny eval.
 - Wyszukiwanie: kod używa Perplexity, gdy ustawiono `PERPLEXITY_API_KEY`, a bez niego Tavily z pamięcią wyników.
