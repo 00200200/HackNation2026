@@ -2,8 +2,8 @@
 
 The references below describe the merged `main` branch. A mitigation is an implemented control,
 not proof that the risk is resolved. Unimplemented controls are labelled **not mitigated**.
-Saved outcome metrics are quoted in [architecture.md](architecture.md) directly from
-[evals/results/latest.json](../../evals/results/latest.json); that run has `overall_pass: false`.
+Saved outcome metrics are quoted in [architecture.md](architecture.md#saved-test-results-and-reproduction),
+which links the cited run by permalink; that run (the full run on `ca48b84`) has `overall_pass: false`.
 
 | Risk and failure scenario | Mitigation present in code, with file:line | Residual risk / absent control |
 |---|---|---|

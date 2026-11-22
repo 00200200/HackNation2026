@@ -4,7 +4,7 @@ This is a submission draft for [issue #18](https://github.com/00200200/HackNatio
 The implementation inspected was originally the `LukiLenkiewicz/issue11-fanout` stack at `cacfb4e`;
 that stack (per-claim fan-out, judge, local source store, link input) is now merged into `main`
 (PRs #37, #30, #42, #28/#44). The implementation described below is `main`'s (`1aa173f`, 22.11.2026), after that merge, except where a row names PR #126 (branch `integration/r3`, head `ca48b84`, open; it contains PR #109 and supersedes it). Those are changes awaiting merge, listed in the README section "Zmiany czekające na scalenie". A later commit to PR #126 needs a recheck of the rows that name it.
-The measured product commits are identified below: `95e6177` (the run on `main`) predates that merge, and the cited full run on `ca48b84` (the head of PR #126) is not on `main` either (its file is in PR #128 and PR #123). This is not a claim of
+The measured commits, as the run files record them, are identified below: `95e6177` (the run on `main`) predates that merge, and the cited full run on `ca48b84` (the head of PR #126) is not on `main` either (its file is in PR #128 and PR #123). This is not a claim of
 submission readiness.
 
 ## Request and evidence flow
@@ -174,16 +174,16 @@ PR #126 has 13 of 86 cases with a URL input (`U01`, `U02`, `E05` to `E15`) and t
 ## Saved test results and reproduction
 
 `evals/results/latest.json` is not a stable pointer: it holds one run on `main`, another in PR #109 and PR #126, and a third in PR #128.
-The runs below are therefore identified by product commit and linked by permalink to the file at a fixed commit.
+The runs below are therefore identified by the commit each file records and linked by permalink to the file at a fixed commit.
 
 The cited run is the full run on `ca48b84`, the head of [PR #126](https://github.com/00200200/HackNation2026/pull/126):
-[run file](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json), `2026-11-22T02:27:29+00:00`, product commit
+[run file](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json), `2026-11-22T02:27:29+00:00`, recorded commit
 `ca48b84390d0df22881024155a37bfafba606ce2`, `mode: "full"`, `n_cases: 75`, `dirty: false`, `coverage_ok: true`, `overall_pass: false`, `concurrency: 4`.
 The file is in [PR #128](https://github.com/00200200/HackNation2026/pull/128) (`6126ac9`, where it is also `latest.json`) and in
 [PR #123](https://github.com/00200200/HackNation2026/pull/123) (`cd61db5`), not on `main` and not in PR #126.
 75 of the 86 cases of `evals/cases.jsonl` in PR #126 ran: `E05` to `E15` were skipped (no public URL for the fixture pages,
 [#94](https://github.com/00200200/HackNation2026/issues/94)), and no case had a harness error. The file records neither the
-extraction model, nor the machine, nor the flags of the run, so exact reproduction is UNCONFIRMED. A later commit in PR #126 needs a new run
+extraction model, nor the machine, nor the flags of the run, so exact reproduction is UNCONFIRMED. The `commit` field is the checkout the harness ran from (`evals/run.py`), and the harness calls the server at `PRAWDOWID_URL` (`evals/adapter.py`), so whether that server was built from `ca48b84` is UNCONFIRMED as well. A later commit in PR #126 needs a new run
 ([#16](https://github.com/00200200/HackNation2026/issues/16)).
 
 Other saved runs, not cited as the measurement of the current build:

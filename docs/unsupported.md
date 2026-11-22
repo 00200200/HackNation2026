@@ -86,9 +86,13 @@ niej, na przykład Reddita albo Mastodona, jest pobierany jak zwykła strona. Ni
 
 ## Czego nie ma w ogóle
 
-- Pętla informacji. Nie ma kolejki spraw moderatora, grupowania powtórzonych pytań ani powiadomień. Pytanie bez
-  źródeł sprawdzamy od nowa za każdym razem i nigdy nie piszemy, że sprawę przekazano
-  ([#79](https://github.com/00200200/HackNation2026/issues/79)).
+- Pętla informacji. Nie ma kolejki spraw moderatora, grupowania powtórzonych pytań ani powiadomień. Na `main`
+  pytanie bez źródeł sprawdzamy od nowa za każdym razem. W PR #126 gotowa odpowiedź na ten sam tekst, także
+  `brak wystarczających dowodów`, wraca z pamięci przez 30 minut (nagłówek `X-Cache: hit`; pamięć jest w procesie
+  i po restarcie pusta), a interfejs tego nie oznacza ([#121](https://github.com/00200200/HackNation2026/issues/121)). Odpowiedź z błędem technicznym albo
+  z twierdzeniem `nie sprawdzono` do pamięci nie trafia. Ponowne sprawdzenie zaczyna się więc dopiero po wygaśnięciu
+  wpisu, a i wtedy trafienia Tavily dla tego samego zapytania mogą wracać z naszej pamięci zapytań do 24 godzin
+  ([#110](https://github.com/00200200/HackNation2026/issues/110)). Nigdy nie piszemy, że sprawę przekazano ([#79](https://github.com/00200200/HackNation2026/issues/79)).
 - Baza incydentów organizatora. Dopasowanie działa, ale baza jest pusta, więc notatka "Podobne znane incydenty"
   nie pojawia się ([#64](https://github.com/00200200/HackNation2026/issues/64)).
 - Ostrzeżenie o statusie źródła, na przykład objęciu sankcjami UE

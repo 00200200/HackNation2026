@@ -2,17 +2,17 @@
 
 This is an extrapolation from a saved test run, not an invoice or a hosting quote.
 The estimate uses the full run on `ca48b84`, the head of [PR #126](https://github.com/00200200/HackNation2026/pull/126):
-[run file](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json), timestamp `2026-11-22T02:27:29+00:00`, product commit
+[run file](https://github.com/00200200/HackNation2026/blob/6126ac9ea3b750704006d320fe095ed9413505d5/evals/results/history/20261122T021757.182695Z-ca48b84-full.json), timestamp `2026-11-22T02:27:29+00:00`, recorded commit
 `ca48b84390d0df22881024155a37bfafba606ce2`, `mode: "full"`, `n_cases: 75`, `dirty: false`, `overall_pass: false`. It ran extraction, retrieval, rerank and judge. The file is in
 PR #128 (`6126ac9`) and PR #123 (`cd61db5`), not on `main` and not in PR #126, so `evals/results/latest.json` in a checkout of
-`main` or of PR #126 is a different run. The file does not record the extraction model or the machine: UNCONFIRMED.
+`main` or of PR #126 is a different run. The file does not record the extraction model, the machine or the build of the server under test (its `commit` field is the checkout the harness ran from): UNCONFIRMED.
 ([architecture.md](architecture.md#saved-test-results-and-reproduction) lists every saved run with a permalink.)
 
 Older runs, not used for the estimate:
 
 - The quick run on `edd34a5` (10 cases, [file](https://github.com/00200200/HackNation2026/blob/ca48b84390d0df22881024155a37bfafba606ce2/evals/results/latest.json), `latest.json` in PR #109 and PR #126): USD 4.91 per 100 checks, extraction
   on Opus (the message of commit `83d6c65` says so; the file does not record the model).
-- The quick run on `ca48b84` (10 cases, in PR #123, [file](https://github.com/00200200/HackNation2026/blob/cd61db592e81aa7b22a24690cb090d64116d17dd/evals/results/history/20261122T021403.618691Z-ca48b84-quick.json)): USD 5.54 per 100 checks (about USD 55.40 per
+- The quick run on `ca48b84` (10 cases, in PR #123, [file](https://github.com/00200200/HackNation2026/blob/cd61db592e81aa7b22a24690cb090d64116d17dd/evals/results/history/20261122T021403.618691Z-ca48b84-quick.json)): USD 5.54 per 100 checks (about USD 55.39 per
   1,000) and a median of 29.8 s.
 - `main` still holds the older run of `2026-11-21T19:10:57+00:00` at commit `95e6177`, `n_cases: 9` ([file](https://github.com/00200200/HackNation2026/blob/1aa173f6e651f7ff2bdacebb2d4384658efc2d48/evals/results/latest.json)).
   It predates the judge, the retrieval pipeline and the check log: its answers came from a stub, so
