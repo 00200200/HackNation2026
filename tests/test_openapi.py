@@ -6,9 +6,12 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from prawdowid.app import CheckRequest, app
+from prawdowid.contract import Source, SourceStance
 
 ROOT = Path(__file__).parent.parent
 SPEC_FILE = ROOT / "docs" / "openapi.json"
@@ -62,3 +65,36 @@ def test_checks_operation_documents_what_a_channel_needs():
 def test_request_example_is_valid_input():
     [example] = CheckRequest.model_json_schema()["examples"]
     assert CheckRequest(**example).input == example["input"]
+
+
+def test_a_source_stands_on_one_of_three_sides_or_none():
+    """#78: the evidence chain. A channel groups sources by `stance`; null means the verdict
+    rules did not count the source."""
+    schemas = app.openapi()["components"]["schemas"]
+    assert schemas["SourceStance"]["enum"] == ["potwierdza", "przeczy", "kontekst"]
+    assert [s.value for s in SourceStance] == schemas["SourceStance"]["enum"]
+    stance = schemas["Source"]["properties"]["stance"]
+    assert stance["anyOf"] == [
+        {"$ref": "#/components/schemas/SourceStance"},
+        {"type": "null"},
+    ]
+    assert "stance" not in schemas["Source"]["required"]
+
+
+def test_a_source_without_a_stance_stays_valid_and_no_other_side_is():
+    """An answer from before the evidence chain (a cached one, say) still validates."""
+    old = {
+        "title": "Polska w UE",
+        "publisher": "gov.pl",
+        "published_at": "2024-05-01",
+        "fetched_at": "2026-11-21T00:00:00Z",
+        "url": "https://www.gov.pl/web/ue",
+        "source_type": "official",
+    }
+    assert Source.model_validate(old).stance is None
+    assert (
+        Source.model_validate({**old, "stance": "przeczy"}).stance
+        is SourceStance.REFUTES
+    )
+    with pytest.raises(ValidationError):
+        Source.model_validate({**old, "stance": "supports"})

@@ -128,6 +128,54 @@ function sourceItem(s, i) {
       : s.fragment ? el("blockquote", { className: "quote", textContent: `„${s.fragment}”` }) : null);
 }
 
+// The evidence chain (#78), word for word and in the order of the web page and the bot: sources grouped by
+// the side their verified quote stands on (`stance`). One under the other, as in a messenger. An answer with
+// no stance at all keeps one plain list.
+const SIDES = [
+  ["potwierdza", "Potwierdza"],
+  ["przeczy", "Przeczy"],
+  ["kontekst", "Uzupełnia kontekst"],
+  [null, "Nie wpływa na ocenę"],
+];
+const NOT_COUNTED_NOTE = "Na przykład sam nagłówek albo starsza ocena tego samego fact-checkera.";
+const SIDE_ICONS = { potwierdza: "M5 12.5l4.5 4.5L19 7.5", przeczy: "M7 7l10 10M17 7L7 17", kontekst: "M12 6v12M6 12h12" };
+let sideCount = 0;
+
+function sideOf(s) {
+  return SIDES.some(([key]) => key && key === s.stance) ? s.stance : null;
+}
+
+function sideIcon(key) {
+  if (!SIDE_ICONS[key]) return null;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", SIDE_ICONS[key]);
+  svg.append(path);
+  const icon = el("span", { className: "side-icon" }, svg);
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
+}
+
+function sourcesList(sources) {
+  if (!sources.length) return el("p", { textContent: "brak" });
+  if (!sources.some(sideOf)) return el("ol", { className: "m-sources" }, ...sources.map(sourceItem));
+  // One numbering across the groups, so [n] still names one source of the claim.
+  let n = 0;
+  return SIDES.map(([key, title]) => {
+    const items = sources.filter((s) => sideOf(s) === key);
+    if (!items.length) return null;
+    const id = `strona-${++sideCount}`;
+    const list = el("ol", { className: "m-sources", start: n + 1 }, ...items.map((s) => sourceItem(s, n++)));
+    list.setAttribute("aria-labelledby", id);
+    return el("div", { className: `m-side side-${key ?? "none"}` },
+      el("h4", { className: "side-title", id }, sideIcon(key), title),
+      key ? null : el("p", { className: "side-note", textContent: NOT_COUNTED_NOTE }),
+      list);
+  });
+}
+
 function claimBubble(n, c) {
   // "nie sprawdzono" is no verdict: it must not read like one.
   const rated = c.verdict === "not_checked" ? "Bez oceny" : "Ocena";
@@ -142,9 +190,7 @@ function claimBubble(n, c) {
     c.reasoning ? named("Uzasadnienie:", c.reasoning) : null,
     c.strength ? named("Siła dowodów:", c.strength) : null,
     c.premises.length ? part("Przesłanki", list(c.premises)) : null,
-    part("Źródła", c.sources.length
-      ? el("ol", { className: "m-sources" }, ...c.sources.map(sourceItem))
-      : el("p", { textContent: "brak" })),
+    part("Źródła", sourcesList(c.sources)),
     c.limitations.length ? part("Ograniczenia", list(c.limitations)) : null);
 }
 

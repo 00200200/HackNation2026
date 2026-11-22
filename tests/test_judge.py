@@ -7,7 +7,7 @@ from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.function import FunctionModel
 
 from prawdowid import factcheck
-from prawdowid.contract import SecurityEvent, Source, Verdict
+from prawdowid.contract import SecurityEvent, Source, SourceStance, Verdict
 from prawdowid.judge import (
     CHECKER_GAP,
     CONFLICT,
@@ -1469,3 +1469,179 @@ def test_a_fact_checkers_data_gap_decides_even_when_not_marked_its_own_conclusio
         ),
     )
     assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+
+
+# --- #78: the evidence chain. Each source carries the side its verified label counted for ---
+
+
+def sides(j):
+    return [(s.publisher, s.stance) for s in j.sources]
+
+
+def test_sources_on_both_sides_of_a_conflict_carry_both_sides():
+    j = run(
+        [GOV, EC],
+        answering(
+            label(GOV, "supports", GOV.source.fragment),
+            label(EC, "refutes", EC.source.fragment),
+        ),
+    )
+    assert CONFLICT in j.limitations
+    assert sides(j) == [("MF", SourceStance.SUPPORTS), ("KE", SourceStance.REFUTES)]
+
+
+@pytest.mark.parametrize(
+    "stance, side",
+    [
+        ("supports", SourceStance.SUPPORTS),
+        ("refutes", SourceStance.REFUTES),
+        ("context", SourceStance.CONTEXT),
+        ("gap", SourceStance.CONTEXT),  # the data cannot settle it: no side taken
+    ],
+)
+def test_a_verified_label_gives_its_side(stance, side):
+    j = run([A], answering(label(A, stance, NO_TAX)))
+    assert sides(j) == [("Portal A", side)]
+
+
+@pytest.mark.parametrize(
+    "rating, read_as, side",
+    [
+        ("Fałsz", "context", SourceStance.REFUTES),
+        ("Prawda", "refutes", SourceStance.SUPPORTS),
+        ("Manipulacja", "refutes", SourceStance.CONTEXT),
+        ("Nieweryfikowalne", "supports", SourceStance.CONTEXT),
+    ],
+)
+def test_a_rating_of_this_claim_gives_its_side_through_the_rating(
+    rating, read_as, side
+):
+    rated = claim_review(rating, CLAIM)
+    j = run([rated], answering(rating_label(rated, read_as)))
+    assert [(s.rating, s.stance) for s in j.sources] == [(rating, side)]
+
+
+def test_a_review_of_another_claim_a_known_narrative_and_corpus_context_add_context():
+    narrative = fragment(
+        "https://euvsdisinfo.eu/report/podatek/",
+        "Ta sama narracja o podatkach UE krąży od 2019 roku.",
+        "EUvsDisinfo",
+        "disinfo_database",
+    )
+    corpus = fragment(
+        "https://www.gov.pl/web/mf/podatki",
+        "Podatki w UE ustalają państwa członkowskie.",
+        "MF",
+        "official",
+    )
+    j = run(
+        [OTHER, narrative, corpus],
+        answering(
+            rating_label(OTHER, "refutes", same_claim=False),
+            label(narrative, "context", narrative.source.fragment),
+            label(corpus, "context", corpus.source.fragment),
+        ),
+    )
+    assert [s.stance for s in j.sources] == [SourceStance.CONTEXT] * 3
+
+
+def test_a_fact_check_quoting_the_claim_stands_on_the_side_of_its_conclusion():
+    j = run(
+        [REVIEW],
+        answering(
+            label(REVIEW, "supports", "UE wprowadza podatek od wypieków"),
+            label(REVIEW, "refutes", "Sprawdziliśmy: to fałsz", own_conclusion=True),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert [s.stance for s in j.sources] == [None, SourceStance.REFUTES]
+
+
+def test_labels_the_rules_set_aside_take_no_side():
+    # A publisher that says both, with no conclusion of its own.
+    j = run(
+        [REVIEW],
+        answering(
+            label(REVIEW, "supports", "UE wprowadza podatek od wypieków"),
+            label(REVIEW, "refutes", "Sprawdziliśmy: to fałsz"),
+        ),
+    )
+    assert [s.stance for s in j.sources] == [None, None]
+    # A headline alone.
+    titled = review(None)
+    j = run([titled], answering(label(titled, "supports", REVIEW_TITLE)))
+    assert sides(j) == [("Demagog", None)]
+    # A publisher whose own conclusion is a data gap: its quote of the claim confirms nothing.
+    gap = fragment(
+        "https://demagog.org.pl/d01r",
+        "Polska jest trzecim krajem w Europie pod względem zarobków lekarzy. "
+        "Nie da się tego zweryfikować.",
+        "Demagog",
+        "fact_check",
+    )
+    j = run(
+        [gap],
+        answering(
+            label(gap, "supports", "Polska jest trzecim krajem w Europie"),
+            label(gap, "gap", "Nie da się tego zweryfikować.", own_conclusion=True),
+        ),
+    )
+    assert [s.stance for s in j.sources] == [None, SourceStance.CONTEXT]
+
+
+def test_an_older_rating_by_the_same_fact_checker_takes_no_side():
+    old = claim_review(
+        "Fałsz", CLAIM, url="https://demagog.org.pl/a/", published=date(2025, 2, 21)
+    )
+    new = claim_review(
+        "Prawda", CLAIM, url="https://demagog.org.pl/b/", published=date(2026, 11, 10)
+    )
+    j = run(
+        [old, new],
+        answering(rating_label(old, "refutes"), rating_label(new, "supports")),
+    )
+    assert [(s.rating, s.stance) for s in j.sources] == [
+        ("Fałsz", None),
+        ("Prawda", SourceStance.SUPPORTS),
+    ]
+
+
+def test_a_side_comes_only_from_a_verified_label_never_from_the_source():
+    # A stance the retrieved source arrives with (a cache, a stored record) is not passed on,
+    # and a label whose quote is not in the document gives no side.
+    preset = Fragment(
+        doc_id=A.doc_id,
+        source=A.source.model_copy(update={"stance": SourceStance.SUPPORTS}),
+    )
+    j = run(
+        [preset],
+        answering(
+            label(
+                preset, "supports", "Komisja Europejska wprowadza podatek od wypieków."
+            ),
+            label(preset, "context", NO_TAX),
+        ),
+    )
+    assert sides(j) == [("Portal A", SourceStance.CONTEXT)]
+    headline = Fragment(
+        doc_id=REVIEW_URL,
+        source=review(None).source.model_copy(update={"stance": SourceStance.SUPPORTS}),
+    )
+    j = run([headline], answering(label(headline, "supports", REVIEW_TITLE)))
+    assert sides(j) == [("Demagog", None)]
+
+
+def test_a_page_keeps_the_side_of_its_counted_quote_over_its_headline():
+    page = fragment("https://c.pl/z", NO_TAX, "Portal C", "official")
+    page.source.title = "Takiego podatku od wypieków w UE nie ma"
+    j = run(
+        [page],
+        answering(
+            label(page, "refutes", page.source.title),
+            label(page, "refutes", NO_TAX),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE
+    assert [(s.fragment, s.stance) for s in j.sources] == [
+        (NO_TAX, SourceStance.REFUTES)
+    ]

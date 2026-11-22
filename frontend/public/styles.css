@@ -202,6 +202,22 @@ body.checked .results { flex: 1 0 auto; }
 .empty { margin: 0; color: var(--muted); }
 .sources-note { margin: .65rem 0 0; font-size: .92rem; }
 
+/* The evidence chain (#78): sources grouped by the side they stand on. Both sides of a conflict sit next to
+   each other on a wide screen and one under the other on a narrow one. The heading names the side; the icon
+   and the colour of the quote rule only help. */
+.chain { display: grid; gap: 1.25rem; }
+.sides { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+@media (min-width: 52rem) { .sides { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.side-title { display: flex; align-items: center; gap: .5rem; margin: 0 0 .6rem; font-size: 1rem; font-weight: 800; }
+.side-icon { flex: none; display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; }
+.side-icon svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.side-potwierdza .side-icon { background: var(--navy); color: #fff; }
+.side-przeczy .side-icon { background: var(--red); color: #fff; }
+.side-kontekst .side-icon { background: #ecebeb; color: var(--navy); }
+.side-note { margin: -.3rem 0 .6rem; font-size: .9rem; color: var(--muted); }
+.side-potwierdza .quote { border-left-color: var(--navy); }
+.side-kontekst .quote, .side-none .quote { border-left-color: #8a7f82; }
+
 .assessment { background: var(--soft); border-radius: 1rem; padding: .9rem 1.1rem; }
 .assessment p { margin: 0 0 .4rem; color: var(--muted); }
 .assessment p:last-child { margin-bottom: 0; }
