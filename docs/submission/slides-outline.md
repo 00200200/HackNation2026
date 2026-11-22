@@ -57,7 +57,7 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
   zwracał stałe `brak wystarczających dowodów`. Jego wartości nie opisują produktu i nie są tu
   cytowane ([eval-notes](../eval-notes.md), [README, sekcja metryk](../../README.md#metryki-obowiązkowe-sekcja-6)).
 - Pełny test zastąpił szybkie testy na 10 przypadkach (`edd34a5`, [plik](https://github.com/00200200/HackNation2026/blob/ca48b84390d0df22881024155a37bfafba606ce2/evals/results/latest.json); `ca48b84`, [plik](https://github.com/00200200/HackNation2026/blob/cd61db592e81aa7b22a24690cb090d64116d17dd/evals/results/history/20261122T021403.618691Z-ca48b84-quick.json)). Liczby na
-  slajdach 8 do 10 pochodzą z pełnego testu; starsze liczby na slajdzie 9 są oznaczone jako starsze albo UNCONFIRMED.
+  slajdach 8 do 10 pochodzą z pełnego testu; starsze liczby na slajdach 9 i 10 są oznaczone jako starsze albo UNCONFIRMED.
 
 ## Slajd 8. Wyniki jakości
 

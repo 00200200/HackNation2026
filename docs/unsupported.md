@@ -91,8 +91,8 @@ niej, na przykład Reddita albo Mastodona, jest pobierany jak zwykła strona. Ni
   `brak wystarczających dowodów`, wraca z pamięci przez 30 minut ([#59](https://github.com/00200200/HackNation2026/issues/59); nagłówek `X-Cache: hit`), a interfejs
   tego nie oznacza ([#121](https://github.com/00200200/HackNation2026/issues/121)). Pamięć jest w procesie, mieści 500 odpowiedzi i po restarcie jest pusta, więc
   ponowne sprawdzenie zaczyna się po wygaśnięciu wpisu, po restarcie albo gdy nowsze odpowiedzi wyprą go z pamięci.
-  Odpowiedź z błędem technicznym albo z twierdzeniem `nie sprawdzono` do pamięci nie trafia. Trafienia Tavily dla tego
-  samego zapytania mogą wracać z naszej pamięci zapytań, domyślnie do 24 godzin od pierwszego takiego zapytania
+  Odpowiedź z błędem technicznym albo z twierdzeniem `nie sprawdzono` do pamięci nie trafia. W PR #126 trafienia Tavily dla
+  tego samego zapytania mogą wracać z naszej pamięci zapytań, domyślnie do 24 godzin od pierwszego takiego zapytania
   ([#110](https://github.com/00200200/HackNation2026/issues/110)). Nigdy nie piszemy, że sprawę przekazano ([#79](https://github.com/00200200/HackNation2026/issues/79)).
 - Baza incydentów organizatora. Dopasowanie działa, ale baza jest pusta, więc notatka "Podobne znane incydenty"
   nie pojawia się ([#64](https://github.com/00200200/HackNation2026/issues/64)).
