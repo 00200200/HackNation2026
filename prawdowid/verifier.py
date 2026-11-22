@@ -40,7 +40,9 @@ from prawdowid.privacy import mask_personal_data
 
 log = logging.getLogger("prawdowid")
 
-MODEL = os.getenv("PRAWDOWID_MODEL") or "anthropic:claude-opus-5-5"
+# Sonnet since 22.11: on the same quick set it matched Opus with a 6.6 s lower median and about 20%
+# lower cost (#88); any PydanticAI model id can replace it.
+MODEL = os.getenv("PRAWDOWID_MODEL") or "anthropic:claude-sonnet-5-5"
 # Below the API's 60 s limit on verify; covers every attempt, including SDK retries.
 MODEL_TIMEOUT_S = 45
 MODEL_MAX_RETRIES = 1

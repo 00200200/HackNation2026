@@ -82,7 +82,7 @@ separate, already-populated source and does not substitute for the incident base
 
 | Role | Default model ID on `main` | Configuration / source |
 |---|---|---|
-| Extract claims and queries | `anthropic:claude-opus-5-5` | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
+| Extract claims and queries | `anthropic:claude-sonnet-5-5` (was Opus until 22.11, #88) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
 | Rerank fragments | `anthropic:claude-haiku-5-5` | `PRAWDOWID_RERANK_MODEL`, [rerank.py](../../prawdowid/rerank.py) |
 | Label evidence | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_JUDGE_MODEL`, [judge.py](../../prawdowid/judge.py) |
 
