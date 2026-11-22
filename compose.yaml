@@ -61,6 +61,8 @@ services:
     build: .
     profiles: [discord]
     restart: on-failure:3
+    # Python as PID 1 ignores SIGTERM; the init process lets a deploy stop the bot at once.
+    init: true
     command: ["python", "-m", "prawdowid.discord_bot"]
     environment:
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}

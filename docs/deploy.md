@@ -21,7 +21,7 @@ there. No CI service is involved, and a failed deploy is retried on the next run
 | `caddy/Caddyfile` | HTTPS sites: `DOMAIN` and `www`, doc2json.pl and `www` |
 | `deploy/pull-deploy.sh` | deploys `origin/prod` when it moves |
 | `deploy/faktczyfejk-deploy.service`, `.timer` | run the script every minute as `ubuntu` |
-| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*`, `PRAWDOWID_ADMIN_TOKEN` (never committed; deploys leave it alone) |
+| `.env` on the server | `DOMAIN`, `COMPOSE_FILE`, `ANTHROPIC_API_KEY`, `POSTGRES_*`, `PRAWDOWID_ADMIN_TOKEN`, for the bot `COMPOSE_PROFILES`, `DISCORD_BOT_TOKEN` (never committed; deploys leave it alone) |
 
 ## What you need
 
