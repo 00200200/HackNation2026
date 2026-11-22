@@ -90,8 +90,11 @@ SOURCES_FAILED = (
 
 class ClaimCheck(BaseModel):
     judgement: judge.Judgement
-    # Reranker and judge calls; None when a request may be billed but its price is unknown.
-    cost_usd: float | None
+    # Priced sum of the reranker and judge requests that were answered, always a number.
+    cost_usd: float
+    # Requests that may be billed but have no price (cut, failed, unpriced model): the cost
+    # above is then a lower bound.
+    unpriced_requests: int = 0
     steps_ms: dict[str, int]
     model_calls: list[ModelCall] = []
     # The claim is not checked because a source or the model was down: a technical failure of
@@ -131,7 +134,7 @@ async def check_claim(
             candidates = _candidates(found)
             judgement = await _judge(claim, candidates, exclude_url, steps, runs)
     except TimeoutError:
-        # The cost is None for a model request cut mid-flight, 0 when only search was cut.
+        # A model request cut mid-flight is counted as unpriced; cost 0 when only search was cut.
         timed_out = _time_limit(found)
         # The pattern pre-check needs no model: pages already found are still screened.
         timed_out.security_events = _source_events(_candidates(found), exclude_url)
@@ -429,17 +432,19 @@ def _needs_more(judgement: judge.Judgement) -> bool:
     )
 
 
-def _cost(messages: list[ModelMessage]) -> float | None:
-    """Price of the captured run: 0.0 without a request, None when a request got no priced
-    answer (failed, cut off or an unpriced model)."""
+def _cost(messages: list[ModelMessage]) -> tuple[float, int]:
+    """Captured run: the priced sum of every answered request, and how many requests have no
+    price (sent but never answered, or answered by an unpriced model)."""
     responses = [m for m in messages if isinstance(m, ModelResponse)]
     requests = [m for m in messages if isinstance(m, ModelRequest)]
-    if len(requests) > len(responses):
-        return None
-    try:
-        return sum(float(r.cost().total_price) for r in responses)
-    except (LookupError, ValueError):
-        return None
+    unpriced = max(0, len(requests) - len(responses))
+    total = 0.0
+    for r in responses:
+        try:
+            total += float(r.cost().total_price)
+        except (LookupError, ValueError):
+            unpriced += 1
+    return total, unpriced
 
 
 async def _timed(steps: dict[str, int], name: str, fn, *args, **kwargs):
@@ -474,18 +479,21 @@ def _done(
     outage: bool = False,
 ) -> ClaimCheck:
     costs = [_cost(m) for m in runs]
-    cost = None if None in costs else sum(costs)
+    cost = sum(c for c, _ in costs)
+    unpriced = sum(n for _, n in costs)
     log.info(
-        "claim check claim=%r verdict=%s sources=%d cost_usd=%s steps_ms=%s",
+        "claim check claim=%r verdict=%s sources=%d cost_usd=%s unpriced=%d steps_ms=%s",
         claim,
         judgement.verdict,
         len(judgement.sources),
         cost,
+        unpriced,
         steps,
     )
     return ClaimCheck(
         judgement=judgement,
         cost_usd=cost,
+        unpriced_requests=unpriced,
         steps_ms=steps,
         outage=outage,
         model_calls=[

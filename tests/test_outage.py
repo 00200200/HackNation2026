@@ -407,3 +407,27 @@ def test_budget_and_claim_cap_defaults():
 def test_budget_and_claim_cap_can_be_set_by_env():
     env = {"PRAWDOWID_CHECK_BUDGET_S": "45", "PRAWDOWID_MAX_CHECKED_CLAIMS": "2"}
     assert defaults(**env) == (45, 2)
+
+
+def test_the_applied_fault_is_echoed_only_with_a_valid_token(monkeypatch):
+    fact_check(monkeypatch, down=False)
+    web(monkeypatch, lambda q: websearch.WebSearch())
+    monkeypatch.setenv(faults.TOKEN_ENV, "secret")
+
+    def post(headers):
+        app_module.limiter.reset()
+        with verifier.agent.override(
+            model=model(lambda _: extraction(1).model_dump_json(), "claude-opus-5-5")
+        ):
+            return TestClient(app_module.app).post(
+                "/api/checks", json={"input": "Twierdzenie."}, headers=headers
+            )
+
+    good = post({"X-Eval-Fault": "llm_unavailable", "X-Eval-Token": "secret"})
+    assert good.headers[faults.APPLIED_HEADER] == "llm_unavailable"
+    for headers in (
+        {"X-Eval-Fault": "llm_unavailable"},
+        {"X-Eval-Fault": "llm_unavailable", "X-Eval-Token": "guess"},
+        {},
+    ):
+        assert faults.APPLIED_HEADER not in post(headers).headers

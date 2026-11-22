@@ -192,3 +192,32 @@ def test_citation_correctness_keeps_every_text_of_one_canonical_url():
         )
         both = [resp("potwierdzone", evidence), resp("potwierdzone", wrong)]
         assert metrics.citation_correctness(both, corpus) == pytest.approx(2 / 3)
+
+
+@pytest.mark.parametrize(
+    ("echo", "scored"),
+    [("factcheck_api_unavailable", True), (None, False), ("llm_unavailable", False)],
+)
+def test_a_fault_case_is_scored_only_when_the_product_echoes_the_fault(
+    monkeypatch, echo, scored
+):
+    monkeypatch.setenv("PRAWDOWID_URL", "http://product.test")
+    monkeypatch.setenv("PRAWDOWID_EVAL_TOKEN", "secret")
+    headers = {"X-Eval-Fault-Applied": echo} if echo else {}
+    monkeypatch.setattr(
+        adapter.urllib.request,
+        "urlopen",
+        lambda request, timeout: FakeHttpResponse(headers),
+    )
+    payload = {"text": "x", "simulate": "factcheck_api_unavailable"}
+    if scored:
+        assert adapter.ask(payload, "web")["claims"] == []
+    else:
+        with pytest.raises(adapter.FaultNotApplied, match="not applied"):
+            adapter.ask(payload, "web")
+
+
+def test_a_fault_case_without_the_eval_token_is_not_sent(monkeypatch):
+    monkeypatch.delenv("PRAWDOWID_EVAL_TOKEN", raising=False)
+    with pytest.raises(adapter.FaultNotApplied, match="PRAWDOWID_EVAL_TOKEN"):
+        adapter.fault_headers({"simulate": "llm_unavailable"})

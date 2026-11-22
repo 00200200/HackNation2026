@@ -143,8 +143,11 @@ class CheckResult(BaseModel):
     security_events: list[SecurityEvent] = []
     # Limits of the check as a whole, e.g. injection detection ran on patterns only.
     limitations: list[str] = []
-    # Model tokens plus paid API calls for this answer; None when it cannot be known.
-    cost_usd: float | None = None
+    # Priced sum of the model requests answered for this answer (tokens only: search credits are
+    # not priced), always a number. `unpriced_requests` counts requests that may be billed but
+    # have no price (cut, failed, unpriced model); above 0, cost_usd is a lower bound.
+    cost_usd: float = 0.0
+    unpriced_requests: int = 0
     # Shown next to the claims, also on a notice (a refused link): never sets or changes a verdict.
     incident_matches: list[IncidentMatch] = []
     # Check log only (prawdowid/checklog.py): never sent to a channel.

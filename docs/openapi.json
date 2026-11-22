@@ -283,15 +283,14 @@
             "default": []
           },
           "cost_usd": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cost Usd"
+            "type": "number",
+            "title": "Cost Usd",
+            "default": 0.0
+          },
+          "unpriced_requests": {
+            "type": "integer",
+            "title": "Unpriced Requests",
+            "default": 0
           },
           "incident_matches": {
             "items": {

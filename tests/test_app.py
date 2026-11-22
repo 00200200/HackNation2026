@@ -119,9 +119,10 @@ def test_verify_timeout_yields_technical_error(client, monkeypatch):
     )
     body = resp.json()
     assert body["status"] == "technical_error"
-    # The pattern event survives a check that never finished; its cost is unknown.
+    # The pattern event survives a check that never finished; its cost is unpriced.
     assert [e["detector"] for e in body["security_events"]] == ["patterns"]
-    assert body["limitations"] and body["cost_usd"] is None
+    assert body["limitations"] and body["cost_usd"] == 0.0
+    assert body["unpriced_requests"] == 1
 
 
 def test_rate_limit(client):

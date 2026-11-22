@@ -29,6 +29,7 @@ FIELDS = {
     "steps_ms",
     "model_calls",
     "cost_usd",
+    "unpriced_requests",
     "security_events",
     "incidents",
     "limitations",
@@ -177,7 +178,8 @@ def test_a_failed_model_call_is_in_the_record():
     with agent.override(model=FunctionModel(garbage, model_name="fake-extract")):
         _, rec = check(TestClient(app))
     assert rec["status"] == "technical_error" and rec["error"] is None
-    assert set(rec["steps_ms"]) == {"extract"} and rec["cost_usd"] is None
+    assert set(rec["steps_ms"]) == {"extract"} and rec["cost_usd"] == 0.0
+    assert rec["unpriced_requests"] == 1
     # The answer that failed validation was billed: it is in the record.
     assert [m["model"] for m in rec["model_calls"]] == ["fake-extract"]
 
