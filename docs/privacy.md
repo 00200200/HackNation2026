@@ -3,6 +3,17 @@
 What we keep about a check, for how long, where text goes, and how to delete it (issue #17,
 brief section 5).
 
+This page describes `main`, except where a line names a pending change. PR #109 changes four things
+here: masking also covers ID card numbers (`[numer dowodu]`) and passport numbers
+(`[numer paszportu]`), and a phone number is masked when it has a country code, dashes or an area code
+in brackets, or is nine digits that start with a mobile prefix or follow a label such as "tel."
+([#82](https://github.com/00200200/HackNation2026/issues/82)); the check log moves to the `checklog` volume at
+`/var/lib/prawdowid/checks.jsonl`, which is meant to survive a deploy (not verified on the server,
+[#70](https://github.com/00200200/HackNation2026/issues/70)); the whole-check budget is 40 s, not 25 s ([#63](https://github.com/00200200/HackNation2026/issues/63)); a ready
+answer for the same text stays 30 minutes in process memory, shared by both channels, and the delete
+button does not remove it ([#59](https://github.com/00200200/HackNation2026/issues/59)). `integration/r3` (a local branch in state
+`235209b`, no PR) adds a Tavily query cache (#110) and Sonnet as the default extraction model (#88).
+
 ## Masking
 
 `prawdowid/privacy.py` (`mask_personal_data`) replaces with placeholders:

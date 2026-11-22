@@ -3,7 +3,7 @@
 This is a submission draft for [issue #18](https://github.com/00200200/HackNation2026/issues/18).
 The implementation inspected was originally the `LukiLenkiewicz/issue11-fanout` stack at `cacfb4e`;
 that stack (per-claim fan-out, judge, local source store, link input) is now merged into `main`
-(PRs #37, #30, #42, #28/#44). The implementation described below is `main`'s, after that merge.
+(PRs #37, #30, #42, #28/#44). The implementation described below is `main`'s, after that merge, except where a row names PR #109 or `integration/r3` (changes awaiting merge, listed in the README section "Zmiany czekające na scalenie"; `integration/r3` is a local branch in state `235209b`).
 The measured product commit is identified below and predates this merge; this is not a claim of
 submission readiness.
 
@@ -17,7 +17,7 @@ Discord /sprawdz -> HTTP, X-Channel: discord +
     -> claim extraction and search queries (PydanticAI / Anthropic)
     -> each checkable claim in parallel:
          Google Fact Check + EUvsDisinfo MCP + www.gov.pl search + Tavily / allowlisted pages
-         + evidence corpus (BM25 over corpus/evidence.jsonl)
+         + evidence corpus (BM25 over corpus/evidence.jsonl; PR #109, `main` does not search it)
          -> deduplicate and rerank fragments -> label and validate quotes
          -> judge.decide() -> shared CheckResult -> channel rendering
 
@@ -74,7 +74,7 @@ separate, already-populated source and does not substitute for the incident base
 
 | Role | Default model ID on `main` | Configuration / source |
 |---|---|---|
-| Extract claims and queries | `anthropic:claude-sonnet-5-5` (was Opus until 22.11, #88) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
+| Extract claims and queries | `anthropic:claude-opus-5-5` (`anthropic:claude-sonnet-5-5` from #88, no PR yet) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
 | Rerank fragments | `anthropic:claude-haiku-5-5` | `PRAWDOWID_RERANK_MODEL`, [rerank.py](../../prawdowid/rerank.py) |
 | Label evidence | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_JUDGE_MODEL`, [judge.py](../../prawdowid/judge.py) |
 
@@ -150,8 +150,8 @@ Browser traffic and fetched evidence also pass through other parties' systems. S
 | Limit | Default | Source |
 |---|---|---|
 | Input / checked page prefix | 5000 characters | [app.py](../../prawdowid/app.py), [verifier.py](../../prawdowid/verifier.py) |
-| Fully considered claims / queries per checkable claim | 3 / 3 | [verifier.py](../../prawdowid/verifier.py) |
-| Check budget / API timeout | 40 s / 60 s | [pipeline.py](../../prawdowid/pipeline.py), [app.py](../../prawdowid/app.py) |
+| Fully considered claims / queries per checkable claim | 3 / 3 (`main`: 5 / 3) | [verifier.py](../../prawdowid/verifier.py) |
+| Check budget / API timeout | 40 s / 60 s (`main`: 25 s / 60 s) | [pipeline.py](../../prawdowid/pipeline.py), [app.py](../../prawdowid/app.py) |
 | Extraction call timeout | 45 s provider setting, bounded by the shared check deadline | [verifier.py](../../prawdowid/verifier.py) |
 | Web query / whole page fetch budget | 10 s / 8 s | [websearch.py](../../prawdowid/websearch.py) |
 | Link fetch | 10 s, 3 redirects, `2 * 1024 * 1024` bytes | [link.py](../../prawdowid/link.py) |
@@ -164,9 +164,10 @@ unfinished claims return `not_checked`. A judge outage also maps to `not_checked
 failure can preserve the first-pass assessment with a limitation when first-pass candidates existed.
 Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
-There is no moderator queue, OCR or reverse image search. The demo corpus and live Discord run
-remain open in [WORKLOG](../../WORKLOG.md). URL inputs are not exercised by the saved eval set
-([cases](../../evals/cases.jsonl)); do not present its latency as a URL benchmark.
+There is no moderator queue, OCR or reverse image search. The live Discord run remains open in
+[WORKLOG](../../WORKLOG.md). The case set on `main` ([cases](../../evals/cases.jsonl)) has no URL input.
+PR #109 adds four (`U01`, `U02`, `E05`, `E06`) and the `edd34a5` run covers only `U01`, so its 37.4 s is
+one data point, not a URL benchmark.
 
 ## Saved test results and reproduction
 
@@ -206,7 +207,7 @@ The following values and targets are copied exactly from the second file:
 Each ratio rests on a handful of cases: `citation_coverage` on one claim (`E01`), `abstention` on two
 (`D01`, `H01`), `injection_resistance` on one (`E01`, an injection in the input text; no page
 injection was scored), `channel_consistency` on one (`G01`, whose second answer took 0.22 s and most
-likely came from the result cache). The slowest case, `U01`, took 37.4 s, above the 30 s target. The
+likely came from the result cache). The slowest case, `U01` (the only URL case, a long gov.pl page from #63), took 37.4 s, above the 30 s target. The
 cost covers model calls only (extraction on Opus, rerank, judge), not search, hosting or the channel.
 On the same ten cases with only `PRAWDOWID_MODEL` changed to Sonnet, the commit message of `83d6c65`
 reports macro-F1 0.375, median 18.3 s and about USD 3.96 per 100 checks; that run's file was not

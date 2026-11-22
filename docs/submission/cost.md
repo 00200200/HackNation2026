@@ -22,9 +22,10 @@ production quality or capacity. A fresh full run is pending
 ## Estimate for 1,000 checks
 
 The recorded `metrics.cost_per_100_usd.value` of the `edd34a5` run is exactly `4.912332` USD.
-The eval computes a mean of per-answer `cost_usd` over the answers that ran a check (cache hits and
-simulated outages are left out) and multiplies it by the reporting unit (`cost_per_100` in
-[evals/run.py](../../evals/run.py)). Applying that measured rate:
+At that commit the eval takes the mean of `cost_usd` over the first answer of every case, `J01` (the
+simulated outage) included, and multiplies it by 100. It reports null when any answer's cost is unknown
+([#102](https://github.com/00200200/HackNation2026/issues/102)), and in this run none was (`cost_per_100_usd` in `evals/run.py` at that
+commit). Applying that measured rate:
 
 ```text
 Estimated USD/check = 4.912332 / 100 = 0.04912332
@@ -34,10 +35,10 @@ Rounded display estimate = USD 49.12 for 1,000 checks
 ```
 
 This assumes the same request mix and retrieval conditions as the saved run. It prices model
-usage, including extraction, rerank and judge, through PydanticAI/genai-prices. `cost_usd` is always a number: the priced sum of the answered requests. A request that was cut,
-failed, refused or sent to an unpriced model is counted in `unpriced_requests`, and above 0 the figure
-is a lower bound; failed calls may still be billed
-([verifier.py](../../prawdowid/verifier.py), [pipeline.py](../../prawdowid/pipeline.py)).
+usage, including extraction, rerank and judge, through PydanticAI/genai-prices. A cut, failed,
+refused or unpriced request can leave an answer's `cost_usd` null, which makes the aggregate null
+(#102); failed calls may still be billed ([verifier.py](../../prawdowid/verifier.py),
+[pipeline.py](../../prawdowid/pipeline.py)).
 It excludes hosting, network, search/MCP fees, Discord operation and tax; those amounts are
 UNCONFIRMED. No price for those services is inferred from a missing API key or a code comment.
 The result file contains an aggregate cost metric, not itemised provider invoices.
@@ -74,7 +75,7 @@ The `edd34a5` run's `metrics.median_latency_s.value` is exactly `24.877917104000
 against a target of at most 30 seconds
 ([latest.json](../../evals/results/latest.json) in PR #109). It covers the whole pipeline
 (extraction, retrieval, rerank, judge), takes the first run of each case and leaves cache hits out.
-The slowest case, `U01`, took 37.4 s. The eval spaces requests at least `PRAWDOWID_MIN_INTERVAL_S`
+The slowest case, `U01` (the only URL case, a long gov.pl page from #63), took 37.4 s. The eval spaces requests at least `PRAWDOWID_MIN_INTERVAL_S`
 (6.5 s by default) apart and excludes that wait from latency ([adapter.py](../../evals/adapter.py));
 the file records `concurrency: 4`. This is a quick regression run, not a concurrency benchmark.
 No simultaneous-user capacity, tail latency, saturation point or cost under load is measured:

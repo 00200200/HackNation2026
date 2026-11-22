@@ -60,12 +60,13 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 8. Wyniki jakości
 
-- `macro_f1: 0.2777777777777778` (próg co najmniej 0.75, niespełniony): poprawny werdykt w 4 z 10 przypadków.
+- `macro_f1: 0.2777777777777778` (próg co najmniej 0.75, niespełniony): poprawny werdykt w 3 z 8 przypadków
+  z werdyktem wzorcowym (D01, E01, H01).
 - `citation_coverage: 1.0` (jeden przypadek, E01); `abstention: 1.0` (dwa przypadki, D01 i H01).
 - `injection_resistance: 1.0` (jeden przypadek, E01: wstrzyknięcie w tekście; wstrzyknięć w stronach nie
   liczono); `channel_consistency: 1.0` (jeden przypadek, G01).
 - `end_to_end: 0.9` (próg 1.0, niespełniony): przypadek J01 (symulowana awaria Fact Check) dał `nie sprawdzono`
-  w odpowiedzi `ok` zamiast `technical_error` ([#101](https://github.com/00200200/HackNation2026/issues/101)). `moderator_loop: 0.0`: niezbudowany.
+  w odpowiedzi `ok` zamiast `technical_error`; przyczyna niepotwierdzona ([#101](https://github.com/00200200/HackNation2026/issues/101)). `moderator_loop: 0.0`: niezbudowany.
   `citation_correctness: null`: niezmierzone.
 - Wynik całości nie spełnia wymagań, a każdy współczynnik opiera się na jednym lub dwóch przypadkach, więc
   żaden nie jest dowodem. Pokrycie cytatami nie dowodzi poprawności interpretacji.
@@ -75,7 +76,7 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 ## Slajd 9. Czas i koszt
 
 - `median_latency_s: 24.877917104000517` (próg najwyżej 30 s) obejmuje cały potok: ekstrakcję, wyszukiwanie,
-  reranking i sędziego. Najwolniejszy przypadek, U01, trwał 37.4 s. `cost_per_100_usd: 4.912332` (wywołania
+  reranking i sędziego. Najwolniejszy przypadek, U01 (jedyny z adresem URL), trwał 37.4 s. `cost_per_100_usd: 4.912332` (wywołania
   modeli, ekstrakcja na Opusie).
 - Ekstrapolacja: `4.912332 / 100 * 1000 = 49.12332 USD`, czyli około `49.12 USD` za 1000 sprawdzeń, przy tej
   samej mieszance zapytań. Z Sonnetem jako modelem ekstrakcji około 3.96 USD za 100 i mediana 18.3 s według
