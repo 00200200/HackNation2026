@@ -9,11 +9,20 @@ import unicodedata
 import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Annotated
 
 from cachetools import TTLCache
-from fastapi import FastAPI, Path, Request, Response
+from fastapi import FastAPI, Header, Path, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, HttpUrl, TypeAdapter, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+)
 from pydantic_core import PydanticCustomError
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
@@ -46,6 +55,23 @@ RATE_LIMIT_MESSAGE = (
     "Wysłano za dużo zapytań w krótkim czasie. Odczekaj minutę i spróbuj ponownie."
 )
 
+API_DESCRIPTION = (
+    "Fact-checks a message or a link in Polish. Each checkable claim gets a verdict "
+    "with the sources behind it: a quote, the publisher, the date and a link. When "
+    "the evidence is not there, the verdict says so.\n\n"
+    "The web page and the Discord bot call `POST /api/checks`. A new channel does the "
+    f"same and names itself in `X-Channel`. The limit is {RATE_LIMIT} per client IP."
+)
+CHECK_DESCRIPTION = (
+    "`input` is a message, a question or one `http`/`https` link. For a link the "
+    f"server fetches the page and checks its text. Allow up to {VERIFY_TIMEOUT_S} s "
+    "for the answer.\n\n"
+    "A check that could not run still returns `200`: `status` is then "
+    "`technical_error`, `cannot_check` or `needs_clarification`, and `message` says "
+    "why in Polish. An `input` that is empty, too long or not a valid link returns "
+    "`422` with a Polish text in `detail[0].msg`; too many requests return `429`."
+)
+
 _http_url = TypeAdapter(HttpUrl)
 
 # Same text, same answer: a channel (web, Discord) asking again within the TTL gets the stored
@@ -73,7 +99,22 @@ def _cacheable(result: CheckResult) -> bool:
 
 
 class CheckRequest(BaseModel):
-    input: str
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "input": "Czy w aplikacji Odyseusz można zarejestrować wyjazd za granicę?"
+                }
+            ]
+        }
+    )
+
+    input: str = Field(
+        description=(
+            f"1 to {MAX_INPUT_CHARS} characters after trimming. A single token with "
+            "`://` is read as a link and must be a valid http or https URL."
+        )
+    )
 
     @field_validator("input")
     @classmethod
@@ -110,8 +151,22 @@ async def lifespan(_: FastAPI):
     yield
 
 
+class RateLimitError(BaseModel):
+    detail: str = Field(examples=[RATE_LIMIT_MESSAGE])
+
+
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="PRAWDOWID", lifespan=lifespan)
+app = FastAPI(
+    title="PRAWDOWID",
+    description=API_DESCRIPTION,
+    lifespan=lifespan,
+    # Under /api/, the only prefix besides /health that the public site forwards.
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
+    # One docs page; no ReDoc and no OAuth2 redirect route (the API has no OAuth).
+    redoc_url=None,
+    swagger_ui_oauth2_redirect_url=None,
+)
 app.state.limiter = limiter
 
 
@@ -125,14 +180,55 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/api/checks")
+@app.post(
+    "/api/checks",
+    summary="Check a text or a link",
+    description=CHECK_DESCRIPTION,
+    responses={
+        200: {
+            "description": "The check result; `status` says whether the check ran.",
+            "headers": {
+                SESSION_HEADER: {
+                    "description": "The session of this check: the one sent, or a "
+                    "new one. Send it back on the next check.",
+                    "schema": {"type": "string"},
+                }
+            },
+        },
+        429: {"description": "Rate limit reached.", "model": RateLimitError},
+    },
+)
 @limiter.limit(RATE_LIMIT)
 async def create_check(
-    request: Request, response: Response, body: CheckRequest
+    request: Request,
+    response: Response,
+    body: CheckRequest,
+    x_channel: Annotated[
+        str,
+        Header(
+            alias="X-Channel",
+            description=(
+                "The calling channel, logged with every check. Known values: "
+                f"{', '.join(sorted(CHANNELS))}. Any other value is logged as `other`."
+            ),
+        ),
+    ] = "web",
+    x_session_id: Annotated[
+        str | None,
+        Header(
+            alias=SESSION_HEADER,
+            description=(
+                "Session id from an earlier answer: 8 to 64 letters, digits or "
+                "hyphens. The session's checks are kept together, and "
+                "`DELETE /api/sessions/{session}` removes them. Without a valid id "
+                "the server starts a new session."
+            ),
+        ),
+    ] = None,
 ) -> CheckResult:
     started = time.perf_counter()
     started_at = datetime.now(UTC)
-    session = request.headers.get(SESSION_HEADER, "")
+    session = x_session_id or ""
     if not re.fullmatch(SESSION_ID, session):
         session = str(uuid.uuid4())
     response.headers[SESSION_HEADER] = session
@@ -172,8 +268,7 @@ async def create_check(
         result.incident_matches = match_incidents(f"{body.input} {final_url}")
     except Exception:
         log.exception("incident matching failed")
-    channel = request.headers.get("x-channel", "web")
-    channel = channel if channel in CHANNELS else "other"
+    channel = x_channel if x_channel in CHANNELS else "other"
     latency_ms = round((time.perf_counter() - started) * 1000)
     log.info(
         "check session=%s channel=%s status=%s security_events=%d cost_usd=%s cache=%s "

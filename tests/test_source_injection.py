@@ -262,7 +262,9 @@ def test_a_retry_cut_by_the_time_limit_still_logs_the_injected_source(monkeypatc
     ]
 
 
-def test_a_failed_retry_judge_still_logs_the_injected_source(monkeypatch):
+def test_a_failed_retry_judge_still_logs_the_injected_source(
+    monkeypatch, quiet_sources
+):
     """The first pass judged a clean page (context only); the retry finds the injected page and its
     judge fails. The first verdict stands, and the event for the retry's page is not lost."""
     text = "Polska należy do NATO od 1999 roku."

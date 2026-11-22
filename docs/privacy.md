@@ -101,6 +101,7 @@ call with the id from the log.
 | EUvsDisinfo MCP server (`mcp.euvsd.info`) | Claim text | Every checkable claim, when `EUVSDISINFO_API_KEY` is set. |
 | The incident base (`prawdowid/incidents.py`) | The raw input and the final URL | Every check; local file, nothing leaves the server. |
 | The site a link points to | A request from our server | Link checks. The site sees our server's address, not the user's. |
+| jsDelivr CDN (`cdn.jsdelivr.net`) | The visitor's IP address and browser details, sent by their own browser. The request carries no check text and no session id. | Only on the API docs page `/api/docs`, which loads Swagger UI from there. The web page itself loads nothing third-party; its Content-Security-Policy forbids it. |
 
 The region where each provider processes the data is UNCONFIRMED: we have not checked their data
 residency terms for this demo.
