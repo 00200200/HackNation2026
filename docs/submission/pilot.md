@@ -7,7 +7,7 @@ pomiar, i zespół potwierdza go przed rozmową z MSZ. Numery z krzyżykiem (#74
 [repozytorium](https://github.com/00200200/HackNation2026/issues). Stan kodu opisujemy dla
 buildu `integration/r3`, na którym oprzemy wdrożenie. Gdy coś jest tylko tam, a nie na `main`,
 piszemy to przy danym zdaniu. #100 (krótkie klucze Fact Check i mapa ocen) i #116 (adapter
-demo `/czat`) nie są jeszcze scalone i nie wchodzą w ten opis.
+demo `/czat`) są w `integration/r3` (PR #126), więc wchodzą w ten opis, tak jak reszta tego buildu.
 
 ## Tryb pracy: wsparcie decyzji, publikację zatwierdza człowiek
 
@@ -62,7 +62,7 @@ Co już jest:
   ([deploy/pull-deploy.sh](../../deploy/pull-deploy.sh)), a do `prod` trafia tylko kod z `main`.
 - Testy: `make check` uruchamia ruff i pytest. 22.11.2026 na `1aa173f` przechodzi 547 testów, 8 jest
   pominiętych.
-- Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 73 przypadkach na `main` (86 w `integration/r3`)
+- Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 73 przypadkach na `main` (86 w `integration/r3`, z czego pełny przebieg na `ca48b84` ocenił 75)
   ([evals/cases.jsonl](../../evals/cases.jsonl)). Każdy przebieg ląduje w
   [evals/results/HISTORY.md](../../evals/results/HISTORY.md) z commitem i uwagami, a
   [docs/eval-notes.md](../eval-notes.md) mówi, którym przebiegom nie ufać.
@@ -153,7 +153,7 @@ Czego brakuje:
 - Zewnętrznego red teamu. Mamy tylko własne przypadki, a wzorce wykrywania pisaliśmy, znając
   pierwsze trzy przypadki E ([WORKLOG](../../WORKLOG.md), wpis do #15). Potrzebne są przypadki,
   których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures w
-  `integration/r3` (#94), ale eval z nimi jeszcze nie był uruchomiony: przebieg na `edd34a5` pominął E05 i E06, bo brakowało publicznego adresu strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
+  `integration/r3` (#94), ale eval z nimi jeszcze nie był uruchomiony: pełny przebieg na `ca48b84` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
   `integration/r3`, nie w `main`.
 - Oceny skutków dla ochrony danych (DPIA) z inspektorem ochrony danych MSZ i umów powierzenia z
   dostawcami. Maskowanie nie łapie numerów dowodów, paszportów i części formatów telefonu (#82).

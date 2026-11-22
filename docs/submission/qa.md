@@ -162,11 +162,12 @@ treści ataku, `detector=model`). Na `main`, bez PR #72, działa tylko to drugie
 
 Wyniki z [HISTORY.md](../../evals/results/HISTORY.md): odporność na injection 0,000 w szybkim
 przebiegu na `95e6177`, 0,571 w pełnym przebiegu na `8c6f396` (ten przebieg jest zniekształcony) i
-1,000 w szybkim przebiegu na `edd34a5` (10 przypadków, E05 i E06 pominięte), przy progu 0,90. Na
-`edd34a5` macro-F1 to 0,278, więc ten przebieg nie spełnia progów. Wzorce pisaliśmy, znając pierwsze trzy przypadki E, więc potrzebujemy nowych.
+1,000 w pełnym przebiegu na `ca48b84` (75 przypadków, E05-E15 pominięte), przy progu 0,90. Ten
+przebieg ma macro-F1 0,803, ale `end_to_end` 0,973 i `moderator_loop` 0,000 nie spełniają progów, więc
+całość nadal nie przechodzi. Wzorce pisaliśmy, znając pierwsze trzy przypadki E, więc potrzebujemy nowych.
 Przypadki z poleceniem ukrytym w stronie mają fixtures w `integration/r3` (#94), ale nie
-uruchamialiśmy na nich evalu. Przebieg na `edd34a5` pominął E05 i E06, bo brakowało publicznego adresu
-strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł (PR #72) też
+uruchamialiśmy na nich evalu. Pełny przebieg na `ca48b84` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu
+strony z fixture (`PRAWDOWID_FIXTURE_BASE`), więc wynik 1,000 dotyczy 7 przypadków E. Sprawdzanie pobranych źródeł (PR #72) też
 jest tylko w `integration/r3`.
 
 Źródła: [risks.md](risks.md), [prawdowid/verifier.py](../../prawdowid/verifier.py),
@@ -214,12 +215,15 @@ pobieraniu stron i właśnie go naprawiamy.
 Szczegóły: brief wymaga poprawnego wstrzymania się od oceny w co najmniej 80% przypadków bez
 dowodów. Szybki przebieg na `95e6177` dał 1,000, ale tylko dlatego, że wszystkie 9 odpowiedzi
 brzmiały „brak wystarczających dowodów” (macro-F1 0,100). Zniekształcony pełny przebieg na `8c6f396`
-dał 0,583 ([HISTORY.md](../../evals/results/HISTORY.md)). Do tego w szybkim przebiegu na stagingu
+dał 0,583, a pełny przebieg na `ca48b84` 0,917 ([HISTORY.md](../../evals/results/HISTORY.md)). Przy
+tak małej liczbie przypadków bez dowodów to wciąż mało na wniosek o zbiorze ukrytym. Do tego w szybkim przebiegu na stagingu
 22.11 (`75c1e20`) wyszukiwarka znajdowała strony, a potem je odrzucała: 102, bo
 robots.txt odpowiadał 403 (czytane jako zakaz wszystkiego), 36 bez tekstu, tytułu albo daty, 17 po
-przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 (w `integration/r3`, jeszcze nie w `main`) i do pełnego przebiegu na tym stanie
-(#16) nie wiemy, o ile poprawią wyniki. Korpus urzędowy jest w `integration/r3` podpięty do
-sprawdzania (#74), ale tego też nie zmierzyliśmy.
+przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95 (w `integration/r3`, jeszcze nie w `main`). Pełny przebieg na `ca48b84`, który je
+zawiera, dał macro-F1 0,803 wobec 0,278 w szybkim przebiegu na `edd34a5`, przed #95. To dwa przebiegi na
+różnych liczbach przypadków (75 i 10), więc nie rozdzielamy, ile dała sama poprawka #95, a ile
+pozostałe zmiany. Korpus urzędowy jest w `integration/r3` podpięty do sprawdzania (#74), a jego wpływu
+osobno nie mierzyliśmy.
 
 Źródła: [HISTORY.md](../../evals/results/HISTORY.md),
 [#95](https://github.com/00200200/HackNation2026/issues/95),
@@ -227,7 +231,8 @@ sprawdzania (#74), ale tego też nie zmierzyliśmy.
 
 ### 11. Jakie macie wyniki i czy utrzymacie je na zbiorze ukrytym?
 
-Krótko: żaden zapisany przebieg nie spełnia wszystkich progów i tego nie ukrywamy. Każdy przebieg
+Krótko: żaden zapisany przebieg nie spełnia wszystkich progów i tego nie ukrywamy. Najlepszy, pełny
+przebieg na `ca48b84`, ma macro-F1 0,803 przy progu 0,75, ale dwie metryki poniżej progu. Każdy przebieg
 jest w repozytorium razem z commitem.
 
 Szczegóły: nasz zestaw to na `main` 73 przypadki (41 w zestawie A-J i 32 w zestawie FC), a w `integration/r3` 86 (54 w A-J i U oraz 32 w FC).
@@ -239,8 +244,17 @@ poprawna odpowiedź to brak dowodów. Zapisane przebiegi: szybki na `95e6177` da
 1,000 i odporność na injection 0,000, przy czym wszystkie 9 odpowiedzi brzmiały „brak wystarczających
 dowodów”. Pełny na `8c6f396` (71 przypadków) dał macro-F1 0,498,
 abstencję 0,583, odporność na injection 0,571 i medianę 18,2 s. Ten wiersz odtworzyliśmy bez pliku
-JSON, a sam przebieg zniekształciły timeouty Anthropic i zbyt ciasny budżet 25 s. Przebieg na
-commicie zgłoszenia: [z #16].
+JSON, a sam przebieg zniekształciły timeouty Anthropic i zbyt ciasny budżet 25 s.
+
+Najnowszy, pełny przebieg na `ca48b84` (22.11, `integration/r3`, 75 ocenionych przypadków z 86,
+E05-E15 pominięte bez publicznego adresu fixture): macro-F1 0,803 (próg 0,75), citation_coverage
+1,000 (0,95), citation_correctness 1,000 (0,85), abstencja 0,917 (0,80), odporność na injection 1,000
+(0,90), mediana 17,8 s (30 s), zgodność kanałów 1,000, koszt 4,27 USD za 100 sprawdzeń. Poniżej progu:
+`end_to_end` 0,973 (wymagane 1,000) i `moderator_loop` 0,000 (1,000, pętli nie zbudowaliśmy, #79).
+Wynik ogólny: nie przechodzi. `citation_correctness` sprawdza tylko, czy cytat występuje w źródle, a
+nie czy dobrze wspiera werdykt. Wiersz jest w HISTORY.md razem z plikiem JSON
+`evals/results/history/20261122T021757.182695Z-ca48b84-full.json`, który trafia do `integration/r3`
+ze scaleniem. Przebieg na commicie zgłoszenia: [z #16].
 
 Zbioru ukrytego nie znamy. Zasada: żadnych przypadków ani odpowiedzi z evalu w promptach i w logice
 weryfikacji (w `prawdowid/` nie ma tekstu żadnego przypadku). Wyjątek jest na stronie: przycisk
@@ -280,23 +294,23 @@ powierzenia, to etap 3 pilotażu.
 
 ### 13. Ile to kosztuje?
 
-Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje według pomiarów z 21 i 22.11, zrobionych
-na starszym kodzie, około 36 groszy, a serwer z domeną około 43 zł miesięcznie.
+Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje około 33 groszy: modele według pełnego przebiegu na `ca48b84`, a kredyty
+Tavily według pomiaru z 21.11, a serwer z domeną około 43 zł miesięcznie.
 
-Szczegóły: modele to 0,0491 USD za sprawdzenie: pomiar na `edd34a5` (Opus, przed #95; szybki przebieg pełnego
-potoku na 10 przypadkach, wiersz w HISTORY.md na `integration/r3`). Obecny kod (#95 podnosi koszt, #88 go
-obniża, bo wyodrębnianie idzie na Sonnecie 5.5) może kosztować więcej albo mniej. Przebieg ze stagingu na
-Sonnecie (3,96 USD za 100) nie ma wiersza w HISTORY.md ani pliku JSON. Tavily dokłada około 4,9 kredytu (wpis z 21.11 w
+Szczegóły: modele to 0,0427 USD za sprawdzenie: pełny przebieg na `ca48b84` (75 przypadków, kod
+`integration/r3` z #88, #95 i #74; średnia z 71 odpowiedzi z ceną, bez czterech symulowanych awarii;
+wiersz w HISTORY.md). Wcześniejsze pomiary: 4,91 USD za 100 na `edd34a5` (Opus, przed #95) i 3,96 USD za
+100 ze stagingu (bez wiersza w HISTORY.md i pliku JSON). Tavily dokłada około 4,9 kredytu (wpis z 21.11 w
 WORKLOG). Konto jest na planie Researcher z opłatą za zużycie: 1000 kredytów miesięcznie za darmo,
 potem 0,008 USD za kredyt, limit konta podniesiony 22.11 do 4000 kredytów (czy z darmowymi:
-UNCONFIRMED). Na 1000 sprawdzeń wychodzi 80,10 USD, czyli 325 zł (88,10 USD, czyli 358 zł, gdy darmowe
+UNCONFIRMED). Na 1000 sprawdzeń wychodzi 73,70 USD, czyli 299 zł (81,70 USD, czyli 332 zł, gdy darmowe
 kredyty zużyją testy). Ten limit starcza na 820 do 1025 sprawdzeń, zależnie od tego, czy wlicza darmowe kredyty (UNCONFIRMED), więc
-1000 mieści się tylko przy górnej granicy. Kwoty dla 1000 sprawdzeń to szacunki z tego jednego pomiaru.
+1000 mieści się tylko przy górnej granicy. Kwoty dla 1000 sprawdzeń to szacunki: koszt modeli z jednego pełnego przebiegu, kredyty Tavily z pomiaru na 8 przypadkach.
 Abonamentowe stawki Tavily (do 0,005 USD za kredyt w planie Growth za 500 USD miesięcznie) nie
 obniżają tego rachunku przy takim ruchu. Koszty stałe: VPS-2 od 37,85 zł brutto miesięcznie,
-domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 4,91 USD za modele
-(`edd34a5`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica). Ostateczne liczby policzymy z pełnego
-przebiegu (#16).
+domena 58,99 zł rocznie przy odnowieniu, bot Discord 0 zł ponad serwer. Koszt 100 testów to 4,27 USD za modele
+(`ca48b84`) plus około 3,90 USD za Tavily (szacunek ze średniej historycznej, nie górna granica).
+Kredyty Tavily z pełnego przebiegu dopiero policzymy (#16).
 
 Źródła: [cost.md](cost.md), [HISTORY.md](../../evals/results/HISTORY.md), [WORKLOG.md](../../WORKLOG.md).
 
@@ -387,8 +401,8 @@ nie ma, a w pilotażu to ona zatwierdzi publikacje.
 Szczegóły: brief chce, żeby przy sprawach wysokiego ryzyka i powtarzających się pytaniach bez źródeł
 system powiadamiał osobę wskazaną przez administratora. Spraw moderatora nie zbudowaliśmy (#79).
 Odpowiedź nigdy nie mówi więc, że coś przekazaliśmy moderatorowi. Eval ma dwa przypadki H, a
-`moderator_loop` wynosi 0,0 w [evals/results/latest.json](../../evals/results/latest.json) i w pełnym
-przebiegu opisanym w [docs/eval-notes.md](../eval-notes.md). Plan na pilotaż: sprawy dla
+`moderator_loop` wynosi 0,0 w [evals/results/latest.json](../../evals/results/latest.json), w pełnym
+przebiegu opisanym w [docs/eval-notes.md](../eval-notes.md) i w pełnym przebiegu na `ca48b84`. Plan na pilotaż: sprawy dla
 powtarzających się pytań bez odpowiedzi, widok administratora za tokenem i zatwierdzanie publikacji
 ze śladem decyzji.
 
@@ -411,8 +425,9 @@ z obrazu, a potem sprawdzać tą samą drogą co tekst.
 
 Krótko: tak. `make up` stawia całość w Dockerze, a eval jednym poleceniem liczy te same metryki co
 my. Wyniki różnią się między przebiegami: w powtórzeniach z 21.11 macro-F1 wahało się od 0,10 do 0,39
-([WORKLOG](../../WORKLOG.md), wpis o Tavily), a trzy z czterech wierszy HISTORY.md odtworzyliśmy bez
-pliku JSON. Porównujcie więc z całą historią, nie z jedną liczbą.
+([WORKLOG](../../WORKLOG.md), wpis o Tavily), od 0,278 na `edd34a5` do 0,803 na `ca48b84`, a część wierszy
+HISTORY.md odtworzyliśmy bez pliku JSON. Pełny przebieg na `ca48b84` to jeden przebieg: rozrzutu
+między powtórzeniami na tym kodzie nie mierzyliśmy. Porównujcie więc z całą historią, nie z jedną liczbą.
 
 Szczegóły: klucze wpisuje się do ignorowanego pliku `.env`. Wymagany jest tylko `ANTHROPIC_API_KEY`.
 Bez kluczy do Google Fact Check, Tavily i EUvsDisinfo te źródła są zgłaszane jako niedostępne. Bez

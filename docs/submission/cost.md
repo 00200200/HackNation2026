@@ -19,11 +19,11 @@ po pełnym evalu (#16)”. Cenniki odczytaliśmy 22.11.2026. Dolary przeliczamy 
 | Pomiar | Wartość | Skąd | Zastrzeżenia |
 |---|---|---|---|
 | Koszt modeli, sam etap wyodrębniania twierdzeń (Claude Opus 5.5) | 1,82 USD za 100 sprawdzeń, czyli 0,0182 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `95e6177`, szybki przebieg, 9 przypadków | Wersja z jednym wywołaniem modelu na sprawdzenie: bez sędziego (#30), bez równoległego sprawdzania twierdzeń (#37) i bez Tavily (#45). Widać to w `git show 95e6177:prawdowid/verifier.py`: „For now one LLM call that finds claims”. |
-| Koszt modeli w pełnym potoku, z dowodami z Tavily | 4,91 USD za 100 sprawdzeń, czyli 0,0491 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md) na `integration/r3`, wiersz `edd34a5`, szybki przebieg, 10 przypadków | To pomiar na `edd34a5` (kod `integration/r2`, wyodrębnianie na Opus 5.5, przed #95), a nie koszt obecnego kodu. #95 zostawia hity, które `edd34a5` odrzucał, więc do rankingu i sędziego trafia więcej fragmentów i koszt może wzrosnąć. #88 (Sonnet zamiast Opusa) go obniża. Wypadkowa może być wyższa albo niższa niż 0,0491 USD. README na `integration/r3` podaje dla Sonnet 5.5 3,96 USD za 100 sprawdzeń i medianę 18,3 s przy tym samym wyniku szybkiego zestawu (macro-F1 0,375 wobec 0,278). To przebieg na stagingu na `integration/r2`, bez wiersza w HISTORY.md i bez pliku JSON w `evals/results/history/`, więc traktujemy go jako wskazówkę, nie pomiar. Wiersz `edd34a5` trafi na `main` ze scaleniem `integration/r3`. Wcześniejszy pomiar z 21.11 (8 przypadków, bez pliku JSON) dał 5,25 USD za 100. |
+| Koszt modeli w pełnym potoku, z dowodami z Tavily | 4,27 USD za 100 sprawdzeń, czyli 0,0427 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `ca48b84` (pełny przebieg 22.11, 75 przypadków; plik JSON `evals/results/history/20261122T021757.182695Z-ca48b84-full.json` trafia do `integration/r3` ze scaleniem), pole `cost_per_100_usd` | Średnia z 71 odpowiedzi z ceną. Cztery odpowiedzi z symulowaną awarią (przypadki J) są pominięte, bo nie wołały modeli. To kod `integration/r3` z #88 (wyodrębnianie na Sonnet 5.5), #95 i #74, czyli ten, który ma zostać wdrożony. Pole `cost_usd` liczy tylko modele, bez Tavily. Wcześniejsze pomiary: 4,91 USD za 100 na `edd34a5` (szybki przebieg, 10 przypadków, Opus, przed #95) i 3,96 USD za 100 ze stagingu (README, bez wiersza w HISTORY.md i bez pliku JSON). Pomiar z 21.11 (8 przypadków, bez pliku JSON) dał 5,25 USD za 100. |
 | Kredyty Tavily na sprawdzenie | około 4,9 (39 zapytań na 8 przypadków) | [WORKLOG.md](../../WORKLOG.md), wpis z 21.11 o Tavily (#7/#8) | Wyszukiwanie `basic`, 1 kredyt za zapytanie. Lepszego pomiaru nie mamy: [docs/eval-notes.md](../eval-notes.md) i HISTORY.md nie zapisują kredytów. Pomiar sprzed wyszukiwarki gov.pl (#53). Pole `cost_usd` w odpowiedzi liczy tylko modele ([prawdowid/verifier.py](../../prawdowid/verifier.py)), więc Tavily doliczamy osobno. |
 
-Według pomiarów samo wyodrębnianie na Opusie to około jednej trzeciej kosztu modeli (0,0182 z
-0,0491 USD). Pomiary pochodzą z różnych wersji kodu, więc to tylko rząd wielkości.
+Pomiar 0,0182 USD pochodzi z innej wersji kodu (jedno wywołanie modelu, Opus) niż pomiar 0,0427 USD,
+więc nie wyciągamy z nich podziału kosztu na etapy.
 
 ## Ceny
 
@@ -49,15 +49,15 @@ Cennik VPS podaje cenę „od”. Kwotę z faktury OVHcloud wpisuje zespół.
 koszt sprawdzenia = koszt modeli + kredyty Tavily × cena kredytu
                     (Google Fact Check, gov.pl, korpus i embeddingi: 0 zł za zapytanie, EUvsDisinfo: UNCONFIRMED)
 
-koszt modeli (pomiar na edd34a5: Opus, przed #95) = 0,0491 USD
+koszt modeli (pełny przebieg na ca48b84)   = 0,0427 USD
 Tavily, kredyt płatny        = 4,875 × 0,008 = 0,0390 USD
-jedno sprawdzenie (po wyczerpaniu darmowych kredytów) = 0,0881 USD, czyli 0,36 zł
+jedno sprawdzenie (po wyczerpaniu darmowych kredytów) = 0,0817 USD, czyli 0,33 zł
 
 1000 sprawdzeń:
-  modele                     = 49,10 USD
+  modele                     = 42,70 USD
   kredyty Tavily             = 4875, z czego 1000 darmowych, 3875 × 0,008 = 31,00 USD
-  razem                      = 80,10 USD, czyli 325 zł
-  bez darmowych kredytów     = 88,10 USD, czyli 358 zł (gdy darmowe 1000 zużyją testy)
+  razem                      = 73,70 USD, czyli 299 zł
+  bez darmowych kredytów     = 81,70 USD, czyli 332 zł (gdy darmowe 1000 zużyją testy)
 ```
 
 Plan Growth (500 USD miesięcznie) nie obniża tej kwoty: przy 1000 sprawdzeń kredyty z abonamentu
@@ -71,7 +71,7 @@ dotyczy tylko kredytów płatnych. Odczyt z 22.11 około 1:40 (plan 2281 z 1500,
 odmówiło z powodem „pay-as-you-go limit”) wskazuje na to drugie, ale rozstrzygnie to odczyt
 `GET https://api.tavily.com/usage` (pola `plan_limit`, `paygo_limit`, `paygo_usage`): UNCONFIRMED.
 Ten sam odczyt podaje w planie 1500 kredytów, a nie 1000 z publicznego cennika: UNCONFIRMED. Przy 1500
-wolnych kredytów 1000 sprawdzeń kosztuje 76,10 USD, czyli 309 zł. Gdy limit się kończy, API odmawia, a
+wolnych kredytów 1000 sprawdzeń kosztuje 69,70 USD, czyli 283 zł. Gdy limit się kończy, API odmawia, a
 kod traktuje odmowę jak każdą awarię wyszukiwarki (patrz niżej).
 
 Powtórzone zapytania do wyszukiwarki nie kosztują kredytów przez 24 godziny (#110,
@@ -81,20 +81,21 @@ pamięci wyników całych odpowiedzi ([prawdowid/app.py](https://github.com/0020
 może napisać inne zapytania i wydać kredyty. Ile kredytów to oszczędza w rzeczywistym ruchu, nie
 zmierzyliśmy, więc rachunek wyżej zakłada, że nikt nie powtarza pytań.
 
-Przy stawce 0,008 USD modele to 56% kosztu sprawdzenia, a Tavily 44%. Te liczby to orientacja z
-dwóch przebiegów na 8 i 10 przypadkach. Ostateczne wartości policzymy z pełnego przebiegu:
+Przy stawce 0,008 USD modele to 52% kosztu sprawdzenia, a Tavily 48%. Koszt modeli pochodzi z pełnego
+przebiegu na 75 przypadkach, a liczba kredytów Tavily z wcześniejszego przebiegu na 8 przypadkach, więc
+to wciąż orientacja. Kredyty Tavily z pełnego przebiegu policzymy tak:
 
 ```text
-do uzupełnienia po pełnym evalu (#16):
-K_modele = cost_per_100_usd / 100           wiersz HISTORY.md dla commitu zgłoszenia
+do uzupełnienia dla kredytów Tavily (#16):
+K_modele = cost_per_100_usd / 100           wiersz HISTORY.md dla commitu zgłoszenia (ca48b84: 0,0427 USD)
 N_Tavily = kredyty zużyte w tym przebiegu / liczba sprawdzeń
            (z odpowiedzi Tavily z `include_usage=True`, z `GET /usage` albo z licznika
            `search_cache.track()`; nie z panelu, który się spóźnia)
 K_1000   = 1000 × K_modele + max(0, 1000 × N_Tavily − 1000) × 0,008 USD
 ```
 
-Koszt 100 testów, o który pyta jury, to 4,91 USD za modele (`edd34a5`, wiersz w HISTORY.md na
-`integration/r3` z plikiem JSON `evals/results/history/20261122T003536.735064Z-edd34a5-quick.json`) plus
+Koszt 100 testów, o który pyta jury, to 4,27 USD za modele (pełny przebieg na `ca48b84`, wiersz w
+HISTORY.md z plikiem JSON `evals/results/history/20261122T021757.182695Z-ca48b84-full.json`) plus
 około 3,90 USD za Tavily (szacunek: średnio około 4,9 kredytu na sprawdzenie × 100 × 0,008 USD, bez darmowych kredytów;
 przy górnej granicy 12 kredytów na sprawdzenie byłoby to 9,60 USD). Wiersz `95e6177`
 (1,82 USD za 100) to wersja z jednym wywołaniem modelu, bez sędziego i bez Tavily.
@@ -115,14 +116,14 @@ koszt VPS przypisany faktczyfejk.pl to więc górna granica.
 
 Ruchu produkcyjnego nie mierzyliśmy. Za punkt wyjścia bierzemy umowne 1000 sprawdzeń miesięcznie i
 to jest założenie do rachunku, nie prognoza. Tavily liczymy tak, jak konto jest rozliczane: po 0,008 USD za kredyt, po odjęciu 1000
-darmowych kredytów. Modele liczymy po 0,0491 USD za sprawdzenie (pomiar na `edd34a5`, Opus, przed #95). Wiersze 1000, 10 000 i
+darmowych kredytów. Modele liczymy po 0,0427 USD za sprawdzenie (pełny przebieg na `ca48b84`). Wiersze 1000, 10 000 i
 100 000 to szacunki: ten jeden pomiar razy liczba sprawdzeń.
 
 | Sprawdzeń w miesiącu | Modele | Tavily | Stałe | Razem | Udział kosztów stałych |
 |---|---|---|---|---|---|
-| 1000 | 49,10 USD (199 zł) | 3875 płatnych kredytów, 31,00 USD (126 zł) | 42,77 zł | około 368 zł | 12% |
-| 10 000 | 491 USD (1994 zł) | 47 750 płatnych kredytów, 382 USD (1551 zł) | 42,77 zł | około 3588 zł | 1,2% |
-| 100 000 | 4910 USD (19 941 zł) | 486 500 płatnych kredytów, 3892 USD (15 807 zł) | 42,77 zł i kolejne serwery, do uzupełnienia (#88) | około 35 791 zł plus serwery | 0,1% bez kolejnych serwerów |
+| 1000 | 42,70 USD (173 zł) | 3875 płatnych kredytów, 31,00 USD (126 zł) | 42,77 zł | około 342 zł | 13% |
+| 10 000 | 427 USD (1734 zł) | 47 750 płatnych kredytów, 382 USD (1551 zł) | 42,77 zł | około 3328 zł | 1,3% |
+| 100 000 | 4270 USD (17 342 zł) | 486 500 płatnych kredytów, 3892 USD (15 807 zł) | 42,77 zł i kolejne serwery, do uzupełnienia (#88) | około 33 191 zł plus serwery | 0,1% bez kolejnych serwerów |
 
 Limit konta Tavily (4000 kredytów) starcza na pierwszy wiersz tylko przy wąskim odczycie (do 1025
 sprawdzeń, patrz wyżej), a na dwa pozostałe nie starcza w żadnym. Przy większym ruchu trzeba go podnieść
@@ -132,7 +133,7 @@ Co z tego wynika:
 
 - Przy 10 i 100 razy większym ruchu liczą się już tylko koszty zmienne. Serwer i domena to poniżej
   2% rachunku.
-- Z kosztów zmiennych od 56 do 61% to tokeny modeli, reszta to kredyty wyszukiwarki. Przy 100 razy
+- Z kosztów zmiennych od 52 do 58% to tokeny modeli, reszta to kredyty wyszukiwarki. Przy 100 razy
   większym ruchu Tavily potrzebuje prawie 490 tys. kredytów miesięcznie, a największy plan z cennika
   ma 100 tys. Cena dla takiej skali: do negocjacji, UNCONFIRMED. Z cennika wychodzi, że plany
   z abonamentem wyjdą taniej niż opłata za zużycie dopiero przy dużym ruchu: Startup (220 USD za
@@ -143,14 +144,9 @@ Co z tego wynika:
   ([prawdowid/verifier.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/verifier.py#L45)), ranking na Haiku 5.5
   ([prawdowid/rerank.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/rerank.py#L50)) i sędzia na Sonnet 5.5
   ([prawdowid/judge.py](https://github.com/00200200/HackNation2026/blob/235209b/prawdowid/judge.py#L64)). Pomiar 0,0182 USD za samo wyodrębnianie
-  pochodzi z wersji na Opus 5.5, czyli z około jednej trzeciej kosztu modeli. Od #88 (`83d6c65`)
-  wyodrębnianie domyślnie idzie na Sonnet 5.5, którego token kosztuje połowę tego co Opus; przy
-  tej samej liczbie tokenów to około 0,009 USD mniej na sprawdzeniu. Przebieg ze stagingu, opisany
-  w README na `integration/r3` (3,96 USD za 100 wobec 4,91 USD), nie ma wiersza w HISTORY.md ani
-  pliku JSON, więc rachunek wyżej bierze pomiar na `edd34a5` (Opus, przed #95). Wyższy koszt rankingu
-  i sędziego po #95 i niższy koszt Sonneta działają w przeciwne strony, więc obecny koszt może być
-  wyższy albo niższy niż 0,0491 USD. Jak koszt dzieli się między
-  ranking i sędziego, nie zmierzyliśmy. Dziennik sprawdzeń zapisuje każde wywołanie modelu z
+  pochodzi z wersji na Opus 5.5 z jednym wywołaniem modelu. Od #88 (`83d6c65`) wyodrębnianie domyślnie
+  idzie na Sonnet 5.5, a pomiar 0,0427 USD z `ca48b84` obejmuje już ten kod, #95 i #74. Jak koszt
+  dzieli się między wyodrębnianie, ranking i sędziego, nie zmierzyliśmy. Dziennik sprawdzeń zapisuje każde wywołanie modelu z
   tokenami, więc podział wyjdzie z pełnego przebiegu (#16).
 - Kredyty zależą od liczby zapytań na twierdzenie (`PRAWDOWID_QUERIES_PER_CLAIM`, domyślnie 3). Każde
   zapytanie mniej to jeden kredyt mniej na każde sprawdzane twierdzenie. Wpływ na jakość: do
@@ -163,9 +159,8 @@ Co z tego wynika:
 Zmierzyliśmy tylko medianę czasu odpowiedzi ([HISTORY.md](../../evals/results/HISTORY.md)): 3,9 s w
 szybkim przebiegu na `95e6177` (wersja z jednym wywołaniem modelu) i 18,2 s w pełnym przebiegu na
 `8c6f396`, który zniekształciły timeouty Anthropic i zbyt ciasny budżet czasu
-([docs/eval-notes.md](../eval-notes.md)). Szybki przebieg na `edd34a5` (10 przypadków, wiersz w
-HISTORY.md na `integration/r3`) dał 24,9 s, a przebieg ze stagingu na Sonnecie 5.5, opisany w README na `integration/r3` (bez wiersza w
-HISTORY.md), 18,3 s. Próg z briefu to 30 s. Nie mierzyliśmy, ile sprawdzeń naraz
+([docs/eval-notes.md](../eval-notes.md)). Pełny przebieg na `ca48b84` (75
+przypadków, wiersz w HISTORY.md) dał 17,8 s. Wcześniej szybki przebieg na `edd34a5` (10 przypadków) dał 24,9 s. Próg z briefu to 30 s. Nie mierzyliśmy, ile sprawdzeń naraz
 wytrzyma serwer, czasu p95, punktu nasycenia ani kosztu pod obciążeniem. Test obciążeniowy z
 podmienionymi źródłami to #88.
 

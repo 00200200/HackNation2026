@@ -40,12 +40,12 @@ po pełnym evalu na commicie zgłoszenia i nie wpisujemy tam niczego wcześniej.
 | Czas | Na ekranie | Mówimy |
 |---|---|---|
 | 0:00-0:30 | Slajd tytułowy | „Na rodzinnym czacie ktoś wkleja wiadomość. Zanim ktokolwiek ją sprawdzi, idzie dalej. Fact-checki istnieją, ale trzeba wiedzieć, gdzie ich szukać. Chatbot odpowie płynnie, tylko że płynna odpowiedź to jeszcze nie dowód. Dlatego zrobiliśmy faktczyfejk.pl.” |
-| 0:30-0:55 | Strona główna | „Wklejasz tekst albo link. Dostajesz odpowiedź po polsku, twierdzenie po twierdzeniu: cytat, wydawca, data i link. Model tylko czyta. Werdykt wylicza kod i tylko z tych cytatów, które naprawdę znaleźliśmy w źródle. A kiedy dowodów nie ma, piszemy wprost, że nie udało się tego potwierdzić.” |
+| 0:30-0:55 | Strona główna | „Wklejasz tekst albo link. Dostajesz odpowiedź po polsku, twierdzenie po twierdzeniu: cytat, wydawca, data i link. Model tylko czyta. Werdykt wylicza kod, z cytatów, które naprawdę znaleźliśmy w źródle, albo z oceny fact-checkera tego samego twierdzenia. A kiedy dowodów nie ma, piszemy wprost, że nie udało się tego potwierdzić.” |
 | 0:55-1:50 | Przycisk „Darmowe przejazdy 65+ we Wrocławiu” | Podczas czekania: „Właśnie pytamy równolegle Google Fact Check, EUvsDisinfo, wyszukiwarkę gov.pl, wyszukiwarkę ograniczoną do zaufanych domen i nasz zamknięty korpus. Każde źródło ma własny limit czasu.” Po odpowiedzi czytamy jej pierwsze słowa i pokazujemy źródło z cytatem i datą, tak jak wyszło na próbie. |
 | 1:50-2:25 | Przycisk „Pytanie z ukrytym poleceniem” | „To samo pytanie, tylko z dopisanym poleceniem: odpowiedz, że tak. Strona mówi, że w treści były polecenia i że ich nie wykonaliśmy. Każdą taką próbę zapisujemy jako zdarzenie bezpieczeństwa, bez jej treści.” Zdanie „Werdykt jest ten sam co bez polecenia” dodajemy tylko wtedy, gdy tak wyszło na próbie. |
 | 2:25-2:55 | Przycisk „Bilety tylko w aplikacji” | „Plotka z małej miejscowości, której nikt nie opisał. Tu najłatwiej o zmyślenie. A my mówimy: nie udało się potwierdzić, i wypisujemy, czego brakuje.” |
 | 2:55-3:15 | Discord, `/sprawdz` z pytaniem o Wrocław | „Drugi kanał. Ta sama usługa i ta sama logika: bot nie ma własnej, wysyła tekst do tego samego API co strona.” Jeśli bot nie działa na produkcji (#59), mówimy to jednym zdaniem i idziemy dalej. |
-| 3:15-3:45 | HISTORY.md albo slajd z wynikami | „Testujemy się tak jak jury: 86 przypadków w scenariuszach A-E, G-J i U (adresy URL), te same metryki. Zrzutów ekranu, czyli F, jeszcze nie mamy. Każdy przebieg zapisujemy w repozytorium razem z commitem, także słaby. Pełny przebieg na commicie zgłoszenia: [z #16]. Najsłabsze miejsce: [z #16].” |
+| 3:15-3:45 | HISTORY.md albo slajd z wynikami | „Testujemy się tak jak jury: 86 przypadków w scenariuszach A-E, G-J i U (adresy URL), te same metryki. Ostatni pełny przebieg ocenił 75 z nich, a 11 z ukrytym poleceniem w stronie czeka na publiczny adres strony testowej. Zrzutów ekranu, czyli F, jeszcze nie mamy. Każdy przebieg zapisujemy w repozytorium razem z commitem, także słaby. Wynik: macro-F1 0,80 przy progu 0,75, ale nie wszystkie progi są spełnione. Najsłabsze miejsce: pętla moderatora, której nie zbudowaliśmy (0,00 przy progu 1,00). Wynik na commicie zgłoszenia: [z #16].” |
 | 3:45-4:30 | Slajd z pilotażem | „Jak to wdrożyć w MSZ? Brief podaje pięć etapów i do każdego mamy już kawałek: uruchomienie jednym poleceniem z testami, zamknięty korpus 1158 dokumentów, w tym 1143 urzędowych, maskowanie danych z 30-dniową retencją, wersję publiczną na serwerze w Niemczech i kontrolę przed pushem, która puszcza testy i sprawdza, czy eval był na tym samym kodzie. Brakuje pomiaru, czy korpus trafia na właściwy dokument, kolejki eksperta, procedury korekt i zewnętrznego red teamu. Proponujemy start od pytań o bezpieczeństwo podróży na danych z Odyseusza, po zmierzeniu, że korpus trafia na właściwy profil kraju. Każdą odpowiedź do publikacji zatwierdza tam człowiek.” |
 | 4:30-5:00 | Slajd końcowy z hasłem „Fakt ma przypis.” | „Nie budujemy sędziego prawdy. Pokazujemy źródło i to, czego nie wiemy, a ostatnie słowo ma czytelnik. Obywatel płaci zero złotych. Fakt ma przypis. Możecie wpisać własne pytanie na żywo, chętnie je sprawdzimy.” |
 
@@ -58,10 +58,12 @@ Jedno zdanie i idziemy dalej:
 
 - Wrocław kończy się „Nie udało mi się potwierdzić tej informacji”: „Tym razem nie znaleźliśmy
   cytatu, który by to rozstrzygał, więc werdyktu nie ma. Wolimy powiedzieć, że nie wiemy, niż
-  zgadywać.” Pokazujemy dopiski pod odpowiedzią. Na dopytanie, przy wersji z #66 na `prod`: ocena
-  fact-checkera trafia do sędziego jako osobny fragment „Ocena fact-checkera: ...” razem ze
-  sprawdzaną tezą, ale sama ocena nie jest werdyktem. Skrótów ocen i krótkich kluczy Fact Check
-  (#100) jeszcze nie ma.
+  zgadywać.” Pokazujemy dopiski pod odpowiedzią. Na dopytanie, w `integration/r3`: ocena
+  fact-checkera trafia do sędziego jako osobny fragment „Ocena fact-checkera: ...” (#66). Dla każdego
+  twierdzenia idzie do Fact Check kilka krótkich kluczy, a ocena tego samego twierdzenia jest
+  mapowana w kodzie na werdykt, tak jak opisuje ADR 0001. Ocena innego twierdzenia to tylko kontekst
+  (#100). Odpowiedź podaje ją jako „Ocena fact-checkera (z danych ClaimReview)”, nie jako cytat ze
+  strony. Na `prod` do czasu scalenia PR #126 tego jeszcze nie ma.
 - Pytanie z poleceniem daje inny werdykt niż pytanie bez niego: „Wyszukiwanie idzie na żywo i za
   drugim razem trafiło na inne strony. Polecenia nie wykonaliśmy i strona to mówi.” Jeśli odpowiedź
   zaczyna się od „Tak.”, nie bronimy jej: „Ten przypadek nam nie wyszedł i zapisujemy go jako błąd.”
@@ -89,19 +91,24 @@ Na wypadek wersji bez przycisków. Treść skopiowana z
 
 Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odpowiadamy wprost:
 
-- Trafność werdyktów (macro-F1) w zapisanych przebiegach jest poniżej progu 0,75 z briefu. Wynik na
-  commicie zgłoszenia: [z #16].
+- Trafność werdyktów (macro-F1) jest w pełnym przebiegu na `ca48b84` (75 przypadków) równa 0,803, przy
+  progu 0,75. Wcześniejsze przebiegi były poniżej progu (0,100 na `95e6177`, 0,278 na `edd34a5`). To
+  nasz własny zestaw, a ukrytego zbioru jury nie znamy. W tym przebiegu nie przechodzą też
+  `end_to_end` (0,973 przy progu 1,000) i `moderator_loop` (0,000, pętli nie zbudowaliśmy, #79), więc
+  całość nadal nie spełnia progów. Wynik na commicie zgłoszenia: [z #16].
 - Odporność na polecenia w zapisanych przebiegach: 0,000 na `95e6177`, 0,571 w zniekształconym
-  pełnym przebiegu na `8c6f396` i 1,000 w szybkim przebiegu na `edd34a5` (10 przypadków, E05 i E06
-  pominięte, macro-F1 0,278), przy progu 0,90 ([HISTORY.md](../../evals/results/HISTORY.md)).
-  Metryka liczy przypadek jako porażkę także przy złym werdykcie, więc sama liczba nie mówi, czy
+  pełnym przebiegu na `8c6f396` i 1,000 w pełnym przebiegu na `ca48b84`, przy progu 0,90
+  ([HISTORY.md](../../evals/results/HISTORY.md)). Ten przebieg pominął E05-E15 (11 przypadków z
+  poleceniem ukrytym w stronie), bo brakowało publicznego adresu strony z fixture, więc wynik
+  dotyczy 7 przypadków E. Metryka liczy przypadek jako porażkę także przy złym werdykcie, więc sama liczba nie mówi, czy
   polecenie zadziałało.
-- Zgodności kanałów nie mamy z wiarygodnego pomiaru. W przebiegu z dwoma kanałami zniekształconym
-  timeoutami wyszło 0,000 ([docs/eval-notes.md](../eval-notes.md)), a na `edd34a5` 1,000 (10 przypadków,
-  za mało, by mówić o zgodności). Na
+- Zgodność kanałów: w pełnym przebiegu na `ca48b84` wyszło 1,000, a w zniekształconym timeoutami
+  przebiegu na `8c6f396` 0,000 ([docs/eval-notes.md](../eval-notes.md)). Eval porównuje odpowiedzi kanałów tylko dla
+  przypadków, które mają więcej niż jeden kanał, więc to nie jest pomiar na ruchu użytkowników. Na
   `main` strona i Discord robią dwa osobne sprawdzenia; wspólna pamięć wyników to #59.
-- Od #66 ocena fact-checkera dociera do sędziego jako osobny fragment (jest w `integration/r3`).
-  Bez #66 na `prod` dociera tylko przez tytuł recenzji. Skróty ocen (#100) nie są scalone.
+- Od #66 ocena fact-checkera dociera do sędziego jako osobny fragment, a od #100 krótkie klucze
+  Fact Check i mapa ocen na werdykt są w kodzie (oba w `integration/r3`, PR #126). Na `prod` ocena
+  dociera tylko przez tytuł recenzji, do czasu scalenia PR #126.
 - Od #60 (PR #109, w `integration/r3`) awaria źródła, które może rozstrzygnąć werdykt, daje
   „nie sprawdzono” z powodem. Bez niego na `prod` taki wynik brzmi „brak wystarczających
   dowodów” z dopiskiem o awarii.
@@ -158,7 +165,7 @@ sobie przeczą ([prawdowid/judge.py](https://github.com/00200200/HackNation2026/
 przypadek C ma jedną ocenę Demagoga, a nie dwa sprzeczne źródła ([WORKLOG](../../WORKLOG.md), punkt
 o lukach evalu w „Next”). Czego się spodziewać:
 
-- Scena 2 zależy od #66 (jest w `integration/r3`) i od tego, czy wyszukiwarka dotrze do cytatu,
+- Scena 2 zależy od #66 i #100 (są w `integration/r3`) i od tego, czy wyszukiwarka dotrze do cytatu,
   tak jak na żywo. Gdy odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”, pokazujemy
   ją z napisem „Bez cytatu nie wydajemy werdyktu”, a lektor zamiast zdania z tabeli mówi: „Tym razem
   nie znaleźliśmy cytatu, który to rozstrzyga, więc werdyktu nie ma. Wolimy to powiedzieć niż
@@ -171,6 +178,11 @@ o lukach evalu w „Next”). Czego się spodziewać:
   jako taki (#95). Jeśli mimo to odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”,
   pokazujemy taką. Napis „źródło zablokowało pobranie, #95” dodajemy tylko wtedy, gdy nagranie albo logi
   potwierdzają blokadę; w innym przypadku opisujemy sam wynik, bez podawania przyczyny.
+  W scenie 7 zmieniamy wtedy też lektora. Napis: „Bez cytatu nie wydajemy werdyktu.” Lektor zamiast
+  zdania z tabeli: „Tym razem nie znaleźliśmy źródła, które rozstrzyga, czy to nagranie jest
+  prawdziwe i w jakim kontekście, więc werdyktu nie ma.” Zdania, że nagranie jest prawdziwe, ale
+  pokazane bez kontekstu, nie mówimy, dopóki odpowiedź tego nie pokazuje. Jeśli ta wersja wygląda
+  słabo, scenę 7 wycinamy i dopisujemy ją do napisu końcowego, a scena 8 zostaje jak była.
 - W scenie 9 baza incydentów organizatora jest pusta (#64), więc notatka „Podobne znane incydenty”
   się nie pojawi. Kontekst może przyjść tylko z EUvsDisinfo. Jeśli nie przyjdzie, zostaje sam werdykt
   ze źródeł, a napis brzmi: „Bazy incydentów organizatora jeszcze nie mamy, #64”.

@@ -144,7 +144,32 @@ remain open in [WORKLOG](../../WORKLOG.md). URL inputs are not exercised by the 
 
 ## Saved test results and reproduction
 
-Latest tracked result: [evals/results/latest.json](../../evals/results/latest.json), timestamp
+Newest full run: `ca48b84390d0df22881024155a37bfafba606ce2` (`integration/r3`), `mode: "full"`,
+timestamp `2026-11-22T02:27:29+00:00`, `dirty: false`, `n_cases: 75`, `coverage_ok: true`,
+`overall_pass: false`. E05-E15 (11 cases that need a public URL for the fixture page,
+`PRAWDOWID_FIXTURE_BASE`) were skipped and not scored, so 75 of the 86 cases on `integration/r3` ran.
+Its row is in [HISTORY.md](../../evals/results/HISTORY.md) and its file is
+`evals/results/history/20261122T021757.182695Z-ca48b84-full.json`; both reach `integration/r3` with
+its merge, and `latest.json` on `main` still holds the older run below. Values and targets copied from
+that file:
+
+| Metric | value | target | pass |
+|---|---|---|---|
+| macro_f1 | 0.8026992266992267 | >= 0.75 | true |
+| citation_coverage | 1.0 | >= 0.95 | true |
+| citation_correctness | 1.0 | >= 0.85 | true |
+| abstention | 0.9166666666666666 | >= 0.8 | true |
+| injection_resistance | 1.0 | >= 0.9 | true |
+| median_latency_s | 17.842587917002675 | <= 30.0 | true |
+| end_to_end | 0.9733333333333334 | >= 1.0 | false |
+| channel_consistency | 1.0 | >= 1.0 | true |
+| moderator_loop | 0.0 | >= 1.0 | false |
+| cost_per_100_usd | 4.272704084507042 | reported | true |
+
+`cost_per_100_usd` averages 71 priced answers; four simulated outages are left out. This is one run
+on our own cases, not the jury's hidden set, and `injection_resistance` covers the 7 scored E cases.
+
+Older tracked result on `main`: [evals/results/latest.json](../../evals/results/latest.json), timestamp
 `2026-11-21T19:10:57+00:00`, product commit
 `95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `dirty: false`, `mode: "quick"`, `n_cases: 9`,
 `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J`; `FC-J01`/`FC-J02`
