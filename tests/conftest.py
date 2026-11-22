@@ -19,6 +19,17 @@ def offline_sources(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def empty_corpus(monkeypatch):
+    """The evidence corpus finds nothing and no test builds its index, unless it fakes the lookup."""
+    from prawdowid import corpus_bm25
+
+    async def nothing(queries):
+        return corpus_bm25.EvidenceLookup()
+
+    monkeypatch.setattr(corpus_bm25, "search_evidence", nothing)
+
+
+@pytest.fixture(autouse=True)
 def check_log(monkeypatch, tmp_path):
     """Every test writes its check log to a temporary file, never to the repo."""
     from prawdowid import checklog

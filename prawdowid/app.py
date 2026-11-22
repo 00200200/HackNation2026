@@ -7,6 +7,7 @@ import re
 import time
 import unicodedata
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from cachetools import TTLCache
@@ -18,7 +19,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from prawdowid import checklog
+from prawdowid import checklog, corpus_bm25
 from prawdowid.contract import CheckResult, Status, Verdict
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
@@ -98,8 +99,19 @@ class CheckRequest(BaseModel):
         return value
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # The corpus index takes about a second to build: do it now, not inside the first check. No
+    # queries builds it and searches nothing. A failure is only logged: the first lookup retries.
+    try:
+        await corpus_bm25.search_evidence([])
+    except Exception:
+        log.exception("corpus warm-up failed")
+    yield
+
+
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="PRAWDOWID")
+app = FastAPI(title="PRAWDOWID", lifespan=lifespan)
 app.state.limiter = limiter
 
 

@@ -9,6 +9,7 @@ from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
 from prawdowid import app as app_module
+from prawdowid import corpus_bm25
 from prawdowid.app import MAX_INPUT_CHARS, RATE_LIMIT_MESSAGE, app, limiter
 from prawdowid.contract import (
     CheckResult,
@@ -336,3 +337,24 @@ def test_decomposed_input_is_normalised_before_the_pipeline(client, monkeypatch)
     assert calls == [composed] and "X-Cache" not in resp.headers
     resp = client.post("/api/checks", json={"input": composed})
     assert len(calls) == 1 and resp.headers["X-Cache"] == "hit"
+
+
+def test_the_corpus_index_is_built_when_the_app_starts(monkeypatch):
+    seen = []
+
+    async def search_evidence(queries):
+        seen.append(queries)
+        return corpus_bm25.EvidenceLookup()
+
+    monkeypatch.setattr(corpus_bm25, "search_evidence", search_evidence)
+    with TestClient(app):
+        assert seen == [[]]  # no queries: the index is built, nothing is searched
+
+
+def test_a_failing_corpus_warm_up_does_not_stop_the_app(monkeypatch):
+    async def search_evidence(queries):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(corpus_bm25, "search_evidence", search_evidence)
+    with TestClient(app) as client:
+        assert client.get("/health").json() == {"status": "ok"}

@@ -15,8 +15,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
 COPY prawdowid ./prawdowid
-# The corpus the search index is built from (`python -m prawdowid.index`), and the directory for the
-# embedding model; compose.prod.yaml mounts a volume there so the model is downloaded only once.
+# The corpus: every check searches it (`prawdowid/corpus_bm25.py`), and the search index is built from
+# it (`python -m prawdowid.index`). Also the directory for the embedding model; compose.prod.yaml
+# mounts a volume there so the model is downloaded only once.
 COPY corpus/evidence.jsonl ./corpus/evidence.jsonl
 ENV FASTEMBED_CACHE_PATH=/models \
     HF_HOME=/models/hf

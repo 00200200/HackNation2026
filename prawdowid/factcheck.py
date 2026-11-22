@@ -136,7 +136,7 @@ def _to_hit(found: dict, review: dict, fetched_at: datetime) -> FactCheckHit | N
             fetched_at=fetched_at,
             url=review["url"],
             source_type=SOURCE_TYPE,
-            fragment=_fragment(review.get("textualRating"), reviewed_claim),
+            fragment=review_fragment(review.get("textualRating"), reviewed_claim),
         )
     except (KeyError, ValidationError):
         log.warning("factcheck review skipped: no usable url")
@@ -146,7 +146,7 @@ def _to_hit(found: dict, review: dict, fetched_at: datetime) -> FactCheckHit | N
     )
 
 
-def _fragment(rating: str | None, claim: str | None) -> str | None:
+def review_fragment(rating: str | None, claim: str | None) -> str | None:
     """The fact-checker's rating and the claim it was given to, as data for rerank and the judge.
 
     No rating: None, so a bare review title (often the disputed claim itself) never stands as
