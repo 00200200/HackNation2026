@@ -133,6 +133,14 @@ Web search in a check also adds the public pages it fetched to the source cache
 (`corpus/docs.jsonl`). Those carry no user text and no session id. A check never writes the
 PostgreSQL source store (written only by the seed script; step 2c is off in the pipeline).
 
+## Exports
+
+The STIX 2.1 and JSON downloads of an answer hold masked data only: the page sends the answer it
+already shows, and the API masks the text again. The export of the check log
+(`GET /api/export/checks`, CSV or JSON, #86) needs the bearer token `PRAWDOWID_ADMIN_TOKEN` (404 while
+it is unset, 401 on a wrong one), holds the masked fields of the records within retention, and leaves out
+the session id. Neither export stores anything.
+
 ## Retention
 
 One constant, `RETENTION_DAYS = 30` in `prawdowid/privacy.py`:

@@ -177,6 +177,40 @@ function copyButton(check) {
   return button;
 }
 
+// Export (#86): the JSON is the API answer as it came, the STIX 2.1 bundle is built by the API from that
+// same answer (masked data only). Both download as files; nothing else leaves the page.
+function download(name, type, text) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const link = el("a", { href: url, download: name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportButtons(check) {
+  const json = el("button", { type: "button", className: "copy-btn secondary", textContent: "Pobierz wynik (JSON)" });
+  json.addEventListener("click", () => download("faktczyfejk-wynik.json", "application/json", JSON.stringify(check, null, 2)));
+  const stix = el("button", { type: "button", className: "copy-btn secondary", textContent: "Pobierz STIX 2.1" });
+  stix.addEventListener("click", async () => {
+    const label = stix.textContent;
+    try {
+      const resp = await fetch("/api/export/stix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(check),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      download("faktczyfejk-stix.json", "application/stix+json", await resp.text());
+    } catch {
+      stix.textContent = "Nie udało się pobrać";
+      setTimeout(() => { stix.textContent = label; }, 2500);
+    }
+  });
+  return [json, stix];
+}
+
 // Scenario I: a known incident the input looks like. Context only, never a verdict.
 const MATCH_LABELS = { url: "ten sam adres", domain: "domena z bazy", text: "podobny tekst" };
 const INCIDENT_NOTE = "Ta treść przypomina incydenty z bazy organizatora. "
@@ -253,7 +287,7 @@ function render(check, seconds) {
         el("p", { className: "card-title" }, `Sprawdziliśmy ${plural(check.claims.length, "zdanie", "zdania", "zdań")} `,
           el("span", { className: "took", textContent: costLine(seconds, check.cost_usd, check.unpriced_requests) })),
         summary(check.claims)),
-      copyButton(check)),
+      el("div", { className: "card-actions" }, copyButton(check), ...exportButtons(check))),
     check.page ? pageNote(check.page) : null,
     warning,
     ...check.claims.map(claimBlock),

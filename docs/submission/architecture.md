@@ -157,6 +157,19 @@ mentions a moderator. There is no push notification and no moderator screen beyo
 It has not run on the live server yet; the server's `.env` needs the variable first
 ([deploy.md](../deploy.md)).
 
+## Integrations for analysts
+
+Brief section 6 (premium) asks for data export and analytical integrations (#86). Each answer on the
+web page downloads as JSON, exactly the API answer, and as a STIX 2.1 bundle: the page posts the
+answer it holds to `POST /api/export/stix`, and `prawdowid/export.py` builds the bundle with the OASIS
+`stix2` library (an Identity for faktczyfejk.pl, a Report for the check, one Note per claim labelled
+`verdict:<code>` with the justification and the sources as external references, and one Note for matched
+incidents). The text is masked again, nothing is fetched, the request is capped at 64 kB. No DISARM
+technique ids are added, because no source we read names any. The bundle parses back with `stix2` in
+`tests/test_export.py`; the import into OpenCTI is untested, no instance was available. For analysts,
+`GET /api/export/checks` (bearer token `PRAWDOWID_ADMIN_TOKEN`, the same as `/api/cases`) returns the check
+log as CSV or JSON for a date range, from the masked fields only, without session ids.
+
 ## Default limits, not performance measurements
 
 | Limit | Default | Source |

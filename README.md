@@ -51,6 +51,9 @@ sprawdzić ..."). A source that answered with nothing is no outage.
   and the like): it sends the same request with `X-Channel: demo` and shows the answer as the bot's
   messages, so jurors can try a second channel without Discord. A real messenger would plug into the
   same API.
+- **Export for analysts (#86):** every answer downloads as JSON (the API answer as it is) or as a STIX 2.1 bundle
+  (`POST /api/export/stix`, built with the OASIS `stix2` library from masked data); the holder of `PRAWDOWID_ADMIN_TOKEN`
+  gets the check log as CSV or JSON at `GET /api/export/checks`. The OpenCTI import is untested.
 
 Measured results live in [`evals/results/HISTORY.md`](evals/results/HISTORY.md), one row per eval
 run with its commit and notes. Read [`docs/eval-notes.md`](docs/eval-notes.md) before quoting a number.
@@ -256,6 +259,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 | Method and path | What it does |
 |---|---|
 | `POST /api/checks` | Body `{"input": "..."}`. Returns `CheckResult`. 60 s timeout on `verify`; 10 requests per minute per client IP. |
+| `POST /api/export/stix` | Body: the JSON of a `CheckResult` (at most 64 kB). Returns a STIX 2.1 bundle (identity, report, one note per claim). 422 without checked claims, 413 over the cap. |
+| `GET /api/export/checks?from=&to=&format=csv\|json` | The masked check log for a date range (UTC days, retention applied, at most 10,000 rows, no session ids), for the holder of `PRAWDOWID_ADMIN_TOKEN`; 404 when unset, 401 on a wrong token. Not in the channel spec. |
 | `GET /api/cases` | The moderator queue, for the holder of `PRAWDOWID_ADMIN_TOKEN` (`Authorization: Bearer <token>`); 404 when the variable is unset, 401 on a wrong token. Not in the channel spec. |
 | `GET /api/openapi.json` | The OpenAPI spec. |
 | `GET /api/docs` | Interactive docs (Swagger UI) for the spec. |

@@ -113,6 +113,13 @@ def read_session(session: str) -> list[dict]:
     ]
 
 
+def read_all() -> list[dict]:
+    """Every record within retention, oldest first (admin export, prawdowid/export.py)."""
+    path = CHECK_LOG
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    return [r for r in map(_parse, lines) if r and _fresh(r)]
+
+
 def delete_session(session: str) -> int:
     """Delete every record of the session, also of checks still running. Number deleted."""
     DELETED[session] = datetime.now(UTC)
