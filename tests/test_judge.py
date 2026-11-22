@@ -1306,6 +1306,16 @@ CHECKER_NO_DATA = fragment(
         ("Wypowiedź oceniamy jako częściową prawdę.", "Częściowa prawda"),
         ("Nie uznajemy jej za prawdę, ale też nie za fałsz.", None),
         ("Fałsz. Tak twierdzi poseł.", None),
+        ("Wypowiedź oceniamy jako prawdopodobnie fałszywą.", None),
+        ("Część uznajemy za prawdziwą, a całość oceniamy jako manipulację.", None),
+        ("Wypowiedź uznajemy nie za fałsz, lecz za manipulację.", None),
+        ("Dane uznajemy za wiarygodne. Za prawdziwe uważamy też inne.", None),
+        ("Wypowiedź oceniamy jako częściową manipulację.", None),
+        ("Dlatego nie\u00a0uznajemy jej za prawdziwą.", None),
+        (
+            "Tę wypowiedź oceniamy jako fałsz, a poprzednią też oceniliśmy jako fałsz.",
+            "Fałsz",
+        ),
     ],
 )
 def test_a_verdict_sentence_states_its_rating(text, rating):
@@ -1328,9 +1338,9 @@ def test_a_fact_checkers_verdict_sentence_decides_like_its_rating():
         ),
     )
     assert j.verdict is Verdict.FALSE
-    assert "Demagog (fact_check, 2026-11-21), ocena fact-checkera: Fałsz." in j.premises
+    assert f"Demagog (fact_check, 2026-11-21) przeczy: „{VERDICT_FALSE}”" in j.premises
     demagog = next(s for s in j.sources if s.publisher == "Demagog")
-    assert (demagog.rating, demagog.fragment) == ("Fałsz", VERDICT_FALSE)
+    assert (demagog.rating, demagog.fragment) == (None, VERDICT_FALSE)
 
 
 def test_a_stated_manipulation_rating_is_misleading_and_named_as_the_rating():
@@ -1338,7 +1348,8 @@ def test_a_stated_manipulation_rating_is_misleading_and_named_as_the_rating():
     page = fragment("https://demagog.org.pl/m", verdict, "Demagog", "fact_check")
     j = run([page], answering(label(page, "refutes", verdict, own_conclusion=True)))
     assert j.verdict is Verdict.MISLEADING
-    assert "ocena fact-checkera: Manipulacja" in j.justification
+    assert j.justification.startswith("Fact-checker ocenił to twierdzenie jako mylące")
+    assert "oceniamy jako manipulację" in j.justification
 
 
 def test_a_verdict_sentence_counts_only_as_the_fact_checkers_own_conclusion():
@@ -1362,7 +1373,11 @@ def test_a_fact_checkers_data_gap_decides_over_other_sources():
     )
     assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
     assert CHECKER_GAP.format(publishers="Demagog") in j.limitations
-    assert "ocena fact-checkera: Nieweryfikowalne" in " ".join(j.premises)
+    assert NOT_ENOUGH not in j.limitations
+    assert (
+        f"Demagog (fact_check, 2026-11-21) wskazuje brak danych: „{NO_DATA}”"
+        in j.premises
+    )
 
 
 def test_a_fact_checkers_data_gap_outranks_another_fact_checkers_context():
@@ -1395,24 +1410,45 @@ def test_a_data_gap_gives_way_when_another_fact_checker_takes_a_side():
 
 
 @pytest.mark.parametrize(
-    ("published", "verdict"),
+    ("published", "found_on", "verdict"),
     [
-        (date(2024, 12, 6), Verdict.INSUFFICIENT_EVIDENCE),
-        (None, Verdict.INSUFFICIENT_EVIDENCE),
-        (date(2026, 11, 22), Verdict.CONFIRMED),
+        (date(2024, 12, 6), TODAY, Verdict.INSUFFICIENT_EVIDENCE),
+        (None, TODAY, Verdict.INSUFFICIENT_EVIDENCE),
+        (date(2026, 11, 22), TODAY, Verdict.CONFIRMED),
+        (date(2026, 11, 22), None, Verdict.INSUFFICIENT_EVIDENCE),
     ],
 )
 def test_only_a_newer_reliable_source_overrides_a_fact_checkers_data_gap(
-    published, verdict
+    published, found_on, verdict
 ):
     gov = GOV.model_copy(
         update={"source": GOV.source.model_copy(update={"published_at": published})}
     )
+    gap = CHECKER_NO_DATA.model_copy(
+        update={
+            "source": CHECKER_NO_DATA.source.model_copy(
+                update={"published_at": found_on}
+            )
+        }
+    )
     j = run(
-        [CHECKER_NO_DATA, gov],
+        [gap, gov],
         answering(
-            label(CHECKER_NO_DATA, "gap", NO_DATA, own_conclusion=True),
+            label(gap, "gap", NO_DATA, own_conclusion=True),
             label(gov, "supports", GOV.source.fragment),
         ),
     )
     assert j.verdict is verdict
+
+
+@pytest.mark.parametrize("stance", ["supports", "context"])
+def test_a_stated_false_counts_only_for_the_side_the_judge_read(stance):
+    """A "fałsz" of an opposite statement supports a negated claim; a related review is context."""
+    j = run(
+        [STATED_FALSE],
+        answering(label(STATED_FALSE, stance, VERDICT_FALSE, own_conclusion=True)),
+    )
+    expected = (
+        Verdict.CONFIRMED if stance == "supports" else Verdict.INSUFFICIENT_EVIDENCE
+    )
+    assert j.verdict is expected

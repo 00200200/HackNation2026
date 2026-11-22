@@ -247,6 +247,8 @@ class Evidence(BaseModel):
     review: bool = False
     # The record's rating, when the verified quote is (part of) that rating line. `source` then
     # shows the rating itself (`Source.rating`): the line around it is our wording, not the page's.
+    # Or the rating a fact-checker's own verdict sentence states (`_stated`); `source` then keeps
+    # the page's sentence and no `Source.rating`.
     rating: str | None = None
 
 
@@ -651,14 +653,25 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         and e.label.own_conclusion
         and e.label.stance is Stance.GAP
     ]
+    gap_decides = False
     if checker_gap:
-        found_on = max(_reviewed_on(e) for e in checker_gap)
+        # An undated finding counts as current: no source is known to come after it.
+        found_on = max(
+            (e.source.published_at for e in checker_gap if e.source.published_at),
+            default=None,
+        )
         side = _body_only(supports + refutes)
         if not rated and not any(
             (e.source.source_type == FACT_CHECK and e.label.own_conclusion)
-            or (_reliable(e) and _reviewed_on(e) > found_on)
+            or (
+                found_on
+                and _reliable(e)
+                and e.source.published_at
+                and e.source.published_at > found_on
+            )
             for e in side
         ):
+            gap_decides = True
             rows = []
             if side or context:
                 publishers = sorted(
@@ -678,7 +691,9 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
                 limitations,
                 cited=_cited_for(verdict, side),
             )
-    if _enough(supports) and not _confirms(supports):
+    if gap_decides:
+        reason = []  # the fact-checker's finding is the reason (CHECKER_GAP), not too few sources
+    elif _enough(supports) and not _confirms(supports):
         # In place of NOT_ENOUGH: the reliable source was there, only as a search snippet.
         names = {
             e.source.publisher or str(e.source.url.host)
@@ -781,40 +796,63 @@ FOLDED_RATINGS = {_rating_key(rating): verdict for rating, verdict in RATINGS.it
 
 # A fact-checker's verdict sentence in its own words, as Demagog and Pravda write it ("…wypowiedź
 # oceniamy jako fałsz", "…uznajemy za nieweryfikowalną"): the rating a ClaimReview record carries,
-# stated on a page without that markup or in a search snippet. A negated verb states no rating.
+# stated on a page without that markup or in a search snippet. Only a rating of its scale, word for
+# word ("prawdopodobnie fałszywą" states none); no sentence end or "nie" between the verb and the
+# rating, and no "nie" right before the verb.
+STATED_WORDS = (
+    r"częściow[ąa]\s+prawd[ęa]|częściowo\s+prawdziw[ąeya]|częściowy\s+fałsz"
+    r"|częściowo\s+fałszyw[ąeya]|fałszyw[ąeya]|fałsz|prawdziw[ąeya]|prawd[ęa]"
+    r"|manipulacj[ęa]|nieweryfikowaln[ąeya]"
+)
 VERDICT_SENTENCE = re.compile(
-    r"(?<!\bnie )\b(?:oceniamy|oceniliśmy|uznajemy|uznaliśmy|uważamy)\b(?:\s+\S+){0,4}?\s+"
-    r"(?:jako|za)\s+(?P<rating>(?:częściow\w*\s+)?(?:fałsz|prawd|manipulacj|nieweryfikowaln)\w*)",
+    r"\b(?:oceniamy|oceniliśmy|uznajemy|uznaliśmy|uważamy)\b"
+    r"(?:\s+(?!nie\b)[^\s.!?;:]+){0,4}?\s+(?:jako|za)\s+"
+    rf"(?P<rating>{STATED_WORDS})\b",
     re.IGNORECASE,
 )
-# The rating a stated word stands for, by its folded stem and an optional second stem.
-STATED_RATINGS = (
-    ("czesciow", "falsz", "Częściowy fałsz"),
-    ("czesciow", "", "Częściowa prawda"),
-    ("falsz", "", "Fałsz"),
-    ("prawd", "", "Prawda"),
-    ("manipulacj", "", "Manipulacja"),
-    ("nieweryfikowaln", "", "Nieweryfikowalne"),
-)
+NEGATED = re.compile(r"\bnie\s*$", re.IGNORECASE)
+# A stated rating may stand only for the side the judge read in the same sentence: a "fałsz" of
+# another, opposite statement supports a negated claim, and a review of a related one is context.
+STATED_STANCES = {
+    Verdict.FALSE: {Stance.REFUTES},
+    Verdict.CONFIRMED: {Stance.SUPPORTS},
+    Verdict.MISLEADING: {Stance.REFUTES, Stance.CONTEXT, Stance.SUPPORTS},
+    Verdict.INSUFFICIENT_EVIDENCE: {Stance.GAP},
+}
 
 
 def _stated_rating(text: str) -> str | None:
-    """The rating a verdict sentence in `text` states ("Fałsz"), None when it states none."""
-    if not (m := VERDICT_SENTENCE.search(text)):
-        return None
-    word = _rating_key(m["rating"])
-    return next(
-        rating
-        for stem, second, rating in STATED_RATINGS
-        if word.startswith(stem) and second in word
-    )
+    """The rating the verdict sentences in `text` state ("Fałsz"); None when they state none, or
+    two different ones (a part rated one way and the whole another)."""
+    ratings = {
+        _stated_name(m["rating"])
+        for m in VERDICT_SENTENCE.finditer(text)
+        if not NEGATED.search(text[: m.start()])
+    }
+    return ratings.pop() if len(ratings) == 1 else None
+
+
+def _stated_name(word: str) -> str:
+    folded = _rating_key(word)
+    if folded.startswith("czesciow"):
+        return "Częściowy fałsz" if "falsz" in folded else "Częściowa prawda"
+    for stem, rating in (
+        ("falsz", "Fałsz"),
+        ("prawd", "Prawda"),
+        ("manipulacj", "Manipulacja"),
+    ):
+        if folded.startswith(stem):
+            return rating
+    return "Nieweryfikowalne"
 
 
 def _stated(e: Evidence) -> Evidence:
     """A fact-checker's own conclusion that states its rating (`VERDICT_SENTENCE`) is its rating of
     this claim, as a ClaimReview record's would be (ADR 0001): many of its pages carry no markup,
-    and a page blocked to our server is known only from its search snippet. The answer names the
-    rating, the quote stays the page's own sentence, and the label takes the rating's stance."""
+    and a page blocked to our server is known only from its search snippet. It counts only when
+    the judge read the sentence for the rating's side (`STATED_STANCES`). The answer quotes the
+    page's own sentence (no `Source.rating`: that is a record's), and the label takes the rating's
+    stance."""
     if (
         e.review
         or e.rating
@@ -822,24 +860,19 @@ def _stated(e: Evidence) -> Evidence:
         or e.source.source_type != FACT_CHECK
         or not e.label.own_conclusion
         or not (rating := _stated_rating(e.source.fragment or ""))
+        or e.label.stance
+        not in STATED_STANCES[verdict := FOLDED_RATINGS[_rating_key(rating)]]
     ):
         return e
     label = e.label.model_copy(
         update={
-            "stance": RATED_STANCE[FOLDED_RATINGS[_rating_key(rating)]],
+            "stance": RATED_STANCE[verdict],
             "same_claim": True,
             "missing_context": None,
             "context_quote": None,
         }
     )
-    return e.model_copy(
-        update={
-            "label": label,
-            "rating": rating,
-            "source": e.source.model_copy(update={"rating": rating}),
-            "context_span": None,
-        }
-    )
+    return e.model_copy(update={"label": label, "rating": rating, "context_span": None})
 
 
 def _other_claim(e: Evidence) -> bool:
@@ -950,9 +983,10 @@ def _origins(evidence: list[Evidence]) -> list[set[str]]:
     groups: list[set[str]] = []
     for e in evidence:
         keys = {_publisher(e)}
-        # A rating is our line around the record's word: two fact-checkers' "Fałsz" are two
-        # origins, and an agency named in the reviewed claim is no syndicated copy.
-        if not e.rating:
+        # A ClaimReview rating is our line around the record's word: two fact-checkers' "Fałsz" are
+        # two origins, and an agency named in the reviewed claim is no syndicated copy. A stated
+        # rating is the page's own sentence, so its copies are one origin like any quote.
+        if not e.review:
             keys.add("quote:" + _fold(e.source.fragment or "")[0])
             keys |= {"agency:" + a for a in AGENCY.findall(e.text)}
         joined = [g for g in groups if g & keys]
@@ -1076,7 +1110,7 @@ def _cited_for(verdict: Verdict, side: list[Evidence]):
             else e.source.model_copy(
                 update={"fragment": e.context_span, "rating": None}
             ),
-            "context",
+            "rated" if _rated(e) else "context",
             e.label.missing_context,
         )
         for e in side
