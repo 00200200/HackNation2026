@@ -38,7 +38,7 @@ from prawdowid import justification
 from prawdowid.contract import SecurityEvent, Source, Verdict
 from prawdowid.factcheck import CLAIM_PREFIX, RATING_PREFIX
 from prawdowid.factcheck import SOURCE_TYPE as FACT_CHECK
-from prawdowid.rerank import RELIABLE_TYPES, Fragment, Ranking
+from prawdowid.rerank import RELIABLE_TYPES, Fragment, Ranking, thinking_env
 
 log = logging.getLogger("prawdowid")
 
@@ -236,6 +236,7 @@ agent = Agent(
     model_settings={
         "request_timeout": MODEL_TIMEOUT_S,
         "max_retries": MODEL_MAX_RETRIES,
+        "thinking": thinking_env("PRAWDOWID_JUDGE_THINKING", "low"),
     },
     retries={"output": 0},
     defer_model_check=True,

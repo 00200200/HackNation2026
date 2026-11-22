@@ -85,7 +85,7 @@ every check, also a failed or timed-out one (#14): session id, start and end tim
 channel, the masked question, status, `error` (`"timeout"` when the API's 60 s limit fired, or the exception class when verify raised;
 `null` when the pipeline returned a notice, also its own 40 s budget cut), the notice message, the masked page URL and content hash for a link, the
 time of each step (`fetch`, `extract`, and per claim `factcheck`, `euvsdisinfo`, `web`, `rerank`,
-`judge`, `retry_*`), every model answer (model name, input and output tokens), `cost_usd`, security
+`judge`), every model answer (model name, input and output tokens), `cost_usd`, security
 events (kind, location and detector, never the wording), ids of matched incidents, check-level
 limitations, each claim with its
 verdict, sources (masked URL and source type) and limitations (search errors, time limit), and the

@@ -379,3 +379,35 @@ def test_two_fact_checkers_rating_one_claim_alike_are_both_kept():
         for url in ("https://demagog.org.pl/a", "https://konkret24.tvn24.pl/b")
     ]
     assert len(run(reviews, answering([0, 1])).fragments) == 2
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, "default"),
+        ("", "default"),
+        ("false", False),
+        (" LOW ", "low"),
+        ("high", "high"),
+    ],
+)
+def test_thinking_env(monkeypatch, raw, expected):
+    if raw is None:
+        monkeypatch.delenv("T", raising=False)
+    else:
+        monkeypatch.setenv("T", raw)
+    assert rr.thinking_env("T", "default") == expected
+
+
+def test_thinking_env_rejects_other_values(monkeypatch):
+    monkeypatch.setenv("T", "xhigh")
+    with pytest.raises(ValueError, match="T must be"):
+        rr.thinking_env("T", False)
+
+
+def test_each_agent_has_its_thinking_setting():
+    from prawdowid import judge, verifier
+
+    assert rr.agent.model_settings["thinking"] is False
+    assert judge.agent.model_settings["thinking"] == "low"
+    assert verifier.agent.model_settings["thinking"] == "low"

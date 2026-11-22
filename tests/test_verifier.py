@@ -269,6 +269,9 @@ def test_cap_keeps_top_n_and_lists_the_rest(monkeypatch):
 
 def test_prompt_states_the_cap_and_queries_per_claim():
     assert f"the {verifier.MAX_CHECKED_CLAIMS} highest-ranked claims" in INSTRUCTIONS
+    assert (
+        verifier.QUERIES_PER_CLAIM == 2
+    )  # the claim and a fact-checker search come on top
     assert f"{verifier.QUERIES_PER_CLAIM} short web search queries" in INSTRUCTIONS
     assert "never judge whether a claim is true" in INSTRUCTIONS
     assert "Leave none out" in INSTRUCTIONS

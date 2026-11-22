@@ -37,6 +37,7 @@ from prawdowid.contract import (
 from prawdowid.judge import Judgement
 from prawdowid.link import Page, Refusal, fetch_page
 from prawdowid.privacy import mask_personal_data
+from prawdowid.rerank import thinking_env
 
 log = logging.getLogger("prawdowid")
 
@@ -166,7 +167,7 @@ def positive_int_env(name: str, default: int) -> int:
 # source sentence, reason and queries, to keep the output short on long texts.
 MAX_CHECKED_CLAIMS = positive_int_env("PRAWDOWID_MAX_CHECKED_CLAIMS", 3)
 # Search queries the model writes per checked claim, for retrieval.
-QUERIES_PER_CLAIM = positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 3)
+QUERIES_PER_CLAIM = positive_int_env("PRAWDOWID_QUERIES_PER_CLAIM", 2)
 
 INSTRUCTIONS = f"""\
 You split a text written in Polish into claims for a fact-checking service. You have no sources,
@@ -255,6 +256,7 @@ agent = Agent(
     model_settings={
         "request_timeout": MODEL_TIMEOUT_S,
         "max_retries": MODEL_MAX_RETRIES,
+        "thinking": thinking_env("PRAWDOWID_EXTRACT_THINKING", "low"),
     },
     # No second model request on invalid output: it would get a fresh 45 s and overrun the API limit.
     retries={"output": 0},

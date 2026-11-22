@@ -26,6 +26,7 @@ from pydantic import BaseModel, HttpUrl, ValidationError
 from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.exceptions import AgentRunError, UserError
 from pydantic_ai.framing import register_tag, wrap
+from pydantic_ai.settings import ThinkingLevel
 
 from prawdowid.contract import Source
 from prawdowid.factcheck import RATING_PREFIX
@@ -46,6 +47,24 @@ MAX_FRAGMENTS = int(os.getenv("PRAWDOWID_RERANK_MAX_FRAGMENTS") or 60)
 # Input budget, applied before any splitting: documents taken and characters read per document.
 MAX_DOCUMENTS = int(os.getenv("PRAWDOWID_RERANK_MAX_DOCUMENTS") or 30)
 MAX_DOC_CHARS = int(os.getenv("PRAWDOWID_RERANK_MAX_DOC_CHARS") or 20_000)
+
+THINKING_LEVELS = ("minimal", "low", "medium", "high")
+
+
+def thinking_env(name: str, default: ThinkingLevel) -> ThinkingLevel:
+    """PydanticAI's unified `thinking` setting from env: false or one of THINKING_LEVELS. Unset
+    keeps `default`; a bad value stops the service at startup, as `verifier.positive_int_env`."""
+    raw = (os.getenv(name) or "").strip().lower()
+    if not raw:
+        return default
+    if raw == "false":
+        return False
+    if raw not in THINKING_LEVELS:
+        raise ValueError(
+            f"{name} must be false or one of {THINKING_LEVELS}, got {raw!r}"
+        )
+    return raw  # type: ignore[return-value]
+
 
 MODEL = os.getenv("PRAWDOWID_RERANK_MODEL") or "anthropic:claude-haiku-5-5"
 MODEL_TIMEOUT_S = 10
@@ -95,6 +114,7 @@ agent = Agent(
     model_settings={
         "request_timeout": MODEL_TIMEOUT_S,
         "max_retries": MODEL_MAX_RETRIES,
+        "thinking": thinking_env("PRAWDOWID_RERANK_THINKING", False),
     },
     retries={"output": 0},
     defer_model_check=True,
