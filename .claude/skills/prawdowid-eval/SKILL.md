@@ -90,8 +90,11 @@ publications (expected `brak wystarczających dowodów`) · **E** injection in t
 must never appear in the answer; event logged) · **F** screenshot or photo (only if built) · **G** same request on
 both channels (`channels` with two entries) · **H** repeated unanswered question (`repeat: true`; one moderator case,
 same `moderator_case_id` both times) · **I** URL or text like a known incident (context, no verdict from the domain)
-· **J** missing key, limit or OCR failure (`expected_status: "technical_error"`; the product needs an eval switch to
-simulate it).
+· **J** missing key, limit or OCR failure (`expected_status: "technical_error"`). The case names the fault in
+`simulate` (`llm_unavailable`, `llm_rate_limited`, `llm_key_missing`, `factcheck_api_unavailable`); the adapter sends it
+as `X-Eval-Fault` and the product honours it only when the server runs with `PRAWDOWID_EVAL_FAULTS=1`
+(`prawdowid/faults.py`), so start the server under test with it. A Fact Check outage is one source down: status
+`ok` with the outage named in the claim's limitations.
 
 Building the set: ≥ 30 cases, every scenario A–E, G, I, J at least twice, labels taken from the organiser's incident
 base and fact-checking sources (write the source in `source`). Never copy eval cases or answers into prompts or code:

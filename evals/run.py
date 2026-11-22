@@ -73,7 +73,10 @@ def call(case: dict, channel: str) -> dict:
         adapter.wait_turn()  # rate limit; not counted as latency
         start = time.monotonic()
         try:
-            response, error = adapter.ask(case["input"], channel), None
+            response, error = (
+                adapter.ask(case["input"], channel, fault=case.get("simulate")),
+                None,
+            )
         except (
             OSError,
             ValueError,
@@ -118,11 +121,18 @@ def expected_label(case: dict) -> str:
     return case.get("expected_verdict") or f"status:{case.get('expected_status', 'ok')}"
 
 
+def matches(expected: str, predicted: str) -> bool:
+    """A status-only "ok" case asks for a finished check, whatever its verdict."""
+    if expected == "status:ok":
+        return not predicted.startswith("status:")
+    return predicted == expected
+
+
 def progress(row: dict, done: int, total: int, elapsed: float) -> str:
     case, runs = row["case"], row["runs"]
     expected = expected_label(case)
     predicted = [metrics.predicted_verdict(run["response"]) for run in runs]
-    ok = not failed(row) and all(p == expected for p in predicted)
+    ok = not failed(row) and all(matches(expected, p) for p in predicted)
     eta = elapsed / done * (total - done)
     return (
         f"[{done}/{total}] {case.get('id')} {'ok' if ok else 'FAIL'} "
@@ -299,7 +309,7 @@ def summarize(per_case: list[dict]) -> dict:
         return (
             not row["errors"]
             and bool(row["predicted"])
-            and row["predicted"][0] == row["expected_label"]
+            and matches(row["expected_label"], row["predicted"][0])
         )
 
     def bucket(rows: list[dict]) -> dict:

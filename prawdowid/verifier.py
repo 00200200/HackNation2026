@@ -23,7 +23,7 @@ from pydantic_ai import (
 from pydantic_ai.exceptions import AgentRunError, ContentFilterError, UserError
 from pydantic_ai.framing import register_tag, wrap
 
-from prawdowid import pipeline
+from prawdowid import faults, pipeline
 from prawdowid.contract import (
     CheckedPage,
     CheckResult,
@@ -431,6 +431,8 @@ async def _extract(
         # Masked before the model: placeholders keep the sentence, so claims still split (docs/privacy.md).
         # The extraction shares the check's budget: its own 45 s would overrun it.
         async with asyncio.timeout_at(deadline) as budget:
+            if error := faults.model_error():  # eval only, off in production
+                raise error
             return await agent.run(wrap(USER_TEXT, mask_personal_data(text)))
     except TimeoutError:
         if not budget.expired():

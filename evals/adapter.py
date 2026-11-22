@@ -94,7 +94,7 @@ def to_eval_shape(raw: dict) -> dict:
     return shaped
 
 
-def ask(payload: dict, channel: str) -> dict:
+def ask(payload: dict, channel: str, fault: str | None = None) -> dict:
     base = os.environ.get("PRAWDOWID_URL")
     if not base:
         raise RuntimeError(
@@ -111,6 +111,8 @@ def ask(payload: dict, channel: str) -> dict:
             "Content-Type": "application/json",
             "X-Eval-Run": "1",
             "X-Channel": channel,
+            # Scenario J: honoured only by a server started with PRAWDOWID_EVAL_FAULTS=1.
+            **({"X-Eval-Fault": fault} if fault else {}),
         },
     )
     with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
