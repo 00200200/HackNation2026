@@ -62,27 +62,30 @@ odpowiedź do publikacji zatwierdzi człowiek. Dziś takiego kroku nie ma.
 
 ### 4. Kto wybrał źródła? Czy to nie jest stronnicze?
 
-Krótko: wybraliśmy je według spisanych reguł. To urzędy polskie i unijne oraz fact-checkerzy ze
-statusem IFCN albo EFCSN. Lista jest jawna, ale to wciąż nasz wybór.
+Krótko: my, według spisanych reguł, i obie listy są jawne. To wciąż nasz wybór, a status części
+fact-checkerów dopiero potwierdzamy.
 
-Szczegóły: wyszukiwarka zwraca tylko strony z domen na liście `ALLOWLIST`, a każda domena ma typ:
-urzędowe, fact-checking, agencja prasowa albo baza narracji. Do korpusu przyjmujemy urzędy polskie i
-unijne oraz fact-checkerów, których status sprawdziliśmy na stronie sieci (wpis ma datę odczytu).
-Pravda jest zweryfikowanym członkiem EFCSN do 23.02.2028. Dowody od tego samego wydawcy, z tym samym
-cytatem albo z tej samej agencji prasowej liczą się jako jedno źródło. EUvsDisinfo nigdy sam nie
-rozstrzyga.
+Szczegóły: list są dwie. Wyszukiwarka zwraca tylko strony z domen na liście `ALLOWLIST`: polskie
+urzędy, instytucje UE, NATO i WHO, trzech fact-checkerów (Konkret24, FakeNews.pl, AFP Sprawdzam),
+agencję PAP i EUvsDisinfo jako bazę znanych narracji. Każda domena ma typ: urzędowe, fact-checking,
+agencja prasowa albo baza narracji. Status IFCN albo EFCSN tych trzech fact-checkerów jest do
+potwierdzenia na listach obu sieci ([docs/sources.md](../sources.md)). Do korpusu przyjmujemy urzędy
+polskie i unijne oraz fact-checkerów, których status odczytaliśmy na stronie sieci, z datą odczytu.
+21.11 odczytaliśmy dwa: Pravda jest zweryfikowanym członkiem EFCSN do 23.02.2028, a Demagog do
+25.05.2027. Demagoga bierzemy jednak tylko przez Google Fact Check (decyzja z 21.11). Dowody od tego
+samego wydawcy, z tym samym cytatem albo z tej samej agencji prasowej liczą się jako jedno źródło.
+EUvsDisinfo nigdy sam nie rozstrzyga.
 
-Słabe strony: lista to decyzja zespołu i nikt z zewnątrz nie badał jej różnorodności. Część
-fact-checkingowa korpusu to 15 rekordów Pravdy. Demagoga bierzemy tylko przez Google Fact Check
-(decyzja z 21.11).
+Słabe strony: listy to decyzja zespołu i nikt z zewnątrz nie badał ich różnorodności. Część
+fact-checkingowa korpusu to 15 rekordów Pravdy. Dwóch z trzech fact-checkerów z listy wyszukiwarki,
+Konkret24 i AFP Sprawdzam, blokuje nasz serwer (pytanie 6).
 
-Źródła: [prawdowid/websearch.py](../../prawdowid/websearch.py#L52),
+Źródła: [prawdowid/websearch.py](../../prawdowid/websearch.py#L52), [docs/sources.md](../sources.md),
 [corpus/catalog.yaml](../../corpus/catalog.yaml), [docs/corpus.md](../corpus.md), [risks.md](risks.md).
 
 ### 5. Jak dodajecie i wykluczacie źródła?
 
-Krótko: przez jeden plik z regułami, w którym każda decyzja ma powód i datę. Po każdej zmianie
-puszczamy eval.
+Krótko: przez jeden plik z regułami, w którym każda decyzja ma powód i datę.
 
 Szczegóły: [corpus/catalog.yaml](../../corpus/catalog.yaml) ma reguły przyjęcia, aktualizacji i
 wykluczenia. Źródło wypada, gdy robots.txt go zabrania, gdy strona odrzuca skrypty, gdy jest
@@ -91,8 +94,11 @@ przestają pozwalać na fragment. Może też wypaść decyzją zespołu, jak Dem
 zostają w katalogu z powodem i datą. Pojedynczy dokument usuwamy przez `removed_urls` i przebudowę
 korpusu. Okres odświeżania wynosi od godziny (ostrzeżenia IMGW) do 30 dni (akty UE). Domenę w
 wyszukiwarce dodajemy w kodzie i w [docs/sources.md](../sources.md) w jednym commicie, a test nie
-przejdzie, gdy lista w dokumentacji się rozjedzie. Zmiany kodu nie wypchniemy bez czystego evalu na tym samym
-commicie. Automatycznego odświeżania na serwerze jeszcze nie ma (#90).
+przejdzie, gdy lista w dokumentacji się rozjedzie. Hook przed `git push` uruchamia ruff i pytest, a
+przy zmianie kodu wymaga evalu zrobionego na tym samym stanie kodu (od pierwszego evalu w danym
+klonie). Słabe metryki blokują dopiero
+zgłoszenie końcowe (`HN_FINAL=1`), przy zwykłym pushu hook tylko ostrzega. Automatycznego
+odświeżania na serwerze jeszcze nie ma (#90).
 
 Źródła: [docs/corpus.md](../corpus.md), [tests/test_websearch.py](../../tests/test_websearch.py),
 [.githooks/pre-push](../../.githooks/pre-push), [#90](https://github.com/00200200/HackNation2026/issues/90).
@@ -102,13 +108,14 @@ commicie. Automatycznego odświeżania na serwerze jeszcze nie ma (#90).
 Krótko: nie obchodzimy blokady. Bierzemy tylko to, co zwraca wyszukiwarka, i oznaczamy to jako
 fragment z wyników.
 
-Szczegóły: 22.11 około 00:50 z naszego serwera konkret24.tvn24.pl, sprawdzam.afp.com i
-demagog.org.pl odpowiadały 403 przy każdym user agencie, a oko.press i pravda.org.pl odpowiadały
-200 (#95, komentarz w #76). Brief zabrania obchodzenia zabezpieczeń, a nasze pobieranie nigdy nie
+Szczegóły: w nocy 22.11 z naszego serwera konkret24.tvn24.pl, sprawdzam.afp.com i
+demagog.org.pl odpowiadały 403, i z naszym user agentem, i z przeglądarkowym, a oko.press i
+pravda.org.pl odpowiadały 200 (#95). Brief zabrania obchodzenia zabezpieczeń, a nasze pobieranie nigdy nie
 omija odpowiedzi 401, 403, 429 ani blokady botów. Dziś trafienie, którego strony nie da się pobrać,
 po prostu wypada, choć wyszukiwarka zwróciła jego fragment (#95).
 
-Zasadę na ten przypadek zatwierdził Michał 22.11.2026. Gdy nie możemy pobrać strony sami (blokada,
+Zasadę na ten przypadek zatwierdził Michał 22.11.2026 ([WORKLOG](../../WORKLOG.md), sekcja
+„Decisions”). Gdy nie możemy pobrać strony sami (blokada,
 przekroczony czas, za duży plik, nieobsługiwany typ), dowodem staje się tytuł i fragment zwrócone
 przez wyszukiwarkę. Odpowiedź oznacza go jako „fragment z wyników wyszukiwarki; strona nie pozwala
 na pobranie”. Cytat sprawdzamy na tym fragmencie jak na każdym innym. Pełnej treści takiej strony nie
@@ -127,7 +134,8 @@ jeszcze jej nie zbudowaliśmy.
 Szczegóły: brief zabrania rozstrzygania prawdziwości na podstawie statusu źródła, także sankcji UE.
 ADR 0001 proponuje notatkę z aktem prawnym i datą sprawdzenia, braną tylko z urzędowego źródła UE.
 Notatka nie zmienia werdyktu ani jego siły (#81). Media objęte sankcjami nie mogą dziś być dowodem,
-bo lista domen wyszukiwarki zawiera tylko urzędy, fact-checkerów i PAP.
+bo lista domen wyszukiwarki zawiera tylko urzędy, instytucje UE i międzynarodowe, fact-checkerów,
+PAP i EUvsDisinfo.
 
 Źródła: [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md), sekcje 5 i 6,
 [prawdowid/websearch.py](../../prawdowid/websearch.py#L52),
@@ -157,24 +165,30 @@ Przypadki z poleceniem ukrytym w stronie jeszcze się nie uruchamiają (#94), a 
 
 ### 9. Co się dzieje, gdy źródło nie działa albo skończy się limit?
 
-Krótko: mówimy, co nie zadziałało. Awaria nigdy nie udaje werdyktu.
+Krótko: mówimy, co nie zadziałało. Gdy padną wszystkie źródła albo model, werdyktu nie ma. Gdy
+padnie tylko część źródeł, mamy dziś lukę i mówimy o niej wprost.
 
 Szczegóły: każde źródło ma własny limit czasu. Google Fact Check ma 15 s, EUvsDisinfo 5 s w potoku,
 jedno zapytanie do wyszukiwarki 10 s, pobranie strony 8 s, a całe sprawdzenie 25 s. Twierdzenie,
-którego wszystkie źródła padły albo nie zdążyły, dostaje „nie sprawdzono” z powodem. Brak klucza do
-modelu albo jego błąd daje komunikat techniczny. Jedenaste zapytanie w ciągu minuty dostaje
-komunikat „Wysłano za dużo zapytań w krótkim czasie”. Eval ma 4 przypadki J. Dwa (FC-J01, FC-J02)
-pomijamy, a dwa pozostałe (J01, J02) liczymy bez zasymulowanej awarii, bo przełącznika awarii
-jeszcze nie ma (#60).
+którego wszystkie źródła padły, dostaje „nie sprawdzono” z powodem. Tak samo, gdy skończy się czas
+albo nie odpowie model-sędzia. Brak klucza do modelu albo jego błąd przy wyodrębnianiu twierdzeń daje
+komunikat techniczny. Jedenaste zapytanie w ciągu minuty dostaje komunikat „Wysłano za dużo zapytań w
+krótkim czasie”. Eval ma 4 przypadki J. Dwa (FC-J01, FC-J02) pomijamy, a dwa pozostałe (J01, J02)
+liczymy bez zasymulowanej awarii, bo przełącznika awarii jeszcze nie ma (#60).
 
-Znana luka: gdy jedno źródło padnie, a pozostałe nic nie znajdą, odpowiedź może brzmieć „brak
-wystarczających dowodów” (#60). Gdy skończą się kredyty wyszukiwarki, twierdzenia wracają jako „nie
-sprawdzono”. Czy komunikat mówi wtedy o limicie wyszukiwarki, sprawdza #75.
+Znana luka (#60): gdy padnie tylko część źródeł, a reszta nic nie znajdzie, wynik brzmi „brak
+wystarczających dowodów”. W ograniczeniach odpowiedzi stoi wtedy, które źródło nie odpowiedziało, ale
+sam werdykt wygląda jak brak dowodów, a brief w scenariuszu J tego zabrania. Przykład: Tavily odmawia,
+bo skończyły się kredyty, co kod traktuje jak każdą awarię wyszukiwarki, a Google Fact Check
+odpowiada, że nic nie znalazł. Poprawka czeka w PR #109: gdy padnie źródło, które może rozstrzygnąć
+(Fact Check albo wyszukiwarka), a dowodów nie starcza, twierdzenie dostaje „nie sprawdzono”.
 
-Źródła: [prawdowid/pipeline.py](../../prawdowid/pipeline.py),
+Źródła: [prawdowid/pipeline.py](../../prawdowid/pipeline.py#L137),
+[prawdowid/websearch.py](../../prawdowid/websearch.py#L113),
 [prawdowid/factcheck.py](../../prawdowid/factcheck.py), [prawdowid/app.py](../../prawdowid/app.py),
 [README](../../README.md#configuration), [#60](https://github.com/00200200/HackNation2026/issues/60),
-[#75](https://github.com/00200200/HackNation2026/issues/75).
+[#75](https://github.com/00200200/HackNation2026/issues/75),
+[PR #109](https://github.com/00200200/HackNation2026/pull/109).
 
 ### 10. Dlaczego tak często „nie udało mi się potwierdzić”?
 
@@ -182,9 +196,10 @@ Krótko: wolimy przyznać, że nie wiemy, niż zgadywać. Ale część tych odpo
 pobieraniu stron i właśnie go naprawiamy.
 
 Szczegóły: brief wymaga poprawnego wstrzymania się od oceny w co najmniej 80% przypadków bez
-dowodów. W szybkich przebiegach mamy 1,000, w zniekształconym pełnym przebiegu na `8c6f396` 0,583
-([HISTORY.md](../../evals/results/HISTORY.md)). Tylko że
-w przebiegu na stagingu 22.11 wyszukiwarka znajdowała strony, a potem je odrzucała: 102, bo
+dowodów. Szybki przebieg na `95e6177` dał 1,000, ale tylko dlatego, że wszystkie 9 odpowiedzi
+brzmiały „brak wystarczających dowodów” (macro-F1 0,100). Zniekształcony pełny przebieg na `8c6f396`
+dał 0,583 ([HISTORY.md](../../evals/results/HISTORY.md)). Do tego w szybkim przebiegu na stagingu
+22.11 (`75c1e20`) wyszukiwarka znajdowała strony, a potem je odrzucała: 102, bo
 robots.txt odpowiadał 403 (czytane jako zakaz wszystkiego), 36 bez tekstu, tytułu albo daty, 17 po
 przekroczeniu 8 s, 8 większych niż 2 MB i 5 plików PDF (#95). Poprawki są w #95. Korpus urzędowy też
 jeszcze nie jest podpięty (#74).
@@ -203,12 +218,15 @@ A 23, B 10, C 6, D 8, E 7, G 6, H 2, I 7, J 4. Etykiety pochodzą z ocen Demagog
 EUvsDisinfo i stron urzędowych, a przy każdym przypadku zapisaliśmy, skąd jest etykieta. Wyjątek to
 przypadki D01-D04 oraz H01 i H02: plotki wymyślone przez zespół, o których nikt nie pisał, więc
 poprawna odpowiedź to brak dowodów. Zapisane przebiegi: szybki na `95e6177` dał macro-F1 0,100, abstencję
-1,000 i odporność na injection 0,000. Pełny na `8c6f396` (71 przypadków) dał macro-F1 0,498,
+1,000 i odporność na injection 0,000, przy czym wszystkie 9 odpowiedzi brzmiały „brak wystarczających
+dowodów”. Pełny na `8c6f396` (71 przypadków) dał macro-F1 0,498,
 abstencję 0,583, odporność na injection 0,571 i medianę 18,2 s. Ten wiersz odtworzyliśmy bez pliku
 JSON, a sam przebieg zniekształciły timeouty Anthropic i zbyt ciasny budżet 25 s. Przebieg na
 commicie zgłoszenia: [z #16].
 
-Zbioru ukrytego nie znamy. Zasada: żadnych przypadków ani odpowiedzi z evalu w promptach i w kodzie.
+Zbioru ukrytego nie znamy. Zasada: żadnych przypadków ani odpowiedzi z evalu w promptach i w logice
+weryfikacji (w `prawdowid/` nie ma tekstu żadnego przypadku). Wyjątek jest na stronie: przycisk
+„Polska w NATO od 1999” wkleja pytanie z przypadków A01 i J02, które jest też początkiem E01.
 Kontrola przecieku i wydzielony zbiór testowy są otwarte (#91). Nie obiecujemy liczby, której nie
 zmierzyliśmy.
 
@@ -244,8 +262,8 @@ powierzenia, to etap 3 pilotażu.
 
 ### 13. Ile to kosztuje?
 
-Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje według dzisiejszych pomiarów od 31 do 37
-groszy, a serwer z domeną około 43 zł miesięcznie.
+Krótko: obywatel płaci zero. Nas jedno sprawdzenie kosztuje według pomiarów z 21.11, zrobionych na
+starszym kodzie, od 31 do 37 groszy, a serwer z domeną około 43 zł miesięcznie.
 
 Szczegóły: modele to 0,0525 USD za sprawdzenie (jeden przebieg pełnego potoku na 8 przypadkach,
 wpis z 21.11 w WORKLOG). Tavily dokłada około 4,9 kredytu po 0,005 do 0,008 USD. Na 1000 sprawdzeń
@@ -262,9 +280,10 @@ Krótko: koszt rośnie liniowo, a rachunek to prawie wyłącznie tokeny modeli i
 Serwer to poniżej 2%. Przepustowości jednego serwera jeszcze nie zmierzyliśmy.
 
 Szczegóły: przy umownych 10 000 sprawdzeń miesięcznie wychodzi około 3726 zł, przy 100 000 około
-37 171 zł plus kolejne serwery. Modele to od 57 do 63% kosztów zmiennych. Największa dźwignia to
-model do wyodrębniania twierdzeń: dziś Opus 5.5, a token Sonnet 5.5 kosztuje połowę tego. Zamianę
-zrobimy dopiero po pomiarze jakości (#88). Dziś backend to jeden proces z limitem zapytań w pamięci,
+37 171 zł plus kolejne serwery. Modele to od 57 do 63% kosztów zmiennych. Wyodrębnianie twierdzeń
+(Opus 5.5) to około jednej trzeciej kosztu modeli, a ranking i sędzia razem około dwóch trzecich.
+Przejście wyodrębniania na Sonnet 5.5, którego token kosztuje połowę tego co Opus, obetnie więc koszt
+modeli o około 17%. Zamianę zrobimy dopiero po pomiarze jakości (#88). Dziś backend to jeden proces z limitem zapytań w pamięci,
 na jednym serwerze bez zapasowego. Test obciążeniowy to #88.
 
 Źródła: [cost.md](cost.md), [Dockerfile](../../Dockerfile), [docs/deploy.md](../deploy.md),
@@ -272,19 +291,29 @@ na jednym serwerze bez zapasowego. Test obciążeniowy to #88.
 
 ### 15. Czy nie uzależniacie MSZ od jednego dostawcy? Gdzie są przetwarzane dane?
 
-Krótko: model zmienia się jedną zmienną środowiskową, a wyszukiwarkę jedną funkcją. Serwer stoi w
-Niemczech. Dostawcy modeli i wyszukiwarki są spoza EOG i mówimy to wprost.
+Krótko: inny model Anthropic to jedna zmienna środowiskowa. Inny dostawca modeli to jego pakiet i
+przebudowa obrazu backendu, a inna wyszukiwarka to jedna funkcja. Całego systemu przebudowywać nie
+trzeba. Serwer stoi w Niemczech, ale gdzie dane przetwarzają dostawcy, jeszcze nie potwierdziliśmy.
 
-Szczegóły: modele wybieramy przez PydanticAI zmiennymi `PRAWDOWID_MODEL`, `PRAWDOWID_RERANK_MODEL` i
-`PRAWDOWID_JUDGE_MODEL`, bez przebudowy obrazu. Wyszukiwarka siedzi za kontraktem `SearchProvider`,
-a zamienniki (Exa, Brave) porównaliśmy przy wyborze dostawcy (decyzja do #7 w WORKLOG). Embeddingi liczy lokalny
-model e5-large (licencja MIT), baza to PostgreSQL z pgvector. Serwer: OVHcloud, Limburg, Niemcy.
+Szczegóły: modele wybieramy przez PydanticAI, a każdy etap ma swoją zmienną z nazwą modelu:
+`PRAWDOWID_MODEL` (wyodrębnianie), `PRAWDOWID_JUDGE_MODEL` (sędzia) i `PRAWDOWID_RERANK_MODEL`
+(ranking). Inny model Anthropic to zmiana tej zmiennej i restart. [compose.yaml](../../compose.yaml)
+przekazuje do kontenera tylko `PRAWDOWID_MODEL`, więc
+dwie pozostałe trzeba dopisać w nadpisaniu Compose. Inny dostawca, na przykład Mistral, potrzebuje
+swojego pakietu. Instalujemy tylko `pydantic-ai-slim[anthropic,mcp]` ([pyproject.toml](../../pyproject.toml)),
+a bez pakietu dostawcy PydanticAI zgłasza ImportError i każde sprawdzenie kończy się komunikatem
+technicznym. Trzeba więc dodać extra i klucz dostawcy, a potem przebudować obraz backendu. Tej drogi
+nie testowaliśmy. Wyszukiwarka siedzi za kontraktem `SearchProvider`, a zamienniki (Exa, Brave)
+porównaliśmy przy wyborze dostawcy (decyzja do #7 w WORKLOG). Embeddingi liczy lokalny model e5-large
+(licencja MIT), baza to PostgreSQL z pgvector. Serwer: OVHcloud, Limburg, Niemcy.
 
 Czego jeszcze nie ma: nie pokazaliśmy działania na modelu przetwarzanym w UE. Gdzie przetwarzają
-dane Anthropic, Google, Tavily i EUvsDisinfo, jest UNCONFIRMED. Ani Tavily, ani Exa, ani Brave nie
-opisuje przetwarzania w EOG (#85).
+dane Anthropic, Google, Tavily i EUvsDisinfo, jest UNCONFIRMED. W lutym 2026 Nebius ogłosił
+przejęcie Tavily; czy transakcja się zamknęła i gdzie Tavily przetwarza dane, też jest UNCONFIRMED.
+Ani Tavily, ani Exa, ani Brave nie opisuje przetwarzania w EOG (#85).
 
-Źródła: [prawdowid/verifier.py](../../prawdowid/verifier.py#L43),
+Źródła: [prawdowid/verifier.py](../../prawdowid/verifier.py#L43), [pyproject.toml](../../pyproject.toml),
+[compose.yaml](../../compose.yaml),
 [prawdowid/rerank.py](../../prawdowid/rerank.py#L49), [prawdowid/judge.py](../../prawdowid/judge.py#L62),
 [prawdowid/websearch.py](../../prawdowid/websearch.py), [docs/deploy.md](../deploy.md),
 [docs/privacy.md](../privacy.md), [WORKLOG.md](../../WORKLOG.md),
@@ -352,7 +381,10 @@ z obrazu, a potem sprawdzać tą samą drogą co tekst.
 
 ### 20. Czy możemy to uruchomić sami?
 
-Krótko: tak. `make up` stawia całość w Dockerze, a eval odtwarza nasze liczby jednym poleceniem.
+Krótko: tak. `make up` stawia całość w Dockerze, a eval jednym poleceniem liczy te same metryki co
+my. Wyniki różnią się między przebiegami: w powtórzeniach z 21.11 macro-F1 wahało się od 0,10 do 0,39
+([WORKLOG](../../WORKLOG.md), wpis o Tavily), a trzy z czterech wierszy HISTORY.md odtworzyliśmy bez
+pliku JSON. Porównujcie więc z całą historią, nie z jedną liczbą.
 
 Szczegóły: klucze wpisuje się do ignorowanego pliku `.env`. Wymagany jest tylko `ANTHROPIC_API_KEY`.
 Bez kluczy do Google Fact Check, Tavily i EUvsDisinfo te źródła są zgłaszane jako niedostępne. Bez

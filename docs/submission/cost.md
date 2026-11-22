@@ -18,7 +18,7 @@ po pełnym evalu (#16)”. Cenniki odczytaliśmy 22.11.2026. Dolary przeliczamy 
 
 | Pomiar | Wartość | Skąd | Zastrzeżenia |
 |---|---|---|---|
-| Koszt modeli, sam etap wyodrębniania twierdzeń (Claude Opus 5.5) | 1,82 USD za 100 sprawdzeń, czyli 0,0182 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `95e6177`, szybki przebieg, 9 przypadków | Wersja z jednym wywołaniem modelu na sprawdzenie: bez sędziego (#30), bez równoległego sprawdzania twierdzeń (#37) i bez Tavily (#45). |
+| Koszt modeli, sam etap wyodrębniania twierdzeń (Claude Opus 5.5) | 1,82 USD za 100 sprawdzeń, czyli 0,0182 USD za sprawdzenie | [HISTORY.md](../../evals/results/HISTORY.md), wiersz `95e6177`, szybki przebieg, 9 przypadków | Wersja z jednym wywołaniem modelu na sprawdzenie: bez sędziego (#30), bez równoległego sprawdzania twierdzeń (#37) i bez Tavily (#45). Widać to w `git show 95e6177:prawdowid/verifier.py`: „For now one LLM call that finds claims”. |
 | Koszt modeli w pełnym potoku, z dowodami z Tavily | 5,25 USD za 100 sprawdzeń, czyli 0,0525 USD za sprawdzenie | [WORKLOG.md](../../WORKLOG.md), wpis z 21.11 o Tavily (#7/#8), 8 przypadków | Jeden przebieg, w którym każde sprawdzenie zmieściło się w budżecie 25 s. Nie ma do niego pliku JSON. Pomiar sprzed wyszukiwarki gov.pl (#53). |
 | Kredyty Tavily na sprawdzenie | około 4,9 (39 zapytań na 8 przypadków) | ten sam wpis w [WORKLOG.md](../../WORKLOG.md) | Wyszukiwanie `basic`, 1 kredyt za zapytanie. Pole `cost_usd` w odpowiedzi liczy tylko modele ([prawdowid/verifier.py](../../prawdowid/verifier.py)), więc Tavily doliczamy osobno. |
 
@@ -39,7 +39,7 @@ USD). Oba pomiary pochodzą z różnych wersji kodu, więc to tylko rząd wielko
 | Embeddingi korpusu (e5-large) | Liczone na naszym serwerze, bez opłaty za zapytanie | [WORKLOG.md](../../WORKLOG.md), decyzja z 21.11 |
 | Serwer OVHcloud VPS-2 (4 vCPU, 8 GB RAM, 75 GB NVMe) | od 30,77 zł netto, czyli 37,85 zł brutto miesięcznie | [cennik VPS OVHcloud](https://www.ovhcloud.com/pl/vps/) |
 | Domena .pl w OVHcloud | 6,99 zł za pierwszy rok (promocja), 58,99 zł za każde odnowienie. Cennik nie mówi, czy to netto, czy brutto. | [cennik domen OVHcloud](https://www.ovhcloud.com/pl/domains/tld/) |
-| Bot Discord | Działa jako proces na tym samym VPS (profil `discord` w [compose.yaml](../../compose.yaml)). Dokumentacja Discorda nie podaje opłat za API botów. | [Discord, Bots](https://docs.discord.com/developers/bots/overview) |
+| Bot Discord | Może działać jako proces na tym samym VPS (profil `discord` w [compose.yaml](../../compose.yaml)). Na produkcji jeszcze go nie uruchomiliśmy (#59). Dokumentacja Discorda nie podaje opłat za API botów. | [Discord, Bots](https://docs.discord.com/developers/bots/overview) |
 
 Cennik VPS podaje cenę „od”. Kwotę z faktury OVHcloud wpisuje zespół.
 
@@ -78,7 +78,7 @@ Tavily, podaje 1,65 USD. Żaden z nich nie obejmuje kredytów Tavily ani obecneg
 |---|---|
 | VPS-2 | 37,85 zł brutto (cena „od” z cennika) |
 | Domena faktczyfejk.pl | 4,92 zł (58,99 zł rocznie przy odnowieniu) |
-| Bot Discord | 0 zł ponad VPS |
+| Bot Discord, po uruchomieniu (#59) | 0 zł ponad VPS |
 | Razem | około 42,77 zł |
 
 Na tym samym serwerze działa też inny projekt, doc2json.pl ([docs/deploy.md](../deploy.md)). Cały
@@ -104,11 +104,16 @@ Co z tego wynika:
   większym ruchu Tavily potrzebuje prawie 490 tys. kredytów miesięcznie, a największy plan z cennika
   ma 100 tys. Cena dla takiej skali: do negocjacji, UNCONFIRMED. Po stawce planu Growth (0,005 USD)
   byłoby to 2437,50 USD (9899 zł).
-- Największą dźwignią jest model do wyodrębniania twierdzeń. Dziś to Opus 5.5
-  ([prawdowid/verifier.py](../../prawdowid/verifier.py#L43)). Token Sonnet 5.5 kosztuje połowę tego
-  co Opus, token Haiku 5.5 czterdzieści razy mniej. Przy tej samej liczbie tokenów przejście na
-  Sonnet obetnie koszt tego etapu o połowę. Czy jakość się utrzyma, sprawdza #88 i bez tego pomiaru
-  domyślnego modelu nie zmieniamy.
+- Koszt modeli dzieli się na trzy etapy. Wyodrębnianie robi Opus 5.5
+  ([prawdowid/verifier.py](../../prawdowid/verifier.py#L43)) i według pomiarów wyżej to około
+  jednej trzeciej kosztu modeli (0,0182 z 0,0525 USD). Resztę, około dwóch trzecich, biorą ranking
+  na Haiku 5.5 ([prawdowid/rerank.py](../../prawdowid/rerank.py#L49)) i sędzia na Sonnet 5.5
+  ([prawdowid/judge.py](../../prawdowid/judge.py#L62)). Token
+  Sonnet kosztuje połowę tego co Opus, więc przejście wyodrębniania na Sonnet przy tej samej liczbie
+  tokenów obetnie koszt modeli o około 17%, nie o połowę. Jak koszt dzieli się między ranking i
+  sędziego, nie zmierzyliśmy. Dziennik sprawdzeń zapisuje każde wywołanie modelu z tokenami, więc
+  podział wyjdzie z pełnego przebiegu (#16). Czy jakość utrzyma się po zmianie modelu, sprawdza #88,
+  i bez tego pomiaru domyślnych modeli nie zmieniamy.
 - Kredyty zależą od liczby zapytań na twierdzenie (`PRAWDOWID_QUERIES_PER_CLAIM`, domyślnie 3). Każde
   zapytanie mniej to jeden kredyt mniej na każde sprawdzane twierdzenie. Wpływ na jakość: do
   zmierzenia. Wyszukiwanie w korpusie działa na naszym serwerze i nie kosztuje nic za zapytanie, ale
@@ -123,7 +128,8 @@ szybkim przebiegu na `95e6177` (wersja z jednym wywołaniem modelu) i 18,2 s w p
 wytrzyma serwer, czasu p95, punktu nasycenia ani kosztu pod obciążeniem. Test obciążeniowy z
 podmienionymi źródłami to #88.
 
-Ustawienia w kodzie (to konfiguracja, nie zmierzona przepustowość):
+Ustawienia w kodzie na `main` (`1aa173f`). To konfiguracja, nie zmierzona przepustowość, a PR #109
+zmienia część z nich (budżet 40 s, najwyżej 3 twierdzenia):
 
 - Backend to jeden proces uvicorn ([Dockerfile](../../Dockerfile)). Limit 10 sprawdzeń na minutę z
   jednego adresu IP jest trzymany w pamięci tego procesu ([prawdowid/app.py](../../prawdowid/app.py#L30)).
@@ -136,9 +142,14 @@ Ustawienia w kodzie (to konfiguracja, nie zmierzona przepustowość):
 - Serwer jest jeden i nie ma zapasowego ([docs/deploy.md](../deploy.md), sekcja „Known limits”).
 
 Co widzi użytkownik, kiedy coś się kończy: jedenaste sprawdzenie w ciągu minuty dostaje HTTP 429 z
-komunikatem po polsku. Źródło, które nie zdążyło albo padło, daje „nie sprawdzono” z powodem, nigdy
-werdykt. Brak klucza do modelu daje komunikat techniczny. Czy wyczerpanie kredytów Tavily pokazuje
-się jako limit wyszukiwarki, a nie jako brak dowodów, sprawdza #75.
+komunikatem po polsku. Brak klucza do modelu albo jego awaria daje komunikat techniczny. Gdy padną
+wszystkie źródła twierdzenia, nie odpowie sędzia albo skończy się czas, twierdzenie dostaje „nie
+sprawdzono” z powodem. Gdy padnie tylko część źródeł, a reszta nic nie znajdzie, wynik brzmi dziś
+„brak wystarczających dowodów”, a w ograniczeniach stoi, które źródło nie odpowiedziało
+([prawdowid/pipeline.py](../../prawdowid/pipeline.py#L137)). Tak skończy się też wyczerpanie
+kredytów Tavily, gdy Google Fact Check i gov.pl nic nie znajdą: dla kodu to zwykła awaria
+wyszukiwarki ([prawdowid/websearch.py](../../prawdowid/websearch.py#L113)). To luka #60, a poprawka
+czeka w PR #109. Alertu o kończących się kredytach nie ma (#75).
 
 Przy większym ruchu potrzebne będą kolejne procesy albo serwery i wspólny licznik limitu dla nich
 wszystkich. Ile, wyjdzie z testu obciążeniowego:

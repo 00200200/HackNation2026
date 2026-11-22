@@ -19,8 +19,11 @@ Część tego działa już dziś:
   ([prawdowid/judge.py](../../prawdowid/judge.py), [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md)).
 - Każda odpowiedź pokazuje tytuł źródła, wydawcę, datę publikacji i pobrania, link i cytat. Pokazuje
   też, czego nie udało się ustalić ([frontend/public/app.js](../../frontend/public/app.js)).
-- Bez dowodów odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji”. Awaria źródła daje
-  osobny komunikat, nigdy werdykt ([prawdowid/pipeline.py](../../prawdowid/pipeline.py)).
+- Bez dowodów odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji”. Gdy padną wszystkie
+  źródła twierdzenia albo skończy się czas, twierdzenie dostaje „nie sprawdzono” z powodem, a
+  awaria modelu daje komunikat techniczny ([prawdowid/pipeline.py](../../prawdowid/pipeline.py#L137)).
+  Luka: gdy padnie tylko część źródeł, a reszta nic nie znajdzie, wynik brzmi dziś „brak
+  wystarczających dowodów” z dopiskiem, które źródło nie odpowiedziało (#60, poprawka w PR #109).
 - Każde sprawdzenie zostawia jeden zamaskowany wpis w dzienniku: pytanie, czas, źródła, werdykty,
   czasy kroków, wywołania modelu i koszt ([prawdowid/checklog.py](../../prawdowid/checklog.py),
   [docs/privacy.md](../privacy.md)). Ekspert ma z czego odtworzyć, skąd wzięła się odpowiedź.
@@ -36,6 +39,9 @@ Na start proponujemy bezpieczeństwo podróży. To propozycja zespołu do uzgodn
 po stronie ministerstwa: korpus ma już 239 profili krajów z serwisu Odyseusz, każdy z aktualnym
 komunikatem i poziomem ostrzeżenia ([docs/corpus.md](../corpus.md)). Na pytanie „Czy MSZ odradza
 podróże do...?” istnieje jedna urzędowa odpowiedź, więc łatwo sprawdzić, czy narzędzie ją podaje.
+Tylko że dziś sprawdzanie nie czyta jeszcze korpusu (#74). Odyseusz to aplikacja w przeglądarce, a
+jego profile czyta tylko budowa korpusu, przez JSON serwisu. Dowody z Odyseusza takie pytanie
+dostanie więc dopiero po #74. To pierwsza praca etapu 2.
 
 ## Etap 1. Odtworzenie wyników, przegląd licencji, bezpieczeństwa i architektury
 
@@ -60,8 +66,9 @@ Co już jest:
   sprawdza adres IP przy każdym połączeniu i respektuje robots.txt
   ([prawdowid/safefetch.py](../../prawdowid/safefetch.py)). Jeden adres IP może wysłać 10 sprawdzeń
   na minutę ([prawdowid/app.py](../../prawdowid/app.py#L30)). Hook przed `git push` blokuje sekrety,
-  pliki powyżej 10 MB, czerwone testy i kod produktu bez świeżego evalu
-  ([.githooks/pre-push](../../.githooks/pre-push)).
+  śledzone pliki `.env`, pliki powyżej 10 MB, czerwone ruff albo pytest i commit bez akceptacji
+  agenta-sędziego. Od pierwszego evalu w danym klonie przepuszcza zmianę kodu produktu tylko z evalem
+  na tym samym stanie kodu ([.githooks/pre-push](../../.githooks/pre-push)).
 
 Czego brakuje:
 
@@ -69,8 +76,12 @@ Czego brakuje:
   żeby użyć kodu. To decyzja zespołu.
 - Zestawienia licencji zależności (SBOM) wygenerowanego z `uv.lock`.
 - CI. GitHub Actions są zablokowane na koncie (decyzja z 21.11 w [WORKLOG](../../WORKLOG.md)), więc
-  testy i eval uruchamia hook na komputerze osoby, która wypycha kod. W pilotażu kontrole powinny
-  chodzić na infrastrukturze, którą kontroluje MSZ.
+  kontrole robi hook na komputerze osoby, która wypycha kod. Hook sam uruchamia ruff i pytest, ale
+  evalu nie puszcza: czyta tylko wynik ostatniego przebiegu w danym klonie. Słaby wynik blokuje
+  dopiero zgłoszenie końcowe (`HN_FINAL=1`), przy zwykłym pushu hook tylko ostrzega. Hook włącza
+  się raz na klon i ma awaryjne obejścia (`HN_SKIP_EVAL=1`, `HN_SKIP_JUDGE=1`). WORKLOG odnotowuje
+  scalenia wypchnięte z `HN_SKIP_EVAL=1`. W pilotażu kontrole powinny chodzić na infrastrukturze,
+  którą kontroluje MSZ, i nie dawać się obejść.
 - Potwierdzenia, gdzie dostawcy przetwarzają dane. Dziś to UNCONFIRMED (#85).
 - Niezależnego przeglądu bezpieczeństwa, na przykład testu penetracyjnego zleconego przez MSZ.
 - Do powtórzenia pomiarów potrzebne są klucze do Anthropic, Tavily, Google Fact Check i EUvsDisinfo.
@@ -84,8 +95,9 @@ bezpieczeństwa zależy od kalendarza MSZ.
 Co już jest:
 
 - Zamknięty korpus [corpus/evidence.jsonl](../../corpus/evidence.jsonl): 1158 dokumentów z 11
-  zarejestrowanych domen, 1143 urzędowe i 15 od fact-checkera. Każdy rekord ma datę publikacji, datę
-  pobrania i licencję. Buduje go `make corpus` z listy [corpus/catalog.yaml](../../corpus/catalog.yaml),
+  zarejestrowanych domen, 1143 urzędowe i 15 od fact-checkera. Każdy rekord ma datę pobrania i
+  licencję. Datę publikacji ma 899 z 1158; reszta stron jej nie podaje, w większości komunikaty
+  CERT (241). Buduje go `make corpus` z listy [corpus/catalog.yaml](../../corpus/catalog.yaml),
   a `make corpus-check` sprawdza progi z briefu ([docs/corpus.md](../corpus.md)).
 - Wyszukiwanie w korpusie: pgvector plus wyszukiwanie pełnotekstowe, embeddingi liczone lokalnie
   modelem e5-large. Tekst nie wychodzi z serwera i nie płacimy za zapytanie
@@ -159,7 +171,8 @@ Czego brakuje:
 - Procedury korekt. Nie ustaliliśmy, kto poprawia błędną odpowiedź, w jakim czasie i gdzie wisi
   rejestr poprawek.
 - Kanału zgłoszeń. Przy odpowiedzi nie ma przycisku „zgłoś błąd”.
-- Trwałości. Dziennik sprawdzeń znika przy każdym wdrożeniu, bo nie ma wolumenu (#70). Baza nie ma
+- Trwałości. Dziennik sprawdzeń znika przy każdym wdrożeniu, bo nie ma wolumenu (#70, poprawka w
+  PR #109). Baza nie ma
   automatycznych kopii zapasowych, a serwer jest jeden, bez zapasowego ([docs/deploy.md](../deploy.md),
   sekcja „Known limits”).
 
@@ -176,9 +189,12 @@ Co już jest:
 - Źródła działają jak wtyczki, każde z własnym limitem czasu ([prawdowid/pipeline.py](../../prawdowid/pipeline.py)).
   Lista domen wyszukiwarki jest w kodzie i w dokumentacji, a test pilnuje, żeby się nie rozjechały
   ([tests/test_websearch.py](../../tests/test_websearch.py)).
-- Bramka regresji. Hook nie wypuści zmiany kodu produktu bez czystego evalu na tym samym commicie i
-  bez akceptacji agenta-sędziego. Zgłoszenie końcowe (`HN_FINAL=1`) wymaga pełnego evalu ze
-  wszystkimi metrykami powyżej progów ([.githooks/pre-push](../../.githooks/pre-push)).
+- Lokalna kontrola przed `git push`. Hook uruchamia ruff i pytest, wymaga akceptacji agenta-sędziego
+  dla wypychanego commita, a przy zmianie kodu produktu evalu na tym samym stanie kodu (od pierwszego
+  evalu w danym klonie). Słabe metryki blokują dopiero
+  zgłoszenie końcowe (`HN_FINAL=1`: pełny eval, wszystkie metryki powyżej progów), przy zwykłym
+  pushu hook tylko ostrzega ([.githooks/pre-push](../../.githooks/pre-push)). To jeszcze nie jest
+  walidacja regresji, o którą prosi brief: brakuje CI (etap 1) i progów uzgodnionych z MSZ.
 
 Czego brakuje:
 
@@ -193,8 +209,9 @@ Szacunek: 2-4 osobodni na kanał, bez czasu weryfikacji konta biznesowego u oper
 
 ## Razem
 
-Około 24-35 osobodni pracy zespołu (szacunek). Do tego czas po stronie MSZ: przegląd bezpieczeństwa,
-DPIA, audyt dostępności, konsultacje i sam pilotaż.
+Około 24-35 osobodni pracy zespołu przy jednym nowym kanale (WhatsApp albo SMS), 26-39 przy obu
+(szacunek). Do tego czas po stronie MSZ: przegląd bezpieczeństwa, DPIA, audyt dostępności,
+konsultacje i sam pilotaż.
 
 ## Tekst na slajd
 
@@ -206,9 +223,10 @@ Tytuł slajdu: Pilotaż z MSZ w pięciu etapach
 | 2. 4-6 tygodni na zamkniętym korpusie | 1158 dokumentów z 11 domen, wyszukiwanie lokalne | podpięcia korpusu (#74), kolejki eksperta (#79) |
 | 3. Red team, dane, dostępność | scenariusz E, maskowanie, 30 dni, usuwanie sesji | zewnętrznego red teamu, DPIA, audytu WCAG, konsultacji |
 | 4. Ograniczone wdrożenie | faktczyfejk.pl na serwerze w UE, dziennik sprawdzeń | alertów, procedury korekt, przycisku „zgłoś błąd” |
-| 5. Nowe kanały i źródła | bot Discord w kodzie, na tym samym API; bramka regresji przed każdą zmianą | bota na produkcji (#59), WhatsApp i SMS, progów uzgodnionych z MSZ |
+| 5. Nowe kanały i źródła | bot Discord w kodzie, na tym samym API; hook z testami i kontrolą evalu przed pushem | bota na produkcji (#59), WhatsApp i SMS, CI, progów uzgodnionych z MSZ |
 
 Pod tabelą: „Tryb wsparcia decyzji: odpowiedź do publikacji zatwierdza człowiek. Start: bezpieczeństwo
 podróży, 239 profili krajów z Odyseusza.”
 
-Przypis: „Praca zespołu: około 24-35 osobodni (szacunek). Szczegóły: docs/submission/pilot.md”
+Przypis: „Praca zespołu: około 24-35 osobodni przy jednym nowym kanale (szacunek). Szczegóły:
+docs/submission/pilot.md”

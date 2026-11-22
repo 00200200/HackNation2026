@@ -3,7 +3,8 @@
 Tekst roboczy do PDF, zgodnie z [issue #18](https://github.com/00200200/HackNation2026/issues/18).
 Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą z
 [evals/results/latest.json](../../evals/results/latest.json); pełna tabela i opis pomiaru są w
-[architecture.md](architecture.md). PDF i film nie są częścią tego pliku.
+[architecture.md](architecture.md). Koszty na slajdzie 9 i ich źródła są w [cost.md](cost.md).
+PDF i film nie są częścią tego pliku.
 
 ## Slajd 1. Prawdowid
 
@@ -63,11 +64,14 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 9. Czas i koszt
 
-- `median_latency_s: 3.8964525419287384`; `cost_per_100_usd: 1.8220444444444441`.
-- Ekstrapolacja: `1.8220444444444441 / 100 * 1000 = 18.220444444444441 USD`, czyli około
-  `18.22 USD` za 1000 sprawdzeń przy tej samej mieszance zapytań.
-- Źródło: [latest.json](../../evals/results/latest.json). Hosting, opłaty kanału i zachowanie pod
-  obciążeniem: UNCONFIRMED. [Założenia i rachunek](cost.md).
+- Zapisany szybki test na `95e6177`: `median_latency_s: 3.8964525419287384`,
+  `cost_per_100_usd: 1.8220444444444441`. Ta wersja wołała model raz, tylko do wyodrębnienia
+  twierdzeń, bez sędziego i bez Tavily. 1,82 USD za 100 to więc koszt samego wyodrębniania.
+- Pełny potok, jeden przebieg z 21.11 na 8 przypadkach: modele 0,0525 USD i około 4,9 kredytu
+  Tavily na sprawdzenie. 1000 sprawdzeń kosztuje od 76,88 do 91,50 USD, czyli od 312 do 372 zł.
+  Obywatel płaci 0 zł.
+- Serwer i domena: około 42,77 zł miesięcznie. Zachowania pod obciążeniem nie mierzyliśmy (#88).
+  Ostateczne liczby: z pełnego evalu (#16). [Założenia i rachunek](cost.md).
 
 ## Slajd 10. Bezpieczeństwo i prywatność
 
@@ -83,7 +87,8 @@ Limit: 12 slajdów; poniższy konspekt ma 12 slajdów. Liczby wyników pochodzą
 
 ## Slajd 11. Ograniczenia
 
-- DuckDuckGo zastąpiono Tavily po problemach z wynikami; korpus demonstracyjny nadal nie jest zbudowany.
+- DuckDuckGo zastąpiono Tavily po problemach z wynikami. Korpus 1158 dokumentów jest zbudowany, ale
+  jeszcze nie jest podpięty do sprawdzania (#74).
 - Baza incydentów organizatora jest wpięta, ale pusta (plik od organizatora jeszcze nie dotarł).
 - Prawa do przechowywania wybranych treści wymagają rozstrzygnięcia; w Discordzie brak komendy usuwania sesji.
 - Nie pokazujemy rozpoznawania obrazów ani kolejki moderatora jako gotowych funkcji.
