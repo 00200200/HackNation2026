@@ -57,6 +57,10 @@ read `evals/results/HISTORY.md`, not only `latest.json`; check the commit and no
 
 **Architecture board:** https://claude.ai/artifact/W9KUaX37YHjRFjAzZedyvs (also linked from README).
 
+**Source list** (#83, branch `claude/83-sources-page-20318f`): the page `/zrodla` lists every source a check uses, filled
+from `GET /api/sources` (`prawdowid/sources.py`), which reads the catalogue, the corpus, `ALLOWLIST` and the live lookups.
+It says the corpus is not searched in checks yet: flip `CORPUS_IN_CHECKS` when #74 wires it in (a test checks `pipeline.py`).
+
 ## Next (open work, take one and put your name on it)
 
 Basic requirements first: the jury gives no points for extras if one of these is missing.
@@ -198,6 +202,8 @@ Basic requirements first: the jury gives no points for extras if one of these is
 - 2026-11-21: Corpus: `corpus/evidence.jsonl` in git is the auditable source of truth, rebuilt by `make corpus`; any search index is built from it. Full text only under a licence or terms that allow it, otherwise a fragment of at most 500 characters and the link. robots.txt and bot protection are always respected. Domains are counted with the Public Suffix List (all of www.gov.pl is one domain). (branch `claude/corpus-455bc1`)
 
 ## Log (newest first, append only)
+
+- 2026-11-22 Michał (via Claude, session #83): public source list for audit (#83): `GET /api/sources` (`prawdowid/sources.py`: catalogue through `corpus.catalog`, counts through `corpus.check.summarize`, newest `retrieved_at` per source, `ALLOWLIST`, the four live lookups with whether their key is set) and the page `/zrodla` (`frontend/public/zrodla.html`, `zrodla.js`; nginx serves it via `$uri.html`): rules in plain Polish from `docs/corpus.md` (they cover the catalogue and corpus; the page says the hand-picked search domains, unconfirmed fact-checker status and Google's any-publisher ClaimReview are outside them), live lookups with key state, allowlist, corpus sources with records, last fetch and how many records have a publication date (899 of 1,158), candidates and excluded with the catalogue's reasons and whether web search still covers the domain (Konkret24 does). Linked from the header, the footer and under every answer's sources; type labels and DOM helpers moved to `common.js`, shared with `app.js`. `pyyaml` and `tldextract` are runtime dependencies now and the image copies the catalogue code; checked in a no-dev environment with read-only code. Branch `claude/83-sources-page-20318f`.
 
 - 2026-11-21 Michał: web: the session paragraph under the answer is gone (user request); "Usuń moje sprawdzenia" now sits at the end of the note under the box and appears once a session exists, so deletion (brief §5) stays.
 - 2026-11-21 Michał: web hero in the layout of doc2json.pl: centred name with the lens and a tagline over a white two-pane panel (check box with examples on the left, "Jak odpowiadamy" guide with verdict chips and the first words of each answer on the right); outlined echo removed; after a check the panel collapses to the box; field and chip borders at 3.9:1. Reviewer and a11y-reviewer findings fixed.

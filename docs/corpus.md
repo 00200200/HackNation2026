@@ -8,6 +8,8 @@ the corpus is rebuilt.
 - Source list with every decision: [`corpus/catalog.yaml`](../corpus/catalog.yaml)
 - Corpus: [`corpus/evidence.jsonl`](../corpus/evidence.jsonl), one JSON record per line
 - Last build, per source, with the reason for anything skipped: [`corpus/manifest.json`](../corpus/manifest.json)
+- The same list for anyone, with record counts and last fetch dates: the page `/zrodla` of the web
+  channel, filled from `GET /api/sources` (`prawdowid/sources.py` reads this catalogue and the corpus)
 
 ## Rebuild and check
 

@@ -73,6 +73,7 @@ SEARCH_TIMEOUT_S = 10
 FETCH_TIMEOUT_S = 10
 ATTEMPTS = 2  # first call plus one retry
 MAX_PAGE_BYTES = 2_000_000
+KEY_ENV = "TAVILY_API_KEY"
 # Both caps keep one claim inside the check's time budget (#11): DuckDuckGo took ~20 s to say
 # "no results" over two attempts in the full eval on f1e1684.
 SEARCH_BUDGET_S = float(
@@ -126,9 +127,9 @@ def tavily_search(query: str, *, domains: Sequence[str], limit: int) -> list[Sea
     https://docs.tavily.com/documentation/api-reference/endpoint/search
     """
     global _client
-    api_key = os.getenv("TAVILY_API_KEY")
+    api_key = os.getenv(KEY_ENV)
     if not api_key:
-        raise SearchUnavailable("TAVILY_API_KEY not set")
+        raise SearchUnavailable(f"{KEY_ENV} not set")
     if _client is None:
         _client = TavilyClient(api_key=api_key)
     try:

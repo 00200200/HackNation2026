@@ -159,7 +159,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 
 ## Layout
 
-- `frontend/`: static `index.html`, `styles.css` and `app.js` (no build step) served by nginx.
+- `frontend/`: static `index.html` (the check) and `zrodla.html` (the source list, from
+  `GET /api/sources`), with `styles.css`, `common.js`, `app.js` and `zrodla.js` (no build step), served by nginx.
   nginx also proxies `/api/` and `/health` to the backend, caps request bodies at 64 KB and sets
   a strict Content-Security-Policy.
 - `Dockerfile`: the backend image (Python 3.13, uv, runs as `nobody`).

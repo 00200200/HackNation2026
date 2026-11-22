@@ -3,6 +3,8 @@
 The committed evidence corpus (`corpus/evidence.jsonl`, built without any key from an audited
 catalogue of official sources and fact-checkers, searched by `prawdowid/corpus_search.py`) is
 described separately in [`docs/corpus.md`](corpus.md). This page covers web search and its cache.
+The web channel's page `/zrodla` lists both for anyone, from `GET /api/sources`
+(`prawdowid/sources.py`), which reads the catalogue, the corpus, `ALLOWLIST` and the lookups below.
 
 ## www.gov.pl site search (`prawdowid/govpl.py`)
 
