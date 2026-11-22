@@ -194,6 +194,11 @@ def test_prompt_asks_for_self_contained_claims_from_the_document_only():
     assert "add nothing from outside" in INSTRUCTIONS
 
 
+def test_prompt_keeps_an_asked_opinion_as_a_claim():
+    # Without this rule the model marked an opinion question unclear (needs_clarification).
+    assert "never as unclear" in INSTRUCTIONS
+
+
 @pytest.mark.usefixtures("quiet_sources")
 def test_resolved_pronoun_and_date_keep_their_source_sentence():
     text = "Warszawa, 3 marca 2025. Wczoraj premier Donald Tusk odwiedził Kijów. Rozmawiał tam o pomocy."
