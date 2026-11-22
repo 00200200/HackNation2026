@@ -185,8 +185,8 @@ do kolejki moderatora (sprawa N)" only then, so a failed write never reads as a 
 section 5). The moderator or analyst who holds `PRAWDOWID_ADMIN_TOKEN` reads the queue at
 `GET /api/cases`. Without that variable nobody could read it, so no check is filed and no answer
 mentions a moderator. There is no push notification and no moderator screen beyond that JSON list.
-It has not run on the live server yet: faktczyfejk.pl serves the `prod` branch (`24e92d4`), which,
-like `main`, does not have #79, and after the merge and the promotion the server's `.env` also
+It has not run on the live server yet: faktczyfejk.pl serves the `prod` branch (`24e92d4`), which does
+not have #79 (it is on `main`), and after `main` is promoted to `prod` the server's `.env` also
 needs the variable ([deploy.md](../deploy.md)).
 
 ## Default limits, not performance measurements
@@ -259,16 +259,16 @@ presence for factual verdicts, not evidence correctness. Whether a quote fits th
 checked by an agent, not a person, on 12 of the 251 quotes the earlier `df74cef` run showed with a URL (not
 repeated for this run), drawn with a
 fixed seed ([citation_spotcheck.md](../../evals/results/citation_spotcheck.md)): the quote or
-rating is on the page in 11 of 12 (A01's PAP page could not be read), 10 of 12 fit the verdict
-shown (FC-I03 only partly), I03 and A02 show a date other than the page's publication date, and
+rating is on the page in 11 of 12 (A01's PAP page could not be read), 9 of 12 fit the verdict
+shown (FC-I03 and FC-A04 only partly), I03 and A02 show a date other than the page's publication date, and
 FC-A04's source covers a different month than the claim.
 Verdict accuracy scores the main claim alone; citation metrics examine all returned claims. The JSON
 does not record per-provider retrieval outcomes or model overrides; the code default at `c422f2d`
 extracts claims with Sonnet (#88) and searches in one pass (#106).
 
-Runs of the same code differ by a few points, because the models and the search results are not
-the same from run to run. The round-4 full runs, with fixes to the judge and to reading
-fact-checker ratings between them, are all in
+The runs below are of different builds, with fixes to the judge and to reading fact-checker
+ratings between them, so they are not repeat runs of the same code. We did not measure how much
+repeated runs on exactly `c422f2d` differ. The round-4 full runs are all in
 [HISTORY.md](../../evals/results/HISTORY.md): `af7ec13` macro_f1 0.823 (abstention 0.750, before
 the judge rule on stated ratings and data gaps), `af163ec` 0.899, `9983127` 0.846 (A01-A03 lost to
 a closed connection right after the staging container was recreated, end_to_end 0.933), `df74cef` 0.888 and, with the #133 extraction fix, `c422f2d` 0.918 (the run

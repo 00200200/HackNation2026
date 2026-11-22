@@ -1,12 +1,12 @@
 # Pilotaż z MSZ: pięć etapów i co już mamy
 
-Stan na 22.11.2026, build `integration/r4` (zawiera `integration/r3`). Brief zadania w rozdziale 9 zaleca po
+Stan na 22.11.2026, `main` w `c422f2d` (zawiera `integration/r4` i `integration/r3`). Brief zadania w rozdziale 9 zaleca po
 hackathonie pięć etapów. Przy każdym piszemy, co już jest w repozytorium, czego brakuje i ile pracy
 to według nas zajmie. Pracochłonność podajemy w osobodniach jednej osoby z zespołu. To szacunek, nie
 pomiar, i zespół potwierdza go przed rozmową z MSZ. Numery z krzyżykiem (#74) to zgłoszenia w
 [repozytorium](https://github.com/00200200/HackNation2026/issues). Stan kodu opisujemy dla
-buildu `integration/r4`, na którym oprzemy wdrożenie. Gdy coś jest tylko tam, a nie na `main`,
-piszemy to przy danym zdaniu. #100 (krótkie klucze Fact Check i mapa ocen) i #116 (adapter
+kodu z `main`, na którym oprzemy wdrożenie. Gdy coś jest tylko tam, a nie w starszym buildzie
+na serwerze (gałąź `prod`, `24e92d4`), piszemy to przy danym zdaniu. #100 (krótkie klucze Fact Check i mapa ocen) i #116 (adapter
 demo `/czat`) weszły w `integration/r3` (PR #126), która jest częścią `integration/r4`, więc wchodzą
 w ten opis, tak jak reszta tego buildu.
 
@@ -22,15 +22,15 @@ Część tego działa już dziś:
   funkcja `judge.decide()` z dowodów, których cytat znaleźliśmy dosłownie w źródle
   ([prawdowid/judge.py](../../prawdowid/judge.py), [ADR 0001](../adr/0001-evidence-retrieval-and-verdict.md)).
 - Gdy odpowiedź ma dowody, pokazuje przy nich tytuł źródła, wydawcę, link i cytat oraz daty
-  publikacji i pobrania, o ile je znamy: strona bez daty publikacji jest dopuszczona (#95, w `integration/r4`; `main` takie strony odrzuca), a
+  publikacji i pobrania, o ile je znamy: strona bez daty publikacji jest dopuszczona (#95, na `main`; starszy build z `prod` takie strony odrzuca), a
   odpowiedź bez dowodów nie ma żadnego źródła do pokazania. Pokazuje też, czego nie udało się
   ustalić ([frontend/public/app.js](../../frontend/public/app.js)).
 - Bez dowodów odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji”. Gdy padną wszystkie
   źródła twierdzenia albo skończy się czas, twierdzenie dostaje „nie sprawdzono” z powodem, a
   awaria modelu daje komunikat techniczny ([prawdowid/pipeline.py](../../prawdowid/pipeline.py)).
   Dotyczy to także awarii samego źródła, które może rozstrzygnąć werdykt (Fact Check albo
-  wyszukiwarka), gdy dowodów nie starcza (#60). Ta reguła jest w `integration/r4` (z PR #109), a na
-  `main` jeszcze jej nie ma: tam taki wynik brzmi „brak wystarczających dowodów” z dopiskiem, które
+  wyszukiwarka), gdy dowodów nie starcza (#60). Ta reguła jest na `main` (z PR #109), a w starszym buildzie z
+  `prod` jeszcze jej nie ma: tam taki wynik brzmi „brak wystarczających dowodów” z dopiskiem, które
   źródło nie odpowiedziało.
 - Każde sprawdzenie zostawia jeden zamaskowany wpis w dzienniku: pytanie, czas, źródła, werdykty,
   czasy kroków, wywołania modelu i koszt ([prawdowid/checklog.py](../../prawdowid/checklog.py),
@@ -52,8 +52,8 @@ Na start proponujemy bezpieczeństwo podróży. To propozycja zespołu do uzgodn
 po stronie ministerstwa: korpus ma już 239 profili krajów z serwisu Odyseusz, każdy z aktualnym
 komunikatem i poziomem ostrzeżenia ([docs/corpus.md](../corpus.md)). Na pytanie „Czy MSZ odradza
 podróże do...?” istnieje jedna urzędowa odpowiedź, więc łatwo sprawdzić, czy narzędzie ją podaje.
-W buildzie `integration/r4` każde sprawdzenie przeszukuje korpus (#74, BM25 po `corpus/evidence.jsonl`,
-w tym 251 dokumentów z Odyseusza). Na `main` korpusu jeszcze nie czyta. Nie mierzyliśmy, czy pytanie
+Na `main` każde sprawdzenie przeszukuje korpus (#74, BM25 po `corpus/evidence.jsonl`,
+w tym 251 dokumentów z Odyseusza). Starszy build z `prod` korpusu nie czyta. Nie mierzyliśmy, czy pytanie
 o podróż faktycznie trafia na właściwy profil kraju i czy cytat z niego przechodzi sędziego:
 pełny przebieg na `c422f2d` dał `citation_correctness` 1,0, ale ta metryka sprawdza tylko, czy cytat z dokumentu korpusu występuje w nim dosłownie. Wpływu korpusu na odpowiedzi i trafień w pytaniach o podróż nie mierzyliśmy, a takich pytań nie ma w zestawie testowym. To pierwsza
 praca etapu 2.
@@ -68,7 +68,7 @@ Co już jest:
   ([deploy/pull-deploy.sh](../../deploy/pull-deploy.sh)), a do `prod` trafia tylko kod z `main`.
 - Testy: `make check` uruchamia ruff i pytest. 22.11.2026 na `integration/r4` (`df74cef`) przechodzi 1215 testów, 8 jest
   pominiętych.
-- Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 73 przypadkach na `main` (86 w `integration/r4`, z czego pełny przebieg na `c422f2d` ocenił 75)
+- Pomiary do powtórzenia: [evals/run.py](../../evals/run.py) liczy metryki z briefu na 86 przypadkach (pełny przebieg na `c422f2d` ocenił 75)
   ([evals/cases.jsonl](../../evals/cases.jsonl)). Runner zapisuje każdy przebieg do
   [evals/results/HISTORY.md](../../evals/results/HISTORY.md) z commitem i uwagami (przebiegów ze stagingu i z 21.11 nie zachowaliśmy, część wierszy jest odtworzona), a
   [docs/eval-notes.md](../eval-notes.md) mówi, którym przebiegom nie ufać.
@@ -115,7 +115,7 @@ Co już jest:
   CERT (241). Buduje go `make corpus` z listy [corpus/catalog.yaml](../../corpus/catalog.yaml),
   a `make corpus-check` sprawdza progi z briefu ([docs/corpus.md](../corpus.md)).
 - Wyszukiwanie w korpusie podczas sprawdzenia to BM25 w pamięci po `corpus/evidence.jsonl`, bez
-  embeddingów ([prawdowid/corpus_bm25.py](../../prawdowid/corpus_bm25.py), w `integration/r4`, nie na `main`). Osobny
+  embeddingów ([prawdowid/corpus_bm25.py](../../prawdowid/corpus_bm25.py), na `main`, nie w buildzie z `prod`). Osobny
   indeks pgvector z wyszukiwaniem pełnotekstowym i embeddingami e5-large, liczonymi lokalnie
   ([prawdowid/corpus_search.py](../../prawdowid/corpus_search.py), [prawdowid/index.py](../../prawdowid/index.py)),
   jest przygotowany, ale sprawdzanie go nie używa. Tekst nie wychodzi z serwera i nie płacimy za zapytanie.
@@ -126,7 +126,7 @@ Co już jest:
 Czego brakuje:
 
 - Pomiaru, że korpus poprawia odpowiedzi. Wyszukiwanie w nim jest podpięte do `verify()` w
-  `integration/r4` (#74), a pełny przebieg na `c422f2d` zmierzył tylko, że cytaty z korpusu występują w dokumentach (`citation_correctness` 1,0). Nie wiemy, czy korpus poprawia odpowiedzi ani czy pytania o podróż trafiają na właściwy profil (#16). Odpowiedzi
+  `main` (#74), a pełny przebieg na `c422f2d` zmierzył tylko, że cytaty z korpusu występują w dokumentach (`citation_correctness` 1,0). Nie wiemy, czy korpus poprawia odpowiedzi ani czy pytania o podróż trafiają na właściwy profil (#16). Odpowiedzi
   biorą dowody z Google Fact Check, EUvsDisinfo, wyszukiwarki www.gov.pl, Tavily i korpusu.
 - Trybu „tylko zamknięty korpus”, który na czas pilotażu wyłącza otwartą wyszukiwarkę. Dziś osobnym
   przełącznikiem da się wyłączyć tylko wyszukiwarkę gov.pl (`PRAWDOWID_GOVPL=0`).
@@ -161,20 +161,20 @@ Czego brakuje:
   pierwsze trzy przypadki E, E01-E03 ([WORKLOG](../../WORKLOG.md), wpis do #15), a przypadki
   FC-E01-FC-E03 `prawdowid/verifier.py` dopasowuje fraza po frazie
   ([docs/eval-notes.md](../eval-notes.md)). Potrzebne są przypadki,
-  których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures w
-  `integration/r4` (#94), ale eval z nimi jeszcze nie był uruchomiony: pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest w
-  `integration/r4`, nie w `main`.
+  których nie widzieliśmy. Przypadki z poleceniem ukrytym w stronie źródłowej mają fixtures na
+  `main` (#94), ale eval z nimi jeszcze nie był uruchomiony: pełny przebieg na `c422f2d` pominął E05-E15 (11 przypadków), bo brakowało publicznego adresu strony z fixture (`PRAWDOWID_FIXTURE_BASE`). Sprawdzanie pobranych źródeł wzorcami (#61, PR #72) jest na
+  `main`, nie w buildzie z `prod`.
 - Oceny skutków dla ochrony danych (DPIA) z inspektorem ochrony danych MSZ i umów powierzenia z
   dostawcami. Maskowanie nie wykrywa imion i adresów, a numer karty po etykiecie
-  produktu („nr 4111 1111 1111 1111”) przepuszcza do modelu (#113); na `main` nie łapie też numerów
-  dowodów, paszportów i części formatów telefonu (#82).
+  produktu („nr 4111 1111 1111 1111”) przepuszcza do modelu (#113); build z `prod` nie łapie też numerów
+  dowodów, paszportów i części formatów telefonu (#82, naprawione na `main`).
   Discord nie ma polecenia usuwania, a logi `stdout` Dockera są poza 30-dniową retencją
   ([docs/privacy.md](../privacy.md)).
 - Audytu WCAG przez zewnętrznego audytora i testów z osobami, które korzystają z czytnika ekranu.
 - Konsultacji z użytkownikami. W repozytorium nie ma żadnego badania z użytkownikami.
 
 Szacunek: 5-7 osobodni po stronie zespołu (nowe przypadki red team i poprawki: 3-5, usuwanie
-w Discordzie: 1, poprawki po audycie WCAG: 1; maskowanie z #82 jest już w `integration/r4`).
+w Discordzie: 1, poprawki po audycie WCAG: 1; maskowanie z #82 jest już na `main`).
 DPIA, audyt i konsultacje to kalendarz MSZ, w naszej
 ocenie od 2 do 4 tygodni.
 
@@ -189,7 +189,7 @@ Co już jest:
 - Endpoint `/health`, limit zapytań i dziennik, w którym każde sprawdzenie ma czasy kroków, błędy i
   koszt odpowiedzi ([prawdowid/checklog.py](../../prawdowid/checklog.py)).
 - Historia pomiarów jakości ([evals/results/HISTORY.md](../../evals/results/HISTORY.md)).
-- Build `integration/r4` czeka na wdrożenie: 22.11 o 04:30 `/czat` i `/zrodla` zwracały na
+- `main` czeka na wdrożenie (promocja na `prod`): 22.11 o 04:30 `/czat` i `/zrodla` zwracały na
   faktczyfejk.pl 404.
 
 Czego brakuje:
@@ -198,8 +198,8 @@ Czego brakuje:
 - Procedury korekt. Nie ustaliliśmy, kto poprawia błędną odpowiedź, w jakim czasie i gdzie wisi
   rejestr poprawek.
 - Kanału zgłoszeń. Przy odpowiedzi nie ma przycisku „zgłoś błąd”.
-- Trwałości. Na `main` dziennik sprawdzeń znika przy każdym wdrożeniu, bo nie ma wolumenu; w
-  `integration/r4` leży na wolumenie (#70, z PR #109), czego na serwerze jeszcze nie sprawdziliśmy. Baza nie ma
+- Trwałości. W buildzie z `prod` dziennik sprawdzeń znika przy każdym wdrożeniu, bo nie ma wolumenu; na
+  `main` leży na wolumenie (#70, z PR #109), czego na serwerze jeszcze nie sprawdziliśmy. Baza nie ma
   automatycznych kopii zapasowych, a serwer jest jeden, bez zapasowego ([docs/deploy.md](../deploy.md),
   sekcja „Known limits”).
 
@@ -247,7 +247,7 @@ Tytuł slajdu: Pilotaż z MSZ w pięciu etapach
 | Etap | Już jest | Brakuje |
 |---|---|---|
 | 1. Odtworzenie i przegląd | `make up`, 1215 testów, eval z metrykami jury, rejestr ryzyk | licencji repo, SBOM, CI |
-| 2. 4-6 tygodni na zamkniętym korpusie | 1158 dokumentów z 11 domen, wyszukiwanie lokalne, kolejka spraw (#79) | pomiaru korpusu (#74 jest w `integration/r4`), zatwierdzania przez eksperta |
+| 2. 4-6 tygodni na zamkniętym korpusie | 1158 dokumentów z 11 domen, wyszukiwanie lokalne, kolejka spraw (#79) | pomiaru korpusu (#74 jest na `main`), zatwierdzania przez eksperta |
 | 3. Red team, dane, dostępność | scenariusz E, maskowanie, 30 dni, usuwanie sesji | zewnętrznego red teamu, DPIA, audytu WCAG, konsultacji |
 | 4. Ograniczone wdrożenie | faktczyfejk.pl na serwerze w UE, dziennik sprawdzeń | alertów, procedury korekt, przycisku „zgłoś błąd” |
 | 5. Nowe kanały i źródła | bot Discord w kodzie, na tym samym API; hook z testami i kontrolą evalu przed pushem | bota na produkcji (#59), WhatsApp i SMS, CI, progów uzgodnionych z MSZ |

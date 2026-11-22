@@ -20,14 +20,14 @@ Brak dowodów, zdarzenie bezpieczeństwa albo niepotwierdzone twierdzenie o tema
 
 Kanały: strona WWW i adapter demonstracyjny komunikatora /czat na tym samym API; bot Discord (/sprawdz) czeka na wdrożenie. Serwer stoi w Niemczech (OVHcloud). Poza EOG trafia zamaskowany tekst do Anthropic i zapytania do Tavily; Google, EUvsDisinfo i gov.pl nie podają, gdzie przetwarzają dane.
 
-Pełny przebieg naszego testu (main, commit c422f2d, 75 przypadków, wyszukiwarka Tavily jak na produkcji): macro-F1 0,92 przy celu 0,75 (42 z 69 etykiet to oceny Demagoga, które produkt może przejąć), pokrycie cytatami 1,0, poprawność cytatów 1,0 (tylko obecność cytatu z korpusu w źródle), abstencja 1,0 (12 z 12), odporność na wstrzyknięcia 1,0 (7 we wklejonym tekście, 3 znane naszym wzorcom), mediana 14,6 s, zgodność kanałów 1,0 (6, drugi kanał z pamięci wyników), pętla moderatora 1,0 (2), end-to-end 0,99. Koszt modeli: 3,46 USD za 100 sprawdzeń, bez wyszukiwarki. Pominęliśmy 11 przypadków z poleceniem na stronie (brak publicznego adresu). Wynik tego samego kodu waha się o kilka punktów, bo modele i wyszukiwarka odpowiadają różnie.
+Pełny przebieg naszego testu (main, commit c422f2d, 75 przypadków, wyszukiwarka Tavily jak na produkcji): macro-F1 0,92 przy celu 0,75 (42 z 69 etykiet to oceny Demagoga, które produkt może przejąć), pokrycie cytatami 1,0, poprawność cytatów 1,0 (tylko obecność cytatu z korpusu w źródle), abstencja 1,0 (12 z 12), odporność na wstrzyknięcia 1,0 (7 we wklejonym tekście, 3 znane naszym wzorcom), mediana 14,6 s, zgodność kanałów 1,0 (6, drugi kanał z pamięci wyników), pętla moderatora 1,0 (2), end-to-end 0,99. Koszt modeli: 3,46 USD za 100 sprawdzeń, bez wyszukiwarki. Pominęliśmy 11 przypadków z poleceniem na stronie (brak publicznego adresu). Wcześniejsze pełne przebiegi to wyniki innych wersji kodu, nie powtórzenia tego samego; rozrzutu na samym c422f2d nie mierzyliśmy.
 
 End-to-end nie przeszedł tylko J01 (przy symulowanej awarii Fact Check oceny z innych źródeł z dopiskiem o awarii zamiast komunikatu technicznego). Z 7 pozostałych pomyłek 4 to „brak wystarczających dowodów” zamiast oceny. Baza incydentów jest pusta (brak pliku organizatora), 259 dokumentów korpusu nie ma daty, a fact-checkerów reprezentuje w nim 15 tekstów Pravdy. Nie obsługujemy zrzutów ekranu i nie maskujemy imion ani adresów.
 
 ## Przed wysłaniem (nie wklejać do formularza)
 
 Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka, bez pustych linii na
-brzegach: 3687 znaków (`len()`, znaki nowej linii jako LF), 3703 z CRLF i 3874 bajty UTF-8 z CRLF;
+brzegach: 3724 znaki (`len()`, znaki nowej linii jako LF), 3740 z CRLF i 3910 bajtów UTF-8 z CRLF;
 limit 4000 znaków ([issue #18](https://github.com/00200200/HackNation2026/issues/18)). Liczby
 pochodzą z pełnego przebiegu na `main` przy commicie `c422f2d` (75 przypadków, 2026-11-22T07:21:52Z,
 `dirty: false`, staging zbudowany z tego commita, sprawdzony sumą md5 `prawdowid/judge.py` i

@@ -111,7 +111,7 @@ before quoting it:
   fits the verdict was checked by an agent, not a person, only for the earlier `df74cef` run, on 12
   of the 251 quotes it showed with a URL, drawn with a fixed seed
   ([citation_spotcheck.md](../evals/results/citation_spotcheck.md)): the quote or rating is on the
-  page in 11 of 12 (A01's PAP page could not be read), 10 of 12 fit the verdict shown (FC-I03 only
+  page in 11 of 12 (A01's PAP page could not be read), 9 of 12 fit the verdict shown (FC-I03 and FC-A04 only
   partly), I03 and A02 show a date other than the page's publication date, and FC-A04's source covers
   a different month than the claim. The check was not repeated for `c422f2d`.
 

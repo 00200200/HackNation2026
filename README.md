@@ -58,7 +58,8 @@ staging built from that commit, with Tavily search as on prod. We wrote the case
 
 75 cases. E05 to E15 (injection in a fetched page) were skipped because they need a public address for the test
 pages. Every run with its commit: [HISTORY.md](evals/results/HISTORY.md). A spot check of 12 sampled citations
-found the quote or rating on the page for 11, and 10 fit the verdict shown:
+found the quote or rating on the page for 11, and 9 fit the verdict shown. The sample is from the earlier `df74cef` run,
+not from `c422f2d`, and an agent with automated tools checked it, not a person:
 [citation_spotcheck.md](evals/results/citation_spotcheck.md).
 
 ## Requirements

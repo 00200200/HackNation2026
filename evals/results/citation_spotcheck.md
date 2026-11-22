@@ -31,7 +31,7 @@ A team member should re-open a few of these before the submission.
 | 6 | FC-G01 | fałszywe | [PKW](https://samorzad2014.pkw.gov.pl/akty_prawne/0/77.html) | yes, word for word (raw page) | refutes: a ballot may have its corner cut off | yes; the source is a 2014 resolution |
 | 7 | A02 | potwierdzone | [Demagog](https://demagog.org.pl/analizy_i_raporty/cala-prawda-o-unii-europejskiej-2-jak-powstala-unia/) | yes, in the article lead (browser; the lead is written with non-breaking spaces) | supports | yes; the product shows 24.05.2024, the page says 02.05.2024 |
 | 8 | A01 | potwierdzone | [PAP](https://www.pap.pl/aktualnosci/26-lat-polski-w-sojuszu-polnocnoatlantyckim-jakie-wyzwania-staly-przed-naszym-krajem) | not checked: the page renders blank in an automated browser and the raw fetch is a script shell; the product labelled it a search-result fragment | — | not checked; the claim rests on four other sources too (IPN, BBN, KPRP, NATO) |
-| 9 | FC-A04 | potwierdzone | [PAP / Eurostat](https://europapnews.pap.pl/eurostat-41-mln-osob-z-ukrainy-objetych-tymczasowa-ochrona-w-ue) | yes, word for word (raw page) | supports: Germany had the most people under temporary protection | yes, but the figure is for the end of July 2024 and the claim names April 2024 |
+| 9 | FC-A04 | potwierdzone | [PAP / Eurostat](https://europapnews.pap.pl/eurostat-41-mln-osob-z-ukrainy-objetych-tymczasowa-ochrona-w-ue) | yes, word for word (raw page) | supports: Germany had the most people under temporary protection | partly: the figure is for the end of July 2024 and the claim names April 2024, so the page does not support the claim's time scope; not counted as verified support |
 | 10 | B01 | wprowadzające w błąd | [Demagog](https://demagog.org.pl/wypowiedzi/protesty-we-francji-berkowicz-udostepnia-stare-nagranie/) | yes, word for word (browser); the page's rating is "Manipulacja" | names the missing context: the video is from March 2023 | yes |
 | 11 | C02 | wprowadzające w błąd | [Kancelaria Sejmu](https://api.sejm.gov.pl/sejm/term10/interpellations/19063/body) | yes, word for word (raw page) | context: an MP notes that the announcement listed no towns, dates or lines | yes |
 | 12 | FC-B06 | wprowadzające w błąd | [Demagog](https://demagog.org.pl/wypowiedzi/donald-tusk-okresla-sie-rzecznikiem-interesow-izraela-to-niepelny-cytat/) | the rating "Manipulacja" is in the page's ClaimReview markup, dated 2025-09-26 (browser) | an incomplete quote | yes |
@@ -39,8 +39,8 @@ A team member should re-open a few of these before the submission.
 ## Result
 
 - **Quote or rating on the page:** 11 of 12. The twelfth page (A01) could not be read by any automated method.
-- **Fits the verdict shown:** 10 of 12. FC-I03 fits only partly, by design: a disinformation database is context, not
-  proof. A01 was not checked.
+- **Fits the verdict shown:** 9 of 12. FC-I03 fits only partly, by design: a disinformation database is context, not
+  proof. FC-A04 fits only partly: the figure is for another month than the claim. A01 was not checked.
 - **Dates:** in 2 of the 11 checked, the product shows a date other than the page's publication date (I03, A02).
   It probably takes the page's modification date. This is open work.
 - **Time scope:** in 1 of the 11 (FC-A04), the source supports the claim for another month than the claim names.

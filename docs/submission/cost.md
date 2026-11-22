@@ -73,7 +73,7 @@ or an ongoing operator subsidy. A free-to-user deployment budget remains UNCONFI
 
 ## Latency and load
 
-Saved `metrics.median_latency_s.value`: exactly `16.00594466700568` seconds
+Saved `metrics.median_latency_s.value`: exactly `14.553565916998195` seconds
 ([latest.json](../../evals/results/latest.json)), over the first answer of each of the 75 cases,
 with up to four cases in flight. Part of the web searches came from the Tavily query cache of the
 earlier runs that day (#110, per the commit message of `fb13425`); the cold-cache full run on

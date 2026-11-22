@@ -16,7 +16,7 @@ zgłoszony kod będzie inny niż `c422f2d`, liczby trzeba zmierzyć ponownie (#1
 - Wersja na produkcji. Scenariusz potrzebuje na `prod` commita, który zawiera #69 (`acb1f9e`, cztery
   przyciski z przykładami w [frontend/public/index.html](../../frontend/public/index.html#L58-L61))
   i scalone #66 (ocena fact-checkera dociera do sędziego) oraz #74 (korpus przeszukiwany przy każdym
-  sprawdzeniu). Oba są w `integration/r4`. W nocy 22.11 `origin/prod` to `24e92d4`: bez przycisków, bez
+  sprawdzeniu). Oba są na `main`. W nocy 22.11 `origin/prod` to `24e92d4`: bez przycisków, bez
   #66 i bez #74. Sprawdzamy to przez `git fetch` i
   `git merge-base --is-ancestor acb1f9e origin/prod && echo jest`, a potem tak samo dla commitów z
   #66 i #74. Bez przycisków wklejamy pytania ręcznie (tabela „Pytania do wklejenia” niżej).
@@ -59,14 +59,13 @@ Jedno zdanie i idziemy dalej:
 
 - Wrocław kończy się „Nie udało mi się potwierdzić tej informacji”: „Tym razem nie znaleźliśmy
   cytatu, który by to rozstrzygał, więc werdyktu nie ma. Wolimy powiedzieć, że nie wiemy, niż
-  zgadywać.” Pokazujemy dopiski pod odpowiedzią. Na dopytanie, w `integration/r4`: ocena
+  zgadywać.” Pokazujemy dopiski pod odpowiedzią. Na dopytanie, na `main`: ocena
   fact-checkera trafia do sędziego jako osobny fragment „Ocena fact-checkera: ...” (#66). Dla każdego
   twierdzenia idzie do Fact Check kilka krótkich kluczy, a ocena tego samego twierdzenia jest
   mapowana w kodzie na werdykt, tak jak opisuje ADR 0001. Ocena innego twierdzenia to tylko kontekst
   (#100). Ocenę czytamy też ze strony recenzji (ClaimReview), a zdanie werdyktu fact-checkera liczy się
   jako jego ocena (#127). Odpowiedź podaje ją jako „Ocena fact-checkera: <ocena>”, nie jako cytat ze
-  strony. Na `prod` tego jeszcze nie ma: PR rundy 4 z `integration/r4` trzeba scalić do `main`, a potem
-  wypchnąć `main` na `prod`.
+  strony. Na `prod` tego jeszcze nie ma: runda 4 jest już na `main`, więc zostaje wypchnąć `main` na `prod`.
 - Pytanie z poleceniem daje inny werdykt niż pytanie bez niego: „Wyszukiwanie idzie na żywo i za
   drugim razem trafiło na inne strony. Polecenia nie wykonaliśmy i strona to mówi.” Jeśli odpowiedź
   zaczyna się od „Tak.”, nie bronimy jej: „Ten przypadek nam nie wyszedł i zapisujemy go jako błąd.”
@@ -99,8 +98,8 @@ Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odp
   0,918 przy progu 0,75. To nie odsetek trafień: trafnych werdyktów jest 62 z 69. Wcześniej: 0,100 na
   `95e6177` (szkielet bez sędziego), 0,278 na `edd34a5` (szybki przebieg), 0,803 na `ca48b84` i od 0,815
   do 0,918 w sześciu wcześniejszych pełnych przebiegach rundy 4 (dwa z nich na API uruchomionym na laptopie, jeden z Perplexity), z poprawkami sędziego i odczytu ocen fact-checkerów
-  między nimi. Przebiegi tego samego kodu różnią się o kilka punktów, bo modele i wyszukiwarka nie
-  odpowiadają za każdym razem tak samo. To nasz własny zestaw, a ukrytego zbioru jury nie znamy. W tym
+  między nimi. To wyniki różnych wersji kodu, nie powtórzenia tego samego; rozrzutu na samym `c422f2d`
+  nie mierzyliśmy. To nasz własny zestaw, a ukrytego zbioru jury nie znamy. W tym
   przebiegu nie przechodzi
   `end_to_end` (0,987 przy progu 1,000: tylko J01), więc całość nadal nie spełnia progów.
 - Odporność na polecenia w zapisanych przebiegach: 0,000 na `95e6177`, 0,571 w zniekształconym
@@ -110,12 +109,12 @@ Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odp
   dotyczy 7 przypadków E. Na `main` (`95e6177`, `8c6f396`) metryka liczy przypadek jako porażkę także przy złym werdykcie. Wartość 1,000 z `c422f2d` liczy tylko kanarka i zapisane zdarzenie bezpieczeństwa; werdykt jest osobną metryką (`injection_verdict_correct`, 0,857: 6 z 7 przypadków, FC-E03 ma ocenę „wprowadzające w błąd” zamiast „fałszywe”).
 - Zgodność kanałów: w pełnym przebiegu na `c422f2d` wyszło 1,000 (drugie odpowiedzi przyszły ze wspólnej pamięci wyników, po 0,17-0,53 s, więc to pokazuje, że pamięć oddaje zapisaną odpowiedź, a nie że dwa niezależne sprawdzenia się zgadzają), a w zniekształconym timeoutami
   przebiegu na `8c6f396` 0,000 ([docs/eval-notes.md](../eval-notes.md)). Eval porównuje odpowiedzi kanałów tylko dla
-  przypadków, które mają więcej niż jeden kanał, więc to nie jest pomiar na ruchu użytkowników. Na
-  `main` strona i Discord robią dwa osobne sprawdzenia; wspólna pamięć wyników to #59.
+  przypadków, które mają więcej niż jeden kanał, więc to nie jest pomiar na ruchu użytkowników. W
+  buildzie z `prod` strona i Discord robią dwa osobne sprawdzenia; wspólna pamięć wyników (#59) jest na `main`.
 - Od #66 ocena fact-checkera dociera do sędziego jako osobny fragment, a od #100 krótkie klucze
-  Fact Check i mapa ocen na werdykt są w kodzie (oba w `integration/r4`). Na `prod` ocena
-  dociera tylko przez tytuł recenzji, dopóki PR rundy 4 nie trafi do `main` i `main` nie zostanie wypchnięty na `prod`.
-- Od #60 (PR #109, w `integration/r4`) awaria źródła, które może rozstrzygnąć werdykt, daje
+  Fact Check i mapa ocen na werdykt są w kodzie (oba na `main`). Na `prod` ocena
+  dociera tylko przez tytuł recenzji, dopóki `main` nie zostanie wypchnięty na `prod`.
+- Od #60 (PR #109, na `main`) awaria źródła, które może rozstrzygnąć werdykt, daje
   „nie sprawdzono” z powodem. Bez niego na `prod` taki wynik brzmi „brak wystarczających
   dowodów” z dopiskiem o awarii.
 - Kolejka moderatora (#79) jest zbudowana i zakłada sprawy tylko przy ustawionym
@@ -123,7 +122,7 @@ Nie twierdzimy, że coś działa, jeśli nie działa. Jeśli padnie pytanie, odp
   a czy token jest na serwerze demo, sprawdzamy przed występem. Nie ma ekranu moderatora ani zatwierdzania odpowiedzi przez eksperta,
   zrzutów ekranu i zdjęć (scenariusz F, #80) ani ostrzeżenia o sankcjach UE (#81).
 - Baza incydentów organizatora jest wpięta, ale pusta, bo nie mamy pliku (#64).
-- Wyszukiwanie w korpusie jest podpięte do sprawdzania w `integration/r4` (#74). Nie mamy pomiaru,
+- Wyszukiwanie w korpusie jest podpięte do sprawdzania na `main` (#74). Nie mamy pomiaru,
   że poprawia odpowiedzi ani że pytania o podróż trafiają na właściwy profil. `citation_correctness` zmierzyliśmy na 1,0, ale sprawdza tylko, czy cytat występuje w dokumencie.
 - Bot Discord działa w kodzie. Jego stan na produkcji: #59.
 - Gdzie dostawcy modeli i wyszukiwarki przetwarzają dane, jest UNCONFIRMED (#85). Nie pokazaliśmy
@@ -173,7 +172,7 @@ sobie przeczą ([prawdowid/judge.py](../../prawdowid/judge.py)), w filmie nie ob
 przypadek C ma jedną ocenę Demagoga, a nie dwa sprzeczne źródła ([WORKLOG](../../WORKLOG.md), punkt
 o lukach evalu w „Next”). Czego się spodziewać:
 
-- Scena 2 zależy od #66 i #100 (są w `integration/r4`) i od tego, czy wyszukiwarka dotrze do cytatu,
+- Scena 2 zależy od #66 i #100 (są na `main`) i od tego, czy wyszukiwarka dotrze do cytatu,
   tak jak na żywo. Gdy odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”, pokazujemy
   ją z napisem „Bez cytatu nie wydajemy werdyktu”, a lektor zamiast zdania z tabeli mówi: „Tym razem
   nie znaleźliśmy cytatu, który to rozstrzyga, więc werdyktu nie ma. Wolimy to powiedzieć niż
@@ -182,7 +181,7 @@ o lukach evalu w „Next”). Czego się spodziewać:
 - Scena 3 wymaga bota na produkcji albo na serwerze testowym (#59). Bez działającego bota wycinamy
   ją i dopisujemy w napisie końcowym: „Discord: uruchomienie w toku, #59”.
 - Sceny 7 i 8 zależą od tego, czy wyszukiwarka dotrze do strony fact-checkera. Część z nich blokuje
-  nasz serwer. W `integration/r4` taki wynik wchodzi jako fragment z wyników wyszukiwarki, oznaczony
+  nasz serwer. Na `main` taki wynik wchodzi jako fragment z wyników wyszukiwarki, oznaczony
   jako taki (#95). Jeśli mimo to odpowiedź brzmi „Nie udało mi się potwierdzić tej informacji.”,
   pokazujemy taką. Napis „źródło zablokowało pobranie, #95” dodajemy tylko wtedy, gdy nagranie albo logi
   potwierdzają blokadę; w innym przypadku opisujemy sam wynik, bez podawania przyczyny.
