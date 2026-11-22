@@ -92,8 +92,9 @@ means the default model. `get.docker.com` is Docker's install script; Docker rec
 repository for long-lived production hosts: https://docs.docker.com/engine/install/ubuntu/.
 
 `PRAWDOWID_ADMIN_TOKEN` is generated the same way as the password. It switches on the moderator
-queue (scenario H, [privacy.md](privacy.md#moderator-cases)) and is the bearer token that reads it,
-so give it only to the moderator the administrator names. With it empty, no check is filed and no
+queue (scenario H, [privacy.md](privacy.md#moderator-cases)) and is the bearer token that reads it and the
+check log export (every check of the last 30 days, masked), so give it only to the moderator the
+administrator names. With it empty, no check is filed and no
 answer mentions a moderator, so the eval's `moderator_loop` fails. In `/opt/faktczyfejk`:
 
 ```bash

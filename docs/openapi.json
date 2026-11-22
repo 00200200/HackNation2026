@@ -220,6 +220,23 @@
           }
         }
       }
+    },
+    "/api/export/stix": {
+      "post": {
+        "summary": "Export Stix",
+        "description": "The answer the client holds (the JSON of `POST /api/checks`) as a STIX 2.1 bundle\n(prawdowid/export.py). Masked again, nothing fetched; at most `export.MAX_ANSWER_BYTES` read.",
+        "operationId": "export_stix_api_export_stix_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

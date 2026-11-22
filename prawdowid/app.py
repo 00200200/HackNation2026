@@ -9,12 +9,21 @@ import time
 import unicodedata
 import uuid
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 from cachetools import TTLCache
-from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+)
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import (
     BaseModel,
@@ -29,8 +38,9 @@ from pydantic_core import PydanticCustomError
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from starlette.concurrency import run_in_threadpool
 
-from prawdowid import cases, checklog, corpus_bm25, faults
+from prawdowid import cases, checklog, corpus_bm25, export, faults
 from prawdowid.contract import CheckResult, Status, Verdict
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
@@ -370,11 +380,78 @@ def list_cases(
     PRAWDOWID_ADMIN_TOKEN; without the variable there is no queue (no check files a case) and the
     route does not exist. Left out of the channel spec (docs/openapi.json): no channel calls it.
     Plain def: it reads a file."""
+    _check_admin(credentials)
+    return cases.read_cases()
+
+
+def _check_admin(credentials: HTTPAuthorizationCredentials | None) -> None:
+    """404 without PRAWDOWID_ADMIN_TOKEN, 401 on a missing or wrong bearer token. Call it inside
+    the rate-limited route body: slowapi counts only when the endpoint runs, not in a dependency,
+    so a check made as a dependency would leave wrong guesses unlimited."""
     token = cases.admin_token()
     if not token:
         raise HTTPException(status_code=404)
     given = credentials.credentials if credentials else ""
     if not hmac.compare_digest(given.encode(), token.encode()):
-        log.warning("moderator cases refused: wrong or missing token")
+        log.warning("admin route refused: wrong or missing token")
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Bearer"})
-    return cases.read_cases()
+
+
+@app.post("/api/export/stix")
+@limiter.limit(RATE_LIMIT)
+async def export_stix(request: Request) -> Response:
+    """The answer the client holds (the JSON of `POST /api/checks`) as a STIX 2.1 bundle
+    (prawdowid/export.py). Masked again, nothing fetched; at most `export.MAX_ANSWER_BYTES` read."""
+    body = b""
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > export.MAX_ANSWER_BYTES:
+            raise HTTPException(
+                status_code=413, detail="Odpowiedź jest za duża do eksportu."
+            )
+    try:
+        answer = CheckResult.model_validate_json(body)
+        # A thread: building the bundle is CPU work and must not stall the event loop.
+        bundle = await run_in_threadpool(export.stix_bundle, answer)
+    except (ValidationError, ValueError):
+        raise HTTPException(
+            status_code=422,
+            detail="To nie jest odpowiedź z wynikami do wyeksportowania.",
+        ) from None
+    return Response(
+        bundle,
+        media_type="application/stix+json;version=2.1",
+        headers={"Content-Disposition": 'attachment; filename="faktczyfejk-stix.json"'},
+    )
+
+
+DATE_MIN, DATE_MAX = (
+    date(2020, 1, 1),
+    date(2100, 1, 1),
+)  # keeps `to` + 1 day inside datetime
+
+
+@app.get("/api/export/checks", include_in_schema=False)
+@limiter.limit(RATE_LIMIT)
+def export_checks(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_admin)],
+    format: Annotated[str, Query(pattern="^(csv|json)$")] = "json",
+    start: Annotated[date | None, Query(alias="from", ge=DATE_MIN, le=DATE_MAX)] = None,
+    end: Annotated[date | None, Query(alias="to", ge=DATE_MIN, le=DATE_MAX)] = None,
+) -> Response:
+    """The masked check log for a date range (UTC days, default: the retention period) as CSV or
+    JSON, for the holder of PRAWDOWID_ADMIN_TOKEN. No session ids. Not in the channel spec."""
+    _check_admin(credentials)
+    if start and end and start > end:
+        raise HTTPException(status_code=422, detail="`from` is after `to`.")
+    records = export.log_records(start, end)
+    if format == "csv":
+        return PlainTextResponse(
+            export.log_csv(records),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="checks.csv"'},
+        )
+    return JSONResponse(
+        records, headers={"Content-Disposition": 'attachment; filename="checks.json"'}
+    )

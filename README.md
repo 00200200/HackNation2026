@@ -51,6 +51,9 @@ sprawdzić ..."). A source that answered with nothing is no outage.
   and the like): it sends the same request with `X-Channel: demo` and shows the answer as the bot's
   messages, so jurors can try a second channel without Discord. A real messenger would plug into the
   same API.
+- **Export for analysts (#86):** every `ok` answer with claims downloads as JSON (the API answer as it is) or as a STIX 2.1 bundle
+  (`POST /api/export/stix`, built with the OASIS `stix2` library from masked data); the holder of `PRAWDOWID_ADMIN_TOKEN`
+  gets the check log as CSV or JSON at `GET /api/export/checks`. The OpenCTI import is untested.
 
 Measured results live in [`evals/results/HISTORY.md`](evals/results/HISTORY.md), one row per eval
 run with its commit and notes. Read [`docs/eval-notes.md`](docs/eval-notes.md) before quoting a number.
@@ -295,7 +298,7 @@ deploys) and its source cache points at a writable `/tmp` path. Other tuning var
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 | `PRAWDOWID_CHECK_LOG` | no | `logs/checks.jsonl` | Check log file (masked question, result, session id). Docker sets `/var/lib/prawdowid/checks.jsonl` on the `checklog` volume. See [docs/privacy.md](docs/privacy.md). |
 | `PRAWDOWID_CASES` | no | `cases.jsonl` next to the check log | Moderator cases (masked claims, session id, lookups tried), with a `.seq` and a `.lock` file of the same name beside it and a `.tmp` file during each write. Docker: `/var/lib/prawdowid/cases.jsonl` on the `checklog` volume. See [docs/privacy.md](docs/privacy.md#moderator-cases). |
-| `PRAWDOWID_ADMIN_TOKEN` | no | unset | Bearer token for `GET /api/cases`, the moderator queue. Give it to the moderator or analyst the administrator names. Unset: there is no moderator queue, so no check files a case, no channel mentions a moderator and the route answers 404. Use a long random value (`openssl rand -hex 32`). |
+| `PRAWDOWID_ADMIN_TOKEN` | no | unset | Bearer token for `GET /api/cases`, the moderator queue, and for `GET /api/export/checks`, the whole 30-day check log (masked, no session ids). Give it to the moderator or analyst the administrator names. Unset: there is no moderator queue, so no check files a case, no channel mentions a moderator and the route answers 404. Use a long random value (`openssl rand -hex 32`). |
 | `PRAWDOWID_CASE_MIN_SIMILARITY` | no | `0.5` | Share of word stems (Jaccard) two claims must share to be one moderator case. A first guess, not tuned. |
 | `PRAWDOWID_INCIDENTS_PATH` | no | `prawdowid/data/incidents.json` (empty) | Scenario I incident base, a `.json` or `.csv` file; format in `prawdowid/incidents.py`. Put the file in `incidents/` (git-ignored) and set a path relative to the repository root, e.g. `incidents/base.csv`: `make dev` reads it from the repository, Docker from `/app/incidents/base.csv`, where `compose.yaml` mounts `incidents/` read-only. The file must be readable by every user (the container runs as `nobody`). Read on the first check and kept: restart the backend after changing it. A match is shown next to the claims and never changes a verdict. |
 | `PRAWDOWID_EMBEDDING_MODEL` | no | `intfloat/multilingual-e5-large` | Local embedding model for corpus search (fastembed). Changing it rebuilds the index on the next `make index`. |
@@ -434,6 +437,8 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 | Method and path | What it does |
 |---|---|
 | `POST /api/checks` | Body `{"input": "..."}`. Returns `CheckResult`. 60 s timeout on `verify`; 10 requests per minute per client IP. |
+| `POST /api/export/stix` | Body: the JSON of a `CheckResult` (at most 64 kB). Returns a STIX 2.1 bundle (identity, report, one note per claim). 422 without checked claims, 413 over the cap. |
+| `GET /api/export/checks?from=&to=&format=csv\|json` | The masked check log for a date range (UTC days, retention applied, at most 10,000 rows, no session ids), for the holder of `PRAWDOWID_ADMIN_TOKEN`; 404 when unset, 401 on a wrong token. Not in the channel spec. |
 | `GET /api/cases` | The moderator queue, for the holder of `PRAWDOWID_ADMIN_TOKEN` (`Authorization: Bearer <token>`); 404 when the variable is unset, 401 on a wrong token. Not in the channel spec. |
 | `GET /api/openapi.json` | The OpenAPI spec. |
 | `GET /api/docs` | Interactive docs (Swagger UI) for the spec. |
