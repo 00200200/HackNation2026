@@ -1,20 +1,23 @@
 import csv
 import io
 import json
+import re
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
 import stix2
 from fastapi.testclient import TestClient
 
-from prawdowid import cases, checklog, export
+from prawdowid import cases, checklog, export, verifier
 from prawdowid.app import app, limiter
 from prawdowid.contract import (
+    CheckedPage,
     CheckResult,
     ClaimKind,
     ClaimResult,
     IncidentMatch,
     MatchKind,
+    SecurityEvent,
     Source,
     Status,
     Verdict,
@@ -127,8 +130,47 @@ def test_incident_matches_are_external_references(full_answer):
 
 
 def test_no_disarm_ids_are_invented(full_answer):
-    assert "T00" not in export.stix_bundle(full_answer)
-    assert "attack-pattern" not in export.stix_bundle(full_answer)
+    bundle = export.stix_bundle(full_answer)
+    assert not re.search(
+        r"\bT\d{4}", bundle
+    )  # an ATT&CK/DISARM id; timestamps are T00:00:00
+    assert "attack-pattern" not in bundle
+
+
+def test_the_bundle_keeps_the_caveats_the_page_shows():
+    snippet = source("https://a.pl/s")
+    snippet.snippet_only = "strona nie pozwala na pobranie"
+    snippet.fragment = "Cytat z wyszukiwarki."
+    answer = CheckResult(
+        status=Status.OK,
+        page=CheckedPage(
+            url="https://x.pl/artykul",
+            sha256="0" * 64,
+            title=None,
+            publisher=None,
+            published_at=None,
+        ),
+        claims=[claim(sources=[snippet])],
+        unchecked_claims=["Czwarte twierdzenie.", "Piąte twierdzenie."],
+        security_events=[
+            SecurityEvent(kind="prompt_injection", location="page", detector="patterns")
+        ],
+        limitations=["Wykrywanie poleceń tylko wzorcami."],
+    )
+    _, by_type = parse(export.stix_bundle(answer))
+    [report] = by_type["report"]
+    for text in (
+        "https://x.pl/artykul",
+        "Czwarte twierdzenie.",
+        "Piąte twierdzenie.",
+        "polecenia dla modelu",
+        "tylko wzorcami",
+    ):
+        assert text in report.description
+    [ref] = next(n for n in by_type["note"]).external_references
+    assert "Strony nie przeczytaliśmy" in ref.description
+    assert "strona nie pozwala na pobranie" in ref.description
+    assert "Cytat z wyszukiwarki." in ref.description
 
 
 def test_the_bundle_is_masked_again():
@@ -154,6 +196,31 @@ def test_stix_route_returns_a_bundle(client, full_answer):
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/stix+json")
     assert stix2.parse(resp.text).type == "bundle"
+
+
+def test_stix_route_refuses_more_than_a_check_produces(client):
+    many = CheckResult(
+        status=Status.OK, claims=[claim()] * (verifier.MAX_CHECKED_CLAIMS + 1)
+    )
+    assert (
+        client.post("/api/export/stix", content=many.model_dump_json()).status_code
+        == 422
+    )
+    flooded = CheckResult(
+        status=Status.OK,
+        claims=[
+            claim(
+                sources=[
+                    source(f"https://a.pl/{i}")
+                    for i in range(export.MAX_SOURCES_PER_CLAIM + 1)
+                ]
+            )
+        ],
+    )
+    assert (
+        client.post("/api/export/stix", content=flooded.model_dump_json()).status_code
+        == 422
+    )
 
 
 def test_stix_route_refuses_a_large_payload(client, full_answer):
@@ -218,6 +285,20 @@ def test_admin_export_refuses_a_missing_or_wrong_token(client, admin, headers):
     resp = client.get("/api/export/checks", headers=headers)
     assert resp.status_code == 401
     assert resp.headers["WWW-Authenticate"] == "Bearer"
+
+
+def test_wrong_tokens_are_rate_limited_like_on_the_cases_route(client, admin):
+    wrong = {"Authorization": "Bearer wrong"}
+    for path in ("/api/export/checks", "/api/cases"):
+        limiter.reset()
+        codes = [client.get(path, headers=wrong).status_code for _ in range(11)]
+        assert codes[:10] == [401] * 10 and codes[10] == 429, path
+
+
+def test_admin_export_rejects_dates_that_overflow(client, admin):
+    assert (
+        client.get("/api/export/checks?to=9999-12-31", headers=AUTH).status_code == 422
+    )
 
 
 def test_admin_export_does_not_exist_without_a_configured_token(client, monkeypatch):

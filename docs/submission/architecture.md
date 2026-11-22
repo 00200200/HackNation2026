@@ -159,7 +159,7 @@ It has not run on the live server yet; the server's `.env` needs the variable fi
 
 ## Integrations for analysts
 
-Brief section 6 (premium) asks for data export and analytical integrations (#86). Each answer on the
+Brief section 6 (premium) asks for data export and analytical integrations (#86). Each `ok` answer with claims on the
 web page downloads as JSON, exactly the API answer, and as a STIX 2.1 bundle: the page posts the
 answer it holds to `POST /api/export/stix`, and `prawdowid/export.py` builds the bundle with the OASIS
 `stix2` library (an Identity for faktczyfejk.pl, a Report for the check, one Note per claim labelled

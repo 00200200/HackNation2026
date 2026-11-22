@@ -3,10 +3,15 @@
 STIX: built with the OASIS `stix2` library (3.0.2, checked 2026-11-22: `Identity`, `Report`, `Note`,
 `ExternalReference`, `Bundle`). The bundle holds
 - an Identity for faktczyfejk.pl (identity_class "system"), the author of everything else;
-- a Report for the check (`object_refs` is required in STIX and the Report is what the notes are about);
+- a Report for the check (`object_refs` is required in STIX and the Report is what the notes are about).
+  Its description carries what the web page shows beside the verdicts: the checked link, the claims
+  left unchecked by the per-check cap, the check's own limitations, and a notice when instructions
+  aimed at the model were ignored;
 - one Note per claim, labelled `verdict:<code>`: the claim as `abstract`, the verdict, the
-  justification, the limitations and the sources' roles as `content`, the sources as
-  `external_references` (url, publisher and date as description). A Note rather than an Opinion:
+  justification, the limitations and a "context, not evidence" line for EUvsDisinfo sources as
+  `content`, the sources as `external_references` (url; the description holds title, publisher,
+  date, a fact-checker's rating, the quote the verdict rests on, and, for a page we could not
+  read, that only the search provider's extract was seen). A Note rather than an Opinion:
   an Opinion has only a five-step agree/disagree scale, which cannot say "not checked" or "not
   verifiable";
 - when incidents from the organiser's base matched, one more Note with their ids as
@@ -17,11 +22,12 @@ The import into OpenCTI is UNTESTED: the bundle parses back with `stix2.parse` a
 spec, no OpenCTI instance was available.
 
 Check log export: a fixed list of fields of the masked record, without the session id (it links one
-visitor's checks). Records outside retention are never in the file (`checklog.read_range`).
+visitor's checks). Records outside retention are never in the file (`checklog.read_all`).
 """
 
 import csv
 import io
+import json
 import uuid
 from datetime import UTC, date, datetime, time, timedelta
 
@@ -29,8 +35,10 @@ import stix2
 
 from prawdowid import checklog
 from prawdowid.contract import CheckResult, ClaimResult, Source, Status
+from prawdowid.pipeline import DISINFO_DATABASE
 from prawdowid.privacy import RETENTION_DAYS
 from prawdowid.privacy import mask_personal_data as mask
+from prawdowid.verifier import MAX_CHECKED_CLAIMS
 
 # The API reads at most this much of an export request (nginx cuts requests at 64k too).
 MAX_ANSWER_BYTES = 64_000
@@ -38,9 +46,9 @@ MAX_ANSWER_BYTES = 64_000
 MAX_ROWS = 10_000
 IDENTITY_NAME = "faktczyfejk.pl"
 IDENTITY_URL = "https://faktczyfejk.pl"
-CONTEXT_TYPES = {
-    "disinfo_database"
-}  # EUvsDisinfo: context, never evidence (pipeline.py)
+# A real answer has at most MAX_CHECKED_CLAIMS claims; a client that posts more is not exporting one.
+MAX_SOURCES_PER_CLAIM = 25
+CONTEXT_TYPES = {DISINFO_DATABASE}  # EUvsDisinfo: context, never evidence
 
 
 def _reference(s: Source) -> stix2.ExternalReference:
@@ -49,11 +57,36 @@ def _reference(s: Source) -> stix2.ExternalReference:
     )
     if s.rating:
         detail += f" (ocena: {s.rating})"
+    parts = [f"{s.title}. {detail}" if detail else s.title]
+    if s.snippet_only:
+        parts.append(
+            f"Strony nie przeczytaliśmy: fragment z wyników wyszukiwarki ({s.snippet_only})."
+        )
+    if s.fragment:
+        parts.append(f"Fragment, na którym opiera się ocena: {s.fragment}")
     return stix2.ExternalReference(
         source_name=mask(s.publisher or s.title) or "source",
         url=mask(str(s.url)),
-        description=mask(f"{s.title}. {detail}" if detail else s.title),
+        description=mask(" ".join(parts)),
     )
+
+
+def _report_description(answer: CheckResult) -> str:
+    lines = []
+    if answer.page:
+        lines.append(f"Sprawdzona strona: {answer.page.url}")
+    if answer.unchecked_claims:
+        lines.append(
+            f"Oceniono {len(answer.claims)} twierdzeń. Tych nie oceniliśmy: "
+            + " | ".join(answer.unchecked_claims)
+        )
+    if answer.security_events:
+        lines.append(
+            "W tekście lub źródłach były polecenia dla modelu; zignorowaliśmy je "
+            f"({len(answer.security_events)})."
+        )
+    lines += answer.limitations
+    return mask("\n".join(lines))
 
 
 def _content(c: ClaimResult) -> str:
@@ -71,6 +104,10 @@ def stix_bundle(answer: CheckResult) -> str:
     """The answer as a serialised STIX 2.1 bundle. Raises ValueError when there is nothing to export."""
     if answer.status is not Status.OK or not answer.claims:
         raise ValueError("only an answer with checked claims can be exported")
+    if len(answer.claims) > MAX_CHECKED_CLAIMS or any(
+        len(c.sources) > MAX_SOURCES_PER_CLAIM for c in answer.claims
+    ):
+        raise ValueError("more claims or sources than a check produces")
     now = datetime.now(UTC)
     identity = stix2.Identity(
         name=IDENTITY_NAME,
@@ -119,10 +156,14 @@ def stix_bundle(answer: CheckResult) -> str:
         created_by_ref=identity.id,
         name="Fact check " + now.strftime("%Y-%m-%d %H:%M UTC"),
         published=now,
+        description=_report_description(answer) or None,
         report_types=["threat-report"],
         object_refs=[identity.id, *(n.id for n in notes)],
     )
-    return stix2.Bundle(identity, report, *notes).serialize(pretty=True)
+    # Not `serialize(pretty=True)`: the library's pretty sort re-searches the bundle for every key,
+    # which grows with the square of its size. Re-indenting with json is linear.
+    compact = stix2.Bundle(identity, report, *notes).serialize()
+    return json.dumps(json.loads(compact), indent=2, ensure_ascii=False)
 
 
 # Fields of a check log record that leave the service. `session` is left out on purpose.
@@ -152,6 +193,7 @@ CSV_COLUMNS = (
     "error",
     "latency_ms",
     "cost_usd",
+    "unpriced_requests",
     "question",
     "claims",
     "verdicts",
@@ -169,7 +211,7 @@ def log_records(start: date | None, end: date | None) -> list[dict]:
     start = start or today - timedelta(days=RETENTION_DAYS)
     end = end or today
     lo = datetime.combine(start, time.min, UTC)
-    hi = datetime.combine(end + timedelta(days=1), time.min, UTC)
+    hi = datetime.combine(end, time.min, UTC) + timedelta(days=1)
     rows = [
         r for r in checklog.read_all() if lo <= datetime.fromisoformat(r["time"]) < hi
     ]

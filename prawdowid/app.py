@@ -38,6 +38,7 @@ from pydantic_core import PydanticCustomError
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from starlette.concurrency import run_in_threadpool
 
 from prawdowid import cases, checklog, corpus_bm25, export, faults
 from prawdowid.contract import CheckResult, Status, Verdict
@@ -379,26 +380,20 @@ def list_cases(
     PRAWDOWID_ADMIN_TOKEN; without the variable there is no queue (no check files a case) and the
     route does not exist. Left out of the channel spec (docs/openapi.json): no channel calls it.
     Plain def: it reads a file."""
-    token = cases.admin_token()
-    if not token:
-        raise HTTPException(status_code=404)
-    given = credentials.credentials if credentials else ""
-    if not hmac.compare_digest(given.encode(), token.encode()):
-        log.warning("moderator cases refused: wrong or missing token")
-        raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Bearer"})
+    _check_admin(credentials)
     return cases.read_cases()
 
 
-def _require_admin(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_admin)],
-) -> None:
-    """Same token and answers as `/api/cases`: 404 without PRAWDOWID_ADMIN_TOKEN, 401 on a wrong one."""
+def _check_admin(credentials: HTTPAuthorizationCredentials | None) -> None:
+    """404 without PRAWDOWID_ADMIN_TOKEN, 401 on a missing or wrong bearer token. Call it inside
+    the rate-limited route body: slowapi counts only when the endpoint runs, not in a dependency,
+    so a check made as a dependency would leave wrong guesses unlimited."""
     token = cases.admin_token()
     if not token:
         raise HTTPException(status_code=404)
     given = credentials.credentials if credentials else ""
     if not hmac.compare_digest(given.encode(), token.encode()):
-        log.warning("admin export refused: wrong or missing token")
+        log.warning("admin route refused: wrong or missing token")
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Bearer"})
 
 
@@ -415,7 +410,9 @@ async def export_stix(request: Request) -> Response:
                 status_code=413, detail="Odpowiedź jest za duża do eksportu."
             )
     try:
-        bundle = export.stix_bundle(CheckResult.model_validate_json(body))
+        answer = CheckResult.model_validate_json(body)
+        # A thread: building the bundle is CPU work and must not stall the event loop.
+        bundle = await run_in_threadpool(export.stix_bundle, answer)
     except (ValidationError, ValueError):
         raise HTTPException(
             status_code=422,
@@ -428,20 +425,24 @@ async def export_stix(request: Request) -> Response:
     )
 
 
-@app.get(
-    "/api/export/checks",
-    include_in_schema=False,
-    dependencies=[Depends(_require_admin)],
-)
+DATE_MIN, DATE_MAX = (
+    date(2020, 1, 1),
+    date(2100, 1, 1),
+)  # keeps `to` + 1 day inside datetime
+
+
+@app.get("/api/export/checks", include_in_schema=False)
 @limiter.limit(RATE_LIMIT)
 def export_checks(
     request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_admin)],
     format: Annotated[str, Query(pattern="^(csv|json)$")] = "json",
-    start: Annotated[date | None, Query(alias="from")] = None,
-    end: Annotated[date | None, Query(alias="to")] = None,
+    start: Annotated[date | None, Query(alias="from", ge=DATE_MIN, le=DATE_MAX)] = None,
+    end: Annotated[date | None, Query(alias="to", ge=DATE_MIN, le=DATE_MAX)] = None,
 ) -> Response:
     """The masked check log for a date range (UTC days, default: the retention period) as CSV or
     JSON, for the holder of PRAWDOWID_ADMIN_TOKEN. No session ids. Not in the channel spec."""
+    _check_admin(credentials)
     if start and end and start > end:
         raise HTTPException(status_code=422, detail="`from` is after `to`.")
     records = export.log_records(start, end)

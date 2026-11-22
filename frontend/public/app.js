@@ -193,7 +193,7 @@ function exportButtons(check) {
   json.addEventListener("click", () => download("faktczyfejk-wynik.json", "application/json", JSON.stringify(check, null, 2)));
   const stix = el("button", { type: "button", className: "copy-btn secondary", textContent: "Pobierz STIX 2.1" });
   stix.addEventListener("click", async () => {
-    const label = stix.textContent;
+    const label = "Pobierz STIX 2.1";
     try {
       const resp = await fetch("/api/export/stix", {
         method: "POST",
