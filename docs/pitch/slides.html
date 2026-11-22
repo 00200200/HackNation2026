@@ -185,18 +185,20 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="ft"><span>Format odpowiedzi według przykładów organizatora</span><span class="n">05 / 12</span></div>
 </section>
 
-<!-- 6. How it works -->
+<!-- 6. How it works: the pipeline -->
 <section class="slide" id="s6">
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px">Model czyta. Werdykt ustala kod.</h2>
-  <div class="flow" style="position:absolute; top:400px; left:110px; right:110px">
-    <div class="step"><div class="k">1</div><h3>Tekst albo link</h3><p>Link pobieramy bezpiecznie i traktujemy jak zwykłą treść.</p></div>
-    <div class="step"><div class="k">2</div><h3>Twierdzenia</h3><p>Model wyodrębnia zdania, które da się sprawdzić. Opinie odkłada.</p></div>
-    <div class="step"><div class="k">3</div><h3>Źródła równolegle</h3><p>Google Fact Check, gov.pl, nasz korpus 1158 dokumentów, wyszukiwarka po wybranych domenach. EUvsDisinfo tylko jako kontekst.</p></div>
-    <div class="step"><div class="k">4</div><h3>Cytat ze źródła</h3><p>Model wskazuje cytat, a kod sprawdza go dosłownie, zanim stanie się dowodem.</p></div>
-    <div class="step code"><div class="k">5</div><h3>Werdykt z reguł</h3><p>Ocenę wyznacza kod z dowodów. Brak dowodów to „nie wiem”.</p></div>
+  <div class="flow" style="position:absolute; top:310px; left:110px; right:110px; grid-template-columns: repeat(3, 1fr); gap:22px">
+    <div class="step"><div class="k">1 · Wejście</div><h3>Tekst albo link</h3><p>Link pobieramy tylko z&nbsp;publicznego adresu: do 3&nbsp;przekierowań, 2&nbsp;MB, 10&nbsp;s. PESEL, telefony, e&#8209;maile i&nbsp;numery kont maskujemy, zanim tekst zobaczy model.</p></div>
+    <div class="step"><div class="k">2 · Claude Sonnet</div><h3>Twierdzenia</h3><p>Model wybiera do 3&nbsp;twierdzeń, które da się sprawdzić, i&nbsp;pisze do nich zapytania. Opinia dostaje „nie podlega weryfikacji”.</p></div>
+    <div class="step"><div class="k">3 · Równolegle, każde z&nbsp;limitem czasu</div><h3>Źródła</h3><p>Google Fact Check, wyszukiwarka gov.pl, wyszukiwarka na liście domen (Perplexity albo Tavily), korpus 1158&nbsp;dokumentów. EUvsDisinfo tylko jako kontekst.</p></div>
+    <div class="step"><div class="k">4 · Claude Haiku</div><h3>Wybór fragmentów</h3><p>Z&nbsp;najwyżej 60&nbsp;fragmentów zostaje 12. Strona z&nbsp;linku nie jest dowodem dla samej siebie. Polecenia ukryte w&nbsp;źródłach wyłapują wzorce w&nbsp;kodzie.</p></div>
+    <div class="step"><div class="k">5 · Claude Sonnet</div><h3>Sędzia i&nbsp;cytat</h3><p>Model oznacza fragment: potwierdza, przeczy albo daje kontekst, zawsze z&nbsp;cytatem. Kod odrzuca cytat, którego nie ma w&nbsp;źródle słowo w&nbsp;słowo.</p></div>
+    <div class="step code"><div class="k">6 · Kod, nie model</div><h3>Werdykt z&nbsp;reguł</h3><p>Wystarczy jedno źródło oficjalne, pierwotne albo fact-checkingowe, albo dwa niezależne. Źródła sprzeczne: „brak wystarczających dowodów” i&nbsp;opis konfliktu. Awaria źródła: „nie sprawdzono”.</p></div>
   </div>
-  <div class="ft"><span>Architektura: docs/adr/0001, docs/submission/architecture.md</span><span class="n">06 / 12</span></div>
+  <p class="muted" style="position:absolute; top:880px; left:110px; right:110px; margin:0; font-size:24px; line-height:1.35">Na całe sprawdzenie jest 40&nbsp;s. Ta sama odpowiedź trafia na stronę, do /czat i&nbsp;na Discorda. Każde sprawdzenie zostawia zamaskowany wpis w&nbsp;dzienniku na 30&nbsp;dni, a&nbsp;twierdzenie bez dowodów trafia do kolejki moderatora.</p>
+  <div class="ft"><span>Modele i limity z kodu na main, 22.11.2026 · docs/submission/architecture.md, docs/adr/0001</span><span class="n">06 / 12</span></div>
 </section>
 
 <!-- 7. Risks -->
