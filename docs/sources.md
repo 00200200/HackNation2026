@@ -41,6 +41,14 @@ corpus is built with `uv run python -m prawdowid.corpus`.
 Search provider is now **Tavily** (`/search`, official API, see `WORKLOG.md` Decisions, #7, #8);
 it replaced DuckDuckGo (`ddgs`), which returned no results from our machine on 2026-11-21.
 
+Tavily results are cached per query (`prawdowid/search_cache.py`, #110) so reruns and repeated
+questions spend no credits: key = casefolded, whitespace-folded masked query + sorted domains +
+limit; TTL `PRAWDOWID_SEARCH_CACHE_TTL_S` (default 24 h, at most `RETENTION_DAYS`, 0 = off); at most
+2,000 entries, persisted in `corpus/search_cache.jsonl`. Failures and limit answers (HTTP 429, 432,
+433; the SDK raises `UsageLimitExceededError` or `ForbiddenError`) are never cached; after a limit
+answer no call is made for 60 s. Calls and hits are logged per lookup and counted in
+`search_cache.STATS` and `search_cache.track()`.
+
 What we store (`prawdowid/cache.py`): metadata of every page (URL, title, publisher, dates,
 type, domain, licence) in the local file `corpus/docs.jsonl`, owner-only (0600), not in the repo.
 Full page text is stored only for a domain whose licence is confirmed (`licence` in `ALLOWLIST`);

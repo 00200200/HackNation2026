@@ -231,6 +231,7 @@ CLAUDE.local.md
 
 # Source cache: full page text, local only (see prawdowid/cache.py)
 corpus/docs.jsonl
+corpus/search_cache.jsonl
 
 # Check log: masked questions per demo session, local only (see prawdowid/checklog.py)
 logs/
