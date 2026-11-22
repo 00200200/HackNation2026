@@ -40,21 +40,21 @@ rules in code set the verdict.
 
 ## Results
 
-Full run of our eval on `df74cef`, 22.11.2026 ([`latest.json`](evals/results/latest.json), stamped `f4c9aa8`,
-which is `df74cef` plus eval results). We wrote the cases and labels. The targets come from the brief.
+Full run of our eval on `main` at `c422f2d`, 22.11.2026 ([`latest.json`](evals/results/latest.json)), on VPS
+staging built from that commit, with Tavily search as on prod. We wrote the cases and labels. The targets come from the brief.
 
 | Metric | Target | Result |
 |---|---|---|
-| Verdict accuracy, macro-F1 | ≥ 0.75 | 0.888 |
+| Verdict accuracy, macro-F1 | ≥ 0.75 | 0.918 |
 | Citation coverage | ≥ 0.95 | 1.0 |
 | Citation correctness | ≥ 0.85 | 1.0 (checks only that the quote is in the corpus document) |
 | Correct abstention | ≥ 0.80 | 1.0 |
 | Prompt-injection resistance | ≥ 0.90 | 1.0 (injection in the input text only) |
-| Median time, text and URL | ≤ 30 s | 16.0 s |
-| End-to-end scenarios without the team | 1.0 | 0.973, below target: J01 and A15 fail |
+| Median time, text and URL | ≤ 30 s | 14.6 s |
+| End-to-end scenarios without the team | 1.0 | 0.987, below target: J01 fails |
 | Channel consistency | 1.0 | 1.0 |
 | Moderator loop | 1.0 | 1.0 |
-| Cost of 100 checks | reported | 3.54 USD, model calls only |
+| Cost of 100 checks | reported | 3.46 USD, model calls only |
 
 75 cases. E05 to E15 (injection in a fetched page) were skipped because they need a public address for the test
 pages. Every run with its commit: [HISTORY.md](evals/results/HISTORY.md). A spot check of 12 sampled citations
@@ -68,7 +68,7 @@ measurement. Partial means it works, with the gap named.
 
 | Requirement | Status | Where |
 |---|---|---|
-| End-to-end without help from the team | Partial: the code has no manual step, but the full run scores 0.973 (J01, A15) | [docs/eval-notes.md](docs/eval-notes.md) |
+| End-to-end without help from the team | Partial: the code has no manual step, but the full run scores 0.987 (J01) | [docs/eval-notes.md](docs/eval-notes.md) |
 | No fabricated sources | Done: the verdict rests on quotes the code found in the cited document, or on a fact-checker's rating of the same claim. The model only labels quotes | [`prawdowid/judge.py`](prawdowid/judge.py) |
 | Abstention without evidence | Done: `judge.decide()` returns `brak wystarczających dowodów` without a verified quote from a strong enough source, 1.0 in the full run | [`tests/test_judge.py`](tests/test_judge.py) |
 | Two channels, or a channel and a demo adapter | Partial: the web page, the `/czat` demo adapter and the Discord bot `/sprawdz` call the same `POST /api/checks`. The bot runs from Compose ([docs/deploy.md](docs/deploy.md), [scenario G](docs/submission/scenario-g.md)); per [#59](https://github.com/00200200/HackNation2026/issues/59) it is not deployed on the demo server (we did not check) | [`czat.js`](frontend/public/czat.js), [`discord_bot.py`](prawdowid/discord_bot.py) |

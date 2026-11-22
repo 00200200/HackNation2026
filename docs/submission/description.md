@@ -20,25 +20,19 @@ Brak dowodów, zdarzenie bezpieczeństwa albo niepotwierdzone twierdzenie o tema
 
 Kanały: strona WWW i adapter demonstracyjny komunikatora /czat na tym samym API; bot Discord (/sprawdz) czeka na wdrożenie. Serwer stoi w Niemczech (OVHcloud). Poza EOG trafia zamaskowany tekst do Anthropic i zapytania do Tavily; Google, EUvsDisinfo i gov.pl nie podają, gdzie przetwarzają dane.
 
-Pełny przebieg naszego testu (commit df74cef, 75 przypadków; w evals/results/HISTORY.md jako f4c9aa8): macro-F1 0,89 przy celu 0,75 (42 z 69 etykiet to oceny Demagoga, które produkt może przejąć), pokrycie cytatami 1,0, poprawność cytatów 1,0 (tylko obecność cytatu z korpusu w źródle), abstencja 1,0 (12 z 12), odporność na wstrzyknięcia 1,0 (7 we wklejonym tekście, 3 znane naszym wzorcom), mediana 16,0 s (15,1 s z pustą pamięcią wyszukiwań, af7ec13), zgodność kanałów 1,0 (6, drugi kanał z pamięci wyników), pętla moderatora 1,0 (2), end-to-end 0,97. Koszt modeli: 3,54 USD za 100 sprawdzeń, bez wyszukiwarki. Pominęliśmy 11 przypadków z poleceniem na stronie (brak publicznego adresu). Wynik tego samego kodu waha się o kilka punktów, bo modele i wyszukiwarka odpowiadają różnie.
+Pełny przebieg naszego testu (main, commit c422f2d, 75 przypadków, wyszukiwarka Tavily jak na produkcji): macro-F1 0,92 przy celu 0,75 (42 z 69 etykiet to oceny Demagoga, które produkt może przejąć), pokrycie cytatami 1,0, poprawność cytatów 1,0 (tylko obecność cytatu z korpusu w źródle), abstencja 1,0 (12 z 12), odporność na wstrzyknięcia 1,0 (7 we wklejonym tekście, 3 znane naszym wzorcom), mediana 14,6 s, zgodność kanałów 1,0 (6, drugi kanał z pamięci wyników), pętla moderatora 1,0 (2), end-to-end 0,99. Koszt modeli: 3,46 USD za 100 sprawdzeń, bez wyszukiwarki. Pominęliśmy 11 przypadków z poleceniem na stronie (brak publicznego adresu). Wynik tego samego kodu waha się o kilka punktów, bo modele i wyszukiwarka odpowiadają różnie.
 
-End-to-end nie przeszły J01 (przy symulowanej awarii Fact Check oceny z innych źródeł z dopiskiem o awarii zamiast komunikatu technicznego) i A15 (przy opinii prośba o doprecyzowanie zamiast „nie podlega weryfikacji”). Z 6 pozostałych pomyłek 4 to „brak wystarczających dowodów” zamiast oceny. Baza incydentów jest pusta (brak pliku organizatora), 259 dokumentów korpusu nie ma daty, a fact-checkerów reprezentuje w nim 15 tekstów Pravdy. Nie obsługujemy zrzutów ekranu i nie maskujemy imion ani adresów.
+End-to-end nie przeszedł tylko J01 (przy symulowanej awarii Fact Check oceny z innych źródeł z dopiskiem o awarii zamiast komunikatu technicznego). Z 7 pozostałych pomyłek 4 to „brak wystarczających dowodów” zamiast oceny. Baza incydentów jest pusta (brak pliku organizatora), 259 dokumentów korpusu nie ma daty, a fact-checkerów reprezentuje w nim 15 tekstów Pravdy. Nie obsługujemy zrzutów ekranu i nie maskujemy imion ani adresów.
 
 ## Przed wysłaniem (nie wklejać do formularza)
 
 Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka, bez pustych linii na
-brzegach: 3801 znaków (`len()`, znaki nowej linii jako LF), 3817 z CRLF i 3997 bajtów UTF-8 z CRLF;
+brzegach: 3687 znaków (`len()`, znaki nowej linii jako LF), 3703 z CRLF i 3874 bajty UTF-8 z CRLF;
 limit 4000 znaków ([issue #18](https://github.com/00200200/HackNation2026/issues/18)). Liczby
-pochodzą z pełnego przebiegu na kodzie `df74cef` (75 przypadków, 2026-11-22T05:40:07Z,
-`dirty: false`):
-[evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json](../../evals/results/history/20261122T053047.203200Z-f4c9aa8-full.json).
-Plik i wiersz w [HISTORY.md](../../evals/results/HISTORY.md) mają znacznik `f4c9aa8`, czyli
-`df74cef` z samymi wynikami evalu (`git diff --stat df74cef f4c9aa8` zmienia tylko
-`evals/results/`). To, że kontener stagingu miał ten kod, sprawdzono sumą md5 pliku
-`prawdowid/judge.py`, jedynego pliku kodu produktu, który `df74cef` zmienia po `9983127` (opis commita
-`fb13425`). Mediana z pustą pamięcią wyszukiwań pochodzi z
-przebiegu na `af7ec13`:
-[evals/results/history/20261122T043246.052204Z-af7ec13-full.json](../../evals/results/history/20261122T043246.052204Z-af7ec13-full.json).
+pochodzą z pełnego przebiegu na `main` przy commicie `c422f2d` (75 przypadków, 2026-11-22T07:21:52Z,
+`dirty: false`, staging zbudowany z tego commita, sprawdzony sumą md5 `prawdowid/judge.py` i
+`prawdowid/websearch.py`, wyszukiwarka Tavily jak na produkcji):
+[evals/results/history/20261122T071235.638303Z-c422f2d-full.json](../../evals/results/history/20261122T071235.638303Z-c422f2d-full.json).
 Co stoi za każdą liczbą (42 etykiety z ocen Demagoga, pamięć wyników przy drugim kanale, trzy
 przypadki wstrzyknięć znane wzorcom, pomyłki): [eval-notes.md](../eval-notes.md). Próbka 12 cytatów,
 którą sprawdził agent: [citation_spotcheck.md](../../evals/results/citation_spotcheck.md). Szczegóły:
@@ -47,8 +41,7 @@ którą sprawdził agent: [citation_spotcheck.md](../../evals/results/citation_s
 
 - Wpisać nazwę zespołu w miejsce TEAM_NAME.
 - Runda 4 jest na `main` (#129, #134 z uzgodnieniem z #130, #133, #73). Liczby w opisie, na slajdzie 9 i w README
-  opisują kod `df74cef`, nie `main`: powtórzyć pełny eval na `main` i poprawić liczby, zanim zgłaszany kod
-  się od `df74cef` różni.
+  opisują ten kod (`c422f2d`). Jeśli do zgłoszenia trafi nowszy kod produktu, powtórzyć pełny eval.
 - Wyszukiwanie: kod używa Perplexity, gdy ustawiono `PERPLEXITY_API_KEY`, a bez niego Tavily z pamięcią wyników.
   Serwer nie ma klucza Perplexity, więc działa na Tavily, jak mówi opis.
 - Wypchnąć `main` na `prod` ([deploy.md](../deploy.md): `prod` bierze tylko commity z `main`).
@@ -60,7 +53,7 @@ którą sprawdził agent: [citation_spotcheck.md](../../evals/results/citation_s
   slajdzie 8 zmienić jego znacznik na „działa” i wyrenderować PDF i PPTX (polecenia w
   `docs/pitch/slides.html`). Jeśli nie zdążymy: w pierwszym akapicie opisu i na slajdzie 8
   napisać, że faktczyfejk.pl działa jeszcze na starszym kodzie, a opis, slajdy i liczby dotyczą
-  `df74cef`; usunąć z opisu `/czat`, `/zrodla` i akapit o kolejce moderatora, a ze slajdu 3
+  `main` (`c422f2d`); usunąć z opisu `/czat`, `/zrodla` i akapit o kolejce moderatora, a ze slajdu 3
   zdanie o kolejce; przeliczyć znaki i wyrenderować deck.
 - W `.env` serwera produkcyjnego ustawić `PRAWDOWID_ADMIN_TOKEN` (polecenie w
   [deploy.md](../deploy.md)). Bez niego faktczyfejk.pl nie zakłada spraw, więc akapit o kolejce
