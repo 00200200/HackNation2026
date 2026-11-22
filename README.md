@@ -56,7 +56,6 @@ Details: [how a check runs](docs/reference.md#how-a-check-runs),
 flowchart TB
     subgraph channels["Channels"]
         web["Web page<br/>text or link, in Polish"]
-        czat["Messenger demo<br/>/czat"]
         discord["Discord<br/>/sprawdz"]
     end
 
@@ -65,18 +64,19 @@ flowchart TB
         verify["verify()"]
         log[("Check log<br/>masked, 30 days")]
         cases[("Moderator queue<br/>GET /api/cases")]
+        cache[("Result cache<br/>same text, 30 min")]
     end
 
     web -- "via nginx" --> api
-    czat --> api
     discord -- "same call" --> api
     api --> verify
     api -.-> log
     api -.-> cases
+    api -. "hit: stored answer" .-> cache
 
     subgraph check["Inside verify(): one check, in order"]
         link["0. Link: guarded fetch<br/>public IPs only, trafilatura / pypdf<br/>blocked: ask for text"]
-        extract["1. Claims + queries<br/>Claude via PydanticAI"]
+        extract["1. Claims + queries<br/>personal data masked first<br/>Claude via PydanticAI<br/>first 3 claims checked in full"]
 
         subgraph sources["2. Each claim in parallel"]
             fc["Google Fact Check"]
@@ -91,18 +91,24 @@ flowchart TB
         decide{"5. judge.decide()<br/>rules in code"}
         verdict(["Verdict + quotes"])
         insufficient(["brak wystarczających dowodów"])
-        notchecked(["nie sprawdzono<br/>source down or deadline"])
+        notchecked(["nie sprawdzono"])
+        notverifiable(["nie podlega weryfikacji<br/>opinion, forecast"])
+        cannotcheck(["cannot_check<br/>paywall, social media, login"])
+        techerror(["technical_error<br/>every checked claim hit an outage"])
     end
 
     verify --> link
     link -- "page text" --> extract
+    link -. "page refused" .-> cannotcheck
     verify -- "text" --> extract
     extract --> fc & gov & ws & corpus & eu
+    extract -. "not checkable" .-> notverifiable
     fc & gov & ws & corpus & eu --> rerank
     rerank --> judge --> decide
     decide -- "enough evidence" --> verdict
     decide -- "sources answered, not enough" --> insufficient
-    decide -- "outage or timeout" --> notchecked
+    sources -. "a deciding source down<br/>or the budget ran out" .-> notchecked
+    notchecked -. "all claims" .-> techerror
 ```
 
 One shared `CheckResult` goes back to every channel. Every claim shares one time budget, and a
