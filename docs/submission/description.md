@@ -16,7 +16,7 @@ Przy źródle widać tytuł, wydawcę, datę publikacji, link i dosłowny cytat,
 
 Wzorce w kodzie i flaga modelu wyłapują polecenia ukryte w tekście, na stronie z linku i w źródłach. Traktujemy je jak dane i zapisujemy zdarzenie bezpieczeństwa. PESEL, numery dowodu i paszportu, telefon, e-mail, numery kont i kart maskujemy przed modelem i logami. Każde sprawdzenie zostawia zamaskowany wpis w dzienniku (pytanie, źródła, wynik, czasy, koszt) na 30 dni; na stronie i w /czat można go usunąć. Zamaskowane logi kontenerów są poza retencją i usuwaniem.
 
-Kanały to strona WWW i adapter demonstracyjny komunikatora pod /czat, oba na tym samym API. Kod bota Discord (/sprawdz) czeka na wdrożenie. Serwer stoi w Niemczech (OVHcloud). Poza EOG trafia zamaskowany tekst do Anthropic i zapytania do wyszukiwarki (Perplexity albo Tavily), a Google, EUvsDisinfo i gov.pl nie podają, gdzie przetwarzają dane. Model każdego kroku ustawia zmienna środowiskowa.
+Kanały to strona WWW, adapter demonstracyjny komunikatora pod /czat i bot Discord (/sprawdz), wszystkie na tym samym API. Serwer stoi w Niemczech (OVHcloud). Poza EOG trafia zamaskowany tekst do Anthropic i zapytania do wyszukiwarki (Perplexity albo Tavily), a Google, EUvsDisinfo i gov.pl nie podają, gdzie przetwarzają dane. Model każdego kroku ustawia zmienna środowiskowa.
 
 Pełny przebieg naszego testu (commit a14b93c, 75 przypadków, lokalne API, evals/results/HISTORY.md): macro-F1 0,92 przy celu 0,75 (69 przypadków z oceną; 42 etykiety to oceny Demagoga, które produkt może przejąć), pokrycie cytatami 1,0, poprawność cytatów 1,0 (tylko obecność cytatu z korpusu w źródle, nie wsparcie twierdzenia), poprawna abstencja 1,0 (12), odporność na wstrzyknięcia w tekście 1,0 (7, 3 z nich nasze wzorce znają dosłownie), mediana czasu 20,5 s, zgodność kanałów 1,0 (6, drugi kanał dostał wynik z pamięci podręcznej), pętla moderatora 1,0 (2), end-to-end 0,99. Koszt modeli: 3,45 USD za 100 sprawdzeń, bez opłat za wyszukiwarkę. 11 przypadków z poleceniem ukrytym na pobranej stronie przeszło osobno na commicie 5e5be00: 11 z 11 trafnych ocen, odporność 1,0. Razem 73 z 80 trafnych ocen, macro-F1 0,92 (dwa przebiegi, docs/eval-notes.md).
 
@@ -24,8 +24,8 @@ End-to-end nie przeszedł J01: przy symulowanej awarii Fact Check produkt dał o
 
 ## Przed wysłaniem (nie wklejać do formularza)
 
-Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka: 3869 znaków
-(`len()`, znaki nowej linii jako LF), 3883 z CRLF; limit 4000 znaków
+Do formularza idzie tylko tekst spod „Opis do formularza”, do tego nagłówka: 3851 znaków
+(`len()`, znaki nowej linii jako LF), 3865 z CRLF; limit 4000 znaków
 ([issue #18](https://github.com/00200200/HackNation2026/issues/18)). Liczby z pełnego przebiegu:
 [evals/results/history/20261122T061635.151613Z-a14b93c-full.json](../../evals/results/history/20261122T061635.151613Z-a14b93c-full.json);
 przypadki E05-E15:
@@ -38,5 +38,4 @@ wstrzyknięć znane wzorcom: [eval-notes.md](../eval-notes.md). Szczegóły:
 
 - Wkleić tekst do formularza i sprawdzić jego licznik.
 - Upublicznić repozytorium albo podać inny link (22.11 o 9:30 było prywatne).
-- Gdy bot Discord będzie na serwerze dostępnym dla jury, poprawić zdanie o nim w akapicie o
-  kanałach i dodać link zaproszenia.
+- Jeśli jury ma używać bota Discord samo, dodać link zaproszenia do akapitu o kanałach i do README.

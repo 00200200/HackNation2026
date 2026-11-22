@@ -145,7 +145,7 @@ same code vary by a few points. Every run is in
 
 - Web: https://faktczyfejk.pl (the live site runs the `prod` branch, which may lag this one).
 - Messenger demo adapter: `/czat` on the same site, or http://localhost:8080/czat after `make up`.
-- Discord: the bot is not on a public server yet. To run it with your own bot, create an
+- Discord: the `/sprawdz` bot works and calls the same API; there is no public invite link yet. To run it with your own bot, create an
   application at https://discord.com/developers/applications, put its token in `.env` as
   `DISCORD_BOT_TOKEN`, invite it with the `bot` and `applications.commands` scopes, then run
   `make dev` and `make discord` and type `/sprawdz` in your server. One question through both
