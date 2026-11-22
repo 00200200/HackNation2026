@@ -15,3 +15,4 @@
 | 2026-11-22T05:09:32+00:00 | 3eed3a2 | full | 20 | 0.556 | 1.000 | 1.000 | 1.000 | — | 19.2 | 3.89 | FAIL | extraction main-claim prompt, subset |
 | 2026-11-22T05:22:11+00:00 | 3eed3a2 | full | 71 | 0.816 | 0.917 | 1.000 | 0.972 | — | 13.6 | 3.21 | FAIL | extraction main-claim + judge entailment/wrong-fact + true rating, budget 600 |
 | 2026-11-22T05:46:35+00:00 | 37c7e87 | full | 73 | 0.814 | 0.917 | 1.000 | 1.000 | — | 10.9 | — | FAIL | default 25 s budget, fault switch on, clean commit |
+| 2026-11-22T06:10:38+00:00 | 6dcc0a5 | full | 73 | 0.813 | 0.917 | 1.000 | 1.000 | — | 9.3 | — | FAIL | moderator loop on, default 25 s budget, fault switch on, clean commit |
