@@ -16,6 +16,7 @@ from datetime import UTC, date, datetime
 import httpx2
 from pydantic import BaseModel, ValidationError
 
+from prawdowid import faults
 from prawdowid.contract import Source
 
 log = logging.getLogger("prawdowid")
@@ -54,6 +55,9 @@ async def search_claims(
     client: httpx2.AsyncClient | None = None,
 ) -> FactCheckLookup:
     """Look the claim up. `language=None` sends no language filter."""
+    if faults.active.get() == faults.FACTCHECK_DOWN:  # eval only, off in production
+        log.warning("factcheck unavailable: eval fault")
+        return FactCheckLookup(limitation=LOOKUP_UNAVAILABLE)
     key = os.getenv(KEY_ENV)
     if not key:
         log.warning("factcheck lookup skipped: %s is not set", KEY_ENV)

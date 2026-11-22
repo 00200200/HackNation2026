@@ -23,7 +23,9 @@ def test_skipped_case_is_reported_not_run(tmp_path, monkeypatch):
     asked = []
     monkeypatch.setattr(adapter, "wait_turn", lambda: None)
     monkeypatch.setattr(
-        adapter, "ask", lambda payload, channel: asked.append(payload) or {"claims": []}
+        adapter,
+        "ask",
+        lambda payload, channel, **_: asked.append(payload) or {"claims": []},
     )
     monkeypatch.setattr(run, "git", lambda *args: "")
     monkeypatch.chdir(tmp_path)
@@ -58,7 +60,7 @@ def run_eval(tmp_path, monkeypatch, *flags, cases=CASES, ask=fake_answer):
     asked = []
     monkeypatch.setattr(adapter, "wait_turn", lambda: None)
     monkeypatch.setattr(
-        adapter, "ask", lambda p, ch: asked.append(p["text"]) or ask(p, ch)
+        adapter, "ask", lambda p, ch, **_: asked.append(p["text"]) or ask(p, ch)
     )
     monkeypatch.setattr(run, "git", lambda *args: "")
     monkeypatch.setattr(run, "RETRY_BACKOFF_S", 0)
@@ -238,3 +240,29 @@ def test_dirty_rows_are_reused_only_by_a_dirty_run(tmp_path):
     assert run.load_reusable(str(path), [case], clean) == {}
     assert run.load_reusable(str(path), [case], dirty) == {case["id"]: row}
     assert run.load_reusable(str(path), [case], {"commit": "x", "dirty": True}) == {}
+
+
+def test_simulate_is_sent_as_the_fault(monkeypatch):
+    seen = []
+    monkeypatch.setattr(adapter, "wait_turn", lambda: None)
+    monkeypatch.setattr(
+        adapter,
+        "ask",
+        lambda p, ch, fault=None: seen.append(fault) or {"status": "technical_error"},
+    )
+    run.call({"id": "J1", "input": {"text": "t"}, "simulate": "llm_unavailable"}, "web")
+    run.call({"id": "A1", "input": {"text": "t"}}, "web")
+    assert seen == ["llm_unavailable", None]
+
+
+def test_status_only_ok_case_counts_any_verdict(tmp_path, monkeypatch):
+    cases = [{"id": "J1", "scenario": "J", "input": {"text": "t0"}}]
+    cases.append(cases[0] | {"id": "J2", "input": {"text": "t1"}})
+
+    def ask(payload, channel):
+        if payload["text"] == "t1":
+            return {"status": "technical_error"}
+        return {"claims": [{"text": "c", "verdict": "nie sprawdzono", "evidence": []}]}
+
+    report, _ = run_eval(tmp_path, monkeypatch, cases=cases, ask=ask)
+    assert report["summary"]["by_scenario"]["J"] == {"cases": 2, "correct": 1}

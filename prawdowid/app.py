@@ -15,7 +15,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from prawdowid import checklog
+from prawdowid import checklog, faults
 from prawdowid.contract import CheckResult, Status
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
@@ -98,6 +98,7 @@ async def create_check(
     response.headers[SESSION_HEADER] = session
     # Why a check ended in a technical error, for the check log; None when verify returned.
     error = None
+    fault = faults.active.set(faults.requested(request.headers.get(faults.HEADER)))
     try:
         async with asyncio.timeout(VERIFY_TIMEOUT_S):
             result = await verify(body.input)
@@ -111,6 +112,8 @@ async def create_check(
         if is_link(body.input):
             # Only the URL was screened, not the page, so the "patterns only" note would mislead.
             result.limitations = []
+    finally:
+        faults.active.reset(fault)
     # Scenario I context, added after the verdicts so it cannot change them.
     try:
         # The final address after redirects counts too (a short link to a known page).
