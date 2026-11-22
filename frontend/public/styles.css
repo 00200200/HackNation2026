@@ -214,6 +214,7 @@ body.checked .results { flex: 1 0 auto; }
 .notice::before { content: "i"; content: "i" / ""; grid-row: span 3; display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: #5c6678; color: #fff; font-weight: 800; }
 .notice strong { display: block; }
 .note { margin: 0; font-size: .9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.moderator { margin-top: 1rem; }
 
 /* Verdict chips: the word carries the meaning, colour only helps */
 .verdict { display: inline-block; padding: .25rem .8rem; border-radius: 999px; font-size: .9rem; font-weight: 800; white-space: nowrap; }

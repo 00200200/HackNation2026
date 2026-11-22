@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from pydantic_ai import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
-from prawdowid import discord_bot
+from prawdowid import cases, discord_bot
 from prawdowid.app import app, limiter
 from prawdowid.contract import (
     CheckResult,
@@ -292,8 +292,10 @@ def test_ask_api_connection_error_becomes_notice():
 
 
 @pytest.mark.usefixtures("quiet_sources")
-def test_same_input_same_result_on_web_and_discord():
-    """Scenario G offline: the Discord path and the web form get the same CheckResult."""
+def test_same_input_same_result_on_web_and_discord(monkeypatch):
+    """Scenario G offline: the Discord path and the web form get the same CheckResult. With a
+    moderator queue set up (scenario H), both questions land in one case."""
+    monkeypatch.setenv(cases.ADMIN_TOKEN_ENV, "test-admin-token")
     extraction = Extraction(
         claims=[
             ExtractedClaim(
@@ -324,7 +326,14 @@ def test_same_input_same_result_on_web_and_discord():
         )
         discord = asyncio.run(via_discord())
     assert discord.status is Status.OK
-    assert discord == web
+    # The same answer, but the Discord question is the second one in the same moderator case.
+    assert (web.moderator_case.status, discord.moderator_case.status) == (
+        "created",
+        "updated",
+    )
+    assert discord.moderator_case.id == web.moderator_case.id
+    unfiled = {"moderator_case": None}
+    assert discord.model_copy(update=unfiled) == web.model_copy(update=unfiled)
 
 
 def test_bot_refuses_to_start_without_token(monkeypatch):

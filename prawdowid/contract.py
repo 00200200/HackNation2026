@@ -140,6 +140,18 @@ class SecurityEvent(BaseModel):
     detector: Literal["patterns", "model"]
 
 
+class ModeratorCase(BaseModel):
+    """The moderator's case this question was added to (scenario H, prawdowid/cases.py). Set only
+    after the case was written, so a channel says the question went to the moderator's queue only
+    when it did."""
+
+    id: int
+    # "created": this question opened the case; "updated": it joined an open one.
+    status: Literal["created", "updated"]
+    # Questions in the case within the retention period, this one included.
+    count: int
+
+
 class CheckResult(BaseModel):
     status: Status
     message: str | None = None
@@ -166,6 +178,13 @@ class CheckResult(BaseModel):
     )
     # Shown next to the claims, also on a notice (a refused link): never sets or changes a verdict.
     incident_matches: list[IncidentMatch] = []
+    moderator_case: ModeratorCase | None = Field(
+        None,
+        description="The moderator case this question was stored in: a claim without enough "
+        "evidence, a security event, or an unconfirmed claim on a high-risk topic. null when "
+        "nothing was stored: the check needed no person, no moderator queue is set up on this "
+        "server, or the case store failed. A channel then says nothing about a moderator.",
+    )
     # Check log only (prawdowid/checklog.py): never sent to a channel.
     steps_ms: dict[str, int] = Field(default={}, exclude=True)
     model_calls: list[ModelCall] = Field(default=[], exclude=True)

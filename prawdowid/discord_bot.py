@@ -199,6 +199,16 @@ def _incidents(matches: list[IncidentMatch], url_limit: int | None) -> str:
     return "\n".join(["### Podobne znane incydenty", INCIDENT_NOTE, *lines])
 
 
+# Scenario H: the API sets `moderator_case` only once the case is stored, so this is never said
+# about a hand-off that did not happen.
+MODERATOR_NOTE = "Zgłoszenie trafiło do kolejki moderatora"
+
+
+def _moderator(check: CheckResult) -> list[str]:
+    case = check.moderator_case
+    return [f"{MODERATOR_NOTE} (sprawa {case.id})."] if case else []
+
+
 def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
     """CheckResult as Discord Markdown, with the same sections as the web form.
 
@@ -216,10 +226,10 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
             notice = f"**Polecenia dla modelu.** {SECURITY_NOTE_ONLY}\n\n{notice}"
         if check.limitations:
             notice += "\n**Ograniczenia:**\n" + "\n".join(_bullets(check.limitations))
-        return "\n\n".join([notice, *warning])
+        return "\n\n".join([notice, *warning, *_moderator(check)])
     if not check.claims and not check.unchecked_claims:
         notice = "**Brak twierdzeń.** Usługa nie zwróciła żadnego twierdzenia."
-        return "\n\n".join([notice, *warning])
+        return "\n\n".join([notice, *warning, *_moderator(check)])
     locations = {e.location for e in check.security_events}
     sections = [
         f"**Polecenia dla modelu.** {note}"
@@ -244,7 +254,7 @@ def render(check: CheckResult, url_limit: int | None = URL_LIMIT) -> str:
                 ]
             )
         )
-    return "\n\n".join(sections)
+    return "\n\n".join(sections + _moderator(check))
 
 
 def split(text: str) -> list[str]:

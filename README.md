@@ -73,7 +73,13 @@ private address or file that is not HTML or PDF comes back as `cannot_check` wit
 paste the text. Personal data (PESEL, ID card, passport, phone, e-mail, account and card numbers) is masked before
 the text goes to the model. Each check is logged to stdout (session, status, latency, input length)
 with a second line for the model call (model, input and output tokens, latency), and kept for 30
-days as one masked record in the check log, which the user can delete per session. A link check
+days as one masked record in the check log, which the user can delete per session. When
+`PRAWDOWID_ADMIN_TOKEN` is set, a claim without enough evidence, a security event, or an
+unconfirmed claim on a high-risk topic also goes to the moderator queue (`prawdowid/cases.py`,
+scenario H): a similar question joins the same case, and the answer says "Zgłoszenie trafiło do
+kolejki moderatora (sprawa N)" only after the case was written. The moderator reads the queue
+through `GET /api/cases` (see API). Without the token nobody could read it, so nothing is filed and
+no answer mentions a moderator. A link check
 also logs the final URL with secret query values removed and personal data masked, the page's
 SHA-256, and the text and verdict of every claim. The page text itself is never logged. Successful
 web evidence fetches are cached in `corpus/docs.jsonl` as metadata only (full text only once a
@@ -86,7 +92,7 @@ Put these in `.env` in the repository root. The file is git-ignored and is not c
 image. `make dev` loads it into the API environment. Compose reads it for interpolation but only
 forwards variables declared in `compose.yaml`: the backend gets `ANTHROPIC_API_KEY`,
 `PRAWDOWID_MODEL`, `GOOGLE_FACTCHECK_API_KEY`, `TAVILY_API_KEY`, `EUVSDISINFO_API_KEY`,
-`PRAWDOWID_GOVPL`, `PRAWDOWID_INCIDENTS_PATH` and `PRAWDOWID_EVAL_TOKEN`, its check log sits on the `checklog` volume (`/var/lib/prawdowid`, kept across
+`PRAWDOWID_GOVPL`, `PRAWDOWID_INCIDENTS_PATH`, `PRAWDOWID_EVAL_TOKEN` and `PRAWDOWID_ADMIN_TOKEN`, its check log and moderator cases sit on the `checklog` volume (`/var/lib/prawdowid`, kept across
 deploys) and its source cache points at a writable `/tmp` path. Other tuning variables need an explicit Compose environment override.
 
 | Variable | Required | Default | What it does |
@@ -109,6 +115,9 @@ deploys) and its source cache points at a writable `/tmp` path. Other tuning var
 | `DATABASE_URL` | no | none | Postgres URI of the step 2c source store, used only by the seed script (`make db-seed` sets it) and `cache.search_documents`. Step 2c is disabled in the pipeline until licensed sources are chosen, so checks never read or write the database. The backend never needs it; `compose.prod.yaml` sets it for production's separate `db`, which has no source-store schema, so enabling step 2c in production needs this migration applied there first. Start the database with `make db` (127.0.0.1:5433). The corpus search (`prawdowid/corpus_search.py`) reads its own tables (`corpus_documents`, `corpus_chunks`) from the same database; `make index` builds them from `corpus/evidence.jsonl`. |
 | `EUVSDISINFO_API_KEY` | no | none | Personal API key for the EUvsDisinfo MCP server (`https://mcp.euvsd.info/mcp`), generated on euvsdisinfo.eu. Sent as the `X-API-Key` header. Without it the EUvsDisinfo lookup is skipped and reported as unavailable. |
 | `PRAWDOWID_CHECK_LOG` | no | `logs/checks.jsonl` | Check log file (masked question, result, session id). Docker sets `/var/lib/prawdowid/checks.jsonl` on the `checklog` volume. See [docs/privacy.md](docs/privacy.md). |
+| `PRAWDOWID_CASES` | no | `cases.jsonl` next to the check log | Moderator cases (masked claims, session id, lookups tried), with a `.seq` and a `.lock` file of the same name beside it and a `.tmp` file during each write. Docker: `/var/lib/prawdowid/cases.jsonl` on the `checklog` volume. See [docs/privacy.md](docs/privacy.md#moderator-cases). |
+| `PRAWDOWID_ADMIN_TOKEN` | no | unset | Bearer token for `GET /api/cases`, the moderator queue. Give it to the moderator or analyst the administrator names. Unset: there is no moderator queue, so no check files a case, no channel mentions a moderator and the route answers 404. Use a long random value (`openssl rand -hex 32`). |
+| `PRAWDOWID_CASE_MIN_SIMILARITY` | no | `0.5` | Share of word stems (Jaccard) two claims must share to be one moderator case. A first guess, not tuned. |
 | `PRAWDOWID_INCIDENTS_PATH` | no | `prawdowid/data/incidents.json` (empty) | Scenario I incident base, a `.json` or `.csv` file; format in `prawdowid/incidents.py`. Put the file in `incidents/` (git-ignored) and set a path relative to the repository root, e.g. `incidents/base.csv`: `make dev` reads it from the repository, Docker from `/app/incidents/base.csv`, where `compose.yaml` mounts `incidents/` read-only. The file must be readable by every user (the container runs as `nobody`). Read on the first check and kept: restart the backend after changing it. A match is shown next to the claims and never changes a verdict. |
 | `PRAWDOWID_EMBEDDING_MODEL` | no | `intfloat/multilingual-e5-large` | Local embedding model for corpus search (fastembed). Changing it rebuilds the index on the next `make index`. |
 | `FASTEMBED_CACHE_PATH` | no | fastembed's temp dir | Where the embedding model files are kept (`/models` in the image). |
@@ -192,6 +201,9 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
   `security_events`, `cost_usd`).
 - `prawdowid/privacy.py`: `mask_personal_data` and `RETENTION_DAYS`; `prawdowid/checklog.py`: the check log
   per demo session (`DELETE /api/sessions/{id}` removes a session).
+- `prawdowid/cases.py`: moderator cases (scenario H). `report` files a check that needs a person
+  (a claim without enough evidence, a security event, an unconfirmed claim on a high-risk topic)
+  into the open case with the same or a similar claim, or opens one; `read_cases` is the admin view.
 - `prawdowid/link.py`: `fetch_page(url)`, the guarded fetch and text extraction for link input.
 - `prawdowid/verifier.py`: `async def verify(text) -> CheckResult`, the one function every
   channel calls. Holds the PydanticAI agent, its prompt and `to_check_result`, the pure function
@@ -243,6 +255,7 @@ The team's architecture whiteboard: https://claude.ai/artifact/W9KUaX37YHjRFjAzZ
 | Method and path | What it does |
 |---|---|
 | `POST /api/checks` | Body `{"input": "..."}`. Returns `CheckResult`. 60 s timeout on `verify`; 10 requests per minute per client IP. |
+| `GET /api/cases` | The moderator queue, for the holder of `PRAWDOWID_ADMIN_TOKEN` (`Authorization: Bearer <token>`); 404 when the variable is unset, 401 on a wrong token. Not in the channel spec. |
 | `GET /api/openapi.json` | The OpenAPI spec. |
 | `GET /api/docs` | Interactive docs (Swagger UI) for the spec. |
 | `GET /health` | Liveness. |
@@ -272,6 +285,18 @@ empty, too long or not a valid link comes back as 422 with a Polish message in `
 
 `ClaimResult` carries `verdict_label`, the Polish label for its verdict, so channels do not keep
 their own copy of the labels.
+
+**Moderator queue.** It exists only while `PRAWDOWID_ADMIN_TOKEN` is set. `GET /api/cases` lists
+the open cases, the most asked first: number, opening
+time, `last_seen` (the last question), `count`, `reasons` (`insufficient_evidence`,
+`security_event:<where>`, `high_risk:<topic>`), the masked `claims`, `channels`, `pages`, `lookups`
+(the sources tried: `factcheck`, `euvsdisinfo`, `govpl`, `web`, `corpus`) and the `sources` they
+found. No session ids. Example: `curl -H "Authorization: Bearer $PRAWDOWID_ADMIN_TOKEN"
+http://localhost:8080/api/cases` (`make up`). A check that filed a case carries `moderator_case`
+(`id`, `status` `created` or `updated`, `count`); without it, a channel says nothing about a
+moderator. `DELETE /api/sessions/{id}` also takes the session's questions out of the cases and
+returns how many in `withdrawn`. What is stored and for how long:
+[docs/privacy.md](docs/privacy.md#moderator-cases).
 
 ## Submission drafts
 

@@ -32,6 +32,7 @@ LABEL = (
         discord_bot.UNCHECKED_NOTE,
         discord_bot.INCIDENT_NOTE,
         discord_bot.CONNECTION_ERROR,
+        discord_bot.MODERATOR_NOTE,
         app.TECHNICAL_ERROR_MESSAGE,
         *discord_bot.KIND_LABELS.values(),
         *discord_bot.MATCH_LABELS.values(),
@@ -101,3 +102,22 @@ def test_sources_show_the_fact_checkers_rating_and_the_search_snippet_label():
 
 def test_no_check_starts_while_a_session_deletion_runs():
     assert CZAT_JS.count("if (busy || deleting) return;") == 2
+
+
+def test_every_channel_names_a_stored_moderator_case_the_same_way():
+    """Scenario H: the web page, the demo adapter and the bot say the same sentence, built from
+    the answer's `moderator_case` (set only after the case store wrote it)."""
+    for js in ((PUBLIC / "app.js").read_text(encoding="utf-8"), CZAT_JS):
+        assert f'const MODERATOR_NOTE = "{discord_bot.MODERATOR_NOTE}";' in js
+        assert "`${MODERATOR_NOTE} (sprawa ${c.id}).`" in js
+        assert "(check.moderator_case)" in js
+    assert 'f"{MODERATOR_NOTE} (sprawa {case.id})."' in BOT_SOURCE
+
+
+def test_both_pages_say_when_deleting_withdrew_questions_from_the_moderator_cases():
+    """DELETE /api/sessions/{id} answers how many questions it took out of the moderator cases
+    (`withdrawn`); after an earlier "Zgłoszenie trafiło ..." both pages say so, in the same words."""
+    sentence = "Usunęliśmy sprawdzenia z tej sesji i wycofaliśmy zgłoszenia z kolejki moderatora."
+    for js in ((PUBLIC / "app.js").read_text(encoding="utf-8"), CZAT_JS):
+        assert f'const DELETED_AND_WITHDRAWN = "{sentence}";' in js
+        assert "withdrawn > 0 ? DELETED_AND_WITHDRAWN" in js

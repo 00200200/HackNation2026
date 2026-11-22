@@ -162,7 +162,7 @@
       },
       "delete": {
         "summary": "Delete Session",
-        "description": "Delete every check record of a demo session (the check log is all a check stores).",
+        "description": "Delete every check record of a demo session (`deleted`), and take its questions out of\nthe moderator cases (`withdrawn`).",
         "operationId": "delete_session_api_sessions__session__delete",
         "parameters": [
           {
@@ -531,6 +531,17 @@
             "type": "array",
             "title": "Incident Matches",
             "default": []
+          },
+          "moderator_case": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModeratorCase"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The moderator case this question was stored in: a claim without enough evidence, a security event, or an unconfirmed claim on a high-risk topic. null when nothing was stored: the check needed no person, no moderator queue is set up on this server, or the case store failed. A channel then says nothing about a moderator."
           }
         },
         "type": "object",
@@ -873,6 +884,34 @@
         ],
         "title": "ModelCall",
         "description": "One model answer, kept in the check log only."
+      },
+      "ModeratorCase": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated"
+            ],
+            "title": "Status"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "count"
+        ],
+        "title": "ModeratorCase",
+        "description": "The moderator's case this question was added to (scenario H, prawdowid/cases.py). Set only\nafter the case was written, so a channel says the question went to the moderator's queue only\nwhen it did."
       },
       "RateLimitError": {
         "properties": {

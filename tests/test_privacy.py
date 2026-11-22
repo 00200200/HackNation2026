@@ -97,10 +97,13 @@ def test_session_can_be_deleted(client, check_log):
     api.post("/api/checks", json={"input": TEXT}, headers=mine)
     api.post("/api/checks", json={"input": TEXT}, headers={"X-Session-Id": "other-01"})
     resp = api.delete("/api/sessions/demo-session-1")
-    assert resp.status_code == 200 and resp.json() == {"deleted": 2}
+    assert resp.status_code == 200 and resp.json() == {"deleted": 2, "withdrawn": 0}
     assert [r["session"] for r in records(check_log)] == ["other-01"]
     # Deleting again, or a session that never existed, deletes nothing.
-    assert api.delete("/api/sessions/demo-session-1").json() == {"deleted": 0}
+    assert api.delete("/api/sessions/demo-session-1").json() == {
+        "deleted": 0,
+        "withdrawn": 0,
+    }
     assert api.delete("/api/sessions/bad").status_code == 422
 
 

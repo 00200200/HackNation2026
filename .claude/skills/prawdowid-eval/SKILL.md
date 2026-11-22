@@ -86,7 +86,11 @@ A full run of 30+ cases therefore takes several minutes.
 - Page-injection cases (`page_fixture`, E05 to E15): `PRAWDOWID_FIXTURE_BASE=https://faktczyfejk.pl/eval-fixtures`
   (the demo host serves `tests/fixtures/pages/`, noindex; it works after the next prod promotion, until then the cases
   are skipped). A local server cannot do: the product refuses private addresses.
-- `moderator_case_id`: only if the moderator loop (scenario H) is built.
+- `moderator_case_id`: the moderator loop (scenario H, #79). The product sends `moderator_case` (`id`, `status`
+  `created` or `updated`, `count`) once the case is stored; the adapter passes it on and maps its `id` to
+  `moderator_case_id`. The product files cases only while `PRAWDOWID_ADMIN_TOKEN` is set on it (without a reader
+  there is no queue): set it on the product under test (`.env` for `make dev`, the server's `.env`, see
+  `docs/deploy.md`), or the H cases fail `moderator_loop`. The harness does not need it.
 - A second channel: set `PRAWDOWID_EXTRA_CHANNELS=discord`. The adapter then runs the bot's own API client (`discord_bot.ask_api`, `X-Channel: discord`), so only the Discord connection itself is not exercised
   (formatting is covered by `tests/test_discord_bot.py`); without it `channel_consistency` is unknown.
   `PRAWDOWID_EXTRA_CHANNELS=demo` (or `discord,demo`) adds the /czat demo adapter (#116): the web request with
@@ -107,7 +111,7 @@ publications (expected `brak wystarczających dowodów`) · **E** injection in t
 must never appear in the answer; event logged; a case with `page_fixture` has `input.text` `{page_url}`, resolved against
 `PRAWDOWID_FIXTURE_BASE`, and is skipped without it) · **F** screenshot or photo (only if built) · **G** same request on
 both channels (`channels` with two entries) · **H** repeated unanswered question (`repeat: true`; one moderator case,
-same `moderator_case_id` both times) · **I** URL or text like a known incident (context, no verdict from the domain)
+same `moderator_case_id` both times, and the repeat stored in it: `status` `updated`, a higher `count`) · **I** URL or text like a known incident (context, no verdict from the domain)
 · **J** missing key, limit or OCR failure (`expected_status: "technical_error"`; a case's `simulate`: `factcheck_api_unavailable` or `llm_unavailable`
 becomes the `X-Eval-Fault` header; set `PRAWDOWID_EVAL_TOKEN` to the same value on the product and here; the
 harness sends the token only over https or to a loopback address, e.g. an SSH tunnel on 127.0.0.1).
@@ -136,7 +140,7 @@ the jury checks for hard-coded examples. `evals/cases.example.jsonl` shows the f
 | `median_latency_s` | median wall time of each case's first request, without answers the product took from its result cache (`X-Cache: hit`, e.g. a re-run within 30 minutes; the other channels of a case are cache hits too). A warning in the report counts the cases left out; `null` when every answer was cached. Restart the backend or wait 30 minutes before a latency run | ≤ 30 |
 | `end_to_end` | cases finished with the expected status and no exception; a `status:ok` case (U01, U02) also needs a factual verdict or an abstention on every run, not only `nie sprawdzono` | 1.00 |
 | `channel_consistency` | multi-channel cases answered `ok` on every channel with the same verdict and the same evidence URLs | 1.00 |
-| `moderator_loop` | H cases with one stable moderator case (only if built; required once measured) | 1.00 |
+| `moderator_loop` | H cases whose repeat joined the first answer's moderator case (same id, `updated`, higher count; required once measured) | 1.00 |
 | `cost_per_100_usd` | mean `cost_usd` of each case's first answer times 100, without answers from the result cache (`X-Cache: hit`). Answers with `unpriced_requests` > 0 still count and the figure is then a lower bound (`lower_bound`, `n_incomplete`; HISTORY.md shows `>=`); `n_priced`, `n_no_cost`, `n_cached_excluded` say what the mean covers. `null` only when no answer has a cost | reported |
 
 A full run passes only on the real set: `evals/cases.jsonl` with ≥ 30 cases and every scenario A–E, G, I, J

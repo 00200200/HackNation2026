@@ -44,7 +44,7 @@ PASSTHROUGH = (
     "limitations",
     "cost_usd",
     "unpriced_requests",
-    "moderator_case_id",
+    "moderator_case",
     "incident_matches",
     "page",
 )
@@ -106,6 +106,9 @@ def to_eval_shape(raw: dict) -> dict:
         "unchecked_claims": raw.get("unchecked_claims") or [],
     }
     shaped.update({key: raw[key] for key in PASSTHROUGH if key in raw})
+    # Scenario H: `moderator_loop` compares the case id of the first answer and the repeat.
+    if case := raw.get("moderator_case"):
+        shaped["moderator_case_id"] = case.get("id")
     return shaped
 
 

@@ -2,6 +2,7 @@
 
 import asyncio
 import hashlib
+import hmac
 import logging
 import re
 import time
@@ -12,8 +13,9 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from cachetools import TTLCache
-from fastapi import FastAPI, Header, Path, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -28,7 +30,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from prawdowid import checklog, corpus_bm25, faults
+from prawdowid import cases, checklog, corpus_bm25, faults
 from prawdowid.contract import CheckResult, Status, Verdict
 from prawdowid.incidents import match_incidents
 from prawdowid.privacy import MaskingFilter
@@ -275,6 +277,12 @@ async def create_check(
     except Exception:
         log.exception("incident matching failed")
     channel = x_channel if x_channel in CHANNELS else "other"
+    # Scenario H: set only once the case is stored, and never while nobody can read the queue
+    # (PRAWDOWID_ADMIN_TOKEN unset), so an answer never claims a hand-off that did not happen.
+    # A hit is one more question: it counts.
+    result.moderator_case = cases.report(
+        session, channel, body.input, result, started_at=started_at
+    )
     latency_ms = round((time.perf_counter() - started) * 1000)
     log.info(
         "check session=%s channel=%s status=%s security_events=%d cost_usd=%s cache=%s "
@@ -328,10 +336,17 @@ async def read_session(
 async def delete_session(
     request: Request, session: str = Path(pattern=f"^{SESSION_ID}$")
 ) -> dict:
-    """Delete every check record of a demo session (the check log is all a check stores)."""
+    """Delete every check record of a demo session (`deleted`), and take its questions out of
+    the moderator cases (`withdrawn`)."""
     deleted = checklog.delete_session(session)
-    log.info("session deleted session=%s records=%d", session, deleted)
-    return {"deleted": deleted}
+    withdrawn = cases.delete_session(session)
+    log.info(
+        "session deleted session=%s records=%d withdrawn=%d",
+        session,
+        deleted,
+        withdrawn,
+    )
+    return {"deleted": deleted, "withdrawn": withdrawn}
 
 
 @app.get("/api/sources")
@@ -339,3 +354,27 @@ def list_sources() -> SourceList:
     """Every source a check uses, for the page /zrodla. Plain def: the first call reads the
     corpus file, so it runs in FastAPI's thread pool instead of blocking the event loop."""
     return source_list()
+
+
+# auto_error off: without the token the route answers 404, whatever the request carries.
+_admin = HTTPBearer(auto_error=False)
+
+
+@app.get("/api/cases", include_in_schema=False)
+@limiter.limit(RATE_LIMIT)
+def list_cases(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_admin)],
+) -> list[cases.CaseSummary]:
+    """The moderator's queue (prawdowid/cases.py) for whoever holds the bearer token set in
+    PRAWDOWID_ADMIN_TOKEN; without the variable there is no queue (no check files a case) and the
+    route does not exist. Left out of the channel spec (docs/openapi.json): no channel calls it.
+    Plain def: it reads a file."""
+    token = cases.admin_token()
+    if not token:
+        raise HTTPException(status_code=404)
+    given = credentials.credentials if credentials else ""
+    if not hmac.compare_digest(given.encode(), token.encode()):
+        log.warning("moderator cases refused: wrong or missing token")
+        raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Bearer"})
+    return cases.read_cases()
