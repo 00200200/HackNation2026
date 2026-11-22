@@ -3,8 +3,8 @@
 This is a submission draft for [issue #18](https://github.com/00200200/HackNation2026/issues/18).
 The implementation inspected was originally the `LukiLenkiewicz/issue11-fanout` stack at `cacfb4e`;
 that stack (per-claim fan-out, judge, local source store, link input) is now merged into `main`
-(PRs #37, #30, #42, #28/#44). The implementation described below is `main`'s, after that merge, except where a row names PR #109 or `integration/r3` (changes awaiting merge, listed in the README section "Zmiany czekające na scalenie"; `integration/r3` is a local branch in state `235209b`).
-The measured product commit is identified below and predates this merge; this is not a claim of
+(PRs #37, #30, #42, #28/#44). The implementation described below is `main`'s (`1aa173f`, 22.11.2026), after that merge, except where a row names PR #126 (branch `integration/r3`, head `ca48b84`, open; it contains PR #109 and supersedes it). Those are changes awaiting merge, listed in the README section "Zmiany czekające na scalenie". A later commit to PR #126 needs a recheck of the rows that name it.
+The measured product commits are identified below: `95e6177` (the run on `main`) predates that merge, and `edd34a5` (the run in PR #109 and PR #126) is not on `main`. This is not a claim of
 submission readiness.
 
 ## Request and evidence flow
@@ -17,7 +17,7 @@ Discord /sprawdz -> HTTP, X-Channel: discord +
     -> claim extraction and search queries (PydanticAI / Anthropic)
     -> each checkable claim in parallel:
          Google Fact Check + EUvsDisinfo MCP + www.gov.pl search + Tavily / allowlisted pages
-         + evidence corpus (BM25 over corpus/evidence.jsonl; PR #109, `main` does not search it)
+         + evidence corpus (BM25 over corpus/evidence.jsonl; PR #126, `main` does not search it)
          -> deduplicate and rerank fragments -> label and validate quotes
          -> judge.decide() -> shared CheckResult -> channel rendering
 
@@ -74,7 +74,7 @@ separate, already-populated source and does not substitute for the incident base
 
 | Role | Default model ID on `main` | Configuration / source |
 |---|---|---|
-| Extract claims and queries | `anthropic:claude-opus-5-5` (`anthropic:claude-sonnet-5-5` from #88, no PR yet) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
+| Extract claims and queries | `anthropic:claude-opus-5-5` (`anthropic:claude-sonnet-5-5` from #88 in PR #126) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
 | Rerank fragments | `anthropic:claude-haiku-5-5` | `PRAWDOWID_RERANK_MODEL`, [rerank.py](../../prawdowid/rerank.py) |
 | Label evidence | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_JUDGE_MODEL`, [judge.py](../../prawdowid/judge.py) |
 
@@ -125,12 +125,12 @@ retention, training use and links to the terms, is in
 |---|---|---|
 | Anthropic (extraction, rerank, judge) | Masked text; masked claims and public fragments | Global by default (US, Europe, Asia, Australia), stored in the US. The first-party API has no EU-only setting |
 | Tavily (web search) | Masked search queries, or the masked claim when the model wrote none or the first search found too little | United States. An EU endpoint exists for selected customers only |
-| Google Fact Check Tools | Masked claim text | Not stated for this API, UNCONFIRMED. Google's privacy policy says its servers are worldwide |
+| Google Fact Check Tools | Masked claim text; in PR #126 up to 8 short queries per claim, each masked (#100) | Not stated for this API, UNCONFIRMED. Google's privacy policy says its servers are worldwide |
 | EUvsDisinfo MCP | Claim text, cut to 200 characters | Not stated, UNCONFIRMED |
 | www.gov.pl search | Search queries, or the claim when the model wrote none | Not stated, UNCONFIRMED |
 | Sites a pasted link points to | The URL as pasted, unmasked: a name or e-mail in its path or query string reaches the site | The site's own hosting |
 | OVHcloud VPS | Everything the app stores | Limburg, Germany |
-| Discord (bot, not deployed yet) | The typed command and our reply | United States |
+| Discord (bot; #59 says it is not deployed, not checked) | The typed command and our reply | United States |
 
 Migration path: the three model steps are chosen by `PRAWDOWID_MODEL`, `PRAWDOWID_RERANK_MODEL`
 and `PRAWDOWID_JUDGE_MODEL` (PydanticAI model strings). The same Claude models can run in the EU
@@ -146,6 +146,8 @@ Browser traffic and fetched evidence also pass through other parties' systems. S
 [risks.md](risks.md) for code references and [sources.md](sources.md) for storage limits.
 
 ## Default limits, not performance measurements
+
+Values are those of PR #126 (`ca48b84`), unless a cell names `main`.
 
 | Limit | Default | Source |
 |---|---|---|
@@ -166,13 +168,13 @@ Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
 There is no moderator queue, OCR or reverse image search. The live Discord run remains open in
 [WORKLOG](../../WORKLOG.md). The case set on `main` ([cases](../../evals/cases.jsonl)) has no URL input.
-PR #109 adds four (`U01`, `U02`, `E05`, `E06`) and the `edd34a5` run covers only `U01`, so its 37.4 s is
+PR #126 has 13 of 86 cases with a URL input (`U01`, `U02`, `E05` to `E15`) and the `edd34a5` run covers only `U01`, so its 37.4 s is
 one data point, not a URL benchmark.
 
 ## Saved test results and reproduction
 
 Two tracked runs exist, and which one [evals/results/latest.json](../../evals/results/latest.json)
-holds depends on whether [PR #109](https://github.com/00200200/HackNation2026/pull/109) is merged.
+holds depends on whether [PR #126](https://github.com/00200200/HackNation2026/pull/126), which contains PR #109, is merged.
 
 - On `main` it is the quick run of `2026-11-21T19:10:57+00:00` at product commit `95e6177`, 9 cases.
   It predates the judge, the retrieval pipeline and the check log. At that commit (`prawdowid/` is
@@ -180,7 +182,7 @@ holds depends on whether [PR #109](https://github.com/00200200/HackNation2026/pu
   `insufficient_evidence` for every checkable claim, and `judge.py`, `pipeline.py` and `checklog.py`
   did not exist. Its values describe that stub, not the pipeline: do not quote them
   ([eval-notes.md](../eval-notes.md)).
-- In PR #109 it is the quick run of `2026-11-22T00:37:27+00:00` at product commit
+- In PR #109 and PR #126 it is the quick run of `2026-11-22T00:37:27+00:00` at product commit
   `edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `dirty: false`, `mode: "quick"`, `n_cases: 10`,
   `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J, U`, one case
   each; `E05` and `E06` skipped (no public URL for the fixture page). It ran on the VPS staging with
@@ -204,14 +206,18 @@ The following values and targets are copied exactly from the second file:
 | injection_verdict_correct | 1.0 | reported | true |
 | cost_per_100_usd | 4.912332 | reported | true |
 
-Each ratio rests on a handful of cases: `citation_coverage` on one claim (`E01`), `abstention` on two
+Each ratio rests on a handful of cases: `citation_coverage` on every factual-verdict claim of the `ok` answers, a number the file does not record (it keeps only each case's first-claim verdict and only `E01` has a factual one, so at least one claim, the rest UNCONFIRMED), `abstention` on two
 (`D01`, `H01`), `injection_resistance` on one (`E01`, an injection in the input text; no page
 injection was scored), `channel_consistency` on one (`G01`, whose second answer took 0.22 s and most
 likely came from the result cache). The slowest case, `U01` (the only URL case, a long gov.pl page from #63), took 37.4 s, above the 30 s target. The
 cost covers model calls only (extraction on Opus, rerank, judge), not search, hosting or the channel.
 On the same ten cases with only `PRAWDOWID_MODEL` changed to Sonnet, the commit message of `83d6c65`
-reports macro-F1 0.375, median 18.3 s and about USD 3.96 per 100 checks; that run's file was not
-saved, so it is UNCONFIRMED.
+reports macro-F1 0.375 and median 18.3 s, and the PR #126 description gives USD 3.96 per 100 checks (the
+commit message shows only ".96"); that run's file was not saved, so it is UNCONFIRMED. The PR #126
+description also reports a quick run on `ca48b84` (VPS staging, one case per scenario): macro-F1 0.750,
+citation coverage 1.0, abstention 1.0, injection resistance 1.0, median 29.8 s, end-to-end 0.90, channel
+consistency 1.0 and USD 5.54 per 100 checks. No run file is committed (`latest.json` in PR #126 still
+holds `edd34a5`), so those values are UNCONFIRMED and the table above stays the committed run.
 
 `null` means not measured, not passed. Citation coverage counts evidence URL/quote presence for
 factual verdicts, not evidence correctness. Citation correctness needs a corpus and would only
