@@ -1,7 +1,8 @@
 # Sources, qualification and update policy
 
-This inventory describes code on `main` (after the issue11-fanout/judge/source-store stack merged
-into it), not a populated or licensed corpus.
+This inventory was written for code on `main` (after the issue11-fanout/judge/source-store stack
+merged into it). The evidence corpus searched in every check has been built since (see "Storage,
+freshness and deletion limits" below); licences for cached web pages are still open.
 `UNCONFIRMED` means that access, a permission or a document-level licence has not been established.
 A public page, an allowlist entry and a robots.txt permission do not themselves authorise
 archiving. The runtime does not enforce licence approval before caching fetched pages.

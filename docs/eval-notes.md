@@ -53,6 +53,40 @@ from a web page outside the corpus is not measured (it used to count as wrong, w
 metric towards 0 on correct answers). It is `null` when no cited URL is in the corpus. Those
 quotes need the manual spot check in `evals/results/citation_spotcheck.md`.
 
+## Full run on `ca48b84` (2026-11-22 02:27 UTC, 75 cases): what each number rests on
+
+JSON: `evals/results/history/20261122T021757.182695Z-ca48b84-full.json`, also `latest.json`; the
+submission description and slide 9 quote it. It was run from a local worktree at `ca48b84`
+(`integration/r3`) and committed later, unchanged. Read this before quoting it:
+
+- The cases and labels are ours (see "How the cases were made" below); only the targets are the
+  jury's. "Progi jury" on slide 9 means the jury's thresholds applied to our set.
+- `macro_f1` 0.803 covers the 69 cases with an expected verdict. 42 of them take their label from a
+  Demagog ClaimReview rating: their `source` in `evals/cases.jsonl` names a `demagog.org.pl` page
+  (48 cases do, 6 of them among the skipped E05-E15). Since #100 the product turns a same-claim
+  rating found through Fact Check into its verdict, so on those cases the score also measures
+  finding the rating, not independent evidence (WORKLOG Decisions, 2026-11-22, #100). The step from
+  0.278 (quick run on `edd34a5`, 10 cases) spans #100 and a different case mix.
+- `citation_correctness` 1.0 checks that each quote citing a corpus document appears in it
+  verbatim, not that it supports the claim; no manual spot check is committed. The JSON keeps only
+  the share. The number of such quotes, 13, was counted from the run's progress file
+  `evals/results/run-20261122T021757.182695Z.partial.jsonl`, which is git-ignored and exists only in
+  the worktree that ran the eval; from there:
+  `uv run python -c "from evals import metrics; from evals.run import load_jsonl; docs={metrics.canonical_url(d['url']) for d in load_jsonl('corpus/evidence.jsonl')}; rows=load_jsonl('evals/results/run-20261122T021757.182695Z.partial.jsonl'); print(sum(1 for r in rows for c in (r['runs'][0]['response'].get('claims') or []) for e in (c.get('evidence') or []) if metrics._has_citation(e) and metrics.canonical_url(e['url']) in docs))"`.
+- `injection_resistance` 1.0 rests on E01-E04 and FC-E01-FC-E03, all with the canary in the
+  pasted text; FC-E01-FC-E03 are tuned on (see below).
+- `channel_consistency` 1.0: the first answer of each G case is a direct `POST /api/checks` with
+  `X-Channel: web` (`evals/adapter.py`), not the web page; the second is the bot's API client. The
+  second answers took 0.09-0.21 s against 11.7-35.3 s for the first: they came from the
+  cross-channel result cache (#59). Their `cached` flag is false only because the bot path does not
+  read `X-Cache`. The metric shows the cache returning the stored result, not two checks agreeing.
+- `end_to_end` 0.973 fails on J01 (`technical_error` expected; factual verdicts came back, with a
+  limitation that Fact Check was down) and A15 (an opinion question, `nie podlega weryfikacji`
+  expected, came back `needs_clarification`).
+- The JSON records the harness commit, not the server. The J cases ran with their fault applied,
+  so the server had `PRAWDOWID_EVAL_TOKEN` (VPS staging only, per WORKLOG); which code it ran is
+  UNCONFIRMED.
+
 ## Run 2 (2026-11-21 ~20:44 UTC, commit `8c6f396`, full, 71 cases) — the one most likely to be misread
 
 Config: web + discord channels, no corpus (`citation_correctness` not measured), Tavily +

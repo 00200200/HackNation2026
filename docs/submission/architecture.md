@@ -1,9 +1,10 @@
 # Architecture and evidence of the current state
 
 This is a submission draft for [issue #18](https://github.com/00200200/HackNation2026/issues/18).
-It describes the code on `integration/r2` (2e0f8ce, [PR #109](https://github.com/00200200/HackNation2026/pull/109)).
-The saved test results below were measured on `edd34a5`, the last product commit of that branch:
-2e0f8ce changes only docs and eval results. This is not a claim of submission readiness.
+It was first written for `integration/r2` (2e0f8ce, [PR #109](https://github.com/00200200/HackNation2026/pull/109));
+the model table and the Fact Check route follow `integration/r3` (ca48b84, #88, #100). The saved test
+results below are the full run on ca48b84; the earlier quick run on `edd34a5` stays in
+[HISTORY.md](../../evals/results/HISTORY.md). This is not a claim of submission readiness.
 
 ## Request and evidence flow
 
@@ -82,7 +83,7 @@ separate, already-populated source and does not substitute for the incident base
 
 ## Models and providers
 
-| Role | Default model ID on `main` | Configuration / source |
+| Role | Default model ID on `integration/r3` | Configuration / source |
 |---|---|---|
 | Extract claims and queries | `anthropic:claude-sonnet-5-5` (was Opus until 22.11, #88) | `PRAWDOWID_MODEL`, [verifier.py](../../prawdowid/verifier.py) |
 | Rerank fragments | `anthropic:claude-haiku-5-5` | `PRAWDOWID_RERANK_MODEL`, [rerank.py](../../prawdowid/rerank.py) |
@@ -160,43 +161,46 @@ Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
 There is no moderator queue, OCR or reverse image search. The evidence corpus is built and
 searched in every check ([corpus.md](../corpus.md)); a live Discord run remains open in
-[WORKLOG](../../WORKLOG.md). One URL case (U01) is in the saved quick run; do not present its
-latency as a URL benchmark.
+[WORKLOG](../../WORKLOG.md). Two URL cases (U01, U02) are in the saved full run; do not present
+their latency as a URL benchmark.
 
 ## Saved test results and reproduction
 
-Latest tracked result: [evals/results/latest.json](../../evals/results/latest.json), timestamp
-`2026-11-22T00:37:27+00:00`, product commit
-`edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `dirty: false`, `mode: "quick"`, `n_cases: 10`,
-`concurrency: 4`, `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J, U`;
-`E05`/`E06` skipped (no public URL for the fixture page). It ran against the VPS staging stack with
-the production keys ([WORKLOG](../../WORKLOG.md), log of 22.11). This is a quick regression run,
-one case per scenario, not the full jury-sized evaluation, even though the saved `coverage_ok`
-flag is true. The values and targets below are copied exactly from that file; the last column
-says how many answers each value rests on:
+Latest tracked result: [evals/results/latest.json](../../evals/results/latest.json), the same file as
+[history/20261122T021757.182695Z-ca48b84-full.json](../../evals/results/history/20261122T021757.182695Z-ca48b84-full.json):
+timestamp `2026-11-22T02:27:29+00:00`, commit `ca48b84390d0df22881024155a37bfafba606ce2`
+(`integration/r3`), `dirty: false`, `mode: "full"`, `n_cases: 75`, `concurrency: 4`,
+`coverage_ok: true`, `overall_pass: false`, run with `--corpus`. Scenarios: `A, B, C, D, E, G, H, I,
+J, U`; E05-E15 skipped (no public URL for the fixture pages). The commit is the harness's: the JSON
+does not record which server or code answered. The J cases ran with their fault applied, so that
+server had `PRAWDOWID_EVAL_TOKEN`, which [WORKLOG](../../WORKLOG.md) places on VPS staging only;
+the target and its code version are UNCONFIRMED. The cases are our own set, not the jury's, and
+the values and targets below are copied exactly from the file; the last column says what each
+value rests on:
 
 | Metric | value | target | pass | rests on |
 |---|---|---|---|---|
-| macro_f1 | 0.2777777777777778 | >= 0.75 | false | the 8 cases with an expected verdict (J01 and U01 have none); 7 of them got `brak wystarczających dowodów` |
-| citation_coverage | 1.0 | >= 0.95 | true | claims with a factual verdict only; of the main claims only E01's; per-claim data is not saved |
-| citation_correctness | null | >= 0.85 | null | not measured (no `--corpus`) |
-| abstention | 1.0 | >= 0.8 | true | 2 cases (D01, H01) |
-| injection_resistance | 1.0 | >= 0.9 | true | 1 case (E01, a canary in the pasted text) |
-| median_latency_s | 24.877917104000517 | <= 30.0 | true | the first run of each of the 10 cases, 4 in flight |
-| end_to_end | 0.9 | >= 1.0 | false | 10 cases; J01 came back `ok` with `nie sprawdzono`, the case expects `technical_error` (#101) |
-| channel_consistency | 1.0 | >= 1.0 | true | 1 case (G01); the bot's API client, not Discord; its answer took 0.22 s, from the shared result cache |
-| moderator_loop | 0.0 | >= 1.0 | false | 1 case (H01); not built |
-| injection_verdict_correct | 1.0 | reported | true | 1 case (E01) |
-| cost_per_100_usd | 4.912332 | reported | true | model tokens only, mean over the answers |
+| macro_f1 | 0.8026992266992267 | >= 0.75 | true | the 69 cases with an expected verdict, five classes; 42 of them are labelled from a Demagog ClaimReview rating, which the product maps to its verdict when Fact Check returns the rating of the same claim (#100), so on those cases the score also measures finding that rating |
+| citation_coverage | 1.0 | >= 0.95 | true | claims with a factual verdict only |
+| citation_correctness | 1.0 | >= 0.85 | true | quotes that cite a corpus document, checked for verbatim presence in it, not for support of the claim; the JSON does not save their number (13 in the run's git-ignored progress file, [eval-notes.md](../eval-notes.md)) |
+| abstention | 0.9166666666666666 | >= 0.8 | true | 12 cases expecting `brak wystarczających dowodów`; FC-D02 got `potwierdzone` |
+| injection_resistance | 1.0 | >= 0.9 | true | 7 cases (E01-E04, FC-E01-FC-E03), each a canary in the pasted text; the patterns in `prawdowid/verifier.py` match FC-E01-FC-E03 phrase for phrase, so read those three as tuned on |
+| median_latency_s | 17.842587917002675 | <= 30.0 | true | the first run of each of the 75 cases, 4 in flight, none from the result cache |
+| end_to_end | 0.9733333333333334 | >= 1.0 | false | 73 of 75; J01 came back `ok` with factual verdicts and a Fact Check limitation where `technical_error` is expected, A15 (an opinion) came back `needs_clarification` |
+| channel_consistency | 1.0 | >= 1.0 | true | 6 G cases; first answer a direct `POST /api/checks` with `X-Channel: web`, second the bot's API client, not Discord; the second answers took 0.09-0.21 s, from the shared result cache (#59), so this shows the cache returning the stored result |
+| moderator_loop | 0.0 | >= 1.0 | false | 2 cases (H01, H02); not built |
+| injection_verdict_correct | 1.0 | reported | true | the 7 injection cases |
+| cost_per_100_usd | 4.272704084507042 | reported | true | model tokens only, mean over 71 priced first answers; the 4 simulated outages are left out, no answer had unpriced requests |
 
-`null` means not measured, not passed. Citation coverage counts evidence URL/quote presence for
-factual verdicts, not evidence correctness. Citation correctness needs a corpus and would only
-test text occurrence, not semantic support; no manual citation spot-check is committed.
-Verdict accuracy scores the main claim alone; citation metrics examine all returned claims.
-The JSON does not record per-provider retrieval outcomes or model overrides. Extraction ran on
-`anthropic:claude-opus-5-5`, the default at `edd34a5`: the message of commit 83d6c65 (#88, on
-`integration/r3`) reports a second run on the same commit and stack with only `PRAWDOWID_MODEL`
-changed, to Sonnet, and `integration/r3` makes Sonnet the default; that run's JSON is not committed.
+By scenario (correct of cases): A 18/23, B 7/10, C 5/6, D 7/8, E 7/7, G 4/6, H 2/2, I 5/7, J 3/4,
+U 2/2; by case set: FC-* 25/32, A-J 35/43. Of the 15 misses, five are `wprowadzające w błąd` where
+`fałszywe` is expected (A04, A06, A08, B04, FC-I03). Citation coverage counts evidence URL/quote
+presence for factual verdicts, not evidence correctness; no manual citation spot-check is committed.
+Verdict accuracy scores the main claim alone; citation metrics examine all returned claims. The JSON
+does not record per-provider retrieval outcomes or model overrides; the code default at ca48b84
+extracts claims with Sonnet (#88). The quick run on `edd34a5` (macro_f1 0.278, 10 cases) and the
+runs before it are in [HISTORY.md](../../evals/results/HISTORY.md), with
+[eval-notes.md](../eval-notes.md) on why some of them are distorted.
 Exact reproduction is UNCONFIRMED. Sources: [metrics](../../evals/metrics.py),
 [runner](../../evals/run.py), [adapter](../../evals/adapter.py), [WORKLOG](../../WORKLOG.md).
 
@@ -208,8 +212,8 @@ PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick
 
 This selects a quick subset of [evals/cases.jsonl](../../evals/cases.jsonl) and overwrites `latest.json`; calls may incur
 provider charges. A missing key exercises failure paths, not the saved live conditions. For the
-full run, remove `--quick` and add `--corpus corpus/evidence.jsonl` (needed for citation
+full run, as saved, remove `--quick` and add `--corpus corpus/evidence.jsonl` (needed for citation
 correctness). The saved run also set `PRAWDOWID_EXTRA_CHANNELS=discord`, which exercises the bot's
 API adapter but not Discord transport, and the same `PRAWDOWID_EVAL_TOKEN` on the server and the
-runner, which the J cases need; E05/E06 need `PRAWDOWID_FIXTURE_BASE`. Exact live reproduction is
+runner, which the J cases need; E05-E15 need `PRAWDOWID_FIXTURE_BASE`. Exact live reproduction is
 UNCONFIRMED because external results and model versions can change.

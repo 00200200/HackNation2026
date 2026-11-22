@@ -9,9 +9,11 @@
           --allow-file-access-from-files --print-to-pdf=faktczyfejk-pitch.pdf "file://$PWD/slides.html"
   PPTX: one screenshot per slide, N = 1..12, with the same Chrome and
           --hide-scrollbars --allow-file-access-from-files --window-size=1920,1080 --screenshot=sN.png "file://$PWD/slides.html?s=N"
-        then python-pptx 1.0.2: a 16:9 deck, blank layout, one full-slide picture per slide, the slide's text as its notes.
-        Without python-pptx, replace ppt/media/imageN.png and the text of ppt/notesSlides/notesSlideN.xml in the existing
-        package (slide N uses both); 22.11 the deck was refreshed that way.
+        and the notes, the JSON list in <body data-notes> of
+          --headless --allow-file-access-from-files --dump-dom "file://$PWD/slides.html?notes"
+        then python-pptx 1.0.2, no project dependency (uvx --with python-pptx==1.0.2 python): the default template,
+        16:9 (12192000 x 6858000 EMU), layout 6 (blank), one full-slide picture per slide, that slide's text as its notes.
+        22.11 (second pass) the whole deck was rebuilt that way.
 -->
 <style>
 /* Figtree, SIL Open Font License 1.1 (OFL.txt in this folder), the same file as frontend/public/fonts/. */
@@ -218,7 +220,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <h2 style="position:absolute; top:170px; left:110px; width:640px">Strona działa dziś.</h2>
   <div class="status" style="position:absolute; top:400px; left:110px; width:620px">
     <p><span class="tag t-on">działa</span><br><b>Strona WWW</b>: faktczyfejk.pl, bez konta, za darmo.</p>
-    <p><span class="tag t-on">gotowy</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, ta sama logika i to samo API co strona.</p>
+    <p><span class="tag t-off">czeka na wdrożenie</span><br><b>Adapter demonstracyjny komunikatora</b>: faktczyfejk.pl/czat, to samo API co strona. Ocenę fact-checkera i&nbsp;fragment z&nbsp;wyszukiwarki pokazuje jeszcze bez podpisu.</p>
     <p><span class="tag t-off">kod gotowy</span><br><b>Discord /sprawdz</b>: to samo API. Wdrożenie czeka, a bot nie był jeszcze uruchomiony na prawdziwym Discordzie.</p>
   </div>
   <img src="site.png" alt="" style="position:absolute; top:170px; right:110px; width:1000px; border-radius:24px; box-shadow:0 30px 80px rgba(29,18,21,.25); border:1px solid var(--line)">
@@ -228,22 +230,22 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
 <!-- 9. Results -->
 <section class="slide" id="s9">
   <div class="hd"><div class="brand" style="color:var(--red)">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
-  <h2 style="position:absolute; top:170px; left:110px">Mierzymy tak jak jury.</h2>
+  <h2 style="position:absolute; top:170px; left:110px">Nasz test, progi jury.</h2>
   <div style="position:absolute; top:330px; left:110px; right:110px; display:grid; grid-template-columns: repeat(4, 1fr); gap:48px">
-    <div class="metric"><div class="big">0,80</div><p>Trafność ocen, macro-F1 (cel&nbsp;≥&nbsp;0,75)</p></div>
+    <div class="metric"><div class="big">0,80</div><p>Trafność ocen, macro-F1 (cel&nbsp;≥&nbsp;0,75). 42&nbsp;etykiety to oceny Demagoga, które produkt może przejąć</p></div>
     <div class="metric"><div class="big">17,8 s</div><p>Mediana czasu odpowiedzi (cel&nbsp;≤&nbsp;30&nbsp;s)</p></div>
     <div class="metric"><div class="big">0,92</div><p>Abstencja na 12 przypadkach: mówimy „nie wiem”, gdy brak dowodów (cel&nbsp;≥&nbsp;0,80)</p></div>
     <div class="metric"><div class="big">4,27 $</div><p>Koszt modeli za 100 sprawdzeń, bez opłat za wyszukiwarkę</p></div>
   </div>
   <div class="small" style="position:absolute; top:700px; left:110px; right:110px">
     <div><b>1,00</b><span>Pokrycie cytatami, przy ocenach merytorycznych (cel&nbsp;≥&nbsp;0,95)</span></div>
-    <div><b>1,00</b><span>Poprawność cytatów: 13&nbsp;cytatów z&nbsp;korpusu, sprawdzonych dosłownie (cel&nbsp;≥&nbsp;0,85)</span></div>
-    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7&nbsp;przypadków, wszystkie we wklejonym tekście (cel&nbsp;≥&nbsp;0,90)</span></div>
-    <div><b>1,00</b><span>Zgodność kanałów: 6&nbsp;przypadków, strona i&nbsp;klient API bota (cel 1,00)</span></div>
-    <div><b style="color:var(--red)">0,97</b><span>End-to-end (cel 1,00): nie przeszły J01 (awaria Fact Check) i A15</span></div>
+    <div><b>1,00</b><span>Poprawność cytatów: tylko czy cytat z&nbsp;korpusu jest w&nbsp;źródle dosłownie, nie czy wspiera twierdzenie (cel&nbsp;≥&nbsp;0,85)</span></div>
+    <div><b>1,00</b><span>Odporność na wstrzyknięcia: 7&nbsp;przypadków we wklejonym tekście, 3&nbsp;z&nbsp;nich nasze wzorce znają dosłownie (cel&nbsp;≥&nbsp;0,90)</span></div>
+    <div><b>1,00</b><span>Zgodność kanałów: 6&nbsp;przypadków, API i&nbsp;klient API bota; bot dostał wynik z&nbsp;pamięci podręcznej (cel 1,00)</span></div>
+    <div><b style="color:var(--red)">0,97</b><span>End-to-end (cel 1,00): nie przeszły J01 (awaria Fact Check) i A15 (opinia)</span></div>
     <div><b style="color:var(--red)">0</b><span>Pętla moderatora (cel 1,00): dopiero ją budujemy</span></div>
   </div>
-  <div class="ft"><span>Pełny przebieg, 75 przypadków · commit ca48b84 · 22.11.2026 · pominięte: 11 przypadków z poleceniem ukrytym na stronie (brak publicznego adresu)</span><span class="n">09 / 12</span></div>
+  <div class="ft"><span>Nasz zestaw, pełny przebieg, 75 przypadków · commit ca48b84 · 22.11.2026 · evals/results/HISTORY.md · pominięte: 11 z poleceniem na stronie (brak publicznego adresu)</span><span class="n">09 / 12</span></div>
 </section>
 
 <!-- 10. Deployment -->
@@ -251,7 +253,7 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
   <div class="hd"><div class="brand">faktczyfejk.pl</div><div class="ev">HackNation 2026<span>wyzwanie Prawdowid</span></div></div>
   <h2 style="position:absolute; top:170px; left:110px; width:1300px">Zbudowane pod wdrożenie.</h2>
   <div class="grid3" style="position:absolute; top:430px; left:110px; right:110px">
-    <div class="card"><h3>Gdzie są dane</h3><p>Serwer w Niemczech (OVHcloud), HTTPS. Poza EOG: model (Anthropic) i wyszukiwarka (Tavily).</p></div>
+    <div class="card"><h3>Gdzie są dane</h3><p>Serwer w Niemczech (OVHcloud), HTTPS. Poza EOG: model (Anthropic) i wyszukiwarka (Tavily). Google, EUvsDisinfo i&nbsp;gov.pl nie podają, gdzie przetwarzają dane.</p></div>
     <div class="card"><h3>Bez uzależnienia</h3><p>Model każdego kroku wybiera się zmienną środowiskową (PydanticAI). Inny dostawca wymaga jeszcze swojego pakietu i klucza. Każde źródło ma własny limit czasu.</p></div>
     <div class="card"><h3>Źródła urzędowe</h3><p>Korpus 1158 dokumentów: gov.pl, CERT Polska, Policja, Sejm, IMGW, Odyseusz, GUS. Oceny <span class="nw">fact-checkerów</span> przez Google Fact Check Tools. Lista źródeł z&nbsp;licencjami jest na stronie&nbsp;/zrodla.</p></div>
   </div>
@@ -287,8 +289,11 @@ h2 { font-size: 76px; font-weight: 900; line-height: 1.02; }
 </section>
 
 <script>
-  const p = new URLSearchParams(location.search).get("s");
+  const q = new URLSearchParams(location.search), p = q.get("s");
   if (p) { document.body.classList.add("one"); document.getElementById("s" + p).classList.add("on"); }
+  // ?notes: each slide's text, whitespace collapsed, for the PPTX notes (read with --dump-dom).
+  if (q.has("notes")) document.body.dataset.notes = JSON.stringify(
+    [...document.querySelectorAll(".slide")].map((s) => s.innerText.split(/\s+/).join(" ").trim()));
 </script>
 </body>
 </html>
