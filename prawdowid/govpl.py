@@ -25,6 +25,7 @@ import httpx2
 from prawdowid import safefetch, websearch
 from prawdowid.cache import Document
 from prawdowid.privacy import mask_personal_data
+from prawdowid.rerank import canonical_url
 from prawdowid.websearch import WebSearch
 
 log = logging.getLogger("prawdowid")
@@ -159,10 +160,12 @@ async def _page(url: str, hit: dict, http: httpx2.AsyncClient) -> Document | Non
         return None
     if doc is None:
         return None
-    update = {"published_at": published or doc.published_at}
+    # After a redirect the hit's title and date describe another page than the one read.
+    same = canonical_url(url) == canonical_url(doc.url)
+    update = {"published_at": (published if same else None) or doc.published_at}
     if publisher := PUBLISHERS.get(str(hit.get("path") or "").lower()):
         update["publisher"] = publisher
-    if isinstance(hit.get("title"), str) and hit["title"].strip():
+    if same and isinstance(hit.get("title"), str) and hit["title"].strip():
         update["title"] = hit["title"].strip()
     return doc.model_copy(update=update)
 

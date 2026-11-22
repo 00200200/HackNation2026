@@ -930,3 +930,13 @@ def test_a_redirect_to_a_pdf_shows_the_pdfs_own_title():
     }
     [doc] = run(provider_returning("https://www.gov.pl/p"), routes).documents
     assert doc.title == "Raport NIK 2025"
+
+
+def test_a_redirected_pdf_without_a_title_is_still_read_under_its_file_name():
+    text = "Raport z kontroli wydatkow na obrone cywilna w latach 2023-2025. " * 5
+    routes = {
+        "www.gov.pl/p": httpx2.Response(302, headers={"location": "/raport.pdf"}),
+        "www.gov.pl/raport.pdf": typed(pdf(text), "application/pdf"),
+    }
+    [doc] = run(provider_returning("https://www.gov.pl/p"), routes).documents
+    assert doc.title == "raport.pdf" and doc.snippet_only is None

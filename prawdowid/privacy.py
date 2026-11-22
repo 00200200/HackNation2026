@@ -94,6 +94,10 @@ PRODUCT_LABEL = re.compile(
 # A card label earlier in the same sentence ("karta kredytowa o numerze 4111...") wins over a generic
 # label (numer, nr, id, kod): not a product code. SKU, EAN, GTIN and UPC are never card labels.
 CARD_LABEL = re.compile(r"\b(?:kart\w*|card|visa|mastercard|maestro)\b", re.IGNORECASE)
+CARD_NEAR = re.compile(
+    r"\b(?:kart\w*|card|visa|mastercard|maestro)\b\W{0,3}(?:\w{1,10}\W{0,3}){0,2}$",
+    re.IGNORECASE,
+)
 UNAMBIGUOUS_LABEL = re.compile(r"\b(?:ean|gtin|upc|sku)\W{0,3}")
 SENTENCE_END = re.compile(r"[.!?;\n]")
 PASSPORT = re.compile(r"\b[A-Z]{2}\d{7}\b")
@@ -255,10 +259,15 @@ def _mask_card(m: re.Match) -> str:
     before = m.string[max(m.start() - 60, 0) : m.start()]
     code = m.group()
     label = PRODUCT_LABEL.search(before)
-    sentence = SENTENCE_END.split(before)[-1]
-    labelled = label and (
-        UNAMBIGUOUS_LABEL.match(label.group().lower())
-        or not CARD_LABEL.search(sentence)
+    # A card word right in front of the number, or earlier in its sentence (cut before the label, whose
+    # own "nr." must not end it), beats a generic label.
+    sentence = SENTENCE_END.split(before[: label.start()])[-1] if label else ""
+    labelled = label and not (
+        CARD_NEAR.search(before)
+        or (
+            not UNAMBIGUOUS_LABEL.match(label.group().lower())
+            and CARD_LABEL.search(sentence)
+        )
     )
     if labelled or URL_TAIL.search(before) or is_gtin13(code):
         return code

@@ -1535,6 +1535,37 @@ def test_a_headline_cannot_make_a_publishers_body_refutation_disappear():
     assert j.verdict is Verdict.FALSE
 
 
+def test_a_headline_conclusion_vetoes_a_publishers_repeated_claim():
+    f = fragment(
+        "https://konkret24.tvn24.pl/x",
+        "W sieci krąży wpis: od 2025 roku UE wprowadza podatek od domowych wypieków.",
+        "Konkret24",
+        "fact_check",
+    )
+    f = f.model_copy(
+        update={
+            "source": f.source.model_copy(
+                update={"title": "Nie, UE nie wprowadza podatku od wypieków"}
+            )
+        }
+    )
+    j = run(
+        [f],
+        answering(
+            label(
+                f,
+                "refutes",
+                "Nie, UE nie wprowadza podatku od wypieków",
+                own_conclusion=True,
+            ),
+            label(
+                f, "supports", "od 2025 roku UE wprowadza podatek od domowych wypieków"
+            ),
+        ),
+    )
+    assert j.verdict is not Verdict.CONFIRMED
+
+
 def test_one_undated_checker_gap_rules_out_the_date_override():
     dated = _on_date(CHECKER_NO_DATA, date(2026, 11, 20))
     undated = _on_date(
@@ -1556,3 +1587,25 @@ def test_one_undated_checker_gap_rules_out_the_date_override():
         ),
     )
     assert j.verdict is Verdict.INSUFFICIENT_EVIDENCE
+
+
+def test_a_checker_headline_gap_alone_neither_undecides_nor_shows_a_gap():
+    f = fragment(
+        "https://demagog.org.pl/g",
+        "Wnioskujemy, że takiego podatku nie ma w UE.",
+        "Demagog",
+        "fact_check",
+    )
+    f = f.model_copy(
+        update={
+            "source": f.source.model_copy(update={"title": "Brak danych o podatku"})
+        }
+    )
+    j = run(
+        [f],
+        answering(
+            label(f, "gap", "Brak danych o podatku", own_conclusion=True),
+            label(f, "refutes", "takiego podatku nie ma w UE", own_conclusion=True),
+        ),
+    )
+    assert j.verdict is Verdict.FALSE

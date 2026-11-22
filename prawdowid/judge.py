@@ -611,8 +611,15 @@ def decide(evidence: list[Evidence], limitations: list[str], today: date) -> Jud
         e for e in decisive if e.label.stance is Stance.REFUTES and not e.title_only
     ]
     both = _publishers(supports) & _publishers(refutes)
+    headlines = [
+        e
+        for e in decisive
+        if e.title_only
+        and e.label.own_conclusion
+        and e.label.stance in (Stance.SUPPORTS, Stance.REFUTES)
+    ]
     supports, refutes, limitations = _one_side_per_publisher(
-        supports, refutes, limitations
+        supports, refutes, limitations, headlines
     )
     # Only labels still counted: a publisher dropped above cannot decide "misleading" either.
     dropped = both - _publishers(supports + refutes)
@@ -887,10 +894,19 @@ def _other_claim(e: Evidence) -> bool:
     return e.review and not e.label.same_claim
 
 
-def _one_side_per_publisher(supports, refutes, limitations):
+def _one_side_per_publisher(supports, refutes, limitations, headlines=()):
     """A publisher on both sides keeps the side of its own conclusion (a fact-check that quotes the
     claim, then rates it false, refutes it). With no single conclusion it counts for neither side.
+    A headline's own conclusion is never counted or cited, but it vetoes the opposite body side of
+    its publisher when that side is not an own conclusion (the claim repeated before it is rated).
     """
+    for e in headlines:
+        refuting = e.label.stance is Stance.REFUTES
+        opposite = supports if refuting else refutes
+        body = [x for x in opposite if _publisher(x) == _publisher(e)]
+        if body and not any(x.label.own_conclusion for x in body):
+            rest = [x for x in opposite if _publisher(x) != _publisher(e)]
+            supports, refutes = (rest, refutes) if refuting else (supports, rest)
     for publisher in sorted(_publishers(supports) & _publishers(refutes)):
         mine = [
             any(e.label.own_conclusion for e in side if _publisher(e) == publisher)

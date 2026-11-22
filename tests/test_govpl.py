@@ -1,12 +1,13 @@
 """gov.pl site search, offline: recorded JSON answer and pages through a MockTransport."""
 
 import asyncio
-from datetime import date
+from datetime import UTC, date, datetime
 
 import httpx2
 import pytest
 
 from prawdowid import govpl, safefetch, websearch
+from prawdowid.cache import Document
 
 # Shape recorded from GET https://www.gov.pl/api/data/search on 2026-11-21, trimmed.
 ANSWER = {
@@ -201,3 +202,30 @@ def test_web_search_leaves_www_gov_pl_to_the_govpl_lookup(monkeypatch):
         )
     )
     assert only_gov.documents == [] and only_gov.limitation is None
+
+
+@pytest.mark.parametrize(
+    ("final", "title"), [("/p", "Hit title"), ("/q", "Page title")]
+)
+def test_the_hits_title_and_date_apply_only_to_the_page_it_describes(
+    monkeypatch, final, title
+):
+    async def fetch(url, http, published):
+        return Document(
+            url=f"https://www.gov.pl{final}",
+            title="Page title",
+            publisher="Gov.pl",
+            published_at=date(2026, 1, 1),
+            fetched_at=datetime.now(UTC),
+            source_type="official",
+            domain="www.gov.pl",
+            text="x" * 300,
+        )
+
+    monkeypatch.setattr(websearch, "fetch_document", fetch)
+    hit = {"title": "Hit title", "publishDate": "2025-01-10T08:00:00Z", "path": "rcb"}
+    doc = asyncio.run(govpl._page("https://www.gov.pl/p", hit, None))
+    assert doc.title == title
+    assert doc.published_at == (
+        date(2025, 1, 10) if final == "/p" else date(2026, 1, 1)
+    )
