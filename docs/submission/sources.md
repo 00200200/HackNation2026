@@ -62,9 +62,11 @@ No restricted pages were fetched to build a corpus for this task.
 
 ## Storage, freshness and deletion limits
 
-The [existing source register](../sources.md) and [WORKLOG](../../WORKLOG.md) record that the
-demo corpus has not been built. The tracked [seed queries](../../corpus/queries.txt) are not a
-document corpus. A populated manifest, licensed source list and citation corpus remain open.
+The evidence corpus searched in every check is built: `corpus/evidence.jsonl`, 1,158 records from
+11 domains, from the audited list in `corpus/catalog.yaml`, with its sources, licences and limits
+in [docs/corpus.md](../corpus.md). It is separate from the web-search page cache and the own store
+described here. The tracked [seed queries](../../corpus/queries.txt) are not a document corpus, and
+licences for the cached web pages remain open.
 
 The own-store expiry defaults to `30 days` (`RETENTION_DAYS`, `prawdowid/privacy.py`), set by the
 app itself on every insert

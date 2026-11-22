@@ -1,11 +1,9 @@
 # Architecture and evidence of the current state
 
 This is a submission draft for [issue #18](https://github.com/00200200/HackNation2026/issues/18).
-The implementation inspected was originally the `LukiLenkiewicz/issue11-fanout` stack at `cacfb4e`;
-that stack (per-claim fan-out, judge, local source store, link input) is now merged into `main`
-(PRs #37, #30, #42, #28/#44). The implementation described below is `main`'s, after that merge.
-The measured product commit is identified below and predates this merge; this is not a claim of
-submission readiness.
+It describes the code on `integration/r2` (2e0f8ce, [PR #109](https://github.com/00200200/HackNation2026/pull/109)).
+The saved test results below were measured on `edd34a5`, the last product commit of that branch:
+2e0f8ce changes only docs and eval results. This is not a claim of submission readiness.
 
 ## Request and evidence flow
 
@@ -87,9 +85,12 @@ separate, already-populated source and does not substitute for the incident base
 | Label evidence | `anthropic:claude-sonnet-5-5` | `PRAWDOWID_JUDGE_MODEL`, [judge.py](../../prawdowid/judge.py) |
 
 These are literal code defaults, not a statement about currently available public model names.
-Availability and the model overrides used in the saved eval are UNCONFIRMED: its JSON does not
-record them. All model calls use PydanticAI native structured output through the installed
-Anthropic provider. Alternative provider dependencies and credentials are not demonstrated.
+Availability is UNCONFIRMED. The saved eval's JSON does not record its models; the results section
+below says what it ran on. All model calls use PydanticAI native structured output through the
+installed Anthropic provider. Another provider needs its PydanticAI extra (only
+`pydantic-ai-slim[anthropic,mcp]` is installed, [pyproject.toml](../../pyproject.toml)), its key
+and an image rebuild; none is demonstrated. Compose forwards only `PRAWDOWID_MODEL`, so changing
+the rerank or judge model on the server also needs a line in [compose.yaml](../../compose.yaml).
 Web search (step 2b) is now **Tavily** (`tavily_search` in `prawdowid/websearch.py`), which
 replaced DuckDuckGo (#7, proposed as #20; wired as #45) because DuckDuckGo via `ddgs` returned no
 results from our machines and left retrieval empty. Retrieval providers and their terms are listed
@@ -118,16 +119,20 @@ runs when seeding, not on a schedule. Sources: [cache.py](../../prawdowid/cache.
 Direct user-linked page bodies are not persisted by the link path. Successful web evidence fetches
 are saved to local JSONL as metadata only (full text only once a domain's licence is confirmed,
 none today), one record per URL, dropped after 30 days (`RETENTION_DAYS`, `prawdowid/privacy.py`).
-Personal data (e-mail, IBAN/NRB, card number, PESEL, phone; regex and checksums, not names or
-addresses) is masked by `privacy.mask_personal_data` before the text reaches the extraction model
-and again in every log line, web search and own-store query (#17, #39, merged into `main`).
+Personal data (e-mail, IBAN/NRB, card number, PESEL, ID card and passport number, phone; regex and
+checksums, not names or addresses) is masked by `privacy.mask_personal_data` before the text
+reaches the extraction model and again in every log line, web search and own-store query (#17,
+#39, #82).
 Each check is kept 30 days as one masked record in the check log (`prawdowid/checklog.py`), which
 the user can delete per session (`DELETE /api/sessions/{id}`, a web button). Input goes to
 Anthropic masked (a placeholder keeps the sentence shape so claims still split); masked claim text
 and queries go to Google, Tavily and EUvsDisinfo when configured. Details and open gaps (Discord
 has no delete command, Docker stdout logs sit outside retention): [docs/privacy.md](../privacy.md).
-Browser traffic, fetched evidence, the host and Discord also process data. Exact provider
-processing locations and retention agreements are UNCONFIRMED. See [risks.md](risks.md) for code
+Browser traffic, fetched evidence, the host and Discord also process data. On this branch
+provider processing locations are UNCONFIRMED; a processor table with the providers' own statements
+(Anthropic: global routing, storage in the US; Tavily: US; Google Fact Check and EUvsDisinfo: not
+stated) is in `docs/privacy.md` of [PR #124](https://github.com/00200200/HackNation2026/pull/124),
+not merged yet. Retention agreements are UNCONFIRMED. See [risks.md](risks.md) for code
 references and [sources.md](sources.md) for storage limits.
 
 ## Default limits, not performance measurements
@@ -149,42 +154,46 @@ unfinished claims return `not_checked`. A judge outage also maps to `not_checked
 failure can preserve the first-pass assessment with a limitation when first-pass candidates existed.
 Request deadlines
 do not establish server capacity; [cost.md](cost.md) describes the unmeasured load behaviour.
-There is no moderator queue, OCR or reverse image search. The demo corpus and live Discord run
-remain open in [WORKLOG](../../WORKLOG.md). URL inputs are not exercised by the saved eval set
-([cases](../../evals/cases.jsonl)); do not present its latency as a URL benchmark.
+There is no moderator queue, OCR or reverse image search. The evidence corpus is built and
+searched in every check ([corpus.md](../corpus.md)); a live Discord run remains open in
+[WORKLOG](../../WORKLOG.md). One URL case (U01) is in the saved quick run; do not present its
+latency as a URL benchmark.
 
 ## Saved test results and reproduction
 
 Latest tracked result: [evals/results/latest.json](../../evals/results/latest.json), timestamp
-`2026-11-21T19:10:57+00:00`, product commit
-`95e6177b5f2ff53f85d222c2cb721630b7b14ebd`, `dirty: false`, `mode: "quick"`, `n_cases: 9`,
-`coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J`; `FC-J01`/`FC-J02`
-skipped in that run (the eval fault switch did not exist yet; since #60 it does and they are scored).
-This is a quick regression run, not the full jury-sized evaluation, even though the saved
-`coverage_ok` flag is true, and it **predates** PR #40
-(this docs change) landing on `main`: no eval has been run on the merged commit, by user decision
-(`HN_SKIP_EVAL=1`) — **a fresh eval on the merged commit is pending**. The following values and
-targets are copied exactly from that file:
+`2026-11-22T00:37:27+00:00`, product commit
+`edd34a5d2dd7f15515e27f51fa06bc2f1c4b3acb`, `dirty: false`, `mode: "quick"`, `n_cases: 10`,
+`concurrency: 4`, `coverage_ok: true`, `overall_pass: false`. Scenarios: `A, B, C, D, E, G, H, I, J, U`;
+`E05`/`E06` skipped (no public URL for the fixture page). It ran against the VPS staging stack with
+the production keys ([WORKLOG](../../WORKLOG.md), log of 22.11). This is a quick regression run,
+one case per scenario, not the full jury-sized evaluation, even though the saved `coverage_ok`
+flag is true. The values and targets below are copied exactly from that file; the last column
+says how many answers each value rests on:
 
-| Metric | value | target | pass |
-|---|---|---|---|
-| macro_f1 | 0.1 | >= 0.75 | false |
-| citation_coverage | null | >= 0.95 | null |
-| citation_correctness | null | >= 0.85 | null |
-| abstention | 1.0 | >= 0.8 | true |
-| injection_resistance | 0.0 | >= 0.9 | false |
-| median_latency_s | 3.8964525419287384 | <= 30.0 | true |
-| end_to_end | 0.8888888888888888 | >= 1.0 | false |
-| channel_consistency | null | >= 1.0 | null |
-| moderator_loop | 0.0 | >= 1.0 | false |
-| cost_per_100_usd | 1.8220444444444441 | reported | true |
+| Metric | value | target | pass | rests on |
+|---|---|---|---|---|
+| macro_f1 | 0.2777777777777778 | >= 0.75 | false | the 8 cases with an expected verdict (J01 and U01 have none); 7 of them got `brak wystarczających dowodów` |
+| citation_coverage | 1.0 | >= 0.95 | true | claims with a factual verdict only; of the main claims only E01's; per-claim data is not saved |
+| citation_correctness | null | >= 0.85 | null | not measured (no `--corpus`) |
+| abstention | 1.0 | >= 0.8 | true | 2 cases (D01, H01) |
+| injection_resistance | 1.0 | >= 0.9 | true | 1 case (E01, a canary in the pasted text) |
+| median_latency_s | 24.877917104000517 | <= 30.0 | true | the first run of each of the 10 cases, 4 in flight |
+| end_to_end | 0.9 | >= 1.0 | false | 10 cases; J01 came back `ok` with `nie sprawdzono`, the case expects `technical_error` (#101) |
+| channel_consistency | 1.0 | >= 1.0 | true | 1 case (G01); the bot's API client, not Discord; its answer took 0.22 s, from the shared result cache |
+| moderator_loop | 0.0 | >= 1.0 | false | 1 case (H01); not built |
+| injection_verdict_correct | 1.0 | reported | true | 1 case (E01) |
+| cost_per_100_usd | 4.912332 | reported | true | model tokens only, mean over the answers |
 
 `null` means not measured, not passed. Citation coverage counts evidence URL/quote presence for
 factual verdicts, not evidence correctness. Citation correctness needs a corpus and would only
 test text occurrence, not semantic support; no manual citation spot-check is committed.
 Verdict accuracy scores the main claim alone; citation metrics examine all returned claims.
-The JSON does not record per-provider retrieval outcomes or model overrides; those conditions are
-UNCONFIRMED for exact reproduction. Sources: [metrics](../../evals/metrics.py),
+The JSON does not record per-provider retrieval outcomes or model overrides. Extraction ran on
+`anthropic:claude-opus-5-5`, the default at `edd34a5`: the message of commit 83d6c65 (#88, on
+`integration/r3`) reports a second run on the same commit and stack with only `PRAWDOWID_MODEL`
+changed, to Sonnet, and `integration/r3` makes Sonnet the default; that run's JSON is not committed.
+Exact reproduction is UNCONFIRMED. Sources: [metrics](../../evals/metrics.py),
 [runner](../../evals/run.py), [adapter](../../evals/adapter.py), [WORKLOG](../../WORKLOG.md).
 
 Start the API with `make dev` and configured keys in ignored `.env`. In another terminal:
@@ -194,8 +203,9 @@ PRAWDOWID_URL=http://127.0.0.1:8000 uv run python -m evals.run --quick
 ```
 
 This selects a quick subset of [evals/cases.jsonl](../../evals/cases.jsonl) and overwrites `latest.json`; calls may incur
-provider charges. A missing key exercises failure paths, not the saved live conditions. Once a
-licensed corpus exists, remove `--quick` and add `--corpus corpus/docs.jsonl` for the full run.
-To exercise the bot's API adapter, add
-`PRAWDOWID_EXTRA_CHANNELS=discord`; this does not test Discord transport itself. Exact live
-reproduction is UNCONFIRMED because external results and model versions can change.
+provider charges. A missing key exercises failure paths, not the saved live conditions. For the
+full run, remove `--quick` and add `--corpus corpus/evidence.jsonl` (needed for citation
+correctness). The saved run also set `PRAWDOWID_EXTRA_CHANNELS=discord`, which exercises the bot's
+API adapter but not Discord transport, and the same `PRAWDOWID_EVAL_TOKEN` on the server and the
+runner, which the J cases need; E05/E06 need `PRAWDOWID_FIXTURE_BASE`. Exact live reproduction is
+UNCONFIRMED because external results and model versions can change.
